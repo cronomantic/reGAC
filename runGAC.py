@@ -1,17 +1,17 @@
 # MIT License
-# 
+#
 # Copyright (c) 2025 Cronomantic
-# 
+#
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
 # in the Software without restriction, including without limitation the rights
 # to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 # copies of the Software, and to permit persons to whom the Software is
 # furnished to do so, subject to the following conditions:
-# 
+#
 # The above copyright notice and this permission notice shall be included in all
 # copies or substantial portions of the Software.
-# 
+#
 # THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 # IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 # FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -19,7 +19,7 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-# 
+#
 import sys
 import os
 import argparse
@@ -53,25 +53,7 @@ def file_path(string):
         raise FileNotFoundError(string)
 
 
-class IoInterfaceCallbackGAC:
-    def __init__(self):
-        self.width = 0
-        self.separators = []
-
-    def print(self, string):
-        print(string)
-
-    def input(self):
-        return input()
-
-    def set_width(self, w):
-        self.width = w
-
-    def set_separators(self, l):
-        self.separators += l
-
-
-class DatabaseGAC:
+class GAC_Interpreter:
 
     # Standard message numbers
     ASK = 240
@@ -135,19 +117,6 @@ class DatabaseGAC:
         self.show_exits = False
         self.old_noun = 0
 
-    def __wait_key_or_timeout(self, timeout_frames):
-        timeout = timeout_frames / 50
-        if platform.system() == "Windows":
-            start_time = time.time()
-            while True:
-                if msvcrt.kbhit():
-                    inp = msvcrt.getch()
-                    break
-                elif time.time() - start_time > timeout:
-                    break
-        else:
-            rlist, wlist, xlist = select([sys.stdin], [], [], timeout)
-
     def __check_ddb(ddb):
         default_keys = set(
             [
@@ -178,7 +147,7 @@ class DatabaseGAC:
             if k == "font":
                 if isinstance(v, list):
                     if len(v) > 0:
-                        if len(v) != 768:
+                        if len(v) != 128 * 8:
                             return False
                         elif not isinstance(v[0], int):
                             return False
@@ -368,21 +337,23 @@ class DatabaseGAC:
     def start_adventure(self):
         if not self.io or not self.ddb:
             return False
-        if not DatabaseGAC.__check_ddb(self.ddb):
+        if not GAC_Interpreter.__check_ddb(self.ddb):
             return False
-        if not hasattr(self.io, "set_width"):
+        if not hasattr(self.io, "separators"):
             return False
-        if not hasattr(self.io, "set_separators"):
+        if not hasattr(self.io, "font"):
             return False
         if not hasattr(self.io, "print"):
             return False
         if not hasattr(self.io, "input"):
             return False
+        if not hasattr(self.io, "wait_key_or_timeout"):
+            return False
         self.__parse_database()
         if self.init_loc == 0:
             return False
-        self.io.set_width(32)  # For now...
-        self.io.set_separators(self.punctuation)
+        self.io.separators = self.punctuation
+        self.io.font = self.font
         self.counters = [0 for x in range(0, 128)]
         self.flags = [False for x in range(0, 256)]
         self.current_loc = self.ddb["init_loc"]
@@ -472,6 +443,7 @@ class DatabaseGAC:
             # check noun1 in case the word is duplicated in adverbs and nouns
             if self.noun1 == 0 and not matched:
                 self.noun1 = self.__find_word(self.nouns, word)
+                # Check if it is a pronoun
                 if self.noun1 != 0:
                     self.old_noun = self.noun1
                 elif word in self.pronouns:
@@ -484,8 +456,6 @@ class DatabaseGAC:
                 self.noun2 = self.__find_word(self.nouns, word)
                 matched = self.noun2 != 0
         return (self.verb != 0 or self.noun1 != 0, False)
-
-    # TODO: It pronoun
 
     def __perfom_conditions(self, cond_list, exit_if_done):
         # reset stack
@@ -528,7 +498,7 @@ class DatabaseGAC:
                     self.stack.append(s0)
                 elif cmd == "HOLD":
                     s0 = self.stack.pop()
-                    self.__wait_key_or_timeout(s0)
+                    self.io.wait_key_or_timeout(s0)
                 elif cmd == "GET":
                     s0 = self.stack.pop()
                     if s0 in self.objects.keys():
@@ -902,14 +872,13 @@ class DatabaseGAC:
                     self.io.print(self.messages[self.CANTDO] + "\n")
 
 
-class IoCallbackGAC(IoInterfaceCallbackGAC):
-    def __init__(self):
-        self.line_remain = 0
-        super().__init__()
+class IoCallbackGAC(object):
 
-    def set_width(self, w):
-        super().set_width(w)
-        self.line_remain = w
+    def __init__(self, width, separators=[], font=[]):
+        self.width = width
+        self.line_remain = width
+        self.separators = separators
+        self.font = font
 
     def print(self, string):
         # This method replicates the 8bit mechanism. No much python-correctness is expected
@@ -933,14 +902,27 @@ class IoCallbackGAC(IoInterfaceCallbackGAC):
         self.line_remain = self.width
         return input()
 
+    def wait_key_or_timeout(self, timeout_frames):
+        timeout = timeout_frames / 50
+        if platform.system() == "Windows":
+            start_time = time.time()
+            while True:
+                if msvcrt.kbhit():
+                    inp = msvcrt.getch()
+                    break
+                elif time.time() - start_time > timeout:
+                    break
+        else:
+            rlist, wlist, xlist = select([sys.stdin], [], [], timeout)
+
 
 def main():
     if sys.version_info[0] < 3:  # Python 2
         sys.exit(_("ERROR: Invalid python version"))
 
     version = "1.0.0"
-    program = "reGAC" + version
-    exec = "reGAC"
+    program = "runGAC" + version
+    exec = "runGAC"
 
     gettext.bindtextdomain(
         exec, os.path.join(os.path.abspath(os.path.dirname(__file__)), "locale")
@@ -966,8 +948,8 @@ def main():
     with open(args.input_path) as f:
         ddb = json.load(f)
 
-    io = IoCallbackGAC()
-    ddb = DatabaseGAC(ddb, io)
+    io = IoCallbackGAC(32)
+    ddb = GAC_Interpreter(ddb, io)
 
     if not ddb.start_adventure():
         sys.exit("Invalid Database")
