@@ -27,6 +27,7 @@ import gettext
 import json
 import random
 import platform
+import threading
 
 if platform.system() == "Windows":
     import time
@@ -116,6 +117,8 @@ class GAC_Interpreter:
         self.ready = False
         self.show_exits = False
         self.old_noun = 0
+        self._running = False
+        self._lock = threading.Lock()
 
     def __check_ddb(ddb):
         default_keys = set(
@@ -136,6 +139,7 @@ class GAC_Interpreter:
                 "pronouns",
                 "punctuation",
                 "init_loc",
+                "no_objs_msg",
             ]
         )
         if not isinstance(ddb, dict):
@@ -154,6 +158,9 @@ class GAC_Interpreter:
                         elif not all(type(x) == type(v[0]) for x in v):
                             return False
                 else:
+                    return False
+            elif k == "no_objs_msg":
+                if not isinstance(v, str):
                     return False
             elif k == "verbs":
                 if isinstance(v, dict):
@@ -333,6 +340,7 @@ class GAC_Interpreter:
         self.punctuation = self.ddb["punctuation"]
         self.pronouns = [x.upper() for x in self.ddb["pronouns"]]
         self.init_loc = self.ddb["init_loc"]
+        self.no_objs_msg = self.ddb["no_objs_msg"]
 
     def start_adventure(self):
         if not self.io or not self.ddb:
@@ -348,6 +356,8 @@ class GAC_Interpreter:
         if not hasattr(self.io, "input"):
             return False
         if not hasattr(self.io, "wait_key_or_timeout"):
+            return False
+        if not hasattr(self.io, "quit"):
             return False
         self.__parse_database()
         if self.init_loc == 0:
@@ -740,9 +750,13 @@ class GAC_Interpreter:
                     self.stack.append(self.verb)
                 elif cmd == "LIST":
                     r = self.stack.pop()
+                    nothing = True
                     for o in self.objects.values():
                         if o["loc"] == r:
                             self.io.print(o["name"] + "\n")
+                            nothing = False
+                    if nothing:
+                        self.io.print(self.no_objs_msg + "\n")
                 elif cmd == "CONN":
                     d = self.stack.pop()
                     res = 0
@@ -792,14 +806,22 @@ class GAC_Interpreter:
                     self.io.print(f"INVALID OPCODE {cmd}.\n")
         return (finished, done, if_true)
 
-    def run_adventure(self):
+    def quit(self):
+        with self._lock:
+            self._running = False
+
+    def run(self):
         if not self.ready:
             return
+        with self._lock:
+            self._running = True
         finished = False
         new_room = True
         if_true = False
         statements = []
-        while not finished:
+        cont = True
+        while cont:
+
             # print current location
             if new_room:
                 self.__display_room(self.current_loc)
@@ -871,6 +893,11 @@ class GAC_Interpreter:
                 else:
                     self.io.print(self.messages[self.CANTDO] + "\n")
 
+            with self._lock:
+                cont = not finished and self._running
+        if finished:
+            self.io.quit()
+
 
 class IoCallbackGAC(object):
 
@@ -901,6 +928,9 @@ class IoCallbackGAC(object):
     def input(self):
         self.line_remain = self.width
         return input()
+
+    def quit(self):
+        pass
 
     def wait_key_or_timeout(self, timeout_frames):
         timeout = timeout_frames / 50
@@ -954,7 +984,7 @@ def main():
     if not ddb.start_adventure():
         sys.exit("Invalid Database")
     else:
-        ddb.run_adventure()
+        ddb.run()
 
 
 if __name__ == "__main__":

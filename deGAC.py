@@ -643,6 +643,7 @@ def get_database(sysram):
     database["punctuation"] = list("\0 .,-!?:")
     database["separators"] = ["then", "and"]
     database["init_loc"] = peek2(sysram, STARTROOM_ADDR)
+    database["no_objs_msg"] = "Nothing"
 
     print(f"font {len(font)}")
     print(f"verbs {len(verbs)}")
