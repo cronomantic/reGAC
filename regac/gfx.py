@@ -132,31 +132,38 @@ class Renderer:
         self.device.draw_point(x, y)
 
     def line(self, x0, y0, x1, y1):
-        """Bresenham, written in the form the Z80 uses so that both put down
-        exactly the same pixels: whole numbers throughout, and the error kept
-        inside a byte."""
+        """A straight line, drawn the way the Spectrum ROM draws one.
+
+        GAC did not write its own: it called the ROM at $24BA, so that is what
+        the artwork was drawn against.  The error starts at half the longer
+        side and counts up by the shorter one; when it reaches the longer side
+        it comes off again and the step goes diagonal.  Counting the other way
+        round, which is just as valid a Bresenham, puts the diagonal steps one
+        place along and shows up on short slanted lines.
+        """
         dx = abs(x1 - x0)
         dy = abs(y1 - y0)
         sx = 1 if x1 > x0 else -1
         sy = 1 if y1 > y0 else -1
+        self.plot(x0, y0)
         if dx >= dy:
-            err = dx >> 1
-            for _ in range(dx + 1):
-                self.plot(x0, y0)
-                err -= dy
-                if err < 0:
-                    y0 += sy
-                    err += dx
-                x0 += sx
+            larger, smaller = dx, dy
         else:
-            err = dy >> 1
-            for _ in range(dy + 1):
-                self.plot(x0, y0)
-                err -= dx
-                if err < 0:
+            larger, smaller = dy, dx
+        error = larger >> 1
+        for _ in range(larger):
+            error += smaller
+            if error >= larger:
+                error -= larger
+                if dx >= dy:
+                    y0 += sy
+                else:
                     x0 += sx
-                    err += dy
+            if dx >= dy:
+                x0 += sx
+            else:
                 y0 += sy
+            self.plot(x0, y0)
 
     def rect(self, x0, y0, x1, y1):
         if x0 > x1:

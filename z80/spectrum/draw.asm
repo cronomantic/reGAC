@@ -215,8 +215,12 @@ fill_pixel:
                 ret
 
 ; A straight line from (gfx_x0, gfx_y0) to (gfx_x1, gfx_y1), in screen rows.
-; Bresenham, in the form that keeps the error inside a byte: it starts at half
-; the longer side and never leaves the range, so nothing here needs a sign.
+; Drawn the way the Spectrum ROM draws a line, because that is what GAC
+; called: it does PLOT at $22E5 and DRAW at $24BA and never wrote its own.
+; The error starts at half the longer side, counts up by the shorter one, and
+; when it reaches the longer side it comes off again and that step goes
+; diagonal.  Counting the other way round is just as valid a Bresenham but
+; puts the diagonal steps one place along, which shows on short slanted lines.
 ; Corrupts: everything
 draw_line:
                 ld      a, (gfx_x0)
@@ -255,72 +259,82 @@ draw_line:
                 jp      .down
 
 .across:
-                ; step across every time, down when the error runs out
+                ; the starting point, then a step across every time and a step
+                ; down when the error comes round
+                push    de
+                call    plot_point
+                pop     de
                 ld      a, (line_dx)
                 srl     a
                 ld      (line_err), a
                 ld      a, (line_dx)
-                inc     a
-                ld      b, a                    ; one more point than steps
+                or      a
+                ret     z                       ; both ends the same place
+                ld      b, a
 .across_step:
                 push    bc
-                push    de
-                call    plot_point
-                pop     de
-                pop     bc
                 ld      a, (line_err)
                 ld      hl, line_dy
-                sub     (hl)
-                jr      nc, .across_no_step
-                ld      hl, line_dx
                 add     a, (hl)
-                ld      hl, line_sy
+                ld      hl, line_dx
+                cp      (hl)
+                jr      c, .across_straight
+                sub     (hl)
                 ld      c, a
+                ld      hl, line_sy
                 ld      a, e
                 add     a, (hl)
-                ld      e, a
+                ld      e, a                    ; the step goes diagonal
                 ld      a, c
-.across_no_step:
+.across_straight:
                 ld      (line_err), a
                 ld      hl, line_sx
                 ld      a, d
                 add     a, (hl)
                 ld      d, a
+                push    de
+                call    plot_point
+                pop     de
+                pop     bc
                 djnz    .across_step
                 ret
 
 .down:
-                ; step down every time, across when the error runs out
+                push    de
+                call    plot_point
+                pop     de
                 ld      a, (line_dy)
                 srl     a
                 ld      (line_err), a
                 ld      a, (line_dy)
-                inc     a
+                or      a
+                ret     z
                 ld      b, a
 .down_step:
                 push    bc
-                push    de
-                call    plot_point
-                pop     de
-                pop     bc
                 ld      a, (line_err)
                 ld      hl, line_dx
-                sub     (hl)
-                jr      nc, .down_no_step
-                ld      hl, line_dy
                 add     a, (hl)
-                ld      hl, line_sx
+                ld      hl, line_dy
+                cp      (hl)
+                jr      c, .down_straight
+                sub     (hl)
                 ld      c, a
+                ld      hl, line_sx
                 ld      a, d
                 add     a, (hl)
                 ld      d, a
                 ld      a, c
-.down_no_step:
+.down_straight:
                 ld      (line_err), a
                 ld      hl, line_sy
                 ld      a, e
                 add     a, (hl)
                 ld      e, a
+                push    de
+                call    plot_point
+                pop     de
+                pop     bc
                 djnz    .down_step
                 ret
 

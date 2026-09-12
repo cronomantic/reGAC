@@ -228,6 +228,49 @@ dirección en cada píxel en lugar de arrastrarla. Lo siguiente es leer las
 rutinas originales, que están dentro de las propias instantáneas, para
 contrastar el método antes de seguir optimizando a ciegas.
 
+## Cómo lo hacía GAC, leído de las propias aventuras
+
+Las instantáneas llevan dentro el intérprete original, y sus rutinas están en
+las mismas direcciones en las ocho, porque es el mismo programa. Buscando la
+firma del cálculo de dirección de pantalla y las llamadas a la ROM aparece
+esto:
+
+| Dirección | Qué hay |
+|---|---|
+| $6484 | `CALL $24BA`, o sea DRAW de la ROM |
+| $64A5 | `JP $22E5`, o sea PLOT de la ROM |
+| $64A8 y $64B4 | guardar y restaurar los 512 atributos de la imagen |
+| $95FF, $9604, $9620 | `CALL $0E9E`, la rutina de dirección de la ROM, para borrar |
+
+O sea que GAC no escribió ni el punto ni la recta: llamaba a la ROM. Los
+colores los pasa copiando los atributos permanentes a los temporales, que es
+como la ROM espera recibirlos.
+
+### Que use la ROM no nos ata a ella
+
+Nosotros no la llamamos. Lo que tomamos de ahí es la regla con la que rompe los
+empates, no el código: el error arranca en la mitad del lado mayor, sube por el
+menor, y cuando alcanza al mayor se lo resta y ese paso va en diagonal. Contarlo
+al revés es un Bresenham igual de válido, pero coloca los pasos diagonales un
+sitio más allá y eso se ve en las rectas cortas inclinadas.
+
+Implementarlo por nuestra cuenta da las dos cosas a la vez. Portabilidad,
+porque el Amstrad, el MSX, el Sam y el Next trazan igual sin necesitar ninguna
+ROM de Spectrum. Y fidelidad, porque el dibujo original se hizo con esa regla y
+queremos reproducir esas láminas, no unas parecidas.
+
+La elipse no aparece entre las llamadas a la ROM, así que ésa sí es código
+propio de GAC y queda por localizar y contrastar. Es lo que falta para poder
+afirmar que reproducimos las láminas exactamente.
+
+### Una comparación que no valía
+
+Intenté contrastar contra la pantalla que guardan las propias instantáneas, y
+el resultado engañaba: salían coincidencias del cero por ciento de error. Al
+mirar el mapa de diferencias se ve que esas pantallas no tienen lámina
+dibujada, así que lo que coincidía eran dos imágenes casi vacías. Para
+contrastar de verdad hay que ejecutar el juego hasta que dibuje.
+
 ## Lo que queda por confirmar
 
 La diferencia exacta entre `FILL` y `BGFILL` se ha deducido, no verificado
