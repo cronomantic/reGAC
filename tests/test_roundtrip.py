@@ -24,6 +24,7 @@ CHAR_WIDTH = SpectrumDevice.char_width
 PICTURE_ROWS = SOURCE_ROWS
 from regac.srcgen import generate  # noqa: E402
 from regac.srcparse import parse  # noqa: E402
+from regac.text import TextStore  # noqa: E402
 
 DATABASES = sorted(glob.glob(os.path.join(ROOT, "snapshots", "*.json")))
 
@@ -174,13 +175,56 @@ def test_a_fill_stays_inside_the_lines():
     assert paper_at(8, 8) == 7, "the fill should not escape the box"
 
 
+def adventure_text(ddb):
+    texts = list(ddb["messages"].values())
+    texts += [o["name"] for o in ddb["objects"].values()]
+    texts += [l["desc"] for l in ddb["locations"].values()]
+    return [t for t in texts if t]
+
+
+@needs_databases
+@parametrized
+def test_text_survives_packing(path):
+    """Every message must come back exactly, and on its own: the interpreter
+    prints message 137 without reading the 136 before it."""
+    texts = adventure_text(load(path))
+    store = TextStore(texts)
+    for index, original in enumerate(texts):
+        assert store.read(index) == original
+    # unpacking out of order must give the same answers
+    for index in range(len(texts) - 1, -1, -1):
+        assert store.read(index) == texts[index]
+
+
+@needs_databases
+@parametrized
+def test_text_packs_to_about_half(path):
+    """The scheme is meant to halve the text.  Guard against drifting back."""
+    store = TextStore(adventure_text(load(path)))
+    assert store.ratio < 0.55, f"{store.ratio:.0%} of the original"
+    # the 8 bit routine needs room for the unpacking stack, and not much
+    assert store.packer.depth() < 32
+
+
+def test_accents_cost_no_more_than_letters():
+    """The reason for giving up the original format: an accented character is
+    just another character, with no special case anywhere."""
+    plain = ["El senor esta aqui", "La cabina esta rota", "Un senor mas"]
+    accented = ["El señor está aquí", "La cabina está rota", "Un señor más"]
+    store = TextStore(accented)
+    for index, original in enumerate(accented):
+        assert store.read(index) == original
+    assert len(TextStore(accented).charset) - len(TextStore(plain).charset) <= 4
+
+
 if __name__ == "__main__":
     # Runnable without pytest so the round trip can be checked anywhere.
     failures = 0
     for path in DATABASES:
         name = os.path.basename(path)
         for check in (test_database_round_trip, test_condition_blocks_round_trip,
-                      test_every_picture_draws):
+                      test_every_picture_draws, test_text_survives_packing,
+                      test_text_packs_to_about_half):
             try:
                 check(path)
             except AssertionError:
@@ -194,12 +238,13 @@ if __name__ == "__main__":
         test_a_fill_stays_inside_the_lines,
         test_a_fill_covers_the_same_ground_on_every_machine,
         test_every_machine_draws_the_same_picture,
+        test_accents_cost_no_more_than_letters,
     ):
         try:
             check()
         except AssertionError:
             failures += 1
             print(f"FAIL {check.__name__}")
-    total = len(DATABASES) * 3 + 7
+    total = len(DATABASES) * 5 + 8
     print(f"{total - failures}/{total} checks passed")
     sys.exit(1 if failures else 0)

@@ -31,6 +31,7 @@ from .devices import DEVICES, device_for, make
 from .gfx import Renderer
 from .png import save_picture
 from .srcgen import generate
+from .text import TextStore
 from .srcparse import SourceError, parse
 
 VERSION = "0.1.0"
@@ -143,6 +144,24 @@ def cmd_checkgfx(args):
     print(f"{name}: every fill covers the same ground on the {args.machine}")
 
 
+def cmd_text(args):
+    """Report what the text of an adventure costs once packed."""
+    ddb = read_json(args.input)
+    texts = list(ddb["messages"].values())
+    texts += [o["name"] for o in ddb["objects"].values()]
+    texts += [l["desc"] for l in ddb["locations"].values()]
+    texts = [t for t in texts if t]
+    store = TextStore(texts)
+    print(f"{os.path.basename(args.input)}")
+    print(f"  characters      {store.raw_size}")
+    print(f"  packed          {store.packed_size}")
+    print(f"  pair table      {store.packer.table_bytes} ({len(store.packer)} pairs)")
+    print(f"  total           {store.total_size}  ({store.ratio:.0%} of the original)")
+    print(f"  glyphs needed   {len(store.charset)}")
+    print(f"  spare codes     {store.charset.spare}")
+    print(f"  unpacking stack {store.packer.depth()} bytes")
+
+
 def main():
     parser = argparse.ArgumentParser("regac", description=f"ReGAC {VERSION}")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -184,6 +203,10 @@ def main():
         help="how much of the screen a fill may differ by (default: 0.05)",
     )
     p.set_defaults(func=cmd_checkgfx)
+
+    p = sub.add_parser("text", help="report what the text costs once packed")
+    p.add_argument("input", help="JSON database")
+    p.set_defaults(func=cmd_text)
 
     p = sub.add_parser("check", help="verify that a database survives a round trip")
     p.add_argument("input", help="JSON database")

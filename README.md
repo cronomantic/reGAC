@@ -9,7 +9,8 @@ Implementation of a decompiler and simple interpreter for Graphic Adventure Crea
 * runGAC_pygame.py: The same interpreter behind a Spectrum-like screen.
 * regac: Decompiler and compiler for the editable source format, and the
   renderer for the vector graphics. See [doc/formato-fuente.md](doc/formato-fuente.md)
-  and [doc/graficos.md](doc/graficos.md).
+  and [doc/graficos.md](doc/graficos.md), plus the text storage described in
+  [doc/textos.md](doc/textos.md).
 
 ```
 python -m regac decompile game.json game.gac
@@ -17,6 +18,7 @@ python -m regac compile   game.gac  game.json
 python -m regac check     game.json
 python -m regac render    game.json pictures/ -m spectrum
 python -m regac checkgfx  game.json -m cpc
+python -m regac text      game.json
 ```
 
 --
