@@ -164,6 +164,9 @@ colour_cell:
 ; Put down a pixel of the outline at (D, E), which also stops fills.
 ; Corrupts: everything but DE
 plot_point:
+                ld      a, e
+                cp      PICTURE_ROWS
+                ret     nc                      ; off the picture, leave it
                 push    de
                 call    pixel_address
                 ld      a, (hl)

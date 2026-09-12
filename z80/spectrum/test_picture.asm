@@ -16,7 +16,14 @@ start:
                 call    text_init
                 call    screen_init
                 call    picture_init
-                ld      hl, picture_wanted
+                ; fall through
+
+; Drawing again needs none of the setting up, so the tests can poke a new
+; number in here, clear the flag and point the processor back at this label
+; instead of loading the snapshot all over again.
+redraw:
+                ld      sp, $7FF0
+                ld      hl, (picture_wanted)
                 call    draw_picture
                 ld      a, $FF
                 ld      (done_flag), a
@@ -24,8 +31,7 @@ start:
                 jr      .stop
 
 done_flag:      db      0
-
-                include "picture_choice.inc"
+picture_wanted: dw      1
 
                 include "../common/database.asm"
                 include "../common/config.asm"
