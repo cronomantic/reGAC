@@ -131,6 +131,11 @@ class GAC_Interpreter:
         """
         return
 
+    def clear_picture(self):
+        """Take the picture off the screen and give the text all of it, which
+        is what TEXT asks for.  Text only interpreters have nothing to do."""
+        return
+
     def __check_ddb(ddb):
         default_keys = set(
             [
@@ -819,6 +824,7 @@ class GAC_Interpreter:
                     self.graphics = True
                 elif cmd == "TEXT":
                     self.graphics = False
+                    self.clear_picture()
                 elif cmd == "SAVE":
                     # TODO
                     pass

@@ -197,6 +197,9 @@ class GAC_Interpreter_Pygame(GAC_Interpreter):
     def draw_picture(self, graphic_id):
         self.cmd_queue.put((0x07, graphic_id))
 
+    def clear_picture(self):
+        self.cmd_queue.put((0x08,))
+
     def print_txt(self, st):
         chars = list(st.encode("ascii"))
         for c in chars:
@@ -306,6 +309,9 @@ class GAC_Interpreter_Pygame(GAC_Interpreter):
                     self.set_cursor(rx_data[1], rx_data[2])
                 elif cmd == 0x07:  # draw the picture of a location
                     self.__show_picture(rx_data[1])
+                elif cmd == 0x08:  # drop the picture, text takes the screen
+                    self.text_top = 0
+                    self.cls()
 
     def __interpreter_task(self):
         if not self.ready:

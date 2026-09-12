@@ -8,7 +8,14 @@ authors = [
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
-    "pygame (>=2.6.1,<3.0.0)",
+    # The community fork: it is import compatible with pygame and, unlike
+    # pygame itself, publishes wheels for current Python versions.
+    "pygame-ce (>=2.5.8,<3.0.0)",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest (>=8.0)",
 ]
 
 

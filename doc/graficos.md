@@ -57,6 +57,28 @@ aventuras, `PAPER` va seguido de `BGFILL` algo más de la mitad de las veces y
 de `FILL` sólo el tres por ciento. `INK`, en cambio, va seguido de trazado y de
 `FILL`.
 
+## Reparto de la pantalla y desplazamiento
+
+La lámina ocupa las dieciséis filas de arriba y el texto las ocho de abajo.
+Cuando el texto llena su zona, se desplaza sólo esa zona: la lámina no se va
+hacia arriba.
+
+Esto no es una suposición. GAC lo consigue con el mecanismo de pantalla
+inferior del Spectrum, y las instantáneas conservan las variables de sistema
+que lo demuestran. La que reserva filas para la pantalla inferior vale ocho en
+las partidas guardadas con lámina a la vista, cuando su valor normal es dos. El
+ROM desplaza esa zona por su cuenta sin tocar la de arriba.
+
+En las instantáneas guardadas en modo texto esa misma variable vale
+veintitrés, o sea casi la pantalla entera. Eso es justo la diferencia entre los
+opcodes de imagen y de texto, y confirma que en modo texto el texto dispone de
+todo.
+
+La otra variable que lo corrobora es el puntero de fuente del ROM, que en las
+ocho aventuras apunta a memoria y no a la ROM. Redefinir ahí la fuente sólo
+sirve de algo si se imprime con las rutinas del ROM, que son las que
+implementan ese reparto de pantalla.
+
 ## Lo que queda por confirmar
 
 La diferencia exacta entre `FILL` y `BGFILL` se ha deducido, no verificado
