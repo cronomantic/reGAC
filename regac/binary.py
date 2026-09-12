@@ -64,6 +64,7 @@ MACHINES = {
     "msx2": 4,
     "sam": 5,
     "next": 6,
+    "pcw": 7,
 }
 
 # How the music player gets at the tune it is playing.  The player runs from
