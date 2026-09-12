@@ -1,0 +1,332 @@
+; MIT License, Copyright (c) 2025 Cronomantic
+;
+; Drawing on the Spectrum: the primitives the picture interpreter asks for.
+;
+; Coordinates arrive as the adventure wrote them, x across and y up from the
+; bottom of the screen, and are turned into screen rows here.  Colour is held
+; per cell of eight by eight, which is the machine's own limitation and none
+; of the picture interpreter's business.
+
+PICTURE_ROWS    equ 128                 ; the top sixteen character rows
+GAC_TOP         equ 175                 ; y=175 is the first row of the screen
+ATTRIBUTES      equ $5800
+
+; Turn the adventure's y into a screen row.  In A, out A.
+to_row:
+                neg
+                add     a, GAC_TOP
+                ret
+
+; The byte holding pixel (D across, E down) in HL, its bit as a mask in B.
+; Corrupts: AF
+pixel_address:
+                ld      a, e
+                and     %11000000
+                rrca
+                rrca
+                rrca                    ; which third
+                ld      h, a
+                ld      a, e
+                and     %00000111       ; which line within the character
+                or      h
+                or      $40
+                ld      h, a
+                ld      a, e
+                and     %00111000       ; which row within the third
+                rlca
+                rlca
+                ld      l, a
+                ld      a, d
+                rrca
+                rrca
+                rrca
+                and     %00011111       ; which byte across
+                or      l
+                ld      l, a
+                ; the bit within the byte, looked up rather than shifted for
+                ; each pixel: this routine is called for every one of them
+                ld      a, d
+                and     7
+                push    hl
+                ld      hl, bit_masks
+                add     a, l
+                ld      l, a
+                jr      nc, .no_carry
+                inc     h
+.no_carry:
+                ld      b, (hl)
+                pop     hl
+                ret
+
+bit_masks:      db      %10000000, %01000000, %00100000, %00010000
+                db      %00001000, %00000100, %00000010, %00000001
+
+; The attribute of the cell holding pixel (D, E), in HL.
+; Corrupts: AF, BC
+attribute_address:
+                ld      a, e
+                rrca
+                rrca
+                rrca
+                and     %00011111
+                ld      l, a
+                ld      h, 0
+                add     hl, hl
+                add     hl, hl
+                add     hl, hl
+                add     hl, hl
+                add     hl, hl          ; thirty two bytes a row
+                ld      a, d
+                rrca
+                rrca
+                rrca
+                and     %00011111
+                add     a, l
+                ld      l, a
+                jr      nc, .no_carry
+                inc     h
+.no_carry:
+                ld      bc, ATTRIBUTES
+                add     hl, bc
+                ret
+
+; Give the cell holding pixel (D, E) the colours in force.  A colour of eight
+; means leave what is there, and an ink of nine means pick black or white,
+; whichever will be read against the paper.
+; Corrupts: everything but DE
+colour_cell:
+                push    de
+                call    attribute_address
+                ld      c, (hl)                 ; what is there now
+                ld      a, (gfx_paper)
+                cp      8
+                jr      c, .have_paper
+                ld      a, c
+                rrca
+                rrca
+                rrca
+.have_paper:
+                and     7
+                ld      d, a                    ; the paper
+                ld      a, (gfx_ink)
+                cp      8
+                jr      c, .have_ink
+                cp      9
+                jr      z, .contrast
+                ld      a, c                    ; leave the ink alone
+                jr      .have_ink
+.contrast:
+                ld      a, 7                    ; white on a dark paper
+                ld      b, a
+                ld      a, d
+                cp      4
+                ld      a, b
+                jr      c, .have_ink
+                xor     a                       ; black on a light one
+.have_ink:
+                and     7
+                ld      e, a                    ; the ink
+                ld      a, d
+                rlca
+                rlca
+                rlca
+                or      e
+                ld      e, a                    ; ink and paper together
+                ld      a, (gfx_bright)
+                cp      8
+                jr      c, .have_bright
+                ld      a, c
+                rrca
+                rrca
+                rrca
+                rrca
+                rrca
+                rrca
+.have_bright:
+                and     1
+                rrca
+                rrca                            ; into bit six
+                or      e
+                ld      e, a
+                ld      a, (gfx_flash)
+                cp      8
+                jr      c, .have_flash
+                ld      a, c
+                rlca
+.have_flash:
+                and     1
+                rrca                            ; into bit seven
+                or      e
+                ld      (hl), a
+                pop     de
+                ret
+
+; Put down a pixel of the outline at (D, E), which also stops fills.
+; Corrupts: everything but DE
+plot_point:
+                push    de
+                call    pixel_address
+                ld      a, (hl)
+                or      b
+                ld      (hl), a
+                pop     de
+                jp      colour_cell
+
+; Whether a fill has to stop at (D, E).  Zero flag clear if it does.
+; Off the picture always stops it.
+; Corrupts: AF, BC, HL
+is_boundary:
+                ld      a, e
+                cp      PICTURE_ROWS
+                jr      nc, .stops              ; off the top or bottom
+                call    pixel_address
+                ld      a, (hl)
+                and     b
+                ret
+.stops:
+                ld      a, 1
+                ret
+
+; Paint a pixel a fill has reached, in the way fill_mode says.
+; Corrupts: everything but DE
+fill_pixel:
+                push    de
+                call    pixel_address
+                ld      a, (fill_mode)
+                cp      FILL_SHADE
+                jr      nz, .wipe
+                ; a half tone: every other pixel of every other row stays lit
+                ld      a, d
+                add     a, e
+                and     1
+                jr      nz, .wipe
+                ld      a, (hl)
+                or      b
+                ld      (hl), a
+                pop     de
+                ret
+.wipe:
+                ; the spreading lit this pixel as a marker; put it out again
+                ld      a, b
+                cpl
+                and     (hl)
+                ld      (hl), a
+                pop     de
+                ret
+
+; A straight line from (gfx_x0, gfx_y0) to (gfx_x1, gfx_y1), in screen rows.
+; Bresenham, in the form that keeps the error inside a byte: it starts at half
+; the longer side and never leaves the range, so nothing here needs a sign.
+; Corrupts: everything
+draw_line:
+                ld      a, (gfx_x0)
+                ld      d, a
+                ld      a, (gfx_y0)
+                ld      e, a
+                ; how far, and which way, across
+                ld      a, (gfx_x1)
+                sub     d
+                ld      b, 1                    ; rightwards
+                jr      nc, .have_dx
+                neg
+                ld      b, -1
+.have_dx:
+                ld      (line_dx), a
+                ld      a, b
+                ld      (line_sx), a
+                ; and down
+                ld      a, (gfx_y1)
+                sub     e
+                ld      b, 1
+                jr      nc, .have_dy
+                neg
+                ld      b, -1
+.have_dy:
+                ld      (line_dy), a
+                ld      a, b
+                ld      (line_sy), a
+                ; which side is longer?
+                ld      a, (line_dx)
+                ld      c, a
+                ld      a, (line_dy)
+                cp      c
+                jr      z, .across
+                jr      c, .across
+                jp      .down
+
+.across:
+                ; step across every time, down when the error runs out
+                ld      a, (line_dx)
+                srl     a
+                ld      (line_err), a
+                ld      a, (line_dx)
+                inc     a
+                ld      b, a                    ; one more point than steps
+.across_step:
+                push    bc
+                push    de
+                call    plot_point
+                pop     de
+                pop     bc
+                ld      a, (line_err)
+                ld      hl, line_dy
+                sub     (hl)
+                jr      nc, .across_no_step
+                ld      hl, line_dx
+                add     a, (hl)
+                ld      hl, line_sy
+                ld      c, a
+                ld      a, e
+                add     a, (hl)
+                ld      e, a
+                ld      a, c
+.across_no_step:
+                ld      (line_err), a
+                ld      hl, line_sx
+                ld      a, d
+                add     a, (hl)
+                ld      d, a
+                djnz    .across_step
+                ret
+
+.down:
+                ; step down every time, across when the error runs out
+                ld      a, (line_dy)
+                srl     a
+                ld      (line_err), a
+                ld      a, (line_dy)
+                inc     a
+                ld      b, a
+.down_step:
+                push    bc
+                push    de
+                call    plot_point
+                pop     de
+                pop     bc
+                ld      a, (line_err)
+                ld      hl, line_dx
+                sub     (hl)
+                jr      nc, .down_no_step
+                ld      hl, line_dy
+                add     a, (hl)
+                ld      hl, line_sx
+                ld      c, a
+                ld      a, d
+                add     a, (hl)
+                ld      d, a
+                ld      a, c
+.down_no_step:
+                ld      (line_err), a
+                ld      hl, line_sy
+                ld      a, e
+                add     a, (hl)
+                ld      e, a
+                djnz    .down_step
+                ret
+
+line_dx:        db      0
+line_dy:        db      0
+line_sx:        db      0
+line_sy:        db      0
+line_err:       db      0
+

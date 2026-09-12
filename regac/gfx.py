@@ -47,6 +47,21 @@ PAPER = "paper"  # recolour it and wipe any mark
 SHADE = "shade"  # lay a half tone over it
 
 
+ELLIPSE_STEPS = 64
+SINE_SCALE = 7  # the table is scaled by 128
+
+
+def scaled(radius, sine):
+    """radius * sine / 128, cut towards zero, the way the Z80 will do it."""
+    magnitude = (radius * abs(sine)) >> SINE_SCALE
+    return -magnitude if sine < 0 else magnitude
+
+
+# round(128 * sin(2 * pi * step / 64)), held to 127 so that it fits a byte
+# with a sign, which is what the Z80 has to work with
+SINE = [0, 13, 25, 37, 49, 60, 71, 81, 91, 99, 106, 113, 118, 122, 126, 127, 127, 127, 126, 122, 118, 113, 106, 99, 91, 81, 71, 60, 49, 37, 25, 13, 0, -13, -25, -37, -49, -60, -71, -81, -91, -99, -106, -113, -118, -122, -126, -127, -127, -127, -126, -122, -118, -113, -106, -99, -91, -81, -71, -60, -49, -37, -25, -13]
+
+
 def shaded(x, y):
     """The dither SHADE lays down: every other pixel of every other row."""
     return (x + y) & 1 == 0
@@ -117,22 +132,30 @@ class Renderer:
         self.device.draw_point(x, y)
 
     def line(self, x0, y0, x1, y1):
-        """Bresenham, in the device's own pixels."""
+        """Bresenham, written in the form the Z80 uses so that both put down
+        exactly the same pixels: whole numbers throughout, and the error kept
+        inside a byte."""
         dx = abs(x1 - x0)
-        dy = -abs(y1 - y0)
-        sx = 1 if x0 < x1 else -1
-        sy = 1 if y0 < y1 else -1
-        err = dx + dy
-        while True:
-            self.plot(x0, y0)
-            if x0 == x1 and y0 == y1:
-                return
-            err2 = 2 * err
-            if err2 >= dy:
-                err += dy
+        dy = abs(y1 - y0)
+        sx = 1 if x1 > x0 else -1
+        sy = 1 if y1 > y0 else -1
+        if dx >= dy:
+            err = dx >> 1
+            for _ in range(dx + 1):
+                self.plot(x0, y0)
+                err -= dy
+                if err < 0:
+                    y0 += sy
+                    err += dx
                 x0 += sx
-            if err2 <= dx:
-                err += dx
+        else:
+            err = dy >> 1
+            for _ in range(dy + 1):
+                self.plot(x0, y0)
+                err -= dx
+                if err < 0:
+                    x0 += sx
+                    err += dy
                 y0 += sy
 
     def rect(self, x0, y0, x1, y1):
@@ -148,28 +171,36 @@ class Renderer:
             self.plot(x1, y)
 
     def ellipse(self, x0, y0, x1, y1):
-        """An ellipse inscribed in the given box, walked round in steps."""
-        from math import cos, pi, sin
+        """An ellipse inscribed in the given box, walked round in fixed steps.
 
+        A table of sines and whole number arithmetic, rather than anything
+        smoother, so that the Z80 can do exactly the same and the two can be
+        compared pixel for pixel.  Every ellipse in the eight adventures fits
+        in 36 pixels, where the steps are smaller than the pixels anyway.
+        """
         if x0 > x1:
             x0, x1 = x1, x0
         if y0 > y1:
             y0, y1 = y1, y0
-        cx, cy = (x0 + x1) / 2.0, (y0 + y1) / 2.0
-        rx, ry = (x1 - x0) / 2.0, (y1 - y0) / 2.0
-        if rx < 1 or ry < 1:
-            self.line(x0, y0, x1, y1)
+        cx, cy = (x0 + x1) // 2, (y0 + y1) // 2
+        rx, ry = (x1 - x0) // 2, (y1 - y0) // 2
+        if rx < 1 and ry < 1:
+            self.plot(cx, cy)
             return
-        steps = int(max(rx, ry) * 8) or 1
-        previous = None
-        for step in range(steps + 1):
-            angle = 2 * pi * step / steps
-            point = (int(round(cx + rx * cos(angle))), int(round(cy + ry * sin(angle))))
-            if previous is None:
+        points = []
+        for step in range(ELLIPSE_STEPS):
+            points.append(
+                (
+                    cx + scaled(rx, SINE[(step + ELLIPSE_STEPS // 4) % ELLIPSE_STEPS]),
+                    cy + scaled(ry, SINE[step]),
+                )
+            )
+        for index, point in enumerate(points):
+            following = points[(index + 1) % ELLIPSE_STEPS]
+            if point == following:
                 self.plot(*point)
-            elif previous != point:
-                self.line(previous[0], previous[1], point[0], point[1])
-            previous = point
+            else:
+                self.line(point[0], point[1], following[0], following[1])
 
     def flood(self, x, y, mode):
         """Spread out from a point until the boundaries stop it.

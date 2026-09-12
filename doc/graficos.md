@@ -174,6 +174,39 @@ se añada una máquina.
 
     python -m regac checkgfx partida.json -m cpc
 
+## El dibujo en el Z80
+
+El Spectrum ya dibuja, en [`z80/spectrum`](../z80/spectrum): punto, recta,
+rectángulo, elipse y los tres rellenos, con el intérprete de órdenes en
+[`z80/common/picture.asm`](../z80/common/picture.asm), que no sabe nada de
+pantallas. Las pruebas dibujan cada primitiva en el emulador y la comparan byte
+a byte con la referencia de Python, píxeles y colores. Las once coinciden
+exactas.
+
+Para que eso fuese posible los dos lados tienen que trazar igual, así que la
+elipse se recorre en sesenta y cuatro pasos con una tabla de senos y aritmética
+entera, y la recta usa la forma de Bresenham que mantiene el error dentro de un
+byte. Cambié la referencia para que hiciera lo mismo.
+
+Dos cosas que costaron. La primera es que rellenar con tinta no cambia ningún
+píxel, así que la región sigue siendo transitable y la propagación no termina
+nunca. Se resuelve encendiendo los píxeles mientras se propaga, que además no
+cuesta nada porque dentro de una región estaban apagados, anotando cada tramo
+pintado y recorriendo la lista después para poner el color y las marcas de
+verdad. Ningún relleno de las 196 láminas pasó de 513 tramos.
+
+La segunda es que el valor 128 de la tabla de senos no cabe en un byte con
+signo. Dos de los sesenta y cuatro puntos salían reflejados y sus segmentos
+cruzaban la elipse. La tabla va acotada a 127 en ambos lados.
+
+### Lo que falta: velocidad
+
+Un relleno de pantalla entera tarda 31 segundos, que es inaceptable. El motivo
+es que todo se hace píxel a píxel, y ocho píxeles consecutivos comparten byte.
+Reescribir el relleno para que trabaje por bytes, tratando aparte los extremos
+parciales de cada tramo, debería dejarlo en menos de un segundo. Es trabajo
+mecánico y la comparación con la referencia lo protege de romperse.
+
 ## Lo que queda por confirmar
 
 La diferencia exacta entre `FILL` y `BGFILL` se ha deducido, no verificado
