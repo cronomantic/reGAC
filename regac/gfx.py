@@ -64,19 +64,15 @@ def fill_pattern(mode, y):
     return low ^ (high if y & 1 else 0)
 
 
-ELLIPSE_STEPS = 64
-SINE_SCALE = 7  # the table is scaled by 128
+ELLIPSE_STEPS = 8  # steps to a quarter turn
 
-
-def scaled(radius, sine):
-    """radius * sine / 128, cut towards zero, the way the Z80 will do it."""
-    magnitude = (radius * abs(sine)) >> SINE_SCALE
-    return -magnitude if sine < 0 else magnitude
-
-
-# round(128 * sin(2 * pi * step / 64)), held to 127 so that it fits a byte
-# with a sign, which is what the Z80 has to work with
-SINE = [0, 13, 25, 37, 49, 60, 71, 81, 91, 99, 106, 113, 118, 122, 126, 127, 127, 127, 126, 122, 118, 113, 106, 99, 91, 81, 71, 60, 49, 37, 25, 13, 0, -13, -25, -37, -49, -60, -71, -81, -91, -99, -106, -113, -118, -122, -126, -127, -127, -127, -126, -122, -118, -113, -106, -99, -91, -81, -71, -60, -49, -37, -25, -13]
+# The table GAC carries at $A1ED: eight cosines then eight sines, for the
+# angles a quarter turn divided in eight, scaled by 256 and held to 255 so
+# that each fits a byte.  Read out of the adventures themselves.
+ELLIPSE_TABLE = [
+    251, 237, 213, 181, 142, 98, 50, 0,
+    50, 98, 142, 181, 213, 237, 251, 255,
+]
 
 
 def shaded(x, y):
@@ -200,37 +196,35 @@ class Renderer:
             self.plot(x0, y)
             self.plot(x1, y)
 
-    def ellipse(self, x0, y0, x1, y1):
-        """An ellipse inscribed in the given box, walked round in fixed steps.
+    def ellipse(self, cx, cy, x1, y1):
+        """An ellipse, drawn the way GAC drew one.
 
-        A table of sines and whole number arithmetic, rather than anything
-        smoother, so that the Z80 can do exactly the same and the two can be
-        compared pixel for pixel.  Every ellipse in the eight adventures fits
-        in 36 pixels, where the steps are smaller than the pixels anyway.
+        The two pairs in the command are not a box round it: the first is the
+        centre and the second gives the radii, as the distance from one to the
+        other.  Read out of the original at $88FE.
+
+        It is walked in eight steps a quarter, off a table of sines held at
+        $A1ED in the adventure itself, scaled by 256.  Each quarter is drawn
+        on its own, starting from the point at the side, which is why the
+        curve is made of thirty two straight pieces.
         """
-        if x0 > x1:
-            x0, x1 = x1, x0
-        if y0 > y1:
-            y0, y1 = y1, y0
-        cx, cy = (x0 + x1) // 2, (y0 + y1) // 2
-        rx, ry = (x1 - x0) // 2, (y1 - y0) // 2
-        if rx < 1 and ry < 1:
+        rx = abs(x1 - cx)
+        ry = abs(y1 - cy)
+        if rx == 0 and ry == 0:
             self.plot(cx, cy)
             return
-        points = []
-        for step in range(ELLIPSE_STEPS):
-            points.append(
-                (
-                    cx + scaled(rx, SINE[(step + ELLIPSE_STEPS // 4) % ELLIPSE_STEPS]),
-                    cy + scaled(ry, SINE[step]),
+        for across, down in ((1, 1), (1, -1), (-1, 1), (-1, -1)):
+            place = ((cx + across * rx) & 0xFF, cy & 0xFF)
+            for step in range(ELLIPSE_STEPS):
+                # the coordinates are bytes on the machine, so they come
+                # round again rather than going off the edge
+                following = (
+                    (cx + across * ((rx * ELLIPSE_TABLE[step]) >> 8)) & 0xFF,
+                    (cy + down * ((ry * ELLIPSE_TABLE[ELLIPSE_STEPS + step]) >> 8)) & 0xFF,
                 )
-            )
-        for index, point in enumerate(points):
-            following = points[(index + 1) % ELLIPSE_STEPS]
-            if point == following:
-                self.plot(*point)
-            else:
-                self.line(point[0], point[1], following[0], following[1])
+                if following != place:
+                    self.line(place[0], place[1], following[0], following[1])
+                place = following
 
     def flood(self, x, y, mode):
         """Fill, the way GAC filled.

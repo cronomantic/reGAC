@@ -6,9 +6,10 @@ running in the emulator.  The two screens are then compared byte for byte,
 pixels and colours alike.  That is the strongest check available here, and it
 is what the device split in regac/gfx.py was for.
 
-The pictures of the adventures themselves are not compared yet: the fill is
-correct but far too slow to run inside a test, which is the next job.  See
-doc/graficos.md.
+Every primitive here follows the original interpreter, read out of the
+snapshots the adventures came in: the line is the ROM's, the fill walks a
+column rather than flooding, and the ellipse takes its centre, its radii and
+its table of sines from GAC itself.  See doc/graficos.md.
 """
 
 import os
@@ -50,8 +51,8 @@ if pytest is not None:
             ("a line at an angle", [["LINE", 10, 60, 60, 120]], None),
             ("a rectangle", [["RECT", 20, 60, 100, 120]], None),
             ("a single point", [["PLOT", 40, 100]], None),
-            ("a small ellipse", [["ELLIPSE", 40, 90, 60, 110]], None),
-            ("a larger ellipse", [["ELLIPSE", 20, 70, 80, 120]], None),
+            ("a small ellipse", [["ELLIPSE", 60, 100, 70, 110]], None),
+            ("a larger ellipse", [["ELLIPSE", 128, 100, 168, 130]], None),
             (
                 "a background fill",
                 [["RECT", 20, 60, 100, 120], ["PAPER", 2], ["BGFILL", 60, 90]],
@@ -143,7 +144,7 @@ if __name__ == "__main__":
     cases = [
         ("a line across", [["LINE", 10, 100, 60, 100]], None),
         ("a rectangle", [["RECT", 20, 60, 100, 120]], None),
-        ("a small ellipse", [["ELLIPSE", 40, 90, 60, 110]], None),
+        ("a small ellipse", [["ELLIPSE", 60, 100, 70, 110]], None),
         ("an ink fill", [["RECT", 20, 60, 100, 120], ["INK", 3], ["FILL", 60, 90]], None),
     ]
     for case in cases:

@@ -2,13 +2,11 @@
 ;
 ; Rectangles and ellipses, built on the straight line.
 ;
-; The ellipse is walked round in sixty four steps off a table of sines, with
-; whole numbers throughout.  Nothing smoother, because the reference renderer
-; in Python does exactly the same sum and the two are compared pixel for
-; pixel.  Every ellipse in the eight adventures fits inside 36 pixels, where
-; the steps are shorter than the pixels anyway.
+; The ellipse follows the original exactly, table and all, so that the pictures
+; come out as they were drawn.  The reference renderer does the same sum and
+; the two are compared pixel for pixel.
 
-ELLIPSE_STEPS   equ 64
+ELLIPSE_STEPS   equ 8                   ; steps to a quarter turn
 
 ; The outline of a rectangle, as four straight lines.
 ; Corrupts: everything
@@ -93,81 +91,141 @@ sine_scaled:
                 ld      a, h
                 ret
 
-; An ellipse inside the box in gfx_x0..gfx_y1.
+; An ellipse, the way GAC drew one.
+;
+; The two pairs in the command are not a box round it: the first is the centre
+; and the second gives the radii, as the distance from one to the other.  Read
+; out of the original at $88FE.
+;
+; It is walked in eight steps a quarter off the table below, and each quarter
+; is drawn on its own starting from the point at the side, which is why the
+; curve comes out as thirty two straight pieces.
 ; Corrupts: everything
 draw_ellipse:
-                call    order_box
-                ; the middle and the two radii
                 ld      a, (gfx_x0)
-                ld      b, a
-                ld      a, (gfx_x1)
-                add     a, b
-                rra                             ; carry carries bit eight
                 ld      (ell_cx), a
-                ld      a, (gfx_x0)
-                ld      b, a
-                ld      a, (gfx_x1)
-                sub     b
-                srl     a
-                ld      (ell_rx), a
                 ld      a, (gfx_y0)
-                ld      b, a
-                ld      a, (gfx_y1)
-                add     a, b
-                rra
                 ld      (ell_cy), a
-                ld      a, (gfx_y0)
-                ld      b, a
+                ld      hl, gfx_x0
+                ld      a, (gfx_x1)
+                sub     (hl)
+                jr      nc, .have_rx
+                neg
+.have_rx:
+                ld      (ell_rx), a
+                ld      hl, gfx_y0
                 ld      a, (gfx_y1)
-                sub     b
-                srl     a
+                sub     (hl)
+                jr      nc, .have_ry
+                neg
+.have_ry:
                 ld      (ell_ry), a
-                ; a box with no room in it is just a point
+                ld      hl, ell_ry
                 ld      a, (ell_rx)
-                ld      b, a
-                ld      a, (ell_ry)
-                or      b
-                jr      nz, .walk_round
-                ld      a, (ell_cx)
+                or      (hl)
+                jr      nz, .quarters
+                ld      a, (ell_cx)             ; no room in it: a point
                 ld      d, a
                 ld      a, (ell_cy)
                 ld      e, a
                 jp      plot_point
-.walk_round:
+.quarters:
+                xor     a
+                ld      (ell_quarter), a
+.each_quarter:
+                ; start at the point on the side
+                ld      a, (ell_quarter)
+                add     a, a
+                ld      e, a
+                ld      d, 0
+                ld      hl, quarter_signs
+                add     hl, de
+                ld      a, (hl)
+                ld      (ell_sx), a
+                inc     hl
+                ld      a, (hl)
+                ld      (ell_sy), a
+                ld      a, (ell_rx)
+                call    give_sign_x
+                ld      hl, ell_cx
+                add     a, (hl)
+                ld      (ell_px), a
+                ld      a, (ell_cy)
+                ld      (ell_py), a
                 xor     a
                 ld      (ell_step), a
-                call    ellipse_point
-                ld      a, (ell_px)
-                ld      (ell_first_x), a
-                ld      a, (ell_py)
-                ld      (ell_first_y), a
-                ld      b, ELLIPSE_STEPS - 1
-.each:
-                push    bc
+.each_step:
                 ld      a, (ell_px)
                 ld      (gfx_x0), a
                 ld      a, (ell_py)
                 ld      (gfx_y0), a
-                ld      hl, ell_step
-                inc     (hl)
                 call    ellipse_point
                 ld      a, (ell_px)
                 ld      (gfx_x1), a
                 ld      a, (ell_py)
                 ld      (gfx_y1), a
                 call    draw_segment
-                pop     bc
-                djnz    .each
-                ; and close it back to where it began
-                ld      a, (ell_px)
-                ld      (gfx_x0), a
-                ld      a, (ell_py)
-                ld      (gfx_y0), a
-                ld      a, (ell_first_x)
-                ld      (gfx_x1), a
-                ld      a, (ell_first_y)
-                ld      (gfx_y1), a
-                ; fall through
+                ld      hl, ell_step
+                inc     (hl)
+                ld      a, (hl)
+                cp      ELLIPSE_STEPS
+                jr      nz, .each_step
+                ld      hl, ell_quarter
+                inc     (hl)
+                ld      a, (hl)
+                cp      4
+                jr      nz, .each_quarter
+                ret
+
+; Where the current step of the current quarter falls, into ell_px and ell_py.
+; Corrupts: everything
+ellipse_point:
+                ld      a, (ell_step)
+                ld      e, a
+                ld      d, 0
+                ld      hl, ellipse_table
+                add     hl, de
+                ld      c, (hl)                 ; the cosine
+                ld      a, (ell_rx)
+                ld      b, a
+                push    de
+                call    multiply
+                pop     de
+                ld      a, h                    ; the top eight bits, the divide
+                call    give_sign_x
+                ld      hl, ell_cx
+                add     a, (hl)
+                ld      (ell_px), a
+                ld      a, (ell_step)
+                add     a, ELLIPSE_STEPS
+                ld      e, a
+                ld      d, 0
+                ld      hl, ellipse_table
+                add     hl, de
+                ld      c, (hl)                 ; the sine
+                ld      a, (ell_ry)
+                ld      b, a
+                call    multiply
+                ld      a, h
+                call    give_sign_y
+                ld      hl, ell_cy
+                add     a, (hl)
+                ld      (ell_py), a
+                ret
+
+; Turn A about if this quarter goes the other way.
+give_sign_x:
+                ld      hl, ell_sx
+                bit     7, (hl)
+                ret     z
+                neg
+                ret
+give_sign_y:
+                ld      hl, ell_sy
+                bit     7, (hl)
+                ret     z
+                neg
+                ret
 
 ; A straight line, or a single point when both ends are the same place.
 draw_segment:
@@ -187,61 +245,16 @@ draw_segment:
                 ld      e, a
                 jp      plot_point
 
-; Put the box the right way round, smaller corner first.
-order_box:
-                ld      a, (gfx_x0)
-                ld      b, a
-                ld      a, (gfx_x1)
-                cp      b
-                jr      nc, .x_done
-                ld      (gfx_x0), a
-                ld      a, b
-                ld      (gfx_x1), a
-.x_done:
-                ld      a, (gfx_y0)
-                ld      b, a
-                ld      a, (gfx_y1)
-                cp      b
-                ret     nc
-                ld      (gfx_y0), a
-                ld      a, b
-                ld      (gfx_y1), a
-                ret
+quarter_signs:  db      1, 1
+                db      1, -1
+                db      -1, 1
+                db      -1, -1
 
-; Where step ell_step falls on the ellipse, into ell_px and ell_py.
-; Corrupts: everything
-ellipse_point:
-                ld      a, (ell_step)
-                add     a, ELLIPSE_STEPS / 4    ; across uses a quarter turn on
-                call    sine_at
-                ld      c, a
-                ld      a, (ell_rx)
-                ld      b, a
-                call    sine_scaled
-                ld      hl, ell_cx
-                add     a, (hl)
-                ld      (ell_px), a
-                ld      a, (ell_step)
-                call    sine_at
-                ld      c, a
-                ld      a, (ell_ry)
-                ld      b, a
-                call    sine_scaled
-                ld      hl, ell_cy
-                add     a, (hl)
-                ld      (ell_py), a
-                ret
-
-; The sine for step A.
-; Corrupts: DE, HL
-sine_at:
-                and     ELLIPSE_STEPS - 1
-                ld      e, a
-                ld      d, 0
-                ld      hl, sine_table
-                add     hl, de
-                ld      a, (hl)
-                ret
+; The table GAC carries at $A1ED inside the adventure: eight cosines then
+; eight sines, a quarter turn divided in eight, scaled by 256 and held to 255
+; so that each fits a byte.
+ellipse_table:  db      251, 237, 213, 181, 142, 98, 50, 0
+                db      50, 98, 142, 181, 213, 237, 251, 255
 
 ell_cx:         db      0
 ell_cy:         db      0
@@ -249,18 +262,7 @@ ell_rx:         db      0
 ell_ry:         db      0
 ell_px:         db      0
 ell_py:         db      0
-ell_first_x:    db      0
-ell_first_y:    db      0
+ell_sx:         db      0
+ell_sy:         db      0
 ell_step:       db      0
-
-; round(128 * sin(2 * pi * step / 64)), held to 127 so it fits a byte with a
-; sign.  The reference holds exactly these numbers.
-sine_table:
-                db      0, 13, 25, 37, 49, 60, 71, 81
-                db      91, 99, 106, 113, 118, 122, 126, 127
-                db      127, 127, 126, 122, 118, 113, 106, 99
-                db      91, 81, 71, 60, 49, 37, 25, 13
-                db      0, -13, -25, -37, -49, -60, -71, -81
-                db      -91, -99, -106, -113, -118, -122, -126, -127
-                db      -127, -127, -126, -122, -118, -113, -106, -99
-                db      -91, -81, -71, -60, -49, -37, -25, -13
+ell_quarter:    db      0

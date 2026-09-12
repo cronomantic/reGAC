@@ -266,9 +266,21 @@ porque el Amstrad, el MSX, el Sam y el Next trazan igual sin necesitar ninguna
 ROM de Spectrum. Y fidelidad, porque el dibujo original se hizo con esa regla y
 queremos reproducir esas láminas, no unas parecidas.
 
-La elipse no aparece entre las llamadas a la ROM, así que ésa sí es código
-propio de GAC y queda por localizar y contrastar. Es lo que falta para poder
-afirmar que reproducimos las láminas exactamente.
+### La elipse
+
+Sí es código propio de GAC, en $88FE, y trae dos sorpresas.
+
+Los dos pares de coordenadas **no son una caja envolvente**. El primero es el
+centro y el segundo da los radios, medidos como la distancia de uno a otro. Yo
+los había tomado por una caja, con lo que todas mis elipses salían a la mitad de
+tamaño y descentradas.
+
+Y la recorre en ocho pasos por cuadrante, con una tabla de senos que la propia
+aventura lleva en $A1ED: ocho cosenos y ocho senos escalados a 256 y acotados a
+255 para que quepan en un byte, que es el mismo apaño que tuve que hacer yo. Los
+radios se multiplican por la entrada y se toma el byte alto. Cada cuadrante se
+traza por separado empezando por el punto del costado, y de ahí que la curva
+sean treinta y dos segmentos rectos.
 
 ### Una comparación que no valía
 
