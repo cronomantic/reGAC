@@ -35,17 +35,17 @@ sys.path.insert(0, os.path.join(ROOT, "tests"))
 import emulator  # noqa: E402
 
 
-def grab(image, machine, wait, keys=None, start=0, size=0x10000, port=emulator.PORT):
+def grab(image, machine, wait, keys=None, start=0, size=0x10000, boot=None,
+         port=emulator.PORT):
     image = os.path.abspath(image)
     extra = ["--fastautoload", "--simulaterealloadfast"]
     if image.lower().endswith(".dsk"):
         extra += ["--enable-dsk", "--dsk-file", image]
     session = emulator.Session(machine=machine, port=port, extra=extra)
     try:
+        time.sleep(boot if boot is not None else emulator.BOOT_SECONDS)
         if not image.lower().endswith(".dsk"):
-            session.load(image)
-        else:
-            time.sleep(emulator.BOOT_SECONDS)
+            session.command(f"smartload {image}")
         if keys:
             session.keys(keys)
             session.enter()
@@ -78,12 +78,14 @@ def main(argv=None):
     parser.add_argument("output", help="where to write the memory image")
     parser.add_argument("--machine", default="CPC464", help="which machine to load it on")
     parser.add_argument("--wait", type=float, default=60.0, help="seconds to let it load")
+    parser.add_argument("--boot", type=float, default=None, help="seconds to let the machine boot")
     parser.add_argument("--keys", default=None, help="what to type once it has booted")
     parser.add_argument("--start", type=lambda n: int(n, 0), default=0)
     parser.add_argument("--size", type=lambda n: int(n, 0), default=0x10000)
     args = parser.parse_args(argv)
 
-    image = grab(args.image, args.machine, args.wait, args.keys, args.start, args.size)
+    image = grab(args.image, args.machine, args.wait, args.keys, args.start,
+                 args.size, args.boot)
     with open(args.output, "wb") as f:
         f.write(image)
     print(f"{len(image)} bytes of {args.machine} memory in {args.output}")

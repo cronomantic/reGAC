@@ -92,6 +92,20 @@ los dos bytes de pila que usa la propia instantánea para arrancar. Falta
 enseñar al decompilador a leer un volcado plano y a situar las tablas donde el
 Amstrad las tiene, a partir de $4000, con la base de datos en $210C.
 
+Las versiones de Amstrad ya están, en `juegos`, acabadas en `_ams.zip`: son
+Megacorp, Los pájaros de Bangkok y La guerra de las vajillas, cada una en
+disco y en cinta. Las dos primeras las tenemos también de Spectrum, así que la
+misma aventura se puede comparar en las dos máquinas, que es justo lo que hace
+falta.
+
+Ahí es donde lo dejamos el 2026-09-13. El disco de Megacorp trae `MEGACORP.BAS`
+de cargador y tres partes, `MEGACOR1.BIN` a `MEGACOR3.BIN`. Arrancarlo con
+`run"megacorp` en un CPC 6128 y leer la memoria funciona, pero en $4000 todavía
+no aparecen las tablas, así que o hace falta más espera, o el cargador se queda
+esperando una tecla, o en el 6128 la aventura no está en los 64K visibles y hay
+que leer el banco que toque. Lo primero que hay que mirar mañana es qué hay de
+verdad en ese volcado.
+
 Vale la pena saber que el emulador que ya usamos hace también el PCW 8256 y el
 8512 con disquetera, así que el banco de pruebas del runtime del PCW no hay que
 inventarlo: es el mismo que el del Spectrum con otro nombre de máquina.
