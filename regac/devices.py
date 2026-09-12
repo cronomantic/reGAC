@@ -101,12 +101,26 @@ class BitmapDevice(Device):
         self.set_pixel(x, y, True)
         self.set_colour_at(x, y)
 
-    def fill_point(self, x, y, mode):
-        self.set_colour_at(x, y)
-        if mode == PAPER:
-            self.set_pixel(x, y, False)
-        elif mode == SHADE and shaded(x, y):
-            self.set_pixel(x, y, True)
+    def fill_run(self, x, y, pattern):
+        """Lay the pattern across the run of clear pixels through this point.
+
+        The original walks whole bytes where it can, because eight clear
+        pixels are one byte of zero, and goes bit by bit only at the two ends.
+        That comes to the same pixels as going one at a time, which is what
+        this does.
+        """
+        row = self.to_device(x, y)[1]
+        left = x
+        while left > 0 and not self.is_boundary(left - 1, row):
+            left -= 1
+        right = x
+        while right < self.width - 1 and not self.is_boundary(right + 1, row):
+            right += 1
+        for place in range(left, right + 1):
+            lit = (pattern >> (7 - (place & 7))) & 1
+            self.set_pixel(place, row, lit)
+            self.set_colour_at(place, row)
+        return right - left + 1
 
     def set_colour_at(self, x, y):
         """Give the point the colours in force, however this machine stores
@@ -227,26 +241,26 @@ class PixelDevice(Device):
             return True
         return self.mask[y * self.width + x]
 
-    def fill_point(self, x, y, mode):
-        """Paint the pixel, and keep the mask in step with what the Spectrum
-        bitmap would hold.
+    def fill_run(self, x, y, pattern):
+        """The same as on the Spectrum, over this machine's mask and colours.
 
-        This matters more than it looks.  On the original, a half tone lays
-        down real pixels, which then stop any later fill, and a background
-        fill wipes pixels, which opens a way through for one.  Artists drew
-        against that behaviour, so the mask has to follow the same rules or
-        fills that stopped short on the Spectrum flood the screen here.
+        Keeping the mask in step with what a Spectrum bitmap would hold is
+        what makes the pictures come out the same: a half tone lays down real
+        marks that stop any later fill, and the artists drew against that.
         """
-        if not self.inside(x, y):
-            return
-        index = y * self.width + x
-        if mode == SHADE and shaded(x, y):
-            self.colours[index] = self.line_colour
-            self.mask[index] = 1
-            return
-        self.colours[index] = self.fill_colour
-        if mode == PAPER:
-            self.mask[index] = 0
+        row = self.to_device(x, y)[1]
+        left = x
+        while left > 0 and not self.is_boundary(left - 1, row):
+            left -= 1
+        right = x
+        while right < self.width - 1 and not self.is_boundary(right + 1, row):
+            right += 1
+        for place in range(left, right + 1):
+            lit = (pattern >> (7 - (place & 7))) & 1
+            index = row * self.width + place
+            self.mask[index] = lit
+            self.colours[index] = self.line_colour if lit else self.fill_colour
+        return right - left + 1
 
     def to_rgb(self):
         return [

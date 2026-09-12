@@ -41,10 +41,27 @@ MAX_Y = 175  # y=175 is the top pixel row
 TRANSPARENT = 8  # colour 8 means leave the colour alone, as in BASIC
 CONTRAST = 9  # colour 9 means pick black or white, whichever reads
 
-# What a filled pixel should become.
-INK = "ink"  # recolour it, leaving any mark alone
-PAPER = "paper"  # recolour it and wipe any mark
-SHADE = "shade"  # lay a half tone over it
+# What a fill lays down.  GAC holds each as two bytes: the low one is used on
+# even rows and the high one is exclusive ored into it on odd ones, counting in
+# the y of the commands.  Read out of the original at $6364.
+INK = "ink"
+PAPER = "paper"
+SHADE = "shade"
+
+FILL_PATTERNS = {
+    INK: (0xFF, 0x00),  # solid
+    PAPER: (0x00, 0x00),  # wiped
+    SHADE: (0xAA, 0xFF),  # a half tone, so $AA and $55 by turns
+}
+
+PICTURE_TOP = 175  # the y a picture reaches
+PICTURE_BOTTOM = 48
+
+
+def fill_pattern(mode, y):
+    """The byte a fill lays down on row y."""
+    low, high = FILL_PATTERNS[mode]
+    return low ^ (high if y & 1 else 0)
 
 
 ELLIPSE_STEPS = 64
@@ -93,11 +110,17 @@ class Device:
         raise NotImplementedError
 
     def is_boundary(self, x, y):
-        """Whether a fill has to stop here.  Off screen always stops it."""
+        """Whether a fill has to stop here, in this screen's own pixels."""
         raise NotImplementedError
 
-    def fill_point(self, x, y, mode):
-        """Paint one pixel inside a region a fill has reached."""
+    def is_blocked(self, x, y):
+        """The same question in the coordinates of the commands, y upwards."""
+        return self.is_boundary(*self.to_device(x, y))
+
+    def fill_run(self, x, y, pattern):
+        """Lay the pattern across the run of clear pixels through this point,
+        and give the cells it passes the colours in force.  Returns how many
+        pixels it covered."""
         raise NotImplementedError
 
     def to_rgb(self):
@@ -210,38 +233,30 @@ class Renderer:
                 self.line(point[0], point[1], following[0], following[1])
 
     def flood(self, x, y, mode):
-        """Spread out from a point until the boundaries stop it.
+        """Fill, the way GAC filled.
 
-        The algorithm is the same on every machine; what differs is what
-        counts as a boundary and what painting a pixel means, and both of
-        those belong to the device.
+        This is not a flood fill, which is what took so long to work out.  It
+        walks up and down the one column the fill was started in, laying a
+        horizontal run across each row, and stops the moment the point
+        directly above or below is blocked.  It never spreads round a corner.
+        That is why a picture carries dozens of fill commands where a flood
+        would need one, and why filling solid does not bury the drawing.
+
+        Read out of the original interpreter at $6374.  The coordinates here
+        are the ones the commands are written in, y upwards.
         """
         reached = 0
-        if self.device.is_boundary(x, y):
-            self.fill_coverage.append(reached)
-            return reached
-        device = self.device
-        seen = set()
-        stack = [(x, y)]
-        while stack:
-            px, py = stack.pop()
-            if (px, py) in seen or device.is_boundary(px, py):
-                continue
-            left = px
-            while left > 0 and not device.is_boundary(left - 1, py):
-                left -= 1
-            right = px
-            while right < device.width - 1 and not device.is_boundary(right + 1, py):
-                right += 1
-            for sx in range(left, right + 1):
-                seen.add((sx, py))
-                device.fill_point(sx, py, mode)
-                reached += 1
-            for ny in (py - 1, py + 1):
-                if 0 <= ny < device.height:
-                    for sx in range(left, right + 1):
-                        if (sx, ny) not in seen and not device.is_boundary(sx, ny):
-                            stack.append((sx, ny))
+        if self.device.is_blocked(x, y):
+            self.fill_coverage.append(0)
+            return 0
+        row = y
+        while row <= PICTURE_TOP and not self.device.is_blocked(x, row):
+            reached += self.device.fill_run(x, row, fill_pattern(mode, row))
+            row += 1
+        row = y - 1
+        while row >= PICTURE_BOTTOM and not self.device.is_blocked(x, row):
+            reached += self.device.fill_run(x, row, fill_pattern(mode, row))
+            row -= 1
         self.fill_coverage.append(reached)
         return reached
 
@@ -271,11 +286,11 @@ class Renderer:
             elif name == "ELLIPSE":
                 self.ellipse(*point(args[0], args[1]), *point(args[2], args[3]))
             elif name == "FILL":
-                self.flood(*point(args[0], args[1]), INK)
+                self.flood(args[0], args[1], INK)
             elif name == "BGFILL":
-                self.flood(*point(args[0], args[1]), PAPER)
+                self.flood(args[0], args[1], PAPER)
             elif name == "SHADE":
-                self.flood(*point(args[0], args[1]), SHADE)
+                self.flood(args[0], args[1], SHADE)
             elif name == "CALL":
                 self.run(args[0], depth + 1)
         return self.device

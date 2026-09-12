@@ -193,14 +193,14 @@ run_picture:
 .a_fill:
                 ld      b, FILL_INK
                 cp      CMD_FILL
-                jr      z, .fill_mode
+                jr      z, .fill_kind
                 ld      b, FILL_PAPER
                 cp      CMD_BGFILL
-                jr      z, .fill_mode
+                jr      z, .fill_kind
                 ld      b, FILL_SHADE
-.fill_mode:
+.fill_kind:
                 ld      a, b
-                ld      (fill_mode), a
+                call    set_fill_pattern
                 call    gfx_fill
                 jp      .next
 .call_picture:

@@ -45,17 +45,24 @@ ya encendidos y los bordes del área de imagen.
 
 ## Lo que costó acertar
 
-El error de bulto fue suponer que rellenar encendía los píxeles. Con eso, un
-relleno del fondo de una habitación la dejaba en negro entera y se comía el
-dibujo. En el Spectrum una zona de color plano se consigue dejando los píxeles
-apagados y poniendo el color de fondo de esas celdas, que además respeta el
-trazado ya dibujado.
+El relleno es lo que más costó, y lo acabé resolviendo leyendo el intérprete
+original dentro de las instantáneas. No es un relleno por inundación.
 
-La prueba de que `BGFILL` trabaja sobre el color de fondo está en los propios
-datos. Contando qué comando sigue a cada cambio de color en las ocho
-aventuras, `PAPER` va seguido de `BGFILL` algo más de la mitad de las veces y
-de `FILL` sólo el tres por ciento. `INK`, en cambio, va seguido de trazado y de
-`FILL`.
+**Recorre una sola columna.** Sube y baja por la columna del punto de partida
+pintando un tramo horizontal en cada fila, y se detiene en cuanto el punto justo
+encima o debajo está ocupado. Nunca dobla una esquina. Por eso una lámina lleva
+decenas de órdenes de relleno donde una inundación necesitaría una, y por eso
+rellenar macizo no sepulta el dibujo. Está en $6374 del original.
+
+**Lo que deposita son dos bytes.** El bajo en las filas pares y el alto aplicado
+con o exclusivo en las impares, contando en la y de las órdenes. Macizo es
+`00FF`, borrar es `0000` y el medio tono es `FFAA`, que da AA y 55 alternando.
+Está en $6364.
+
+De ahí salen dos correcciones a lo que yo había deducido de los datos. El
+relleno de tinta sí enciende píxeles, es macizo; yo había concluido que sólo
+cambiaba el color, porque con una inundación se desbordaba y se comía la lámina.
+Y el medio tono resultó ser exactamente el damero que había supuesto.
 
 ## Reparto de la pantalla y desplazamiento
 

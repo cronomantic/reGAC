@@ -189,31 +189,6 @@ is_boundary:
 
 ; Paint a pixel a fill has reached, in the way fill_mode says.
 ; Corrupts: everything but DE
-fill_pixel:
-                push    de
-                call    pixel_address
-                ld      a, (fill_mode)
-                cp      FILL_SHADE
-                jr      nz, .wipe
-                ; a half tone: every other pixel of every other row stays lit
-                ld      a, d
-                add     a, e
-                and     1
-                jr      nz, .wipe
-                ld      a, (hl)
-                or      b
-                ld      (hl), a
-                pop     de
-                ret
-.wipe:
-                ; the spreading lit this pixel as a marker; put it out again
-                ld      a, b
-                cpl
-                and     (hl)
-                ld      (hl), a
-                pop     de
-                ret
-
 ; A straight line from (gfx_x0, gfx_y0) to (gfx_x1, gfx_y1), in screen rows.
 ; Drawn the way the Spectrum ROM draws a line, because that is what GAC
 ; called: it does PLOT at $22E5 and DRAW at $24BA and never wrote its own.
