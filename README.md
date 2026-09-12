@@ -10,7 +10,8 @@ Implementation of a decompiler and simple interpreter for Graphic Adventure Crea
 * regac: Decompiler and compiler for the editable source format, and the
   renderer for the vector graphics. See [doc/formato-fuente.md](doc/formato-fuente.md)
   and [doc/graficos.md](doc/graficos.md), plus the text storage described in
-  [doc/textos.md](doc/textos.md).
+  [doc/textos.md](doc/textos.md) and the binary database in
+  [doc/binario.md](doc/binario.md).
 
 ```
 python -m regac decompile game.json game.gac
@@ -19,6 +20,7 @@ python -m regac check     game.json
 python -m regac render    game.json pictures/ -m spectrum
 python -m regac checkgfx  game.json -m cpc
 python -m regac text      game.json
+python -m regac build     game.json game.rgac -m spectrum128 -b 16k
 ```
 
 --

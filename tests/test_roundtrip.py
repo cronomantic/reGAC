@@ -24,7 +24,8 @@ CHAR_WIDTH = SpectrumDevice.char_width
 PICTURE_ROWS = SOURCE_ROWS
 from regac.srcgen import generate  # noqa: E402
 from regac.srcparse import parse  # noqa: E402
-from regac.text import TextStore  # noqa: E402
+from regac.binary import Database, Reader  # noqa: E402
+from regac.text import Packer, TextStore  # noqa: E402
 
 DATABASES = sorted(glob.glob(os.path.join(ROOT, "snapshots", "*.json")))
 
@@ -206,6 +207,67 @@ def test_text_packs_to_about_half(path):
     assert store.packer.depth() < 32
 
 
+def read_back(ddb, **options):
+    """Build the binary database and read it the way the 8 bit routine will."""
+    database = Database(ddb, **options)
+    reader = Reader(database.build())
+    first_pair, pairs, packed = reader.text()
+    texts = [
+        database.store.charset.decode(Packer(pairs, first_pair).unpack(m))
+        for m in packed
+    ]
+    return database, reader, texts
+
+
+@needs_databases
+@parametrized
+def test_binary_database_round_trips(path):
+    """Everything written must come back: the format is only right if the
+    reader can rebuild what went in."""
+    ddb = load(path)
+    database, reader, texts = read_back(ddb)
+    assert texts == database.texts
+
+    high, low, locals_ = reader.conditions()
+    assert high == through_json(ddb["hpcs"])
+    assert low == through_json(ddb["lpcs"])
+    assert locals_ == {k: through_json(v) for k, v in ddb["lcs"].items()}
+
+    objects = reader.objects()
+    for key, original in ddb["objects"].items():
+        got = objects[key]
+        assert got["weight"] == original["weight"]
+        assert got["initial_loc"] == original["initial_loc"]
+        assert texts[got["name"]] == original["name"]
+
+    locations = reader.locations()
+    for key, original in ddb["locations"].items():
+        got = locations[key]
+        assert got["graphic_id"] == original["graphic_id"]
+        assert got["exits"] == original["exits"]
+        assert texts[got["desc"]] == original["desc"]
+
+    assert reader.graphics() == {
+        k: through_json(v) for k, v in ddb["gfx"].items()
+    }
+
+
+@needs_databases
+@parametrized
+def test_banking_changes_nothing_but_the_layout(path):
+    """The same adventure split into banks must read back the same, and its
+    resident part must be a good deal smaller."""
+    ddb = load(path)
+    flat, _, flat_texts = read_back(ddb)
+    banked, reader, banked_texts = read_back(ddb, page_bits=14)
+    assert banked_texts == flat_texts
+    assert banked.resident_size < flat.resident_size
+    assert len(banked.banks) >= 1
+    # nothing that is needed at any moment may end up in a bank
+    for index in (0, 1, 2, 3, 4, 6):
+        assert reader.directory[index][0] == 0xFF
+
+
 def test_accents_cost_no_more_than_letters():
     """The reason for giving up the original format: an accented character is
     just another character, with no special case anywhere."""
@@ -224,7 +286,9 @@ if __name__ == "__main__":
         name = os.path.basename(path)
         for check in (test_database_round_trip, test_condition_blocks_round_trip,
                       test_every_picture_draws, test_text_survives_packing,
-                      test_text_packs_to_about_half):
+                      test_text_packs_to_about_half,
+                      test_binary_database_round_trips,
+                      test_banking_changes_nothing_but_the_layout):
             try:
                 check(path)
             except AssertionError:
@@ -245,6 +309,6 @@ if __name__ == "__main__":
         except AssertionError:
             failures += 1
             print(f"FAIL {check.__name__}")
-    total = len(DATABASES) * 5 + 8
+    total = len(DATABASES) * 7 + 8
     print(f"{total - failures}/{total} checks passed")
     sys.exit(1 if failures else 0)

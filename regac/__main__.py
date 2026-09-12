@@ -27,6 +27,7 @@ import json
 import os
 import sys
 
+from .binary import MACHINES, SECTION_NAMES, Database, Reader
 from .devices import DEVICES, device_for, make
 from .gfx import Renderer
 from .png import save_picture
@@ -162,6 +163,32 @@ def cmd_text(args):
     print(f"  unpacking stack {store.packer.depth()} bytes")
 
 
+BANK_SIZES = {"none": 0, "8k": 13, "16k": 14}
+
+
+def cmd_build(args):
+    """Write the binary database the 8 bit interpreter reads."""
+    ddb = read_json(args.input)
+    database = Database(
+        ddb,
+        machine=args.machine,
+        page_bits=BANK_SIZES[args.banks],
+        music_buffer=args.music_buffer,
+    )
+    image = database.build()
+    with open(args.output, "wb") as f:
+        f.write(image)
+    print(f"{args.input} -> {args.output}")
+    print(f"  machine     {args.machine}")
+    print(f"  image       {len(image)} bytes")
+    print(f"  resident    {database.resident_size} bytes")
+    print(f"  banks       {len(database.banks)}")
+    for index, name in enumerate(SECTION_NAMES):
+        bank, offset, size = database.placement[index]
+        where = "resident" if bank == 0xFF else f"bank {bank}"
+        print(f"  {name:<12}{size:7}  {where}")
+
+
 def main():
     parser = argparse.ArgumentParser("regac", description=f"ReGAC {VERSION}")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -203,6 +230,25 @@ def main():
         help="how much of the screen a fill may differ by (default: 0.05)",
     )
     p.set_defaults(func=cmd_checkgfx)
+
+    p = sub.add_parser("build", help="write the binary database for a machine")
+    p.add_argument("input", help="JSON database")
+    p.add_argument("output", help="binary file to write")
+    p.add_argument("-m", "--machine", default="spectrum48", choices=sorted(MACHINES))
+    p.add_argument(
+        "-b",
+        "--banks",
+        default="none",
+        choices=sorted(BANK_SIZES),
+        help="size of a memory bank, or none to keep everything resident",
+    )
+    p.add_argument(
+        "--music-buffer",
+        type=int,
+        default=0,
+        help="bytes to reserve for the tune being played (see doc/binario.md)",
+    )
+    p.set_defaults(func=cmd_build)
 
     p = sub.add_parser("text", help="report what the text costs once packed")
     p.add_argument("input", help="JSON database")

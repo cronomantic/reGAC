@@ -54,10 +54,15 @@ class Charset:
     machine short of font memory can hold the useful glyphs and drop the tail.
     """
 
-    def __init__(self, texts, first=0):
+    def __init__(self, texts, first=0, extra=()):
         counts = collections.Counter()
         for text in texts:
             counts.update(text)
+        # Characters that need a code and a glyph but are never packed: the
+        # vocabulary is matched against what the player types, not printed.
+        for text in extra:
+            for char in text:
+                counts.setdefault(char, 0)
         self.order = [c for c, _ in counts.most_common()]
         self.first = first
         self.codes = {c: first + i for i, c in enumerate(self.order)}
@@ -167,8 +172,8 @@ def pack(sequences, first_pair, spare, min_uses=3):
 class TextStore:
     """An adventure's text, ready to be written out for a machine."""
 
-    def __init__(self, texts, first=0):
-        self.charset = Charset(texts, first)
+    def __init__(self, texts, first=0, extra=()):
+        self.charset = Charset(texts, first, extra)
         encoded = [self.charset.encode(t) for t in texts]
         self.packer, self.messages = pack(
             encoded, first + len(self.charset), self.charset.spare
