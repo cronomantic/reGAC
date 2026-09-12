@@ -199,13 +199,34 @@ La segunda es que el valor 128 de la tabla de senos no cabe en un byte con
 signo. Dos de los sesenta y cuatro puntos salían reflejados y sus segmentos
 cruzaban la elipse. La tabla va acotada a 127 en ambos lados.
 
-### Lo que falta: velocidad
+### Velocidad: cómo se hacía entonces
 
-Un relleno de pantalla entera tarda 31 segundos, que es inaceptable. El motivo
-es que todo se hace píxel a píxel, y ocho píxeles consecutivos comparten byte.
-Reescribir el relleno para que trabaje por bytes, tratando aparte los extremos
-parciales de cada tramo, debería dejarlo en menos de un segundo. Es trabajo
-mecánico y la comparación con la referencia lo protege de romperse.
+La primera versión tardaba 31 segundos en rellenar la pantalla, porque
+calculaba la dirección de cada píxel una y otra vez. Las rutinas de la época no
+hacían eso, y aplicarlo baja a 7 segundos:
+
+**La dirección se calcula una vez por fila.** Los treinta y dos bytes de una
+fila tienen la columna en los cinco bits bajos del byte bajo, así que moverse a
+lo largo de ella es `inc l` y `dec l`, sin tocar la parte alta.
+
+**De píxel a píxel se rota una máscara.** Buscar dónde acaba un tramo es girar
+un bit y mirar; cuando la máscara da la vuelta, se pasa al byte de al lado.
+
+**Ocho píxeles de golpe.** Encender un tramo, apagarlo o ponerle trama se hace
+por bytes enteros, con máscaras sólo en los dos extremos parciales. Un byte a
+cero son ocho píxeles libres y un byte a 255 son ocho bordes, lo que también
+acelera el rastreo de las filas vecinas.
+
+**El relleno con trama es un patrón de ocho filas**, un byte por fila, en
+[`shade_pattern`](../z80/spectrum/fill.asm). Por eso cuesta lo mismo que un
+relleno liso: se escribe un byte y cubre ocho píxeles igual. Cambiar la trama es
+cambiar la tabla.
+
+Quedan 7 segundos para una pantalla entera, que sigue siendo mucho. El resto se
+va en el rastreo de las filas de arriba y abajo, que todavía recalcula la
+dirección en cada píxel en lugar de arrastrarla. Lo siguiente es leer las
+rutinas originales, que están dentro de las propias instantáneas, para
+contrastar el método antes de seguir optimizando a ciegas.
 
 ## Lo que queda por confirmar
 
