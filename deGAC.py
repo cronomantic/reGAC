@@ -118,15 +118,20 @@ def load_file(file_path):
 
 
 def peek1(sysram, addr):
+    # Addresses are 16 bit and wrap round, as they do on the Z80 itself.  The
+    # token table of some adventures runs past the top of memory and relies on
+    # it.
+    addr &= MAXRAM
     if addr < MINRAM:
         return 0xFF
     return sysram[addr]
 
 
 def peek2(sysram, addr):
+    addr &= MAXRAM
     if addr < MINRAM:
         return 0xFF
-    return sysram[addr] + 256 * sysram[addr + 1]
+    return sysram[addr] + 256 * peek1(sysram, addr + 1)
 
 
 def find_token(sysram, token):
@@ -463,7 +468,7 @@ def get_cond(sysram, cond):
             elif bt == 0x1F:
                 result.append(("CARR",))
             elif bt == 0x20:
-                result.append(("CARR",))
+                result.append(("AVAI",))
             elif bt == 0x21:
                 result.append(("+",))
             elif bt == 0x22:
@@ -628,7 +633,7 @@ def get_database(sysram):
     database["pronouns"] = []
     for k, v in nouns.items():
         if v == 255:  # Pronoun detected
-            database["pronouns"].append(v)
+            database["pronouns"].append(k)
         else:
             database["nouns"][k] = v
     database["adverbs"] = adverbs

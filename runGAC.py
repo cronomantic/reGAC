@@ -27,7 +27,7 @@ import gettext
 import json
 import random
 import platform
-import threading
+
 
 if platform.system() == "Windows":
     import time
@@ -86,13 +86,14 @@ class GAC_Interpreter:
     LAMP_FLAG = 2
     SCORE_DIS_FLAG = 3
 
-    def __init__(self, ddb, io):
+    def __init__(self, ddb, width=80):
         self.ddb = ddb
         self.counters = [0 for x in range(0, 128)]
         self.flags = [False for x in range(0, 256)]
         self.current_loc = 0
         self.stack = []
-        self.io = io
+        self.width = width
+        self.line_remain = width
         self.font = None
         self.verbs = None
         self.nouns = None
@@ -117,8 +118,9 @@ class GAC_Interpreter:
         self.ready = False
         self.show_exits = False
         self.old_noun = 0
-        self._running = False
-        self._lock = threading.Lock()
+        self.finished = False
+        self.new_room = True
+        self.statements = []
 
     def __check_ddb(ddb):
         default_keys = set(
@@ -343,27 +345,13 @@ class GAC_Interpreter:
         self.no_objs_msg = self.ddb["no_objs_msg"]
 
     def start_adventure(self):
-        if not self.io or not self.ddb:
+        if not self.ddb:
             return False
         if not GAC_Interpreter.__check_ddb(self.ddb):
-            return False
-        if not hasattr(self.io, "separators"):
-            return False
-        if not hasattr(self.io, "font"):
-            return False
-        if not hasattr(self.io, "print"):
-            return False
-        if not hasattr(self.io, "input"):
-            return False
-        if not hasattr(self.io, "wait_key_or_timeout"):
-            return False
-        if not hasattr(self.io, "quit"):
             return False
         self.__parse_database()
         if self.init_loc == 0:
             return False
-        self.io.separators = self.punctuation
-        self.io.font = self.font
         self.counters = [0 for x in range(0, 128)]
         self.flags = [False for x in range(0, 256)]
         self.current_loc = self.ddb["init_loc"]
@@ -383,6 +371,9 @@ class GAC_Interpreter:
             v["loc"] = v["initial_loc"]
             objs[k] = v
         self.objects = objs
+        self.finished = False
+        self.new_room = True
+        self.statements = []
         return True
 
     def __find_word(self, word_dictionary, word):
@@ -406,9 +397,9 @@ class GAC_Interpreter:
     def __display_room(self, loc):
         # Check whether there's light
         if not self.flags[self.LIGHTING_FLAG] and not self.flags[self.LAMP_FLAG]:
-            self.io.print(self.messages[self.ITSDARK])
+            self.print(self.messages[self.ITSDARK])
         else:
-            self.io.print(self.locations[loc]["desc"])
+            self.print(self.locations[loc]["desc"])
             objs = self.__get_location_objects(loc)
             if len(objs) > 0:
                 str_obj = self.messages[self.OBJHERE]
@@ -418,7 +409,7 @@ class GAC_Interpreter:
                         str_obj += ","
                     str_obj += v["name"]
                     top = True
-                self.io.print(str_obj)
+                self.print(str_obj)
             if self.show_exits:
                 exits = self.locations[loc]["exits"]
                 top = False
@@ -433,7 +424,7 @@ class GAC_Interpreter:
                                 str_exits += k2
                                 break
                         top = True
-                    self.io.print(str_exits)
+                    self.print(str_exits)
 
     def __parse_input(self, input_string):
         self.verb = 0
@@ -508,7 +499,8 @@ class GAC_Interpreter:
                     self.stack.append(s0)
                 elif cmd == "HOLD":
                     s0 = self.stack.pop()
-                    self.io.wait_key_or_timeout(s0)
+                    if not self.wait_key_or_timeout(s0):
+                        finished = True
                 elif cmd == "GET":
                     s0 = self.stack.pop()
                     if s0 in self.objects.keys():
@@ -520,23 +512,23 @@ class GAC_Interpreter:
                                 if v["loc"] == self.CARRIED_LOC:
                                     playerweight += v["weight"]
                             if playerweight + obj["weight"] > self.max_weight:
-                                self.io.print(self.messages[self.TOOMUCH] + "\n")
+                                self.print(self.messages[self.TOOMUCH] + "\n")
                             else:
                                 obj["loc"] = self.CARRIED_LOC
                         else:
-                            self.io.print(self.messages[self.CANTSEE] + "\n")
+                            self.print(self.messages[self.CANTSEE] + "\n")
                 elif cmd == "DROP":
                     s0 = self.stack.pop()
                     if s0 in self.objects.keys():
                         obj = self.objects[s0]
                         if s0 not in self.objects.keys():
-                            self.io.print(self.messages[self.DONTHAVE] + "\n")
+                            self.print(self.messages[self.DONTHAVE] + "\n")
                         else:
                             obj = self.objects[s0]
                             if obj["loc"] == self.CARRIED_LOC:
                                 obj["loc"] = self.current_loc
                             else:
-                                self.io.print(self.messages[self.DONTHAVE] + "\n")
+                                self.print(self.messages[self.DONTHAVE] + "\n")
                 elif cmd == "SWAP":
                     s0 = self.stack.pop()
                     s1 = self.stack.pop()
@@ -553,7 +545,7 @@ class GAC_Interpreter:
                 elif cmd == "OBJ":
                     o = self.stack.pop()
                     if o in self.objects.keys():
-                        self.io.print(self.objects[o]["name"] + "\n")
+                        self.print(self.objects[o]["name"] + "\n")
                 elif cmd == "SET":
                     f = self.stack.pop()
                     if f in range(0, len(self.flags)):
@@ -621,10 +613,10 @@ class GAC_Interpreter:
                 elif cmd == "MESS":
                     m = self.stack.pop()
                     if m in self.messages.keys():
-                        self.io.print(self.messages[m])
+                        self.print(self.messages[m])
                 elif cmd == "PRIN":
                     m = self.stack.pop()
-                    self.io.print(f"{m}")
+                    self.print(f"{m}")
                 elif cmd == "RAND":
                     m = self.stack.pop()
                     self.stack.append(random.randint(0, m))
@@ -669,7 +661,7 @@ class GAC_Interpreter:
                             self.stack.append(0)
                     else:
                         self.stack.append(0)
-                elif cmd == "AVAIL":
+                elif cmd in ("AVAI", "AVAIL"):
                     s0 = self.stack.pop()
                     if s0 in self.objects.keys():
                         obj = self.objects[s0]
@@ -702,18 +694,20 @@ class GAC_Interpreter:
                     else:
                         self.stack.append(0)
                 elif cmd == "OP28":
-                    self.io.print("ILLEGAL COMMAND OP28")
+                    self.print("ILLEGAL COMMAND OP28")
                 elif cmd == "OP29":
-                    self.io.print("ILLEGAL COMMAND OP29")
+                    self.print("ILLEGAL COMMAND OP29")
                 elif cmd == "OKAY":
-                    self.io.print(self.messages[self.OKAY] + "\n")
+                    self.print(self.messages[self.OKAY] + "\n")
                     done = True
                 elif cmd == "WAIT":
                     done = True
                 elif cmd == "QUIT":
-                    self.io.print(self.messages[self.YOUSURE])
-                    res = self.io.input()
-                    if res.upper() in ["YES", "Y", "SI", "S"]:
+                    self.print(self.messages[self.YOUSURE])
+                    res = self.input()
+                    if not isinstance(res, str):
+                        finished = True
+                    elif res.upper() in ["YES", "Y", "SI", "S"]:
                         finished = True
                 elif cmd == "EXIT":
                     finished = True
@@ -753,10 +747,10 @@ class GAC_Interpreter:
                     nothing = True
                     for o in self.objects.values():
                         if o["loc"] == r:
-                            self.io.print(o["name"] + "\n")
+                            self.print(o["name"] + "\n")
                             nothing = False
                     if nothing:
-                        self.io.print(self.no_objs_msg + "\n")
+                        self.print(self.no_objs_msg + "\n")
                 elif cmd == "CONN":
                     d = self.stack.pop()
                     res = 0
@@ -779,7 +773,7 @@ class GAC_Interpreter:
                     s0 = self.stack.pop()
                     self.max_weight = s0
                 elif cmd == "LF":
-                    self.io.print("\n")
+                    self.print("\n")
                 elif cmd == "END":
                     skip = False
                     self.stack = []
@@ -803,113 +797,94 @@ class GAC_Interpreter:
                     # TODO
                     pass
                 else:
-                    self.io.print(f"INVALID OPCODE {cmd}.\n")
+                    self.print(f"INVALID OPCODE {cmd}.\n")
         return (finished, done, if_true)
 
-    def quit(self):
-        with self._lock:
-            self._running = False
+    def main_loop(self):
+        # print current location
+        if self.new_room:
+            self.__display_room(self.current_loc)
+            self.new_room = False
+
+        # Increment turn
+        if self.counters[self.TURN_CNT_L] < 255:
+            self.counters[self.TURN_CNT_L] += 1
+        elif self.counters[self.TURN_CNT_H] < 255:
+            self.counters[self.TURN_CNT_L] = 0
+            self.counters[self.TURN_CNT_H] += 1
+
+        # High priority conditions
+        self.finished, done, if_true = self.__perfom_conditions(self.hpcs, False)
+        if self.finished:
+            return self.finished
+
+        if not self.new_room and len(self.statements) == 0:
+            input_str = ""
+            while len(input_str) == 0:
+                self.print("\n" + self.messages[self.ASK])
+                input_str = self.input()
+                if not isinstance(input_str, str):
+                    self.finished = True
+                    return self.finished
+            # Separate statements
+            separators = filter(lambda x: x != " ", self.separators + self.punctuation)
+            for sep in separators:
+                input_str = input_str.replace(sep, ".")
+            self.statements = input_str.split(".")
+            self.old_noun = 0  # Delete after new text input
+
+        # Process player input
+        while len(self.statements) > 0:
+            input_str = self.statements.pop(0)
+            valid_input, self.finished = self.__parse_input(input_str)
+            if self.finished:
+                break
+            elif valid_input:
+                # Check connection table
+                for exit in self.locations[self.current_loc]["exits"]:
+                    if exit["dir"] == self.verb:
+                        self.current_loc = exit["dest"]
+                        self.new_room = True
+                        break
+                if self.new_room or valid_input:
+                    break
+
+        if self.new_room or self.finished:
+            return self.finished
+
+        # Local conditions
+        done = False
+        if_true = False
+        if self.current_loc in self.lcs.keys():
+            self.finished, done, if_true = self.__perfom_conditions(
+                self.lcs[self.current_loc], True
+            )
+        if self.new_room or done:
+            return self.finished
+
+        # Low priority conditions
+        self.finished, done, if_true_lcp = self.__perfom_conditions(self.lpcs, True)
+        if self.new_room or done:
+            return self.finished
+
+        if not if_true and not if_true_lcp:
+            if self.verb == 0:
+                self.print(self.messages[self.NOTUNDERSTAND] + "\n")
+            else:
+                self.print(self.messages[self.CANTDO] + "\n")
+
+        return self.finished
 
     def run(self):
         if not self.ready:
             return
-        with self._lock:
-            self._running = True
-        finished = False
-        new_room = True
-        if_true = False
-        statements = []
-        cont = True
-        while cont:
-
-            # print current location
-            if new_room:
-                self.__display_room(self.current_loc)
-                new_room = False
-
-            # Increment turn
-            if self.counters[self.TURN_CNT_L] < 255:
-                self.counters[self.TURN_CNT_L] += 1
-            elif self.counters[self.TURN_CNT_H] < 255:
-                self.counters[self.TURN_CNT_L] = 0
-                self.counters[self.TURN_CNT_H] += 1
-
-            # High priority conditions
-            finished, done, if_true = self.__perfom_conditions(self.hpcs, False)
-            if finished:
-                break
-
-            if not new_room and len(statements) == 0:
-                input_str = ""
-                while len(input_str) == 0:
-                    self.io.print("\n" + self.messages[self.ASK])
-                    input_str = self.io.input()
-                # Separate statements
-                separators = filter(
-                    lambda x: x != " ", self.separators + self.punctuation
-                )
-                for sep in separators:
-                    input_str = input_str.replace(sep, ".")
-                statements = input_str.split(".")
-                self.old_noun = 0  # Delete after new text input
-
-            # Process player input
-            while len(statements) > 0:
-                input_str = statements.pop(0)
-                valid_input, finished = self.__parse_input(input_str)
-                if finished:
-                    break
-                elif valid_input:
-                    # Check connection table
-                    for exit in self.locations[self.current_loc]["exits"]:
-                        if exit["dir"] == self.verb:
-                            self.current_loc = exit["dest"]
-                            new_room = True
-                            break
-                    if new_room or valid_input:
-                        break
-
-            if new_room or finished:
-                continue
-
-            # Local conditions
-            done = False
-            if_true = False
-            if self.current_loc in self.lcs.keys():
-                finished, done, if_true = self.__perfom_conditions(
-                    self.lcs[self.current_loc], True
-                )
-            if new_room or done:
-                continue
-
-            # Low priority conditions
-            finished, done, if_true_lcp = self.__perfom_conditions(self.lpcs, True)
-            if new_room or done:
-                continue
-
-            if not if_true and not if_true_lcp:
-                if self.verb == 0:
-                    self.io.print(self.messages[self.NOTUNDERSTAND] + "\n")
-                else:
-                    self.io.print(self.messages[self.CANTDO] + "\n")
-
-            with self._lock:
-                cont = not finished and self._running
-        if finished:
-            self.io.quit()
-
-
-class IoCallbackGAC(object):
-
-    def __init__(self, width, separators=[], font=[]):
-        self.width = width
-        self.line_remain = width
-        self.separators = separators
-        self.font = font
+        self.finished = False
+        while not self.finished:
+            self.main_loop()
 
     def print(self, string):
         # This method replicates the 8bit mechanism. No much python-correctness is expected
-        separators = self.separators + ["\n"]
+        separators = self.punctuation + ["\n"]
         pos = 0
         while pos < len(string):
             pos_w = pos
@@ -929,9 +904,6 @@ class IoCallbackGAC(object):
         self.line_remain = self.width
         return input()
 
-    def quit(self):
-        pass
-
     def wait_key_or_timeout(self, timeout_frames):
         timeout = timeout_frames / 50
         if platform.system() == "Windows":
@@ -944,6 +916,7 @@ class IoCallbackGAC(object):
                     break
         else:
             rlist, wlist, xlist = select([sys.stdin], [], [], timeout)
+        return True
 
 
 def main():
@@ -978,9 +951,7 @@ def main():
     with open(args.input_path) as f:
         ddb = json.load(f)
 
-    io = IoCallbackGAC(32)
-    ddb = GAC_Interpreter(ddb, io)
-
+    ddb = GAC_Interpreter(ddb, 32)
     if not ddb.start_adventure():
         sys.exit("Invalid Database")
     else:

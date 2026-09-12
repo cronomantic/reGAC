@@ -14,7 +14,7 @@ import json
 from runGAC import GAC_Interpreter
 
 
-class GAC_interface_Pygame:
+class GAC_Interpreter_Pygame(GAC_Interpreter):
 
     SPECTRUM_PALETTE = [
         0x000000,
@@ -47,7 +47,7 @@ class GAC_interface_Pygame:
     SCREEN_START_X = (WINDOW_WIDTH - SCREEN_WIDTH) >> 1
     SCREEN_START_Y = (WINDOW_HEIGHT - SCREEN_HEIGHT) >> 1
 
-    def __init__(self):
+    def __init__(self, ddb):
         self.print_att = 0x07
         self.pxl_screen = [0 for x in range(self.CHAR_WIDTH * self.SCREEN_HEIGHT)]
         self.att_screen = [
@@ -65,16 +65,12 @@ class GAC_interface_Pygame:
         self.frame_count = 0
         self.input_txt = ""
 
-        self.width = self.SCREEN_WIDTH
-        self.line_remain = self.SCREEN_WIDTH
-        self.separators = []
-        self.font = None
-        self.interpreter = None
-
         self.cmd_queue = queue.Queue()
         self.resp_queue = queue.Queue()
 
         self.th_interpreter = threading.Thread(target=self.__interpreter_task)
+
+        super().__init__(ddb, self.CHAR_WIDTH)
 
         pygame.init()
         self._screen = pygame.display.set_mode(
@@ -203,8 +199,8 @@ class GAC_interface_Pygame:
             pygame.display.flip()
             self._clock.tick(50)  # limits FPS to 50
         print(self.th_interpreter.is_alive())
+        self.th_interpreter.join()
         self.on_cleanup()
-        # self.th_interpreter.join()
 
     def on_update(self):
         self.flash_counter += 1
@@ -214,7 +210,6 @@ class GAC_interface_Pygame:
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                self.interpreter.quit()
                 self._running = False
             if event.type == pygame.KEYDOWN:
                 if self.waitkey_mode:
@@ -273,13 +268,17 @@ class GAC_interface_Pygame:
                     self.set_cursor(rx_data[1], rx_data[2])
 
     def __interpreter_task(self):
-        if self.interpreter:
-            self.interpreter.run()
+        if not self.ready:
+            return
+        self.finished = False
+        while not self.finished:
+            self.main_loop()
 
     def print(self, txt):
         # This method replicates the 8bit mechanism. No much python-correctness is expected
-        separators = self.separators + ["\n"]
+        separators = self.punctuation + ["\n"]
         pos = 0
+        final_str = ""
         while pos < len(txt):
             pos_w = pos
             while pos_w < (len(txt) - 1) and txt[pos_w] not in separators:
@@ -294,17 +293,25 @@ class GAC_interface_Pygame:
             pos = pos_w + 1
             self.cmd_queue.put((0x01, subtxt))
 
+    def __get_response_data(self):
+        val = None
+        while val is None:
+            try:
+                val = self.resp_queue.get_nowait()
+                self.resp_queue.task_done()
+            except:
+                val = None
+        return val
+
     def input(self):
         self.line_remain = self.width
         self.cmd_queue.put((0x02,))
-        txt = self.resp_queue.get()
-        self.resp_queue.task_done()
+        txt = self.__get_response_data()
         return txt
 
     def wait_key_or_timeout(self, timeout_frames):
         self.cmd_queue.put((0x05, timeout_frames))
-        self.resp_queue.get()
-        self.resp_queue.task_done()
+        val = self.__get_response_data()
 
     def quit(self):
         self.cmd_queue.put((0x00,))
@@ -361,10 +368,8 @@ if __name__ == "__main__":
     with open(args.input_path) as f:
         ddb = json.load(f)
 
-    io = GAC_interface_Pygame()
-    ddb = GAC_Interpreter(ddb, io)
-    io.interpreter = ddb
+    ddb = GAC_Interpreter_Pygame(ddb)
     if not ddb.start_adventure():
         sys.exit("Invalid Database")
     else:
-        io.run()
+        ddb.run()
