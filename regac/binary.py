@@ -103,6 +103,7 @@ VERB, NOUN, ADVERB, PRONOUN = range(4)
 
 CONDITION_END = 0x00
 NO_MESSAGE = 0xFF  # there is no message with that number
+NO_CHARACTER = 0xFF  # the adventure has no such character
 PUSH_MARK = 0x80
 
 
@@ -229,6 +230,12 @@ class Database:
         # print a number without hunting for them.
         for digit in "0123456789":
             out += u8(self.code_of(digit))
+        # What the player types arrives as ASCII and has to become a code of
+        # this adventure's character set before it can be matched against the
+        # vocabulary.  Ninety six bytes covers everything typeable.
+        codes = self.store.charset.codes
+        for point in range(32, 128):
+            out += u8(codes.get(chr(point), NO_CHARACTER))
         punct = self.ddb.get("punctuation", [])
         # The first entry is the end of string marker and has no glyph.
         printable = [c for c in punct if c != "\0"]

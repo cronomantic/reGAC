@@ -151,6 +151,45 @@ class Session:
                 return True
         return False
 
+    # Where each key sits in the Spectrum matrix: which half row, which bit.
+    KEY_MATRIX = {}
+    for _row, _keys in enumerate([
+        ".ZXCV", "ASDFG", "QWERT", "12345", "09876", "POIUY",
+        "@LKJH", " .MNB",
+    ]):
+        for _bit, _key in enumerate(_keys):
+            if _key != ".":
+                # "@" stands for enter, which has no printable character
+                KEY_MATRIX[chr(13) if _key == "@" else _key] = (_row, _bit)
+
+    def hold(self, row=None, bit=None):
+        """Hold one key down, or let everything go when given nothing."""
+        rows = ["FF"] * 8
+        if row is not None:
+            rows[row] = f"{0xFF ^ (1 << bit):02X}"
+        return self.command("set-ui-io-ports " + "".join(rows) + "00")
+
+    def type(self, text, hold_for=0.12):
+        """Type at the keyboard, one key at a time, letting each go before the
+        next.  Driving the matrix directly keeps the timing ours rather than
+        the emulator's, which drops keys when they are sent in a stream."""
+        for char in text.upper():
+            where = self.KEY_MATRIX.get(char)
+            if where is None:
+                continue
+            self.hold(*where)
+            time.sleep(hold_for)
+            self.hold()
+            time.sleep(hold_for)
+
+    def keys(self, text, pause=100):
+        """Type something, as if at the keyboard.  The pause is how long each
+        key is held, in milliseconds."""
+        return self.command(f"send-keys-string {pause} {text}")
+
+    def enter(self, pause=100):
+        return self.command(f"send-keys-ascii {pause} 13")
+
     def close(self):
         try:
             if self.socket:

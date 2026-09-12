@@ -1,0 +1,119 @@
+"""The whole interpreter playing a real adventure on a real Z80.
+
+It loads MegaCorp, lets the interpreter describe where the player starts and
+ask for an order, types one at the keyboard and checks what comes back.  The
+keyboard is driven by holding each key down and letting it go in turn, which
+keeps the timing in the test's hands rather than the emulator's.
+"""
+
+import json
+import os
+import subprocess
+import sys
+import time
+
+try:
+    import pytest
+except ImportError:
+    pytest = None
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, ROOT)
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+import emulator  # noqa: E402
+from regac.binary import S_FONT, Database, Reader  # noqa: E402
+
+SPECTRUM = os.path.join(ROOT, "z80", "spectrum")
+SOURCE = os.path.join(SPECTRUM, "game.asm")
+DATABASE = os.path.join(SPECTRUM, "game.rgac")
+SNAPSHOT = os.path.join(SPECTRUM, "game.sna")
+LISTING = os.path.join(SPECTRUM, "game.lst")
+ADVENTURE = os.path.join(ROOT, "snapshots", "megacorp2.json")
+
+TEXT_THIRD = 0x5000
+ENTER = chr(13)
+NOT_UNDERSTOOD = "242"  # the message GAC prints when a word means nothing
+
+if pytest is not None:
+    needs_tools = pytest.mark.skipif(
+        not emulator.available() or not os.path.exists(ADVENTURE),
+        reason="sjasmplus and ZEsarUX must be in tools/, with a decompiled adventure",
+    )
+else:
+
+    def needs_tools(func):
+        return func
+
+
+def build():
+    with open(ADVENTURE, encoding="utf-8") as f:
+        ddb = json.load(f)
+    subprocess.run(
+        [sys.executable, "-m", "regac", "build", ADVENTURE, DATABASE, "-m", "spectrum48"],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+    )
+    return ddb, emulator.assemble(SOURCE, listing=LISTING)
+
+
+def glyph_table(database):
+    font = Reader(database.build()).section(S_FONT)
+    first, count = font[0], font[1]
+    table = {}
+    for index in range(count):
+        glyph = bytes(font[2 + index * 8 : 10 + index * 8])
+        table.setdefault(glyph, database.store.charset.chars[first + index])
+    return table
+
+
+def screen(session, glyphs):
+    memory = session.read(TEXT_THIRD, 2048)
+    lines = []
+    for row in range(8):
+        line = "".join(
+            glyphs.get(bytes(memory[p * 256 + row * 32 + c] for p in range(8)), "?")
+            for c in range(32)
+        )
+        lines.append(line.rstrip())
+    return lines
+
+
+@needs_tools
+def test_it_describes_asks_and_answers():
+    ddb, listing = build()
+    database = Database(ddb)
+    glyphs = glyph_table(database)
+    where = ddb["locations"][str(ddb["init_loc"])]["desc"]
+    prompt = ddb["messages"]["240"]
+    puzzled = ddb["messages"][NOT_UNDERSTOOD]
+
+    session = emulator.Session()
+    try:
+        session.load(SNAPSHOT)
+        time.sleep(2.0)
+        opening = screen(session, glyphs)
+        assert any(where[:16] in line for line in opening), (
+            f"the room was never described: {opening}"
+        )
+        assert any(prompt.strip()[:3] in line for line in opening if line), (
+            f"the interpreter never asked: {opening}"
+        )
+
+        # A word the adventure does not know, so it has to say so.
+        session.type("XYZZY" + ENTER)
+        time.sleep(2.0)
+        answered = screen(session, glyphs)
+    finally:
+        session.close()
+
+    assert answered != opening, "typing changed nothing on screen"
+    assert any(puzzled[:10] in line for line in answered), (
+        f"expected {puzzled!r} somewhere in {answered}"
+    )
+
+
+if __name__ == "__main__":
+    test_it_describes_asks_and_answers()
+    print("the interpreter plays")

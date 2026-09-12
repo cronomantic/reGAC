@@ -778,7 +778,10 @@ op_if:
                 jr      nz, .true
                 ld      a, 1
                 ld      (vm_skip), a
+                jp      vm_loop
 .true:
+                ld      a, 1
+                ld      (vm_if_true), a         ; something took the order
                 jp      vm_loop
 
 op_end:

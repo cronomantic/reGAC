@@ -17,6 +17,7 @@ start:
                 xor     a
                 out     ($FE), a        ; black border
                 call    db_init
+                call    config_init
                 call    text_init
                 call    screen_init
 
@@ -43,6 +44,7 @@ start:
 done_flag:      db      0
 
                 include "../common/database.asm"
+                include "../common/config.asm"
                 include "../common/unpack.asm"
                 include "screen.asm"
                 include "../common/conditions.asm"

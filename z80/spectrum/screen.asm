@@ -29,21 +29,6 @@ screen_init:
                 ld      (font_count), a
                 inc     hl
                 ld      (font_glyphs), hl
-                ; the config holds the digits, then the punctuation; the
-                ; first of the punctuation is the space
-                ld      a, SECTION_CONFIG
-                call    db_section
-                push    hl
-                ld      de, CONFIG_DIGITS
-                add     hl, de
-                ld      de, digit_codes
-                ld      bc, 10
-                ldir
-                pop     hl
-                ld      de, CONFIG_PUNCTUATION
-                add     hl, de
-                ld      a, (hl)
-                ld      (space_code), a
                 ; fall through
 
 ; Clear the text window and put the cursor at its top left.
@@ -171,6 +156,31 @@ print_char:
                 ld      (cursor_x), a
                 ret
 
+; Step back one place and rub out what was there.
+; Corrupts: AF, BC, DE, HL
+backspace:
+                ld      a, (cursor_x)
+                or      a
+                jr      nz, .same_line
+                ld      a, (cursor_y)
+                cp      TEXT_TOP
+                ret     z                       ; nothing left to rub out
+                dec     a
+                ld      (cursor_y), a
+                ld      a, SCREEN_COLS - 1
+                jr      .place
+.same_line:
+                dec     a
+.place:
+                ld      (cursor_x), a
+                call    cursor_address
+                ld      b, 8
+.row:
+                ld      (hl), 0
+                inc     h
+                djnz    .row
+                ret
+
 ; Print BC characters from HL, breaking between words so none is split.
 ; Corrupts: AF, BC, DE, HL
 print_text:
@@ -249,7 +259,5 @@ print_text:
 font_glyphs:    dw      0
 font_first:     db      0
 font_count:     db      0
-space_code:     db      0
-digit_codes:    ds      10
 cursor_x:       db      0
 cursor_y:       db      TEXT_TOP

@@ -320,6 +320,7 @@ vm_sp:          dw      0
 vm_arg:         dw      0
 find_id:        dw      0
 vm_skip:        db      0
+vm_if_true:     db      0                       ; some IF came out true
 vm_done:        db      0                       ; the turn is over
 vm_over:        db      0                       ; the game is over
 vm_new_room:    db      0                       ; the room wants describing
