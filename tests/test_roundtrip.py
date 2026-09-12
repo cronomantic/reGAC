@@ -18,7 +18,10 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
 from regac.conds import compile_block, render_block  # noqa: E402
-from regac.gfx import CHAR_WIDTH, PICTURE_ROWS, Renderer  # noqa: E402
+from regac.devices import SpectrumDevice, make  # noqa: E402
+from regac.gfx import SOURCE_ROWS, Renderer  # noqa: E402
+CHAR_WIDTH = SpectrumDevice.char_width
+PICTURE_ROWS = SOURCE_ROWS
 from regac.srcgen import generate  # noqa: E402
 from regac.srcparse import parse  # noqa: E402
 
@@ -130,8 +133,20 @@ def test_every_picture_draws(path):
 def test_the_origin_is_at_the_bottom():
     """GAC counts y upwards from the bottom of the screen, as BASIC did."""
     picture = Renderer({1: [["PLOT", 0, 175], ["PLOT", 255, 48]]}).run(1)
-    assert picture.get(0, 0) == 1, "y=175 should be the top row"
-    assert picture.get(255, PICTURE_ROWS - 1) == 1, "y=48 should be the bottom row"
+    assert picture.is_boundary(0, 0), "y=175 should be the top row"
+    assert picture.is_boundary(255, PICTURE_ROWS - 1), "y=48 should be the bottom row"
+
+
+def test_a_fill_covers_the_same_ground_on_every_machine():
+    """The whole point of the device split: a picture must come out the same
+    on a machine that stores colour per pixel as on the original."""
+    gfx = {1: [["RECT", 64, 100, 120, 60], ["PAPER", 2], ["BGFILL", 80, 80],
+               ["SHADE", 80, 80]]}
+    spectrum = Renderer(gfx, make("spectrum"))
+    spectrum.run(1)
+    sam = Renderer(gfx, make("sam"))
+    sam.run(1)
+    assert spectrum.fill_coverage == sam.fill_coverage
 
 
 def test_a_fill_stays_inside_the_lines():
@@ -163,12 +178,13 @@ if __name__ == "__main__":
         test_dangling_value_is_preserved,
         test_the_origin_is_at_the_bottom,
         test_a_fill_stays_inside_the_lines,
+        test_a_fill_covers_the_same_ground_on_every_machine,
     ):
         try:
             check()
         except AssertionError:
             failures += 1
             print(f"FAIL {check.__name__}")
-    total = len(DATABASES) * 3 + 5
+    total = len(DATABASES) * 3 + 6
     print(f"{total - failures}/{total} checks passed")
     sys.exit(1 if failures else 0)

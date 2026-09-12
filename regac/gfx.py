@@ -20,108 +20,104 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 #
-"""Renderer for the vector graphics of a GAC adventure.
+"""The picture interpreter.
 
-The adventures store each picture as a short list of drawing commands.  This
-module turns that list into a plain bitmap plus a colour attribute per 8x8
-cell, which is the shape every target machine can then paint in its own way.
+An adventure stores each picture as a short list of drawing commands.  This
+module walks that list; the machine it draws on is a `Device`, which is the
+only part that changes from one target to another.  The split is the same one
+the 8 bit runtime will have: one shared command interpreter in Z80, and a
+handful of primitives written once per machine.
 
-Coordinates are the ones the Spectrum used: x from 0 to 255 left to right, y
-from 0 at the bottom of the screen to 175 at the top.  The pictures occupy the
-top sixteen character rows, leaving the bottom eight for text.
-
-Colour values follow the same conventions BASIC used: 8 means leave the current
-colour alone and 9 means pick black or white for contrast.
+Coordinates in the commands are the ones the Spectrum used: x from 0 to 255
+left to right, y from 0 at the bottom of the screen to 175 at the top.  A
+device maps them to its own screen, so scaling happens before anything is
+rasterised and lines stay joined up.
 """
 
-SCREEN_WIDTH = 256
-SCREEN_HEIGHT = 192
-CHAR_WIDTH = SCREEN_WIDTH // 8
-CHAR_HEIGHT = SCREEN_HEIGHT // 8
-PICTURE_ROWS = 128  # the top sixteen character rows
+SOURCE_WIDTH = 256  # the coordinate space the commands are written in
+SOURCE_ROWS = 128  # the picture is the top sixteen character rows
 MAX_Y = 175  # y=175 is the top pixel row
 
-TRANSPARENT = 8
-CONTRAST = 9
-SHADE_PATTERN = 0  # checkerboard, see shaded()
+TRANSPARENT = 8  # colour 8 means leave the colour alone, as in BASIC
+CONTRAST = 9  # colour 9 means pick black or white, whichever reads
+
+# What a filled pixel should become.
+INK = "ink"  # recolour it, leaving any mark alone
+PAPER = "paper"  # recolour it and wipe any mark
+SHADE = "shade"  # lay a half tone over it
 
 
 def shaded(x, y):
-    """The dither SHADE paints: every other pixel of every other row."""
-    return (x + y) & 1 == SHADE_PATTERN
+    """The dither SHADE lays down: every other pixel of every other row."""
+    return (x + y) & 1 == 0
 
 
-class Picture:
-    """A bitmap and its colour attributes, in the linear layout the frontends
-    use: one bit per pixel, `CHAR_WIDTH` bytes per row."""
+class Device:
+    """What a target machine has to provide for pictures to be drawn on it.
 
-    def __init__(self):
-        self.pixels = bytearray(CHAR_WIDTH * SCREEN_HEIGHT)
-        self.attrs = bytearray([0x38] * (CHAR_WIDTH * CHAR_HEIGHT))
-        self.border = 0
+    A device owns its screen, its colour model and its resolution.  Everything
+    above this line is shared between machines.
+    """
 
-    def get(self, x, y):
-        if not (0 <= x < SCREEN_WIDTH and 0 <= y < PICTURE_ROWS):
-            return 1  # outside the picture counts as a boundary
-        return (self.pixels[y * CHAR_WIDTH + (x >> 3)] >> (7 - (x & 7))) & 1
+    name = "device"
+    width = SOURCE_WIDTH  # its own picture area, in its own pixels
+    height = SOURCE_ROWS
 
-    def set(self, x, y, on=True):
-        if not (0 <= x < SCREEN_WIDTH and 0 <= y < PICTURE_ROWS):
-            return
-        index = y * CHAR_WIDTH + (x >> 3)
-        mask = 1 << (7 - (x & 7))
-        if on:
-            self.pixels[index] |= mask
-        else:
-            self.pixels[index] &= 0xFF ^ mask
+    def to_device(self, x, y):
+        """Map a coordinate of the commands onto this screen."""
+        return x, MAX_Y - y
 
-    def set_attr(self, x, y, attr):
-        if not (0 <= x < SCREEN_WIDTH and 0 <= y < PICTURE_ROWS):
-            return
-        self.attrs[(y >> 3) * CHAR_WIDTH + (x >> 3)] = attr
+    def set_border(self, colour):
+        raise NotImplementedError
+
+    def set_colours(self, ink, paper, bright, flash):
+        raise NotImplementedError
+
+    def draw_point(self, x, y):
+        """Put down an outline pixel.  It also becomes a boundary for fills."""
+        raise NotImplementedError
+
+    def is_boundary(self, x, y):
+        """Whether a fill has to stop here.  Off screen always stops it."""
+        raise NotImplementedError
+
+    def fill_point(self, x, y, mode):
+        """Paint one pixel inside a region a fill has reached."""
+        raise NotImplementedError
+
+    def to_rgb(self):
+        """The finished picture as rows of (red, green, blue), for saving and
+        for comparing one machine against another."""
+        raise NotImplementedError
 
 
 class Renderer:
-    """Runs the drawing commands of one picture over a `Picture`."""
+    """Runs the drawing commands of a picture on a device."""
 
     MAX_DEPTH = 8  # a picture may call others; stop runaway recursion
 
-    def __init__(self, gfx, picture=None):
+    def __init__(self, gfx, device=None):
+        from .devices import SpectrumDevice
+
         self.gfx = gfx  # id -> list of commands
-        self.pic = picture or Picture()
+        self.device = device if device is not None else SpectrumDevice()
         self.ink = 0
         self.paper = 7
         self.bright = 0
         self.flash = 0
+        self.fill_coverage = []  # pixels each fill command reached, in order
+        self.__push_colours()
 
-    # -- colour -------------------------------------------------------------
-
-    def attr_at(self, x, y):
-        """The attribute to write at a point, honouring transparency."""
-        current = self.pic.attrs[(y >> 3) * CHAR_WIDTH + (x >> 3)]
-        ink = current & 7 if self.ink >= TRANSPARENT else self.ink
-        paper = (current >> 3) & 7 if self.paper >= TRANSPARENT else self.paper
-        bright = (current >> 6) & 1 if self.bright >= TRANSPARENT else self.bright
-        flash = (current >> 7) & 1 if self.flash >= TRANSPARENT else self.flash
-        if self.ink == CONTRAST:
-            ink = 0 if paper >= 4 else 7
-        return ink | (paper << 3) | (bright << 6) | (flash << 7)
-
-    def paint(self, x, y):
-        self.pic.set_attr(x, y, self.attr_at(x, y))
+    def __push_colours(self):
+        self.device.set_colours(self.ink, self.paper, self.bright, self.flash)
 
     # -- primitives ---------------------------------------------------------
 
-    @staticmethod
-    def to_screen(y):
-        return MAX_Y - y
-
-    def plot(self, x, y, on=True):
-        self.pic.set(x, y, on)
-        self.paint(x, y)
+    def plot(self, x, y):
+        self.device.draw_point(x, y)
 
     def line(self, x0, y0, x1, y1):
-        """Bresenham, in screen coordinates."""
+        """Bresenham, in the device's own pixels."""
         dx = abs(x1 - x0)
         dy = -abs(y1 - y0)
         sx = 1 if x0 < x1 else -1
@@ -152,7 +148,9 @@ class Renderer:
             self.plot(x1, y)
 
     def ellipse(self, x0, y0, x1, y1):
-        """An ellipse inscribed in the given box, drawn by midpoint stepping."""
+        """An ellipse inscribed in the given box, walked round in steps."""
+        from math import cos, pi, sin
+
         if x0 > x1:
             x0, x1 = x1, x0
         if y0 > y1:
@@ -163,92 +161,88 @@ class Renderer:
             self.line(x0, y0, x1, y1)
             return
         steps = int(max(rx, ry) * 8) or 1
-        from math import cos, pi, sin
-
-        prev = None
+        previous = None
         for step in range(steps + 1):
             angle = 2 * pi * step / steps
             point = (int(round(cx + rx * cos(angle))), int(round(cy + ry * sin(angle))))
-            if prev is not None and prev != point:
-                self.line(prev[0], prev[1], point[0], point[1])
-            elif prev is None:
+            if previous is None:
                 self.plot(*point)
-            prev = point
+            elif previous != point:
+                self.line(previous[0], previous[1], point[0], point[1])
+            previous = point
 
     def flood(self, x, y, mode):
-        """Flood the area around a point, bounded by pixels already set.
+        """Spread out from a point until the boundaries stop it.
 
-        `mode` is "ink" to fill it solid, "paper" to leave the pixels clear and
-        only recolour the cells, or "shade" to fill it with a dither.
+        The algorithm is the same on every machine; what differs is what
+        counts as a boundary and what painting a pixel means, and both of
+        those belong to the device.
         """
-        if self.pic.get(x, y):
-            return
+        reached = 0
+        if self.device.is_boundary(x, y):
+            self.fill_coverage.append(reached)
+            return reached
+        device = self.device
         seen = set()
         stack = [(x, y)]
         while stack:
             px, py = stack.pop()
-            if (px, py) in seen or self.pic.get(px, py):
+            if (px, py) in seen or device.is_boundary(px, py):
                 continue
-            # walk the whole run of clear pixels on this row
             left = px
-            while left > 0 and not self.pic.get(left - 1, py):
+            while left > 0 and not device.is_boundary(left - 1, py):
                 left -= 1
             right = px
-            while right < SCREEN_WIDTH - 1 and not self.pic.get(right + 1, py):
+            while right < device.width - 1 and not device.is_boundary(right + 1, py):
                 right += 1
             for sx in range(left, right + 1):
                 seen.add((sx, py))
-                self.paint(sx, py)
-                if mode == "paper":
-                    self.pic.set(sx, py, False)
-                elif mode == "shade" and shaded(sx, py):
-                    self.pic.set(sx, py, True)
+                device.fill_point(sx, py, mode)
+                reached += 1
             for ny in (py - 1, py + 1):
-                if 0 <= ny < PICTURE_ROWS:
+                if 0 <= ny < device.height:
                     for sx in range(left, right + 1):
-                        if (sx, ny) not in seen and not self.pic.get(sx, ny):
+                        if (sx, ny) not in seen and not device.is_boundary(sx, ny):
                             stack.append((sx, ny))
-        return
+        self.fill_coverage.append(reached)
+        return reached
 
     # -- command dispatch ---------------------------------------------------
 
     def run(self, picture_id, depth=0):
-        commands = self.gfx.get(picture_id) or self.gfx.get(str(picture_id))
+        commands = self.gfx.get(picture_id)
+        if commands is None:
+            commands = self.gfx.get(str(picture_id))
         if commands is None or depth > self.MAX_DEPTH:
-            return self.pic
-        y = self.to_screen
+            return self.device
+        point = self.device.to_device
         for command in commands:
             name = command[0]
             args = command[1:]
             if name == "BORDER":
-                self.pic.border = args[0] & 7
-            elif name == "INK":
-                self.ink = args[0]
-            elif name == "PAPER":
-                self.paper = args[0]
-            elif name == "BRIGHT":
-                self.bright = args[0]
-            elif name == "FLASH":
-                self.flash = args[0]
+                self.device.set_border(args[0] & 7)
+            elif name in ("INK", "PAPER", "BRIGHT", "FLASH"):
+                setattr(self, name.lower(), args[0])
+                self.__push_colours()
             elif name == "PLOT":
-                self.plot(args[0], y(args[1]))
+                self.plot(*point(args[0], args[1]))
             elif name == "LINE":
-                self.line(args[0], y(args[1]), args[2], y(args[3]))
+                self.line(*point(args[0], args[1]), *point(args[2], args[3]))
             elif name == "RECT":
-                self.rect(args[0], y(args[1]), args[2], y(args[3]))
+                self.rect(*point(args[0], args[1]), *point(args[2], args[3]))
             elif name == "ELLIPSE":
-                self.ellipse(args[0], y(args[1]), args[2], y(args[3]))
+                self.ellipse(*point(args[0], args[1]), *point(args[2], args[3]))
             elif name == "FILL":
-                self.flood(args[0], y(args[1]), "ink")
+                self.flood(*point(args[0], args[1]), INK)
             elif name == "BGFILL":
-                self.flood(args[0], y(args[1]), "paper")
+                self.flood(*point(args[0], args[1]), PAPER)
             elif name == "SHADE":
-                self.flood(args[0], y(args[1]), "shade")
+                self.flood(*point(args[0], args[1]), SHADE)
             elif name == "CALL":
                 self.run(args[0], depth + 1)
-        return self.pic
+        return self.device
 
 
-def render(gfx, picture_id):
-    """Draw one picture and return it."""
-    return Renderer(gfx).run(picture_id)
+def render(gfx, picture_id, device=None):
+    """Draw one picture and return the device it was drawn on."""
+    return Renderer(gfx, device).run(picture_id)

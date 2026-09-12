@@ -11,8 +11,11 @@ import argparse
 import gettext
 import json
 
-from regac.gfx import CHAR_WIDTH as GFX_CHAR_WIDTH
-from regac.gfx import PICTURE_ROWS, Renderer
+from regac.devices import SpectrumDevice
+from regac.gfx import SOURCE_ROWS as PICTURE_ROWS
+from regac.gfx import Renderer
+
+GFX_CHAR_WIDTH = SpectrumDevice.char_width
 from runGAC import GAC_Interpreter
 
 

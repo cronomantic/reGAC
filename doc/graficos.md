@@ -79,6 +79,62 @@ ocho aventuras apunta a memoria y no a la ROM. Redefinir ahí la fuente sólo
 sirve de algo si se imprime con las rutinas del ROM, que son las que
 implementan ese reparto de pantalla.
 
+## Cómo se hace multiplataforma
+
+El motor se parte en dos. Un intérprete de órdenes común, que en el Z80 se
+escribirá una sola vez porque las cinco máquinas lo son, y debajo un dispositivo
+por máquina que aporta seis primitivas: fijar el borde, fijar los colores en
+curso, poner un punto, decir si una posición corta un relleno, pintar un píxel
+dentro de un relleno y volcar el resultado. El rectángulo y la elipse se
+construyen sobre la recta y viven en el código común.
+
+En el PC eso es [`regac/gfx.py`](../regac/gfx.py) para el intérprete y
+[`regac/devices.py`](../regac/devices.py) para las máquinas. Sirve de referencia
+contra la que validar cada capa en ensamblador.
+
+### Las dos familias de color
+
+Spectrum y MSX llevan color por bloque de píxeles. Amstrad, Sam Coupé y Next lo
+llevan por píxel y no tienen limitación de atributos, pero entonces un píxel
+encendido ya no marca el borde de una figura y el relleno no sabe dónde parar.
+Esas tres necesitan un plano de máscara de un bit, que cuesta 4 KB.
+
+Y esa máscara tiene que seguir exactamente las mismas reglas que el mapa de bits
+del Spectrum. Ahí me equivoqué al principio: el medio tono enciende píxeles de
+verdad, que luego frenan a los rellenos siguientes, y el relleno de fondo los
+apaga, que les abre paso. Los dibujantes trabajaron contra ese comportamiento.
+Con la máscara sin actualizar, ciento un rellenos del Quijote que en el original
+se quedaban parados inundaban la pantalla en el Sam.
+
+### No escalar
+
+El área de dibujo original es de 256 por 128, y las cinco máquinas pueden
+mostrar 256 píxeles de ancho. El Amstrad en modo 1 tiene 320, así que invita a
+estirar. No hay que hacerlo.
+
+Estirar obliga a volver a trazar las rectas en la resolución destino, y dos
+segmentos que en el original se tocaban pueden dejar de tocarse. El relleno se
+cuela por esa rendija. Medido sobre los 7760 rellenos de las ocho aventuras:
+
+| Variante del Amstrad | Rellenos que discrepan | De ellos, graves |
+|---|---|---|
+| 256 centrado en los 320 | 0 | 0 |
+| Estirado a 320 | 776 | 236 |
+
+Grave quiere decir que el relleno cubre más de media pantalla de diferencia, o
+sea que la lámina queda destrozada. Centrar la imagen y dejar un margen de 32
+píxeles a cada lado no cuesta nada a la vista y evita la clase entera de
+problema.
+
+### Verificarlo
+
+La orden `checkgfx` dibuja cada lámina en el Spectrum y en la máquina destino y
+compara cuánta pantalla cubre cada relleno. Es la prueba que encontró las dos
+cosas de arriba, y la que conviene pasar cada vez que se toque un dispositivo o
+se añada una máquina.
+
+    python -m regac checkgfx partida.json -m cpc
+
 ## Lo que queda por confirmar
 
 La diferencia exacta entre `FILL` y `BGFILL` se ha deducido, no verificado

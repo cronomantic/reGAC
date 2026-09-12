@@ -27,6 +27,7 @@ import json
 import os
 import sys
 
+from .devices import DEVICES, make
 from .gfx import Renderer
 from .png import save_picture
 from .srcgen import generate
@@ -85,6 +86,7 @@ def cmd_check(args):
 def cmd_render(args):
     """Draw one picture of an adventure, or all of them, as PNG files."""
     gfx = read_json(args.input)["gfx"]
+    machine = args.machine
     if args.picture is not None:
         wanted = [str(args.picture)]
     else:
@@ -94,13 +96,51 @@ def cmd_render(args):
     for pid in wanted:
         if pid not in gfx:
             sys.exit(f"ERROR: there is no picture {pid}")
-        picture = Renderer(gfx).run(int(pid))
+        picture = Renderer(gfx, make(machine)).run(int(pid))
         if os.path.isdir(args.output):
             path = os.path.join(args.output, f"{pid}.png")
         else:
             path = args.output
         save_picture(path, picture, scale=args.scale)
         print(f"picture {pid} -> {path}")
+
+
+def cmd_checkgfx(args):
+    """Compare the pictures on a target machine against the Spectrum.
+
+    A fill spreads until the outlines stop it, so a change of resolution can
+    let one escape through a gap the scaling opened, or strand its starting
+    point on the wrong side of a line.  Comparing how much of the screen each
+    fill reaches on each machine catches exactly that.
+    """
+    gfx = read_json(args.input)["gfx"]
+    name = os.path.basename(args.input)
+    suspect = 0
+    for pid in sorted(gfx, key=int):
+        reference = Renderer(gfx, make("spectrum"))
+        reference.run(int(pid))
+        target = Renderer(gfx, make(args.machine))
+        target.run(int(pid))
+        ref_area = reference.device.width * reference.device.height
+        out_area = target.device.width * target.device.height
+        if len(reference.fill_coverage) != len(target.fill_coverage):
+            print(f"  picture {pid}: the two runs filled a different number of times")
+            suspect += 1
+            continue
+        for n, (a, b) in enumerate(
+            zip(reference.fill_coverage, target.fill_coverage), 1
+        ):
+            share_a = a / ref_area
+            share_b = b / out_area
+            if abs(share_a - share_b) > args.tolerance:
+                print(
+                    f"  picture {pid}, fill {n}: covers {share_a:.0%} of the screen "
+                    f"on the spectrum but {share_b:.0%} on the {args.machine}"
+                )
+                suspect += 1
+    if suspect:
+        sys.exit(f"{name}: {suspect} fills differ on the {args.machine}")
+    print(f"{name}: every fill covers the same ground on the {args.machine}")
 
 
 def main():
@@ -122,7 +162,28 @@ def main():
     p.add_argument("output", help="PNG file, or a directory for several")
     p.add_argument("-p", "--picture", type=int, help="one picture id (default: all)")
     p.add_argument("-s", "--scale", type=int, default=2, help="pixel scale")
+    p.add_argument(
+        "-m",
+        "--machine",
+        default="spectrum",
+        choices=sorted(DEVICES),
+        help="which machine to draw for (default: spectrum)",
+    )
     p.set_defaults(func=cmd_render)
+
+    p = sub.add_parser(
+        "checkgfx", help="compare the pictures on a machine against the Spectrum"
+    )
+    p.add_argument("input", help="JSON database")
+    p.add_argument("-m", "--machine", required=True, choices=sorted(DEVICES))
+    p.add_argument(
+        "-t",
+        "--tolerance",
+        type=float,
+        default=0.05,
+        help="how much of the screen a fill may differ by (default: 0.05)",
+    )
+    p.set_defaults(func=cmd_checkgfx)
 
     p = sub.add_parser("check", help="verify that a database survives a round trip")
     p.add_argument("input", help="JSON database")

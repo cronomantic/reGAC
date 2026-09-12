@@ -15,7 +15,8 @@ Implementation of a decompiler and simple interpreter for Graphic Adventure Crea
 python -m regac decompile game.json game.gac
 python -m regac compile   game.gac  game.json
 python -m regac check     game.json
-python -m regac render    game.json pictures/
+python -m regac render    game.json pictures/ -m spectrum
+python -m regac checkgfx  game.json -m cpc
 ```
 
 --
