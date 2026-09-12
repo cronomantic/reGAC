@@ -138,15 +138,29 @@ def test_the_origin_is_at_the_bottom():
 
 
 def test_a_fill_covers_the_same_ground_on_every_machine():
-    """The whole point of the device split: a picture must come out the same
-    on a machine that stores colour per pixel as on the original."""
+    """The whole point of the device split.  Every machine that keeps the
+    original 256 pixels across must fill exactly the same ground, whether it
+    carries colour per cell, per row of eight, or per pixel."""
     gfx = {1: [["RECT", 64, 100, 120, 60], ["PAPER", 2], ["BGFILL", 80, 80],
                ["SHADE", 80, 80]]}
     spectrum = Renderer(gfx, make("spectrum"))
     spectrum.run(1)
-    sam = Renderer(gfx, make("sam"))
-    sam.run(1)
-    assert spectrum.fill_coverage == sam.fill_coverage
+    for machine in ("sam", "next", "msx", "msx2", "cpc"):
+        target = Renderer(gfx, make(machine))
+        target.run(1)
+        assert spectrum.fill_coverage == target.fill_coverage, machine
+
+
+def test_every_machine_draws_the_same_picture():
+    """A picture drawn on each machine must come out the same size as that
+    machine's screen, and never blank."""
+    gfx = {1: [["RECT", 40, 160, 200, 60], ["PAPER", 4], ["BGFILL", 120, 110]]}
+    for machine in ("spectrum", "sam", "next", "msx", "msx2", "cpc"):
+        device = Renderer(gfx, make(machine)).run(1)
+        rows = device.to_rgb()
+        assert len(rows) == device.height, machine
+        assert len(rows[0]) == device.width, machine
+        assert len({tuple(p) for row in rows for p in row}) > 1, machine
 
 
 def test_a_fill_stays_inside_the_lines():
@@ -179,12 +193,13 @@ if __name__ == "__main__":
         test_the_origin_is_at_the_bottom,
         test_a_fill_stays_inside_the_lines,
         test_a_fill_covers_the_same_ground_on_every_machine,
+        test_every_machine_draws_the_same_picture,
     ):
         try:
             check()
         except AssertionError:
             failures += 1
             print(f"FAIL {check.__name__}")
-    total = len(DATABASES) * 3 + 6
+    total = len(DATABASES) * 3 + 7
     print(f"{total - failures}/{total} checks passed")
     sys.exit(1 if failures else 0)

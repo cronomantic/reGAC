@@ -94,10 +94,17 @@ contra la que validar cada capa en ensamblador.
 
 ### Las dos familias de color
 
-Spectrum y MSX llevan color por bloque de píxeles. Amstrad, Sam Coupé y Next lo
-llevan por píxel y no tienen limitación de atributos, pero entonces un píxel
-encendido ya no marca el borde de una figura y el relleno no sabe dónde parar.
-Esas tres necesitan un plano de máscara de un bit, que cuesta 4 KB.
+Spectrum y MSX1 llevan color por bloque de píxeles, con un matiz importante: el
+Spectrum lo lleva por celda de ocho por ocho y el MSX1 en modo 2 por franja de
+ocho de ancho y una de alto, así que su limitación es la misma en horizontal y
+mucho más suave en vertical. Además el MSX1 no tiene brillo ni parpadeo, y sus
+quince colores no son los del Spectrum, de modo que cada color se traduce al más
+parecido que esa máquina tenga.
+
+Amstrad, Sam Coupé, Next y el MSX2 en modo 5 llevan color por píxel y no tienen
+limitación ninguna, pero entonces un píxel encendido ya no marca el borde de una
+figura y el relleno no sabe dónde parar. Ésas necesitan un plano de máscara de
+un bit, que cuesta 4 KB.
 
 Y esa máscara tiene que seguir exactamente las mismas reglas que el mapa de bits
 del Spectrum. Ahí me equivoqué al principio: el medio tono enciende píxeles de

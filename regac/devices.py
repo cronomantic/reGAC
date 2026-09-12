@@ -69,51 +69,23 @@ def nearest(colour, palette):
     return best
 
 
-class SpectrumDevice(Device):
-    """Colour per eight by eight cell, one bit per pixel.  The original."""
+class BitmapDevice(Device):
+    """A machine with one bit per pixel, where a lit pixel is what stops a
+    fill.  How colour is carried is left to the machine underneath."""
 
-    name = "spectrum"
     width = SOURCE_WIDTH
     height = SOURCE_ROWS
     char_width = SOURCE_WIDTH // CHAR_SIDE
-    palette = SPECTRUM_PALETTE
 
-    def __init__(self):
-        # The buffers cover the whole screen, not just the picture, because
+    def init_bitmap(self):
+        # The buffer covers the whole screen, not just the picture, because
         # the frontends print text into the rows below.
         self.pixels = bytearray(self.char_width * 192)
-        self.attrs = bytearray([0x38] * (self.char_width * 24))
-        self.border = 0
-        self.ink = 0
-        self.paper = 7
-        self.bright = 0
-        self.flash = 0
-
-    # -- the picture interpreter's view -------------------------------------
-
-    def set_border(self, colour):
-        self.border = colour
-
-    def set_colours(self, ink, paper, bright, flash):
-        self.ink, self.paper, self.bright, self.flash = ink, paper, bright, flash
-
-    def draw_point(self, x, y):
-        self.set_pixel(x, y, True)
-        self.set_attr(x, y)
 
     def is_boundary(self, x, y):
         if not (0 <= x < self.width and 0 <= y < self.height):
             return True
         return (self.pixels[y * self.char_width + (x >> 3)] >> (7 - (x & 7))) & 1
-
-    def fill_point(self, x, y, mode):
-        self.set_attr(x, y)
-        if mode == PAPER:
-            self.set_pixel(x, y, False)
-        elif mode == SHADE and shaded(x, y):
-            self.set_pixel(x, y, True)
-
-    # -- its own screen -----------------------------------------------------
 
     def set_pixel(self, x, y, on):
         if not (0 <= x < self.width and 0 <= y < self.height):
@@ -124,6 +96,44 @@ class SpectrumDevice(Device):
             self.pixels[index] |= mask
         else:
             self.pixels[index] &= 0xFF ^ mask
+
+    def draw_point(self, x, y):
+        self.set_pixel(x, y, True)
+        self.set_colour_at(x, y)
+
+    def fill_point(self, x, y, mode):
+        self.set_colour_at(x, y)
+        if mode == PAPER:
+            self.set_pixel(x, y, False)
+        elif mode == SHADE and shaded(x, y):
+            self.set_pixel(x, y, True)
+
+    def set_colour_at(self, x, y):
+        """Give the point the colours in force, however this machine stores
+        them."""
+        raise NotImplementedError
+
+
+class SpectrumDevice(BitmapDevice):
+    """Colour per eight by eight cell, one bit per pixel.  The original."""
+
+    name = "spectrum"
+    palette = SPECTRUM_PALETTE
+
+    def __init__(self):
+        self.init_bitmap()
+        self.attrs = bytearray([0x38] * (self.char_width * 24))
+        self.border = 0
+        self.ink = 0
+        self.paper = 7
+        self.bright = 0
+        self.flash = 0
+
+    def set_border(self, colour):
+        self.border = colour
+
+    def set_colours(self, ink, paper, bright, flash):
+        self.ink, self.paper, self.bright, self.flash = ink, paper, bright, flash
 
     def attr_at(self, x, y):
         """The attribute to write at a point, honouring transparency."""
@@ -136,7 +146,7 @@ class SpectrumDevice(Device):
             ink = 0 if paper >= 4 else 7
         return ink | (paper << 3) | (bright << 6) | (flash << 7)
 
-    def set_attr(self, x, y):
+    def set_colour_at(self, x, y):
         if not (0 <= x < self.width and 0 <= y < self.height):
             return
         self.attrs[(y >> 3) * self.char_width + (x >> 3)] = self.attr_at(x, y)
@@ -256,6 +266,79 @@ def next_device():
     return PixelDevice(SOURCE_WIDTH, SOURCE_ROWS, SPECTRUM_PALETTE, name="next")
 
 
+# The palette of the TMS9918 the MSX1 draws with, in the usual approximation
+# to RGB.  Entry zero is the transparent colour, which shows the backdrop; a
+# picture never wants it, so it is left out of the colour matching below.
+MSX1_PALETTE = [
+    0x000000, 0x000000, 0x3EB849, 0x74D07D,
+    0x5955E0, 0x8076F1, 0xB95E51, 0x65DBEF,
+    0xDB6559, 0xFF897D, 0xCCC35E, 0xDED087,
+    0x3AA241, 0xB766B5, 0xCCCCCC, 0xFFFFFF,
+]
+
+
+class MsxDevice(BitmapDevice):
+    """The MSX1 in screen 2.
+
+    One bit per pixel as on the Spectrum, so fills behave identically, but the
+    colour is carried per row of eight pixels rather than per eight by eight
+    cell.  The clash is therefore milder vertically and the same horizontally.
+    There is no bright and no flash, and the fifteen colours are not the
+    Spectrum's, so every colour is matched to the nearest this machine has.
+    """
+
+    name = "msx"
+    palette = MSX1_PALETTE
+
+    def __init__(self):
+        self.init_bitmap()
+        # Entry zero is transparent, so match against the rest and shift back.
+        self.map = [1 + nearest(c, self.palette[1:]) for c in SPECTRUM_PALETTE]
+        self.border = self.map[0]
+        self.ink = 0
+        self.paper = 7
+        start = (self.map[0] << 4) | self.map[7]
+        self.colours = bytearray([start]) * (self.char_width * 192)
+
+    def set_border(self, colour):
+        self.border = self.map[colour & 7]
+
+    def set_colours(self, ink, paper, bright, flash):
+        # Bright and flash have nowhere to go on this machine.
+        self.ink, self.paper = ink, paper
+
+    def cell(self, x, y):
+        return y * self.char_width + (x >> 3)
+
+    def set_colour_at(self, x, y):
+        if not (0 <= x < self.width and 0 <= y < self.height):
+            return
+        index = self.cell(x, y)
+        current = self.colours[index]
+        foreground = current >> 4 if self.ink >= TRANSPARENT else self.map[self.ink]
+        background = current & 15 if self.paper >= TRANSPARENT else self.map[self.paper]
+        if self.ink == CONTRAST:
+            foreground = self.map[0] if self.paper >= 4 else self.map[7]
+        self.colours[index] = (foreground << 4) | background
+
+    def to_rgb(self):
+        rows = []
+        for y in range(self.height):
+            row = []
+            for x in range(self.width):
+                colour = self.colours[self.cell(x, y)]
+                lit = (self.pixels[y * self.char_width + (x >> 3)] >> (7 - (x & 7))) & 1
+                row.append(rgb(self.palette[(colour >> 4) if lit else (colour & 15)]))
+            rows.append(row)
+        return rows
+
+
+# The MSX2 in screen 5: colour per pixel, sixteen at a time out of a palette
+# wide enough to hold the Spectrum's own colours, so nothing has to be matched.
+def msx2_device():
+    return PixelDevice(SOURCE_WIDTH, SOURCE_ROWS, SPECTRUM_PALETTE, name="msx2")
+
+
 # The Amstrad in mode 1: four colours at a time, which is the real constraint
 # of this target.  The screen is 320 pixels across but the picture keeps the
 # 256 of the original and sits centred, with a margin of 32 either side.
@@ -282,6 +365,8 @@ DEVICES = {
     "next": next_device,
     "cpc": cpc_device,
     "cpc-wide": cpc_stretched_device,
+    "msx": MsxDevice,
+    "msx2": msx2_device,
 }
 
 
