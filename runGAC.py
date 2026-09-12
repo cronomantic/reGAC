@@ -120,7 +120,16 @@ class GAC_Interpreter:
         self.old_noun = 0
         self.finished = False
         self.new_room = True
+        self.graphics = True
         self.statements = []
+
+    def draw_picture(self, graphic_id):
+        """Show the picture of a location.
+
+        The text only interpreter has nowhere to draw it, so this does nothing.
+        Frontends with a screen override it.
+        """
+        return
 
     def __check_ddb(ddb):
         default_keys = set(
@@ -399,6 +408,8 @@ class GAC_Interpreter:
         if not self.flags[self.LIGHTING_FLAG] and not self.flags[self.LAMP_FLAG]:
             self.print(self.messages[self.ITSDARK])
         else:
+            if self.graphics:
+                self.draw_picture(self.locations[loc]["graphic_id"])
             self.print(self.locations[loc]["desc"])
             objs = self.__get_location_objects(loc)
             if len(objs) > 0:
@@ -542,6 +553,19 @@ class GAC_Interpreter:
                     o = self.stack.pop()
                     if o in self.objects.keys():
                         self.objects[o]["loc"] = r
+                elif cmd == "BRIN":
+                    # Bring the object here, if it exists.
+                    o = self.stack.pop()
+                    if o in self.objects.keys():
+                        self.objects[o]["loc"] = self.current_loc
+                elif cmd == "FIND":
+                    # Move the player to the object, ignoring the connections.
+                    o = self.stack.pop()
+                    if o in self.objects.keys():
+                        loc = self.objects[o]["loc"]
+                        if loc in self.locations.keys():
+                            self.current_loc = loc
+                            self.__display_room(self.current_loc)
                 elif cmd == "OBJ":
                     o = self.stack.pop()
                     if o in self.objects.keys():
@@ -674,6 +698,13 @@ class GAC_Interpreter:
                             self.stack.append(0)
                     else:
                         self.stack.append(0)
+                elif cmd == "IN":
+                    r = self.stack.pop()
+                    o = self.stack.pop()
+                    if o in self.objects.keys() and self.objects[o]["loc"] == r:
+                        self.stack.append(1)
+                    else:
+                        self.stack.append(0)
                 elif cmd == "+":
                     s0 = self.stack.pop()
                     s1 = self.stack.pop()
@@ -785,11 +816,9 @@ class GAC_Interpreter:
                         if_true = True
                         skip = False
                 elif cmd == "PICT":
-                    # TODO
-                    pass
+                    self.graphics = True
                 elif cmd == "TEXT":
-                    # TODO
-                    pass
+                    self.graphics = False
                 elif cmd == "SAVE":
                     # TODO
                     pass

@@ -27,6 +27,8 @@ import json
 import os
 import sys
 
+from .gfx import Renderer
+from .png import save_picture
 from .srcgen import generate
 from .srcparse import SourceError, parse
 
@@ -80,6 +82,27 @@ def cmd_check(args):
     sys.exit(f"{name}: round trip differs in {', '.join(differing)}")
 
 
+def cmd_render(args):
+    """Draw one picture of an adventure, or all of them, as PNG files."""
+    gfx = read_json(args.input)["gfx"]
+    if args.picture is not None:
+        wanted = [str(args.picture)]
+    else:
+        wanted = sorted(gfx, key=int)
+    if not os.path.isdir(args.output) and len(wanted) > 1:
+        sys.exit(f"ERROR: {args.output} must be a directory for more than one picture")
+    for pid in wanted:
+        if pid not in gfx:
+            sys.exit(f"ERROR: there is no picture {pid}")
+        picture = Renderer(gfx).run(int(pid))
+        if os.path.isdir(args.output):
+            path = os.path.join(args.output, f"{pid}.png")
+        else:
+            path = args.output
+        save_picture(path, picture, scale=args.scale)
+        print(f"picture {pid} -> {path}")
+
+
 def main():
     parser = argparse.ArgumentParser("regac", description=f"ReGAC {VERSION}")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -93,6 +116,13 @@ def main():
     p.add_argument("input", help="source file")
     p.add_argument("output", help="JSON database to write")
     p.set_defaults(func=cmd_compile)
+
+    p = sub.add_parser("render", help="draw the pictures of an adventure as PNG")
+    p.add_argument("input", help="JSON database")
+    p.add_argument("output", help="PNG file, or a directory for several")
+    p.add_argument("-p", "--picture", type=int, help="one picture id (default: all)")
+    p.add_argument("-s", "--scale", type=int, default=2, help="pixel scale")
+    p.set_defaults(func=cmd_render)
 
     p = sub.add_parser("check", help="verify that a database survives a round trip")
     p.add_argument("input", help="JSON database")

@@ -7,13 +7,15 @@ Implementation of a decompiler and simple interpreter for Graphic Adventure Crea
 * deGAC.py: Parse a SNA Spectrum image file of a GAC adventure to extract data to a JSON file
 * runGAC.py: Simple interpreter for the previous JSON file. Text only.
 * runGAC_pygame.py: The same interpreter behind a Spectrum-like screen.
-* regac: Decompiler and compiler for the editable source format. See
-  [doc/formato-fuente.md](doc/formato-fuente.md).
+* regac: Decompiler and compiler for the editable source format, and the
+  renderer for the vector graphics. See [doc/formato-fuente.md](doc/formato-fuente.md)
+  and [doc/graficos.md](doc/graficos.md).
 
 ```
 python -m regac decompile game.json game.gac
 python -m regac compile   game.gac  game.json
 python -m regac check     game.json
+python -m regac render    game.json pictures/
 ```
 
 --

@@ -11,6 +11,8 @@ import argparse
 import gettext
 import json
 
+from regac.gfx import CHAR_WIDTH as GFX_CHAR_WIDTH
+from regac.gfx import PICTURE_ROWS, Renderer
 from runGAC import GAC_Interpreter
 
 
@@ -47,6 +49,9 @@ class GAC_Interpreter_Pygame(GAC_Interpreter):
     SCREEN_START_X = (WINDOW_WIDTH - SCREEN_WIDTH) >> 1
     SCREEN_START_Y = (WINDOW_HEIGHT - SCREEN_HEIGHT) >> 1
 
+    # A picture takes the top sixteen character rows, text lives below it.
+    PICTURE_CHAR_ROWS = PICTURE_ROWS >> 3
+
     def __init__(self, ddb):
         self.print_att = 0x07
         self.pxl_screen = [0 for x in range(self.CHAR_WIDTH * self.SCREEN_HEIGHT)]
@@ -64,6 +69,7 @@ class GAC_Interpreter_Pygame(GAC_Interpreter):
         self.waitkey_mode = False
         self.frame_count = 0
         self.input_txt = ""
+        self.text_top = 0  # first character row the text may use
 
         self.cmd_queue = queue.Queue()
         self.resp_queue = queue.Queue()
@@ -81,10 +87,13 @@ class GAC_Interpreter_Pygame(GAC_Interpreter):
         self._running = True
 
     def __scroll_up(self):
-        self.pxl_screen = self.pxl_screen[self.CHAR_WIDTH * 8 :] + [
-            0 for x in range(self.CHAR_WIDTH * 8)
-        ]
-        self.att_screen = self.att_screen[self.CHAR_WIDTH :] + [
+        """Scroll the text window, leaving any picture above it untouched."""
+        first_pxl = self.text_top * 8 * self.CHAR_WIDTH
+        first_att = self.text_top * self.CHAR_WIDTH
+        self.pxl_screen[first_pxl:] = self.pxl_screen[
+            first_pxl + (self.CHAR_WIDTH * 8) :
+        ] + [0 for x in range(self.CHAR_WIDTH * 8)]
+        self.att_screen[first_att:] = self.att_screen[first_att + self.CHAR_WIDTH :] + [
             self.print_att for x in range(self.CHAR_WIDTH)
         ]
 
@@ -100,15 +109,23 @@ class GAC_Interpreter_Pygame(GAC_Interpreter):
             self.att_screen[pos_att] &= 0x7F
 
     def cls(self):
+        """Clear the text window.  A picture on screen stays where it is."""
         self.cx = 0
-        self.cy = 0
-        self.pxl_screen = [0 for x in range(self.CHAR_WIDTH * self.SCREEN_HEIGHT)]
-        self.att_screen = [
-            self.print_att for x in range(self.CHAR_WIDTH * self.CHAR_HEIGHT)
+        self.cy = self.text_top
+        first_pxl = self.text_top * 8 * self.CHAR_WIDTH
+        first_att = self.text_top * self.CHAR_WIDTH
+        self.pxl_screen[first_pxl:] = [
+            0 for x in range(len(self.pxl_screen) - first_pxl)
+        ]
+        self.att_screen[first_att:] = [
+            self.print_att for x in range(len(self.att_screen) - first_att)
         ]
 
     def newline(self):
         self.cx = 0
+        if self.cy < self.text_top:
+            self.cy = self.text_top
+            return
         if self.cy == self.CHAR_HEIGHT - 1:
             self.__scroll_up()
             if self.scy > 0:
@@ -159,6 +176,27 @@ class GAC_Interpreter_Pygame(GAC_Interpreter):
         if self.input_mode:
             self.__toggle_cursor(True)
 
+    def __show_picture(self, graphic_id):
+        """Draw a picture into the top of the screen and put the text window
+        underneath it."""
+        picture = Renderer(self.gfx).run(graphic_id)
+        for row in range(PICTURE_ROWS):
+            start = row * self.CHAR_WIDTH
+            self.pxl_screen[start : start + self.CHAR_WIDTH] = list(
+                picture.pixels[row * GFX_CHAR_WIDTH : (row + 1) * GFX_CHAR_WIDTH]
+            )
+        for row in range(self.PICTURE_CHAR_ROWS):
+            start = row * self.CHAR_WIDTH
+            self.att_screen[start : start + self.CHAR_WIDTH] = list(
+                picture.attrs[row * GFX_CHAR_WIDTH : (row + 1) * GFX_CHAR_WIDTH]
+            )
+        self.border = picture.border
+        self.text_top = self.PICTURE_CHAR_ROWS
+        self.cls()
+
+    def draw_picture(self, graphic_id):
+        self.cmd_queue.put((0x07, graphic_id))
+
     def print_txt(self, st):
         chars = list(st.encode("ascii"))
         for c in chars:
@@ -182,7 +220,7 @@ class GAC_Interpreter_Pygame(GAC_Interpreter):
                     else:
                         pxl_array[px, y] = self.SPECTRUM_PALETTE[bk]
         del pxl_array
-        self._screen.fill(self.border)
+        self._screen.fill(self.SPECTRUM_PALETTE[self.border & 0x07])
         self._screen.blit(
             self._active_screen, (self.SCREEN_START_X, self.SCREEN_START_Y)
         )
@@ -266,6 +304,8 @@ class GAC_Interpreter_Pygame(GAC_Interpreter):
                     self.frame_count = rx_data[1]
                 elif cmd == 0x06:  # pos cursor
                     self.set_cursor(rx_data[1], rx_data[2])
+                elif cmd == 0x07:  # draw the picture of a location
+                    self.__show_picture(rx_data[1])
 
     def __interpreter_task(self):
         if not self.ready:

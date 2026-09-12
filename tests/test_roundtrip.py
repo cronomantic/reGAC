@@ -18,6 +18,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
 from regac.conds import compile_block, render_block  # noqa: E402
+from regac.gfx import CHAR_WIDTH, PICTURE_ROWS, Renderer  # noqa: E402
 from regac.srcgen import generate  # noqa: E402
 from regac.srcparse import parse  # noqa: E402
 
@@ -99,12 +100,58 @@ def test_dangling_value_is_preserved():
     assert compile_block(render_block(code)) == code
 
 
+@needs_databases
+@parametrized
+def test_every_picture_draws(path):
+    """Every picture of every adventure draws without falling over."""
+    gfx = load(path)["gfx"]
+    marks = {"PLOT", "LINE", "RECT", "ELLIPSE", "SHADE"}
+
+    def marks_pixels(pid, depth=0):
+        """Whether a picture, or one it calls, puts anything on the bitmap.
+        Some pictures only set the border or wash the screen with a colour."""
+        commands = gfx.get(str(pid)) or []
+        if depth > 8:
+            return False
+        for command in commands:
+            if command[0] in marks:
+                return True
+            if command[0] == "CALL" and marks_pixels(command[1], depth + 1):
+                return True
+        return False
+
+    for pid in gfx:
+        picture = Renderer(gfx).run(int(pid))
+        assert len(picture.attrs) == CHAR_WIDTH * 24
+        if marks_pixels(pid):
+            assert any(picture.pixels), f"picture {pid} came out blank"
+
+
+def test_the_origin_is_at_the_bottom():
+    """GAC counts y upwards from the bottom of the screen, as BASIC did."""
+    picture = Renderer({1: [["PLOT", 0, 175], ["PLOT", 255, 48]]}).run(1)
+    assert picture.get(0, 0) == 1, "y=175 should be the top row"
+    assert picture.get(255, PICTURE_ROWS - 1) == 1, "y=48 should be the bottom row"
+
+
+def test_a_fill_stays_inside_the_lines():
+    gfx = {1: [["RECT", 64, 100, 120, 60], ["PAPER", 2], ["BGFILL", 80, 80]]}
+    picture = Renderer(gfx).run(1)
+
+    def paper_at(x, y):
+        return (picture.attrs[(y >> 3) * CHAR_WIDTH + (x >> 3)] >> 3) & 7
+
+    assert paper_at(80, 95) == 2, "the inside of the box should be filled"
+    assert paper_at(8, 8) == 7, "the fill should not escape the box"
+
+
 if __name__ == "__main__":
     # Runnable without pytest so the round trip can be checked anywhere.
     failures = 0
     for path in DATABASES:
         name = os.path.basename(path)
-        for check in (test_database_round_trip, test_condition_blocks_round_trip):
+        for check in (test_database_round_trip, test_condition_blocks_round_trip,
+                      test_every_picture_draws):
             try:
                 check(path)
             except AssertionError:
@@ -114,12 +161,14 @@ if __name__ == "__main__":
         test_left_to_right_evaluation,
         test_prefix_operand_is_not_greedy,
         test_dangling_value_is_preserved,
+        test_the_origin_is_at_the_bottom,
+        test_a_fill_stays_inside_the_lines,
     ):
         try:
             check()
         except AssertionError:
             failures += 1
             print(f"FAIL {check.__name__}")
-    total = len(DATABASES) * 2 + 3
+    total = len(DATABASES) * 3 + 5
     print(f"{total - failures}/{total} checks passed")
     sys.exit(1 if failures else 0)
