@@ -75,9 +75,26 @@ teclado.
 
 Sergio puede conseguir las mismas aventuras en su versión de Amstrad CPC. Es la
 mejor fuente que hay para el PCW, porque es el único sitio donde se ve qué hizo
-el original al llevar las láminas a una máquina que no es el Spectrum. Hacen
-falta instantáneas de CPCEMU, que empiezan por `MV - SNA`; el decompilador de
-referencia ya las lee y sitúa la base de datos en $210C.
+el original al llevar las láminas a una máquina que no es el Spectrum.
+
+Lo que se encuentra por ahí son imágenes de disco y de cinta, no instantáneas,
+así que hay que cargarlas en la máquina que les toca y leer la memoria después.
+Eso es lo que hace `grab.py`: arranca el emulador en la máquina que se le diga,
+mete el medio, espera a que cargue y escribe la memoria en un fichero plano
+donde la dirección de un byte es su posición.
+
+    python grab.py --machine CPC464 juego.cdt juego.bin
+    python grab.py --machine CPC6128 juego.dsk juego.bin
+
+Está comprobado contra una instantánea de Spectrum, que se puede comparar
+consigo misma: los 48K vuelven byte a byte salvo el contador de fotogramas y
+los dos bytes de pila que usa la propia instantánea para arrancar. Falta
+enseñar al decompilador a leer un volcado plano y a situar las tablas donde el
+Amstrad las tiene, a partir de $4000, con la base de datos en $210C.
+
+Vale la pena saber que el emulador que ya usamos hace también el PCW 8256 y el
+8512 con disquetera, así que el banco de pruebas del runtime del PCW no hay que
+inventarlo: es el mismo que el del Spectrum con otro nombre de máquina.
 
 Leyendo ese decompilador ya se sacan cuatro cosas, antes incluso de tener las
 instantáneas:

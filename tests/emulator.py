@@ -77,7 +77,7 @@ def label_address(listing, label):
 class Session:
     """A running ZEsarUX, talked to over its remote protocol."""
 
-    def __init__(self, machine="48k", port=PORT):
+    def __init__(self, machine="48k", port=PORT, extra=()):
         emulator = find_zesarux()
         if not emulator:
             raise RuntimeError("ZEsarUX is not in tools/")
@@ -86,7 +86,7 @@ class Session:
                 emulator, "--noconfigfile", "--machine", machine,
                 "--vo", "null", "--ao", "null",
                 "--enable-remoteprotocol", "--remoteprotocol-port", str(port),
-            ],
+            ] + list(extra),
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
