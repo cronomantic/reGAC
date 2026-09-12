@@ -6,7 +6,8 @@ authors = [
     {name = "Cronomantic",email = "cronomantic@gmail.com"}
 ]
 readme = "README.md"
-requires-python = ">=3.9"
+# pygame-ce needs 3.10, and 3.9 reached its end of life in 2025.
+requires-python = ">=3.10"
 dependencies = [
     # The community fork: it is import compatible with pygame and, unlike
     # pygame itself, publishes wheels for current Python versions.
