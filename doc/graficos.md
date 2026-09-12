@@ -133,6 +133,38 @@ sea que la lámina queda destrozada. Centrar la imagen y dejar un margen de 32
 píxeles a cada lado no cuesta nada a la vista y evita la clase entera de
 problema.
 
+### La paleta del Amstrad
+
+El hardware puede hacer 27 colores, tres niveles de rojo, verde y azul
+combinados. Están en [`regac/devices.py`](../regac/devices.py) en el orden de
+numeración del firmware, del 0 negro al 26 blanco brillante, con los valores
+tomados de la tabla de paletas de hardware del proyecto gimp-palettes y
+contrastados con la documentación de CPCWiki.
+
+El modo 1 carga cuatro a la vez. El modo 0 carga dieciséis, pero sólo tiene 160
+píxeles de ancho, lo que obligaría a reducir la imagen y eso rompe los rellenos
+por lo dicho arriba. Así que modo 1, con cuatro colores.
+
+Cuatro se queda corto para estas aventuras. Contando los colores que cada lámina
+enseña de verdad, descartando los testimoniales que ocupan menos de una milésima
+de la pantalla:
+
+| Colores que usa la lámina | Láminas |
+|---|---|
+| 1 a 4 | 126 |
+| 5 | 49 |
+| 6 | 17 |
+| 7 | 4 |
+
+La salida es que el Amstrad puede recargar sus tintas en cada pantalla, así que
+la elección es por lámina y no por aventura. `choose_inks` mira cuánta pantalla
+cubre cada color del original y escoge las cuatro del hardware que minimizan el
+error ponderado por área, de modo que el color de una pared pesa más que el del
+pomo de una puerta.
+
+Con eso, 125 de las 196 láminas no pierden ningún color. De las otras, 50
+pierden uno, 17 pierden dos y 4 pierden tres.
+
 ### Verificarlo
 
 La orden `checkgfx` dibuja cada lámina en el Spectrum y en la máquina destino y

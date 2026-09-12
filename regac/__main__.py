@@ -27,7 +27,7 @@ import json
 import os
 import sys
 
-from .devices import DEVICES, make
+from .devices import DEVICES, device_for, make
 from .gfx import Renderer
 from .png import save_picture
 from .srcgen import generate
@@ -96,7 +96,7 @@ def cmd_render(args):
     for pid in wanted:
         if pid not in gfx:
             sys.exit(f"ERROR: there is no picture {pid}")
-        picture = Renderer(gfx, make(machine)).run(int(pid))
+        picture = Renderer(gfx, device_for(machine, gfx, pid)).run(int(pid))
         if os.path.isdir(args.output):
             path = os.path.join(args.output, f"{pid}.png")
         else:
@@ -119,7 +119,7 @@ def cmd_checkgfx(args):
     for pid in sorted(gfx, key=int):
         reference = Renderer(gfx, make("spectrum"))
         reference.run(int(pid))
-        target = Renderer(gfx, make(args.machine))
+        target = Renderer(gfx, device_for(args.machine, gfx, pid))
         target.run(int(pid))
         ref_area = reference.device.width * reference.device.height
         out_area = target.device.width * target.device.height

@@ -339,24 +339,117 @@ def msx2_device():
     return PixelDevice(SOURCE_WIDTH, SOURCE_ROWS, SPECTRUM_PALETTE, name="msx2")
 
 
-# The Amstrad in mode 1: four colours at a time, which is the real constraint
-# of this target.  The screen is 320 pixels across but the picture keeps the
-# 256 of the original and sits centred, with a margin of 32 either side.
-# Stretching it to 320 costs nothing in looks and breaks fills, see
-# doc/graficos.md.
-CPC_MODE1_PALETTE = [0x000000, 0x0000FF, 0xFF0000, 0xFFFF00]
+# The 27 colours the Amstrad hardware can make, three levels of red, green and
+# blue.  The order is the firmware's own colour numbering, 0 black to 26 bright
+# white.  Mode 1 loads four of these at a time, mode 0 sixteen.
+CPC_HARDWARE_PALETTE = [
+    0x000000,  #  0 black
+    0x000080,  #  1 blue
+    0x0000FF,  #  2 bright blue
+    0x800000,  #  3 red
+    0x800080,  #  4 magenta
+    0x8000FF,  #  5 violet
+    0xFF0000,  #  6 bright red
+    0xFF0080,  #  7 purple
+    0xFF00FF,  #  8 bright magenta
+    0x008000,  #  9 green
+    0x008080,  # 10 cyan
+    0x0080FF,  # 11 sky blue
+    0x808000,  # 12 yellow
+    0x808080,  # 13 grey
+    0x8080FF,  # 14 pale blue
+    0xFF8000,  # 15 orange
+    0xFF8080,  # 16 pink
+    0xFF80FF,  # 17 pale magenta
+    0x00FF00,  # 18 bright green
+    0x00FF80,  # 19 sea green
+    0x00FFFF,  # 20 bright cyan
+    0x80FF00,  # 21 lime green
+    0x80FF80,  # 22 pale green
+    0x80FFFF,  # 23 pale cyan
+    0xFFFF00,  # 24 bright yellow
+    0xFFFF80,  # 25 pale yellow
+    0xFFFFFF,  # 26 bright white
+]
+
+CPC_MODE1_INKS = 4
+CPC_MODE0_INKS = 16
 CPC_SCREEN_WIDTH = 320
 CPC_MARGIN = (CPC_SCREEN_WIDTH - SOURCE_WIDTH) // 2
 
+# What the machine loads when nothing has chosen for it: the four the pictures
+# of these adventures need most often.  A picture is better off with inks
+# picked for it, see choose_inks.
+CPC_MODE1_DEFAULT = [
+    CPC_HARDWARE_PALETTE[0],  # black
+    CPC_HARDWARE_PALETTE[26],  # bright white
+    CPC_HARDWARE_PALETTE[20],  # bright cyan
+    CPC_HARDWARE_PALETTE[8],  # bright magenta
+]
 
-def cpc_device():
-    return PixelDevice(SOURCE_WIDTH, SOURCE_ROWS, CPC_MODE1_PALETTE, name="cpc")
+
+def distance(one, other):
+    ar, ag, ab = rgb(one)
+    br, bg, bb = rgb(other)
+    return (ar - br) ** 2 + (ag - bg) ** 2 + (ab - bb) ** 2
+
+
+def choose_inks(usage, hardware=None, count=CPC_MODE1_INKS):
+    """Pick the colours a machine with few inks should load for one picture.
+
+    `usage` maps a colour of the original to how much of the screen it covers.
+    The choice minimises the error over the whole picture weighted by area, so
+    a colour covering a wall counts for more than one used on a door handle.
+    """
+    hardware = hardware or CPC_HARDWARE_PALETTE
+    from itertools import combinations
+
+    wanted = [(SPECTRUM_PALETTE[i], area) for i, area in usage.items() if area]
+    if not wanted:
+        return [hardware[0]] * count
+    # Distance from every colour in use to every colour the machine can make.
+    table = [[distance(colour, h) for h in hardware] for colour, _ in wanted]
+    areas = [area for _, area in wanted]
+    best, best_cost = None, None
+    for combo in combinations(range(len(hardware)), count):
+        cost = 0
+        for row, area in zip(table, areas):
+            cost += area * min(row[c] for c in combo)
+            if best_cost is not None and cost >= best_cost:
+                break
+        else:
+            if best_cost is None or cost < best_cost:
+                best, best_cost = combo, cost
+    return [hardware[c] for c in best]
+
+
+def colour_usage(device):
+    """How much of the screen each colour of the original covers.  Reads a
+    Spectrum device, which is the reference every other machine follows."""
+    counts = {}
+    cw = device.char_width
+    for y in range(device.height):
+        for x in range(device.width):
+            attr = device.attrs[(y >> 3) * cw + (x >> 3)]
+            lift = 8 if (attr >> 6) & 1 else 0
+            lit = (device.pixels[y * cw + (x >> 3)] >> (7 - (x & 7))) & 1
+            index = ((attr & 7) if lit else ((attr >> 3) & 7)) + lift
+            counts[index] = counts.get(index, 0) + 1
+    return counts
+
+
+def cpc_device(palette=None):
+    return PixelDevice(
+        SOURCE_WIDTH, SOURCE_ROWS, palette or CPC_MODE1_DEFAULT, name="cpc"
+    )
 
 
 # The same machine with the picture stretched across the full screen, kept so
 # that the cost of stretching can be measured rather than argued about.
 def cpc_stretched_device():
-    return PixelDevice(CPC_SCREEN_WIDTH, SOURCE_ROWS, CPC_MODE1_PALETTE, name="cpc-wide")
+    return PixelDevice(
+        CPC_SCREEN_WIDTH, SOURCE_ROWS, CPC_MODE1_DEFAULT, name="cpc-wide"
+    )
 
 
 DEVICES = {
@@ -370,7 +463,31 @@ DEVICES = {
 }
 
 
+# Machines with too few inks to hold the colours of the original, which are
+# therefore better off having them chosen for each picture.
+LIMITED = {"cpc", "cpc-wide"}
+
+
 def make(name):
     if name not in DEVICES:
         raise KeyError(f"unknown machine {name!r}; try one of {sorted(DEVICES)}")
     return DEVICES[name]()
+
+
+def device_for(name, gfx=None, picture_id=None):
+    """Build a device for one picture.
+
+    On a machine short of inks, which four or sixteen colours to load is a
+    decision per picture, not per adventure: the Amstrad can reload its inks
+    for every screen.  Choosing them from what the picture actually uses beats
+    any fixed palette.
+    """
+    if name not in LIMITED or gfx is None or picture_id is None:
+        return make(name)
+    from .gfx import Renderer
+
+    reference = Renderer(gfx, SpectrumDevice()).run(int(picture_id))
+    inks = choose_inks(colour_usage(reference))
+    if name == "cpc-wide":
+        return PixelDevice(CPC_SCREEN_WIDTH, SOURCE_ROWS, inks, name="cpc-wide")
+    return cpc_device(inks)
