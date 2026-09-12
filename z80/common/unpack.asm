@@ -28,6 +28,9 @@ text_init:
                 sla     e
                 rl      d                       ; two bytes a pair
                 add     hl, de
+                ld      (message_lookup), hl    ; message number -> its place
+                ld      de, 256
+                add     hl, de
                 ld      e, (hl)
                 inc     hl
                 ld      d, (hl)
@@ -138,6 +141,7 @@ expand_code:
                 jr      expand_code             ; then right, as a tail call
 
 pair_table:     dw      0
+message_lookup: dw      0
 offset_table:   dw      0
 message_data:   dw      0
 message_count:  dw      0
@@ -145,3 +149,21 @@ data_size:      dw      0
 first_pair:     db      0
 pair_count:     db      0
 text_buffer:    ds      256
+
+
+; The place in the store of message number A, in DE.  Carry set if there is no
+; such message.
+; Corrupts: AF, HL
+message_index:
+                ld      hl, (message_lookup)
+                ld      e, a
+                ld      d, 0
+                add     hl, de
+                ld      a, (hl)
+                cp      NO_MESSAGE
+                scf
+                ret     z
+                ld      e, a
+                ld      d, 0
+                or      a
+                ret

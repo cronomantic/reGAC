@@ -102,6 +102,7 @@ ALWAYS_RESIDENT = {S_CONFIG, S_VOCAB, S_OBJECTS, S_LOCATIONS, S_CONDITIONS, S_FO
 VERB, NOUN, ADVERB, PRONOUN = range(4)
 
 CONDITION_END = 0x00
+NO_MESSAGE = 0xFF  # there is no message with that number
 PUSH_MARK = 0x80
 
 
@@ -205,6 +206,9 @@ class Database:
         extra += list(self.ddb.get("pronouns", []))
         extra += list(self.ddb.get("separators", []))
         extra += [c for c in self.ddb.get("punctuation", []) if c != chr(0)]
+        # The digits always get a code and a glyph, whether the adventure's
+        # text happens to use one or not, because scores get printed.
+        extra += list("0123456789")
         self.store = TextStore(texts, extra=extra)
         self.message_index = {m: i for i, m in enumerate(self.messages)}
         base = len(self.messages)
@@ -221,6 +225,10 @@ class Database:
         out = bytearray()
         out += u16(self.ddb.get("init_loc", 1))
         out += u8(self.ddb.get("width", 32))
+        # The codes of the ten digits, at a fixed place so the runtime can
+        # print a number without hunting for them.
+        for digit in "0123456789":
+            out += u8(self.code_of(digit))
         punct = self.ddb.get("punctuation", [])
         # The first entry is the end of string marker and has no glyph.
         printable = [c for c in punct if c != "\0"]
@@ -302,6 +310,13 @@ class Database:
         out += u8(len(packer))
         for left, right in packer.table:
             out += u8(left) + u8(right)
+        # Message numbers are the ones the adventure was written with and they
+        # are full of gaps, so a straight table turns one into its place in the
+        # store.  Two hundred and fifty six bytes, and no searching.
+        lookup = bytearray([NO_MESSAGE] * 256)
+        for index, key in enumerate(self.messages):
+            lookup[int(key)] = index
+        out += lookup
         out += u16(len(self.store.messages))
         offset = 0
         offsets = bytearray()
@@ -491,6 +506,8 @@ class Reader:
         first_pair, pair_count = data[0], data[1]
         pairs = [(data[2 + 2 * i], data[3 + 2 * i]) for i in range(pair_count)]
         p = 2 + 2 * pair_count
+        self.message_lookup = data[p : p + 256]
+        p += 256
         count = struct.unpack_from("<H", data, p)[0]
         p += 2
         offsets = [struct.unpack_from("<H", data, p + 2 * i)[0] for i in range(count)]

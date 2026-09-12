@@ -26,6 +26,12 @@ SECTION_FONT        equ 6
 SECTION_GRAPHICS    equ 7
 SECTION_MUSIC       equ 8
 
+NO_MESSAGE          equ $FF   ; no message carries that number
+
+; Inside the config section
+CONFIG_DIGITS       equ 3     ; the codes of "0" to "9"
+CONFIG_PUNCTUATION  equ 14    ; how many, then the codes; the space comes first
+
 HEADER_SECTION_COUNT equ 11
 HEADER_DIRECTORY     equ 12
 DIRECTORY_ENTRY_SIZE equ 5

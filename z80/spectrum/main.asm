@@ -45,6 +45,8 @@ done_flag:      db      0
                 include "../common/database.asm"
                 include "../common/unpack.asm"
                 include "screen.asm"
+                include "../common/conditions.asm"
+                include "../common/opcodes.asm"
 
                 ALIGN   256
 database:

@@ -29,10 +29,18 @@ screen_init:
                 ld      (font_count), a
                 inc     hl
                 ld      (font_glyphs), hl
-                ; the space is the first of the punctuation in the config
+                ; the config holds the digits, then the punctuation; the
+                ; first of the punctuation is the space
                 ld      a, SECTION_CONFIG
                 call    db_section
-                ld      de, 4
+                push    hl
+                ld      de, CONFIG_DIGITS
+                add     hl, de
+                ld      de, digit_codes
+                ld      bc, 10
+                ldir
+                pop     hl
+                ld      de, CONFIG_PUNCTUATION
                 add     hl, de
                 ld      a, (hl)
                 ld      (space_code), a
@@ -242,5 +250,6 @@ font_glyphs:    dw      0
 font_first:     db      0
 font_count:     db      0
 space_code:     db      0
+digit_codes:    ds      10
 cursor_x:       db      0
 cursor_y:       db      TEXT_TOP

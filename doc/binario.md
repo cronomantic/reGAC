@@ -36,6 +36,15 @@ localidad. Los nombres de objeto y las descripciones no se guardan con su tabla:
 guardan un índice al almacén de textos. El detalle de cómo se empaqueta está en
 [textos.md](textos.md).
 
+La sección de configuración empieza con la localidad inicial, el ancho de línea
+y los códigos de los diez dígitos, en ese orden y en sitio fijo, para que el
+intérprete pueda escribir un número sin buscarlos. Después van los signos de
+puntuación, el primero de los cuales es el espacio.
+
+Los números de mensaje son los que el autor escribió y están llenos de huecos,
+así que la sección de texto lleva una tabla de 256 bytes que traduce número de
+mensaje a su sitio en el almacén. Cuesta poco y ahorra buscar.
+
 Las condiciones usan la codificación del original, que era buena: una constante
 son dos bytes con el bit alto del primero puesto, lo que deja quince bits, y
 cualquier otra cosa es su opcode en un byte. Un cero termina la tabla.
