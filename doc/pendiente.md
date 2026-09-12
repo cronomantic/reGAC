@@ -71,6 +71,51 @@ residente ni ranura propia.
 de pantalla, que no es lineal ni como la del Spectrum, y cómo se lee el
 teclado.
 
+### Mirar las versiones de CPC, que es la lección para el PCW
+
+Sergio puede conseguir las mismas aventuras en su versión de Amstrad CPC. Es la
+mejor fuente que hay para el PCW, porque es el único sitio donde se ve qué hizo
+el original al llevar las láminas a una máquina que no es el Spectrum. Hacen
+falta instantáneas de CPCEMU, que empiezan por `MV - SNA`; el decompilador de
+referencia ya las lee y sitúa la base de datos en $210C.
+
+Leyendo ese decompilador ya se sacan cuatro cosas, antes incluso de tener las
+instantáneas:
+
+**La geometría es la misma y el color no.** Recta, elipse, rectángulo, punto,
+relleno, trama y llamada existen en las dos máquinas con los mismos argumentos.
+Lo que cambia por completo es el color: el Spectrum tiene tinta, papel, brillo,
+parpadeo y borde, cada uno con su argumento, y el CPC tiene cuatro tintas
+metidas en el propio opcode y nada más. La numeración de los opcodes tampoco
+coincide en nada. Es justo la separación que ya hicimos entre el intérprete de
+láminas y el dispositivo, confirmada por el original.
+
+**Nadie reescaló las coordenadas.** Son los mismos bytes en las dos máquinas,
+así que el ajuste a la pantalla lo hace la máquina y no el dato. Eso respalda
+centrar la lámina de 256 en los 720 del PCW.
+
+**El CPC guarda una paleta por lámina**, ocho bytes a la cabeza de cada
+registro, antes de las órdenes. Es la respuesta del original a la pregunta que
+nuestro `choose_inks` resuelve adivinando: las tintas no se deducían del uso,
+se guardaban. En el PCW ese mismo hueco es el que diría qué trama representa a
+cada tinta.
+
+**El lenguaje de láminas se amplió por máquina.** El CPC tiene cuatro órdenes
+de espejo y volteo que el Spectrum no tiene, y no tiene relleno de fondo.
+Añadir órdenes propias de una máquina no rompe nada, es lo que ya se hacía.
+
+Y lo que hay que sacar de las instantáneas cuando estén:
+
+- Las tramas del relleno. Con cuatro colores por píxel, dos bits cada uno, los
+  bytes $FF, $00 y $AA no pueden significar lo mismo. Cómo expresaron ahí el
+  sólido, el borrado y la media tinta es el molde para las tramas del PCW.
+- La prueba de bloqueo. En el Spectrum un punto detiene el relleno si está
+  encendido; con dos bits por píxel hay que decidir contra qué se compara, y
+  esa decisión es la que hace falta entender.
+- Si la tabla de la elipse y el trazado de rectas son los mismos. Si lo son,
+  queda demostrado que sólo cambian las seis primitivas.
+- Qué hace la paleta de ocho bytes con las tintas del Spectrum.
+
 ## Cosas menores
 
 `deGAC` sólo lee instantáneas de Spectrum. El decompilador de referencia en C
