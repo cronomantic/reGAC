@@ -520,8 +520,11 @@ class AmstradDevice(Device):
         while right < self.width - 1 and not self.is_boundary(right + 1, row):
             right += 1
         for column in range(left, right + 1):
+            # Which of the two pens a point gets turns on the y of the
+            # commands, not on the screen row: the original picks between its
+            # two pattern bytes with bit zero of that y.
             self.pens[row * self.width + column] = (
-                self.first if (column + row) % 2 == 0 else self.second
+                self.first if (column + y) % 2 == 0 else self.second
             )
         return right - left + 1
 

@@ -464,11 +464,47 @@ sola orden, ni corrigiendo el origen de la y.
 Para verlas hizo falta un dispositivo que dibuje como el Amstrad, porque con
 el modelo del Spectrum salen manchas planas: un relleno que allí se para al
 cambiar de pluma aquí se lo lleva todo por delante. Está en
-[`AmstradDevice`](../regac/devices.py), y son dos reglas. El relleno se para
-donde la pluma deja de ser la de la semilla, no donde hay un píxel encendido.
-Y lo que tiende es un damero de dos plumas, que son las de la orden de color,
-distintas de la pluma con la que se trazan las líneas: confundir las dos era
-lo que dejaba las láminas en un solo color.
+[`AmstradDevice`](../regac/devices.py).
+
+### Contrastarlo contra la máquina
+
+Lo anterior no bastaba: las láminas seguían saliendo con fallos, y sólo se
+podía saber preguntándole a un Amstrad. El cargador del disco quiere una
+comilla tecleada en BASIC que el emulador no manda, así que la aventura entra
+en memoria a mano, en la dirección que dice su propia cabecera, y la arranca un
+`CALL` en decimal. Desde ahí se lee la pantalla y se convierte en números de
+pluma, que es una comparación que no depende de los colores. Y escribiendo un
+cero en medio de las órdenes de una lámina se la corta donde se quiera, que es
+lo que permite ir acorralando un fallo.
+
+Con eso salieron cuatro cosas:
+
+**La lámina se dibuja en el 32,1 de la pantalla**, no pegada a la esquina.
+
+**Empieza con la pluma 1**, y eso no lo dice el dato en ninguna parte: el marco
+que pinta cada cuarto no lleva ni una orden de color y sale amarillo.
+
+**Los ocho bytes de cabecera no son órdenes.** Merecía la pena probarlo porque
+habría explicado el marco: cambiando el último en la máquina, lo que dibuja no
+se mueve.
+
+**El damero elige pluma por la y de las órdenes, no por la fila de pantalla.**
+Es un bit de diferencia y volvía del revés todas las tramas. Esto solo llevó
+una lámina entera del 89 al 99 por ciento.
+
+Cómo queda, midiendo contra la pantalla de la máquina:
+
+| lo que se dibuja | coincide |
+|---|---|
+| sólo el marco | 100,00% |
+| el marco y la lámina 3 | 99,36% |
+| el cuarto del aeropuerto entero | 99,15% |
+
+Lo que falta son píxeles sueltos a lo largo de las líneas, uno aquí y otro
+allá, y el reparto de los fallos lo dice: la mitad son puntos que la máquina
+deja en el fondo y nosotros encendemos, y la otra mitad al revés. Es el trazado
+de rectas del firmware del Amstrad, que no rompe los empates como la ROM del
+Spectrum. Eso es lo siguiente si se quiere exactitud.
 
 ### Lo que no está claro todavía
 
