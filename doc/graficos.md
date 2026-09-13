@@ -514,12 +514,31 @@ mayor, el resto es el mismo Bresenham que ya teníamos, error a la mitad del
 lado mayor, subiendo por el menor, y paso diagonal al alcanzarlo. Con eso las
 siete rectas salen exactas.
 
-Queda un fleco, y está localizado: **la elipse**. Una sola, de radio 30, da 168
-puntos en la máquina y 168 en el nuestro, pero sesenta y cuatro caen un píxel
-corridos, siempre del lado en que el radio se resta. La máquina parece cambiar
-el signo antes de dividir por 256 y nosotros después, que redondea al otro
-lado; corregirlo recupera la mitad de esos puntos, así que hay algo más. Con
-todo lo demás puesto, un cuarto entero se queda en el 99,2 por ciento.
+### La elipse, que sigue sin cuadrar
+
+Es lo único que queda, y no está resuelto. Lo medido, para quien lo retome:
+
+Una elipse de radio 30 da 168 puntos en la máquina y 168 en el nuestro, y
+sesenta y cuatro caen corridos un píxel. De los treinta y dos vértices que
+calculamos, doce no están en la curva que dibuja la máquina, y los doce son de
+los cuartos en los que el radio se **resta** del centro; el cuarto en el que
+las dos coordenadas se suman sale entero.
+
+Lo que dice el código del Amstrad es que no debería haber diferencia. La rutina
+de $22C0 saca las dos distancias como el byte alto de radio por tabla, y cada
+cuarto las suma o las resta con `ADD HL,BC` o `SBC HL,BC`, sin más. Leído así,
+sumar y restar tendrían que ser simétricos.
+
+Probado y descartado: redondear hacia afuera al restar (queda mucho peor, 60
+puntos de 168), redondear al más cercano, y ordenar las puntas de las rectas
+empinadas al revés. Y una comprobación que desconcierta: el tramo que va del
+lado izquierdo hacia abajo, dibujado suelto como una orden de recta, sale en la
+máquina exactamente igual que en el nuestro, con los mismos seis puntos; dentro
+de la elipse, en cambio, la máquina pone uno de ellos una columna más a la
+izquierda. O los vértices no son los que creemos, o la recta del firmware no
+hace lo mismo cuando encadena que cuando empieza con un movimiento.
+
+Con todo lo demás puesto, un cuarto entero se queda en el 99,2 por ciento.
 
 ### Lo que no está claro todavía
 
