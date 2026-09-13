@@ -448,6 +448,28 @@ parte en tinta y papel, y la que fija una sola pluma queda como tinta. Los ocho
 bytes de cabecera de cada lámina no caben entre las órdenes, así que se guardan
 aparte, en `gfx_inks`, para no perder lo único que dice de qué color iba.
 
+### Las mismas escenas, dibujadas otra vez
+
+Con eso se pueden poner las dos versiones de Los pájaros de Bangkok una al
+lado de la otra. Los cuartos llevan el mismo número en las dos, así que se
+emparejan solas, y de cuarenta que tienen lámina en ambas salen veintiséis
+parejas distintas.
+
+Son las mismas escenas y ninguna es la misma lámina. El autobús con la cara
+del hombre, la calle con sus dos edificios, el corro de gente, la mujer: se
+reconocen todas, pero están vueltas a dibujar, con más color en pantalla y más
+detalle, y sin el marco que el Spectrum pinta alrededor. No coincide ni una
+sola orden, ni corrigiendo el origen de la y.
+
+Para verlas hizo falta un dispositivo que dibuje como el Amstrad, porque con
+el modelo del Spectrum salen manchas planas: un relleno que allí se para al
+cambiar de pluma aquí se lo lleva todo por delante. Está en
+[`AmstradDevice`](../regac/devices.py), y son dos reglas. El relleno se para
+donde la pluma deja de ser la de la semilla, no donde hay un píxel encendido.
+Y lo que tiende es un damero de dos plumas, que son las de la orden de color,
+distintas de la pluma con la que se trazan las líneas: confundir las dos era
+lo que dejaba las láminas en un solo color.
+
 ### Lo que no está claro todavía
 
 Cada lámina empieza con ocho bytes que no son órdenes. Van en cuatro parejas y

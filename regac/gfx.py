@@ -101,6 +101,13 @@ class Device:
     def set_colours(self, ink, paper, bright, flash):
         raise NotImplementedError
 
+    def set_fill_pens(self, first, second):
+        """The two pens a fill weaves together, on a machine that has them.
+
+        The Amstrad parts this from the pen it draws outlines in; the Spectrum
+        has no such thing and pays it no attention.
+        """
+
     def draw_point(self, x, y):
         """Put down an outline pixel.  It also becomes a boundary for fills."""
         raise NotImplementedError
@@ -112,6 +119,14 @@ class Device:
     def is_blocked(self, x, y):
         """The same question in the coordinates of the commands, y upwards."""
         return self.is_boundary(*self.to_device(x, y))
+
+    def begin_fill(self, x, y):
+        """A fill is about to start here.
+
+        The Spectrum asks of every point only whether it is set, so it has
+        nothing to remember.  The Amstrad asks whether the pen has changed
+        from the one under the seed, so that is where it takes note of it.
+        """
 
     def fill_run(self, x, y, pattern):
         """Lay the pattern across the run of clear pixels through this point,
@@ -256,6 +271,7 @@ class Renderer:
         are the ones the commands are written in, y upwards.
         """
         reached = 0
+        self.device.begin_fill(x, y)
         if self.device.is_blocked(x, y):
             self.fill_coverage.append(0)
             return 0
@@ -301,6 +317,8 @@ class Renderer:
                 self.flood(args[0], args[1], PAPER)
             elif name == "SHADE":
                 self.flood(args[0], args[1], SHADE)
+            elif name == "PENS":
+                self.device.set_fill_pens(args[0], args[1])
             elif name == "CALL":
                 self.run(args[0], depth + 1)
         return self.device

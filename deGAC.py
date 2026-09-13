@@ -566,9 +566,10 @@ def get_graphics_amstrad(sysram):
             if name is None:
                 inst.append(("INK", cmd & 3))
             elif name == "PENS":
-                # one order sets both pens of the dither; ours are apart
-                inst.append(("INK", args[0] & 3))
-                inst.append(("PAPER", args[1] & 3))
+                # The two pens a fill weaves together.  They are not the pen
+                # the outlines are drawn in, which is a different order
+                # altogether, so this keeps its own name.
+                inst.append(("PENS", args[0] & 3, args[1] & 3))
             elif name == "CALL":
                 inst.append(("CALL", args[0] + 256 * (args[1] & 0x7F)))
             elif argc == 2:

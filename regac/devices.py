@@ -452,6 +452,95 @@ def colour_usage(device):
     return counts
 
 
+class AmstradDevice(Device):
+    """Four pens a pixel, the way the Amstrad drew.
+
+    Two things set it apart from the Spectrum, and both were read out of the
+    original interpreter.  A fill stops where the pen stops being the one it
+    started on, rather than wherever a pixel happens to be set; and what it
+    lays down is a chequer of two pens, which is how four colours are made to
+    look like more.  With the two pens the same it comes out solid.
+
+    Drawn on the Spectrum's model instead, an Amstrad picture comes out as one
+    flat block of colour, because a fill that should have stopped at a pen of
+    its own goes straight over it.
+    """
+
+    name = "amstrad"
+
+    def __init__(self, palette, name=None):
+        self.palette = list(palette)
+        if name:
+            self.name = name
+        self.pens = bytearray(self.width * self.height)
+        self.ink = 1                            # what an outline is drawn in
+        self.first = 1                          # and the two a fill weaves
+        self.second = 1
+        self.seed = 0
+        self.border = 0
+
+    def set_border(self, colour):
+        self.border = colour & 3
+
+    def set_colours(self, ink, paper, bright, flash):
+        if ink < TRANSPARENT:
+            self.ink = ink & 3
+
+    def set_fill_pens(self, first, second):
+        self.first = first & 3
+        self.second = second & 3
+
+    def inside(self, x, y):
+        return 0 <= x < self.width and 0 <= y < self.height
+
+    def draw_point(self, x, y):
+        if self.inside(x, y):
+            self.pens[y * self.width + x] = self.ink
+
+    def is_boundary(self, x, y):
+        if not self.inside(x, y):
+            return True
+        return self.pens[y * self.width + x] != self.seed
+
+    def begin_fill(self, x, y):
+        column, row = self.to_device(x, y)
+        self.seed = self.pens[row * self.width + column] if self.inside(column, row) else 0
+
+    def fill_run(self, x, y, pattern):
+        row = self.to_device(x, y)[1]
+        left = x
+        while left > 0 and not self.is_boundary(left - 1, row):
+            left -= 1
+        right = x
+        while right < self.width - 1 and not self.is_boundary(right + 1, row):
+            right += 1
+        for column in range(left, right + 1):
+            self.pens[row * self.width + column] = (
+                self.first if (column + row) % 2 == 0 else self.second
+            )
+        return right - left + 1
+
+    def to_rgb(self):
+        return [
+            [self.palette[self.pens[y * self.width + x]] for x in range(self.width)]
+            for y in range(self.height)
+        ]
+
+
+def amstrad_device(header=None):
+    """A device for one Amstrad picture, in the four inks it names.
+
+    Those are the eight bytes it carries at its head: four pairs, because an
+    ink there can flash between two colours, and the three bits above the
+    colour are not understood yet.
+    """
+    if header:
+        inks = [header[n * 2] & 0x1F for n in range(4)]
+    else:
+        inks = [0, 26, 20, 8]
+    return AmstradDevice([CPC_HARDWARE_PALETTE[min(c, 26)] for c in inks])
+
+
 def cpc_device(palette=None):
     return PixelDevice(
         SOURCE_WIDTH, SOURCE_ROWS, palette or CPC_MODE1_DEFAULT, name="cpc"
@@ -474,6 +563,7 @@ DEVICES = {
     "cpc-wide": cpc_stretched_device,
     "msx": MsxDevice,
     "msx2": msx2_device,
+    "amstrad": amstrad_device,
 }
 
 
