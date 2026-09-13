@@ -90,6 +90,8 @@ class Device:
     name = "device"
     width = SOURCE_WIDTH  # its own picture area, in its own pixels
     height = SOURCE_ROWS
+    start_ink = 0  # what it draws in before a picture says otherwise
+    start_paper = 7
 
     def to_device(self, x, y):
         """Map a coordinate of the commands onto this screen."""
@@ -150,8 +152,8 @@ class Renderer:
 
         self.gfx = gfx  # id -> list of commands
         self.device = device if device is not None else SpectrumDevice()
-        self.ink = 0
-        self.paper = 7
+        self.ink = self.device.start_ink
+        self.paper = self.device.start_paper
         self.bright = 0
         self.flash = 0
         self.fill_coverage = []  # pixels each fill command reached, in order

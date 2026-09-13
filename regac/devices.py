@@ -467,6 +467,11 @@ class AmstradDevice(Device):
     """
 
     name = "amstrad"
+    # The pen a picture starts drawing in.  Nothing in the picture data says
+    # so: the frame every room draws carries no colour order at all and comes
+    # out in pen one on the machine.
+    start_ink = 1
+    start_paper = 1
 
     def __init__(self, palette, name=None):
         self.palette = list(palette)

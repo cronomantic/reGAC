@@ -552,6 +552,8 @@ def get_graphics_amstrad(sysram):
             return pictures, inks
         at = gfx + 4
         end = at + length
+        # Those eight are not orders: changing them on the machine changes
+        # nothing about what it draws, so the interpreter steps over them.
         inks[id] = [peek1(sysram, at + n) for n in range(8)]
         at += 8
         inst = []
