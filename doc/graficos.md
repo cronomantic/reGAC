@@ -315,6 +315,28 @@ radios se multiplican por la entrada y se toma el byte alto. Cada cuadrante se
 traza por separado empezando por el punto del costado, y de ahí que la curva
 sean treinta y dos segmentos rectos.
 
+### Lo que hace con lo que se sale de la lámina
+
+Una elipse puede salirse por arriba, y entonces sus puntos caen fuera de la
+lámina. Qué hacía el original con ellos no se podía deducir, así que se le
+preguntó: se carga la aventura en el emulador, se entra directamente en su
+rutina de dibujo con el número de lámina en HL, y se deja un salto a sí mismo
+justo donde la lámina termina, para que el juego no borre lo que acaba de
+pintar. La respuesta está en $643C, y son dos reglas.
+
+**Las coordenadas son de dieciséis bits con signo.** La elipse suma y resta el
+radio al centro en HL, no en un byte, así que un punto por encima del borde
+sigue estando por encima y no da la vuelta.
+
+**Un punto que se sale no se tira, se lleva al borde.** La x se mete en 0 a
+255 y la y en 48 a 175, y sólo después se sacan las dos diferencias que se le
+pasan a la ROM. Por eso una curva que se escapa por arriba sale aplanada
+contra el borde en lugar de volver como una raya que cruza la pantalla.
+
+Nosotros hacíamos las dos cosas mal: enmascarábamos a un byte y no acotábamos.
+Con las dos reglas puestas, las láminas 17, 18, 19 y 20 de quijote2, que eran
+las que fallaban, salen idénticas a las del original, píxel a píxel.
+
 ### Una comparación que no valía
 
 Intenté contrastar contra la pantalla que guardan las propias instantáneas, y

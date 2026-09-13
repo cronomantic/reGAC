@@ -147,8 +147,21 @@ class Renderer:
 
     # -- primitives ---------------------------------------------------------
 
+    def at_most_the_edge(self, x, y):
+        """Where the original puts a point that falls outside the picture.
+
+        It does not drop it, it brings it to the edge: x into the width and y
+        into the picture's rows.  That is what stops a curve which leaves the
+        top of the picture from coming back as a line across the whole screen,
+        and it is the reason a byte of coordinate is not enough on its own.
+        GAC does it at $643C, on sixteen bit values, before working out the
+        two deltas it hands to the ROM.
+        """
+        return (min(max(x, 0), self.device.width - 1),
+                min(max(y, 0), self.device.height - 1))
+
     def plot(self, x, y):
-        self.device.draw_point(x, y)
+        self.device.draw_point(*self.at_most_the_edge(x, y))
 
     def line(self, x0, y0, x1, y1):
         """A straight line, drawn the way the Spectrum ROM draws one.
@@ -160,6 +173,8 @@ class Renderer:
         round, which is just as valid a Bresenham, puts the diagonal steps one
         place along and shows up on short slanted lines.
         """
+        x0, y0 = self.at_most_the_edge(x0, y0)
+        x1, y1 = self.at_most_the_edge(x1, y1)
         dx = abs(x1 - x0)
         dy = abs(y1 - y0)
         sx = 1 if x1 > x0 else -1
@@ -214,13 +229,14 @@ class Renderer:
             self.plot(cx, cy)
             return
         for across, down in ((1, 1), (1, -1), (-1, 1), (-1, -1)):
-            place = ((cx + across * rx) & 0xFF, cy & 0xFF)
+            # the machine keeps these as sixteen bit values, so a curve that
+            # leaves the picture keeps going rather than coming round again;
+            # what brings it back is the edge, in at_most_the_edge
+            place = (cx + across * rx, cy)
             for step in range(ELLIPSE_STEPS):
-                # the coordinates are bytes on the machine, so they come
-                # round again rather than going off the edge
                 following = (
-                    (cx + across * ((rx * ELLIPSE_TABLE[step]) >> 8)) & 0xFF,
-                    (cy + down * ((ry * ELLIPSE_TABLE[ELLIPSE_STEPS + step]) >> 8)) & 0xFF,
+                    cx + across * ((rx * ELLIPSE_TABLE[step]) >> 8),
+                    cy + down * ((ry * ELLIPSE_TABLE[ELLIPSE_STEPS + step]) >> 8),
                 )
                 if following != place:
                     self.line(place[0], place[1], following[0], following[1])
