@@ -23,6 +23,8 @@ CMD_INK         equ $10
 CMD_PAPER       equ $11
 CMD_BRIGHT      equ $12
 CMD_FLASH       equ $13
+CMD_PENS        equ $14                 ; the two pens a fill weaves, on the
+                                        ; machines that have such a thing
 
 ; Where the pictures are.
 ; Corrupts: AF, BC, DE, HL
@@ -131,25 +133,27 @@ run_picture:
                 ld      c, a
                 ; one byte commands first
                 cp      CMD_BORDER
-                jr      z, .one_byte
+                jp      z, .one_byte
                 cp      CMD_INK
-                jr      z, .one_byte
+                jp      z, .one_byte
                 cp      CMD_PAPER
-                jr      z, .one_byte
+                jp      z, .one_byte
                 cp      CMD_BRIGHT
-                jr      z, .one_byte
+                jp      z, .one_byte
                 cp      CMD_FLASH
-                jr      z, .one_byte
+                jp      z, .one_byte
+                cp      CMD_PENS
+                jp      z, .two_pens
                 cp      CMD_CALL
                 jp      z, .call_picture
                 cp      CMD_PLOT
-                jr      z, .two_bytes
+                jp      z, .two_bytes
                 cp      CMD_FILL
-                jr      z, .two_bytes
+                jp      z, .two_bytes
                 cp      CMD_BGFILL
-                jr      z, .two_bytes
+                jp      z, .two_bytes
                 cp      CMD_SHADE
-                jr      z, .two_bytes
+                jp      z, .two_bytes
                 ; the rest take four
                 ld      a, (hl)
                 inc     hl
@@ -202,9 +206,9 @@ run_picture:
                 cp      CMD_BORDER
                 jr      nz, .not_border
                 ld      a, b
-                and     7
-                out     ($FE), a
-                jp      .next
+                call    .keep_place
+                call    gfx_border              ; the machine knows how
+                jp      .resume
 .not_border:
                 push    hl
                 ld      hl, gfx_ink
@@ -220,6 +224,16 @@ run_picture:
 .store:
                 ld      (hl), b
                 pop     hl
+                jp      .next
+.two_pens:
+                ld      a, (hl)
+                inc     hl
+                dec     de
+                ld      (gfx_pen1), a
+                ld      a, (hl)
+                inc     hl
+                dec     de
+                ld      (gfx_pen2), a
                 jp      .next
 .two_bytes:
                 ld      a, (hl)
@@ -248,7 +262,7 @@ run_picture:
                 ld      a, b
                 call    set_fill_pattern
                 call    gfx_fill
-                jr      .resume
+                jp      .resume
 .call_picture:
                 ld      a, (hl)
                 inc     hl
@@ -291,5 +305,7 @@ gfx_x1:         db      0
 gfx_y1:         db      0
 gfx_ink:        db      0
 gfx_paper:      db      7
+gfx_pen1:       db      1               ; only the machines with pens use these
+gfx_pen2:       db      1
 gfx_bright:     db      0
 gfx_flash:      db      0

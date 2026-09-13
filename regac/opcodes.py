@@ -168,4 +168,8 @@ GFX_CMDS = {
     "PAPER": (0x11, 1),
     "BRIGHT": (0x12, 1),
     "FLASH": (0x13, 1),
+    # The Amstrad's, which the Spectrum has no use for: the two pens a fill
+    # weaves together, which there are a different thing from the pen an
+    # outline is drawn in.  Machines that know nothing of it pay it no mind.
+    "PENS": (0x14, 2),
 }

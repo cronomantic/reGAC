@@ -17,6 +17,13 @@ to_row:
                 add     a, GAC_TOP
                 ret
 
+; The border, which on a Spectrum is three bits of a port.
+; Corrupts: AF
+gfx_border:
+                and     7
+                out     ($FE), a
+                ret
+
 ; Turn a command's y into a screen row, keeping sixteen bits with their sign.
 ; A picture may name a y above the top or below the bottom of the picture, and
 ; those have to stay outside rather than come round in a byte.  In A, out HL.
