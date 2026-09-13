@@ -17,6 +17,51 @@ to_row:
                 add     a, GAC_TOP
                 ret
 
+; Turn a command's y into a screen row, keeping sixteen bits with their sign.
+; A picture may name a y above the top or below the bottom of the picture, and
+; those have to stay outside rather than come round in a byte.  In A, out HL.
+; Corrupts: AF, C
+row_of:
+                ld      c, a
+                ld      a, GAC_TOP
+                sub     c
+                ld      l, a
+                sbc     a, a                    ; all ones when it went below
+                ld      h, a
+                ret
+
+; Bring an x that left the picture to its edge: below nought comes to nought
+; and past the last column comes to the last column.  In HL, out L.
+; Corrupts: AF
+clamp_x:
+                ld      a, h
+                or      a
+                ret     z                       ; nought to 255 already
+                ld      l, 0
+                bit     7, h
+                ret     nz
+                ld      l, 255
+                ret
+
+; The same for a row: above the top comes to the top and below the bottom to
+; the last row.  In HL, out L.
+; Corrupts: AF
+clamp_row:
+                ld      a, h
+                or      a
+                jr      nz, .outside
+                ld      a, l
+                cp      PICTURE_ROWS
+                ret     c
+                ld      l, PICTURE_ROWS - 1
+                ret
+.outside:
+                ld      l, 0
+                bit     7, h
+                ret     nz
+                ld      l, PICTURE_ROWS - 1
+                ret
+
 ; The byte holding pixel (D across, E down) in HL, its bit as a mask in B.
 ; Corrupts: AF
 pixel_address:
@@ -230,7 +275,34 @@ is_boundary:
 
 ; Paint a pixel a fill has reached, in the way fill_mode says.
 ; Corrupts: everything but DE
-; A straight line from (gfx_x0, gfx_y0) to (gfx_x1, gfx_y1), in screen rows.
+; A straight line between the two points in lin_x0 and lin_x1, which are
+; sixteen bit and may lie outside the picture.
+;
+; Each end is brought to the edge before anything else, which is what GAC does
+; at $643C, and only then are the two deltas worked out in a byte.  Without
+; that a curve which leaves the top of the picture comes back as a line down
+; the whole screen, because in a byte a row of minus one is a row of 255.
+; Corrupts: everything
+draw_line:
+                ld      hl, (lin_x0)
+                call    clamp_x
+                ld      a, l
+                ld      (gfx_x0), a
+                ld      hl, (lin_y0)
+                call    clamp_row
+                ld      a, l
+                ld      (gfx_y0), a
+                ld      hl, (lin_x1)
+                call    clamp_x
+                ld      a, l
+                ld      (gfx_x1), a
+                ld      hl, (lin_y1)
+                call    clamp_row
+                ld      a, l
+                ld      (gfx_y1), a
+                ; fall through
+
+; The line between two points that are known to be inside, in screen rows.
 ; Drawn the way the Spectrum ROM draws a line, because that is what GAC
 ; called: it does PLOT at $22E5 and DRAW at $24BA and never wrote its own.
 ; The error starts at half the longer side, counts up by the shorter one, and
@@ -238,7 +310,7 @@ is_boundary:
 ; diagonal.  Counting the other way round is just as valid a Bresenham but
 ; puts the diagonal steps one place along, which shows on short slanted lines.
 ; Corrupts: everything
-draw_line:
+line_between:
                 ld      a, (gfx_x0)
                 ld      d, a
                 ld      a, (gfx_y0)
@@ -353,6 +425,11 @@ draw_line:
                 pop     bc
                 djnz    .down_step
                 ret
+
+lin_x0:         dw      0                       ; a line's two ends, before
+lin_y0:         dw      0                       ; they are brought inside
+lin_x1:         dw      0
+lin_y1:         dw      0
 
 line_dx:        db      0
 line_dy:        db      0

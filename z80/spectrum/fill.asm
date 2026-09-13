@@ -358,36 +358,47 @@ colour_span:
 ; -- what the picture interpreter calls -------------------------------------
 
 ; The y in the commands counts up from the bottom of the screen; the screen
-; counts rows down from the top.  The fill is the one thing that keeps working
-; in the commands' own coordinates, because that is where its pattern and its
-; limits are reckoned.
-gfx_to_rows:
+; counts rows down from the top.  Everything that draws an outline works in
+; sixteen bit rows, so that a point above the top stays above it; the fill is
+; the one thing that keeps working in the commands' own coordinates, because
+; that is where its pattern and its limits are reckoned.
+gfx_to_words:
+                ld      a, (gfx_x0)
+                ld      l, a
+                ld      h, 0
+                ld      (lin_x0), hl
                 ld      a, (gfx_y0)
-                call    to_row
-                ld      (gfx_y0), a
+                call    row_of
+                ld      (lin_y0), hl
+                ld      a, (gfx_x1)
+                ld      l, a
+                ld      h, 0
+                ld      (lin_x1), hl
                 ld      a, (gfx_y1)
-                call    to_row
-                ld      (gfx_y1), a
+                call    row_of
+                ld      (lin_y1), hl
                 ret
 
 gfx_line:
-                call    gfx_to_rows
+                call    gfx_to_words
                 jp      draw_line
 
 gfx_rect:
-                call    gfx_to_rows
+                call    gfx_to_words
                 jp      draw_rect
 
 gfx_ellipse:
-                call    gfx_to_rows
+                call    gfx_to_words
                 jp      draw_ellipse
 
 gfx_plot:
-                call    gfx_to_rows
-                ld      a, (gfx_x0)
-                ld      d, a
-                ld      a, (gfx_y0)
-                ld      e, a
+                call    gfx_to_words
+                ld      hl, (lin_x0)
+                call    clamp_x
+                ld      d, l
+                ld      hl, (lin_y0)
+                call    clamp_row
+                ld      e, l
                 jp      plot_point
 
 gfx_fill:
