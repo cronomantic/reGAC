@@ -34,10 +34,11 @@ partida, de `vm_state` a `vm_state_end`: la aventura no cambia nunca, así que
 no hace falta guardarla. El original sí la guardaba entera, de $5DC0 al final
 de su base de datos, porque tenía el estado metido dentro.
 
-De esos dos no hay prueba automática: el banco de pruebas no sabe grabar lo
-que sale por la cinta ni reproducir nada, así que sólo están comprobados a
-mano. Si algún día hace falta, la vía sería que el emulador escribiese un
-fichero de cinta.
+De esos dos, en el Spectrum, no hay prueba automática: el emulador no sabe
+grabar lo que sale por la cinta, así que sólo están comprobados a mano. En el
+Amstrad sí la hay, y la mitad que se puede probar aquí también se podría:
+darle una cinta de Spectrum de verdad y leer un bloque de ella, como se hace
+allí.
 
 Partir la línea en varias órdenes ya está, y de paso se aclaró de dónde salen
 los separadores: de ningún sitio. GAC parte al llegar a un signo de
@@ -60,15 +61,54 @@ tecla de mayúsculas y se quedaba ahí.
 ## Las máquinas
 
 En Python están modeladas Spectrum, Sam Coupé, Next, MSX1, MSX2 y Amstrad. En
-Z80 están el Spectrum, que está entero, y el Amstrad CPC, que juega.
+Z80 están el Spectrum y el Amstrad CPC, los dos enteros.
 
-### Lo que le falta al Amstrad
+### El Amstrad, con su cinta
 
-Dibuja, escribe y lee el teclado, y con eso ya describe el cuarto, entiende lo
-que se teclea y contesta. Queda la cinta, que en el Spectrum son dos llamadas a
-la ROM y aquí no, porque el firmware está paginado fuera mientras corre el
-intérprete; habría que traerlo de vuelta alrededor de la llamada o escribir la
-grabación desde cero. Por ahora guardar y cargar dicen que no han hecho nada.
+Dibuja, escribe, lee el teclado y ya graba y carga, así que juega de principio
+a fin.
+
+La cinta va por el firmware, igual que en el Spectrum va por la ROM: un bloque
+de datos sin cabecera delante, escrito con CAS WRITE ($BC9E) y leído con CAS
+READ ($BCA1). Lo que viaja es sólo la partida, de `vm_state` a `vm_state_end`,
+como allí.
+
+No hizo falta paginar nada, que era lo que parecía el problema. Las entradas
+del salto del firmware no son un salto: son un reinicio, `CF` más la
+dirección, o sea `RST 1`, que trae la ROM baja mientras dura la rutina aunque
+nosotros corramos con las dos fuera. Lo que sí hay que hacer al volver es
+recoger la máquina, porque el firmware la deja a su gusto: interrupciones
+apagadas otra vez, nuestro modo y las cuatro plumas de la lámina que está en
+pantalla. Y funciona con las interrupciones apagadas de principio a fin, que
+es como corre el intérprete; está medido, no supuesto.
+
+Es cinta y no disco a propósito. Las trece entradas de casete que abren un
+fichero con nombre son justo las que AMSDOS se queda para sí —en un 6128 las
+trece están parcheadas a un `RST 3` al ROM de disco, se ve leyendo el salto en
+$BC77— y todas piden dos kilobytes de memoria nuestra para trabajar. No hay
+sitio: la base de datos llega a $ADAD y las variables del firmware empiezan en
+$B100. CAS WRITE y CAS READ son las dos que el disco no toca, no piden
+memoria, y son el par exacto de las del Spectrum.
+
+Y de ésta sí hay prueba, que en el Spectrum no la había. El emulador sabe
+reproducir una cinta pero no grabarla, así que cada sentido se mira por su
+lado. Escribir se comprueba viendo que el firmware acepta el bloque, dice que
+lo escribió y devuelve la máquina como estaba. Leer se comprueba contra una
+cinta de verdad: el primer bloque de datos de la cinta de Megacorp, leído con
+nuestra rutina y comparado byte a byte con los mismos bytes sacados de la
+imagen `.cdt`, y los 256 salen iguales. Lo único que no se puede probar solo
+es la ida y vuelta entera, grabar lo nuestro y volver a leerlo, porque el
+emulador no graba.
+
+De camino salió un fallo de los de mirar y no medir. `MODE_1` valía
+%10001100, que es modo 0: los dos bits de abajo del registro son el modo y el
+modo 1 es %01, así que lo que hay que sacar es %10001101. No lo cazaba ninguna
+prueba porque todas leen la memoria de pantalla, y el modo no cambia lo que
+hay escrito en ella, sólo cómo se ve; en la pantalla de verdad el juego salía
+con los píxeles al doble de ancho. Se comprobó en la máquina, poniendo los dos
+valores y mirando lo que sale, y lo confirma el arranque del propio firmware,
+que lo primero que hace en $0000 es programar $89: modo 1 con la ROM baja
+dentro.
 
 El teclado sí tiene prueba, y lo de que el emulador perdiera teclas era cosa de
 cómo se las mandábamos. Darle una cadena entera pierde letras; mandarle la
