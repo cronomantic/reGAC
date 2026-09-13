@@ -552,8 +552,10 @@ def amstrad_device(header=None):
     """A device for one Amstrad picture, in the four inks it names.
 
     Those are the eight bytes it carries at its head: four pairs, because an
-    ink there can flash between two colours, and the three bits above the
-    colour are not understood yet.
+    ink there can flash between two colours.  Only the five bits the firmware
+    reads count: a colour that was typed rather than taken from the screen is
+    stored as the letter that was typed, and A or a comes out 1, Z or z 26,
+    and a space black, which is what the machine does with it.
     """
     if header:
         inks = [header[n * 2] & 0x1F for n in range(4)]

@@ -127,6 +127,12 @@ MAXRAM = MACHINE["max_ram"]
 PICTURE_BOTTOM = 48
 
 
+# The tables a table of pointers holds, in the order they are in memory, which
+# is also the order their contents follow one another through the database.
+TABLES = ("nouns", "adverbs", "objects", "rooms", "hpcs", "lcs", "lpcs",
+          "messages", "graphics", "tokens")
+
+
 def use_machine(name):
     """Point the decompiler at one machine's tables."""
     global MACHINE, PUNCTUATION_ADDR, NOUNS_ADDR, ADVERBS_ADDR, OBJECTS_ADDR
@@ -150,6 +156,39 @@ def use_machine(name):
     DBASE_ADDR = MACHINE["dbase"]
     MINRAM = MACHINE["min_ram"]
     MAXRAM = MACHINE["max_ram"]
+
+
+def tables_look_right(sysram, name):
+    """Whether a machine's pointers point anywhere sensible.
+
+    What they point at lies one piece after another through the database, so
+    the pointers climb, and none of them can point at anything before the
+    database itself.  A weak test, but a wrong one is loud, and the way to
+    get it wrong is to lay a memory image somewhere the machine would not
+    have laid it, which reads as an adventure with one noun in it.
+    """
+    entry = MACHINES[name]
+    last = entry["dbase"]
+    for table in TABLES:
+        at = entry[table]
+        if not 0 <= at < len(sysram) - 1:
+            return False
+        pointer = sysram[at] | sysram[at + 1] << 8
+        if not last < pointer <= 0xFFFF:
+            return False
+        last = pointer
+    return True
+
+
+def settled(sysram, name):
+    """Take the machine, and say so if its tables are not where they should
+    be, which means the image is not laid where the machine lays it."""
+    use_machine(name)
+    if not tables_look_right(sysram, name):
+        print(f"The {name} tables at ${MACHINES[name]['nouns']:04X} do not "
+              "look like pointers; is this image laid where the machine "
+              "would have it?", file=sys.stderr)
+    return sysram
 
 
 def dir_path(string):
@@ -219,8 +258,8 @@ def load_file(file_path, machine=None):
 
     if blob[:8] == b"MV - SNA":
         # A CPCEMU snapshot: a header of 256 bytes and then the memory.
-        use_machine(machine or "cpc")
-        return list(blob[0x100:0x100 + 0x10000]) + [0] * 0x10000
+        return settled(list(blob[0x100:0x100 + 0x10000]) + [0] * 0x10000,
+                       machine or "cpc")
 
     if blob[:19] == b"VICE Snapshot File":
         # Untested: written from the reference decompiler, which looks for the
@@ -228,19 +267,18 @@ def load_file(file_path, machine=None):
         at = blob[:256].find(b"C64MEM")
         if at < 0:
             sys.exit("No C64MEM block in that snapshot")
-        use_machine(machine or "c64")
-        return list(blob[at + 0x1A:at + 0x1A + 0x10000]) + [0] * 0x10000
+        return settled(list(blob[at + 0x1A:at + 0x1A + 0x10000]) + [0] * 0x10000,
+                       machine or "c64")
 
     if len(blob) == 49179:
-        use_machine(machine or "spectrum")
-        return [0] * MEM_BASE + list(blob[SEEKPOS:SEEKPOS + MEM_SIZE])
+        return settled([0] * MEM_BASE + list(blob[SEEKPOS:SEEKPOS + MEM_SIZE]),
+                       machine or "spectrum")
 
     if len(blob) >= 0x10000:
         # A plain image of the memory, where a byte's address is where it sits
         if machine is None:
             sys.exit("Say which machine that memory image is from, with -m")
-        use_machine(machine)
-        return list(blob[:0x10000])
+        return settled(list(blob[:0x10000]), machine)
 
     sys.exit("Invalid file size")
 
@@ -554,7 +592,12 @@ def get_graphics_amstrad(sysram):
         end = at + length
         # Those eight are not orders: changing them on the machine changes
         # nothing about what it draws, so the interpreter steps over them.
-        inks[id] = [peek1(sysram, at + n) for n in range(8)]
+        # What is kept of each is the five bits the firmware keeps, because
+        # the colour was typed as a letter and what got stored is the letter:
+        # GAC asks for "Colours (A..Z or SPACE)" and hands the character
+        # straight to the firmware, which reads A or a as 1, Z or z as 26 and
+        # a space as black.
+        inks[id] = [peek1(sysram, at + n) & 0x1F for n in range(8)]
         at += 8
         inst = []
         while at < end:

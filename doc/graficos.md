@@ -584,209 +584,38 @@ mirar el mapa de diferencias se ve que esas pantallas no tienen lámina
 dibujada, así que lo que coincidía eran dos imágenes casi vacías. Para
 contrastar de verdad hay que ejecutar el juego hasta que dibuje.
 
-## La versión de Amstrad CPC, leída entera
+### Las tintas de una lámina, y por qué traen bits de más
 
-Las aventuras de CPC vienen en disco, y de ahí salen los ficheros sin encender
-nada: el directorio de AMSDOS dice dónde está cada uno y su cabecera dice a qué
-dirección se carga. `CARVALHO.FAC`, que es Los pájaros de Bangkok, se carga en
-$0040 y ocupa hasta $A2F4, y trae dentro el intérprete y la aventura. En $4000
-están los punteros en fila, tal como decía el decompilador de referencia, y en
-$4012 el de las láminas. Con eso se lee el intérprete del CPC igual que se leyó
-el del Spectrum, pero sin emulador de por medio.
+Cada lámina empieza con ocho bytes que no son órdenes: cuatro parejas, una por
+pluma, y cada pareja son los dos colores de esa tinta, porque una tinta del CPC
+puede parpadear entre dos. El intérprete las copia a $A804 y las va poniendo de
+la pluma tres a la cero con SCR SET INK, y el borde lo saca de la primera
+pareja; está en $2EF3.
 
-### Las órdenes y sus argumentos
+Lo que no se entendía eran los bits de arriba, valores como 122, 107 o 32, muy
+por encima de los 26 colores que tiene el CPC. Son dos bits y no tres, porque
+el séptimo no está puesto nunca, y la respuesta está escrita en el propio
+intérprete unas líneas antes de esa rutina:
 
-El repertorio es más corto que el del Spectrum: 1 recta, 2 elipse, 3 relleno,
-8 rectángulo, 9 color, A llamada, B punto, y el 0 termina. Cualquier otro byte
-cae en el caso por defecto, que fija la pluma con la que se dibuja. No hay
-relleno de fondo ni media tinta aparte, porque aquí no hacen falta.
+    Give ink number (0..3)
+    Ink #: Colours (A..Z or SPACE)?
 
-Los argumentos van en parejas, y **el segundo byte de cada pareja lleva siempre
-el bit 7 puesto**; el intérprete lo quita al leerlo, con un `RES 7,E`. Por eso
-la y de una lámina va de 0 a 127: la lámina del CPC mide 256 por 128, los
-mismos números que la del Spectrum. El que escribe las láminas hace lo propio
-al revés, con un `OR $80` sobre el byte alto.
+El color se teclea como una letra y lo que se guarda es la letra. El firmware
+se queda con los cinco bits de abajo, así que la A y la a son 1, la Z y la z
+son 26, y el espacio es negro. 122 es una `z`, que es blanco; 32 es un espacio,
+que es negro; 107 es una `k`, que es el azul celeste.
 
-### Sí escalaba, con una sola perilla
+Medido en la máquina, por si alguna vez hace falta: SCR SET INK con 122 y 90 y
+luego SCR GET INK devuelve 26 y 26, o sea que el firmware enmascara y guarda ya
+enmascarado. Un valor cuyos cinco bits pasen de 26 se sale de la tabla de
+colores y saca lo que haya detrás, pero eso no ocurre en ninguna lámina: los
+valores altos que hay son siempre letras de la A a la Z, en mayúscula o en
+minúscula, o un espacio.
 
-Cada coordenada pasa por lo mismo antes de dibujarse: se multiplica por un
-factor de un byte, se divide por 64 y se le suma un origen, uno para la x y
-otro para la y. El factor que trae el fichero es 128, que en las coordenadas
-del firmware del CPC, que van de 0 a 639 por 0 a 399 sea cual sea el modo, deja
-la lámina a tamaño natural, un píxel por punto.
-
-Así que la lámina no se estira, pero **la perilla para estirarla está puesta**:
-un byte de escala y dos orígenes colocan los mismos datos en cualquier
-pantalla. Eso es exactamente lo que le hace falta al PCW, y no hay que
-inventarlo.
-
-### Se apoya en el firmware, como el Spectrum en su ROM
-
-Mover, trazar la recta, poner el punto, preguntar por un punto, elegir pluma,
-fijar el origen, la ventana y borrarla: todo eso lo pide a la máquina. El
-Spectrum hacía lo mismo con su ROM. Lo que ninguna de las dos delega es el
-relleno.
-
-### El relleno, y el atajo que nos faltaba
-
-El modelo es el mismo que en el Spectrum: recorrer la columna de la semilla
-hacia arriba y hacia abajo tendiendo un tramo horizontal en cada fila. Lo que
-cambia es cómo busca los extremos del tramo, y aquí está lo que llevábamos
-buscando.
-
-Antes de empezar pregunta por el punto de la semilla, y con el número de pluma
-que le devuelven monta un byte en el que los cuatro píxeles son esa pluma. Ese
-byte es la referencia. Para buscar el extremo hace un `XOR` de la referencia
-contra el byte de pantalla: si la parte que toca al píxel no sale cero, ahí se
-acaba el tramo. Y cuando el recorrido entra en un byte nuevo, compara el byte
-entero: **si todo el byte coincide con la referencia, se lleva sus cuatro
-píxeles de una vez** y salta al siguiente.
-
-Es la optimización por bytes que intenté y deshice. El original la tiene, hecha
-así: comparar primero el byte completo, y sólo bajar a máscara de bit en los
-dos extremos.
-
-### El color es una trama de dos plumas
-
-La orden 9 lleva dos números de pluma. El intérprete convierte cada uno en su
-byte de cuatro píxeles, se queda con las columnas pares del primero y las
-impares del segundo, y los junta. Eso da un damero de las dos plumas. Después
-guarda el mismo byte con las dos plumas intercambiadas, para las filas
-alternas.
-
-Es la pareja de patrones del Spectrum, generalizada: con las dos plumas iguales
-sale un color sólido, y con dos distintas sale una mezcla que en modo 1 da
-muchos más colores de los cuatro que hay. En una máquina de un bit por píxel
-las dos plumas sólo pueden ser negro y blanco, y de ahí salen exactamente los
-tres rellenos del Spectrum: lleno, vacío y damero. El PCW no necesita un modelo
-de color propio, le basta esta orden.
-
-### La elipse es la misma, byte por byte
-
-En $22B0 está la tabla de dieciséis valores, la misma que el Spectrum guarda en
-$A1ED, sin una cifra distinta. El primer par de la orden es el centro y el
-segundo da los radios, como allí. Queda demostrado que la geometría de las
-láminas no depende de la máquina.
-
-### El dibujo, en cambio, no se reaprovechó
-
-Las láminas no son las mismas. La versión de CPC de Bangkok trae 44 y la de
-Spectrum 32, y no coincide ninguna, ni siquiera corrigiendo el origen de la y.
-Se volvieron a dibujar para la máquina.
-
-### Leer una aventura de Amstrad
-
-`deGAC` las lee, con `-m cpc` cuando lo que se le da es una imagen plana de
-memoria como la que saca `disk.py`. Las coordenadas salen ya en las del
-Spectrum: la y se le quita el bit 7, que allí siempre está puesto, y se le
-suman 48, porque la lámina mide 128 filas en las dos máquinas y lo único que
-cambia es desde dónde se cuentan.
-
-Las órdenes de color no tienen equivalente exacto. La que lleva dos plumas se
-parte en tinta y papel, y la que fija una sola pluma queda como tinta. Los ocho
-bytes de cabecera de cada lámina no caben entre las órdenes, así que se guardan
-aparte, en `gfx_inks`, para no perder lo único que dice de qué color iba.
-
-### Las mismas escenas, dibujadas otra vez
-
-Con eso se pueden poner las dos versiones de Los pájaros de Bangkok una al
-lado de la otra. Los cuartos llevan el mismo número en las dos, así que se
-emparejan solas, y de cuarenta que tienen lámina en ambas salen veintiséis
-parejas distintas.
-
-Son las mismas escenas y ninguna es la misma lámina. El autobús con la cara
-del hombre, la calle con sus dos edificios, el corro de gente, la mujer: se
-reconocen todas, pero están vueltas a dibujar, con más color en pantalla y más
-detalle, y sin el marco que el Spectrum pinta alrededor. No coincide ni una
-sola orden, ni corrigiendo el origen de la y.
-
-Para verlas hizo falta un dispositivo que dibuje como el Amstrad, porque con
-el modelo del Spectrum salen manchas planas: un relleno que allí se para al
-cambiar de pluma aquí se lo lleva todo por delante. Está en
-[`AmstradDevice`](../regac/devices.py).
-
-### Contrastarlo contra la máquina
-
-Lo anterior no bastaba: las láminas seguían saliendo con fallos, y sólo se
-podía saber preguntándole a un Amstrad. El cargador del disco quiere una
-comilla tecleada en BASIC que el emulador no manda, así que la aventura entra
-en memoria a mano, en la dirección que dice su propia cabecera, y la arranca un
-`CALL` en decimal. Desde ahí se lee la pantalla y se convierte en números de
-pluma, que es una comparación que no depende de los colores. Y escribiendo un
-cero en medio de las órdenes de una lámina se la corta donde se quiera, que es
-lo que permite ir acorralando un fallo.
-
-Con eso salieron cuatro cosas:
-
-**La lámina se dibuja en el 32,1 de la pantalla**, no pegada a la esquina.
-
-**Empieza con la pluma 1**, y eso no lo dice el dato en ninguna parte: el marco
-que pinta cada cuarto no lleva ni una orden de color y sale amarillo.
-
-**Los ocho bytes de cabecera no son órdenes.** Merecía la pena probarlo porque
-habría explicado el marco: cambiando el último en la máquina, lo que dibuja no
-se mueve.
-
-**El damero elige pluma por la y de las órdenes, no por la fila de pantalla.**
-Es un bit de diferencia y volvía del revés todas las tramas. Esto solo llevó
-una lámina entera del 89 al 99 por ciento.
-
-Cómo queda, midiendo contra la pantalla de la máquina:
-
-| lo que se dibuja | coincide |
-|---|---|
-| sólo el marco | 100,00% |
-| el marco y la lámina 3 | 99,36% |
-| el cuarto del aeropuerto entero | 99,15% |
-
-### La recta del Amstrad da igual por qué punta se empiece
-
-Se midió dibujando rectas de extremos conocidos en la máquina y anotando qué
-puntos encendía. Siete rectas bastaron, y dicen dos cosas.
-
-La primera: **ir de A a B enciende exactamente los mismos puntos que ir de B a
-A**. La ROM del Spectrum no hace eso; dónde caen los pasos diagonales depende
-de por qué punta se empiece.
-
-La segunda: en cuanto se ponen las dos puntas en orden a lo largo del lado
-mayor, el resto es el mismo Bresenham que ya teníamos, error a la mitad del
-lado mayor, subiendo por el menor, y paso diagonal al alcanzarlo. Con eso las
-siete rectas salen exactas.
-
-### La elipse, que sigue sin cuadrar
-
-Es lo único que queda, y no está resuelto. Lo medido, para quien lo retome:
-
-Una elipse de radio 30 da 168 puntos en la máquina y 168 en el nuestro, y
-sesenta y cuatro caen corridos un píxel. De los treinta y dos vértices que
-calculamos, doce no están en la curva que dibuja la máquina, y los doce son de
-los cuartos en los que el radio se **resta** del centro; el cuarto en el que
-las dos coordenadas se suman sale entero.
-
-Lo que dice el código del Amstrad es que no debería haber diferencia. La rutina
-de $22C0 saca las dos distancias como el byte alto de radio por tabla, y cada
-cuarto las suma o las resta con `ADD HL,BC` o `SBC HL,BC`, sin más. Leído así,
-sumar y restar tendrían que ser simétricos.
-
-Probado y descartado: redondear hacia afuera al restar (queda mucho peor, 60
-puntos de 168), redondear al más cercano, y ordenar las puntas de las rectas
-empinadas al revés. Y una comprobación que desconcierta: el tramo que va del
-lado izquierdo hacia abajo, dibujado suelto como una orden de recta, sale en la
-máquina exactamente igual que en el nuestro, con los mismos seis puntos; dentro
-de la elipse, en cambio, la máquina pone uno de ellos una columna más a la
-izquierda. O los vértices no son los que creemos, o la recta del firmware no
-hace lo mismo cuando encadena que cuando empieza con un movimiento.
-
-Con todo lo demás puesto, un cuarto entero se queda en el 99,2 por ciento.
-
-### Lo que no está claro todavía
-
-Cada lámina empieza con ocho bytes que no son órdenes. Van en cuatro parejas y
-las dos mitades de cada pareja son siempre iguales. Los valores son un color de
-0 a 26, que es justo la gama del CPC, más tres bits sueltos por encima. Leído
-así son las cuatro tintas de la lámina, con la pareja repetida porque una tinta
-del CPC admite dos colores y parpadea si difieren. Para qué son los tres bits
-de arriba no lo sé todavía.
+Y por eso hay láminas con valores limpios de 0 a 26: ésas no las tecleó nadie.
+Cuando la lámina no trae color, el intérprete lee el que hay con SCR GET INK y
+lo guarda tal cual, y de ahí salen los 1, 24, 20 y 6 que son las tintas del
+modo 1 al arrancar.
 
 ## Lo que queda por confirmar
 
