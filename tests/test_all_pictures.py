@@ -74,6 +74,9 @@ def draw_them_all(path):
     session = emulator.Session()
     try:
         session.load(os.path.join(SPECTRUM, "picture.sna"))
+        # the snapshot draws one picture of its own accord; waiting for that
+        # is how we know it has really loaded and run
+        assert session.wait_for(where["done_flag"], 0xFF, timeout=60.0),             "the Spectrum never got going"
         for key in sorted(gfx, key=int):
             number = int(key)
             session.command(
