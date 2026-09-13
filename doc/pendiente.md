@@ -142,9 +142,11 @@ metidas en el propio opcode y nada más. La numeración de los opcodes tampoco
 coincide en nada. Es justo la separación que ya hicimos entre el intérprete de
 láminas y el dispositivo, confirmada por el original.
 
-**Nadie reescaló las coordenadas.** Son los mismos bytes en las dos máquinas,
-así que el ajuste a la pantalla lo hace la máquina y no el dato. Eso respalda
-centrar la lámina de 256 en los 720 del PCW.
+**Las coordenadas son los mismos bytes en las dos máquinas**, así que el ajuste
+a la pantalla lo hace la máquina y no el dato. Leyendo el intérprete se ve
+cómo: un factor de escala de un byte y dos orígenes. En el CPC el factor deja
+la lámina a tamaño natural, pero la perilla está puesta, y es la que le hace
+falta al PCW.
 
 **El CPC guarda una paleta por lámina**, ocho bytes a la cabeza de cada
 registro, antes de las órdenes. Es la respuesta del original a la pregunta que
@@ -180,5 +182,11 @@ De la versión de CPC quedan tres cabos:
 también entiende las de Amstrad y Commodore 64, lo que ampliaría el catálogo de
 aventuras recuperables.
 
-El intérprete de Python casa palabras por prefijo, y el original y el nuestro
-casan la palabra entera. Conviene alinearlo o dejar dicho por qué no.
+El intérprete de Python casa palabras por prefijo, recortando la del
+vocabulario a lo que se haya tecleado, así que "LA" casa con "LAMPARA". El
+original y el nuestro casan la palabra entera. Conviene alinearlo o dejar
+dicho por qué no.
+
+En ese mismo intérprete, `__parse_input` tiene una condición que no puede ser
+cierta nunca, `self.noun2 == 0 and self.noun2 != 0`, así que en Python el
+segundo nombre no se lee jamás.
