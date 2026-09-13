@@ -27,26 +27,129 @@ import argparse
 import gettext
 import json
 
-SEEKPOS = 0x1C1B  # Number of bytes to skip in the file
-MEM_BASE = 0x5C00  # First address loaded
+SEEKPOS = 0x1C1B  # Number of bytes to skip in a Spectrum snapshot
+MEM_BASE = 0x5C00  # First address it holds
 MEM_SIZE = 0xA400  # Number of bytes to load from it
 
-PUNCTUATION_ADDR = 0xA1E5  # 8 possible phrase endings
-NOUNS_ADDR = 0xA51F  # Words that GAC recognises as nouns
-ADVERBS_ADDR = 0xA521  # Words that GAC recognises as adverbs
-OBJECTS_ADDR = 0xA523  # Table of objects
-ROOMS_ADDR = 0xA525  # Table of locations
-HPCS_ADDR = 0xA527  # High-priority conditions
-LCS_ADDR = 0xA529  # Local conditions
-LPCS_ADDR = 0xA52B  # Low-priority conditions
-MESSAGES_ADDR = 0xA52D  # Message text
-GRAPHICS_ADDR = 0xA52F  # Room graphics
-TOKENS_ADDR = 0xA531  # Tokens used to store all forms of text
-STARTROOM_ADDR = 0xA54D  # Initial room
-VERBS_ADDR = 0xA54F  # Words that GAC recognises as verbs
-DBASE_ADDR = 0xA1E5  # Start of database
-MINRAM = 0x4000  # Minimum RAM address
-MAXRAM = 0xFFFF  # Maximum RAM address
+# Where each machine keeps the pointers to the tables.  The same interpreter
+# was carried from one to the next, so the tables themselves are the same
+# shape; only where they are found changes, and the pictures, which are drawn
+# with each machine's own orders.
+MACHINES = {
+    "spectrum": {
+        "model": "SPECTRUM",
+        "punctuation": 0xA1E5,
+        "nouns": 0xA51F,
+        "adverbs": 0xA521,
+        "objects": 0xA523,
+        "rooms": 0xA525,
+        "hpcs": 0xA527,
+        "lcs": 0xA529,
+        "lpcs": 0xA52B,
+        "messages": 0xA52D,
+        "graphics": 0xA52F,
+        "tokens": 0xA531,
+        "startroom": 0xA54D,
+        "verbs": 0xA54F,
+        "dbase": 0xA1E5,
+        "min_ram": 0x4000,
+        "max_ram": 0xFFFF,
+        "pictures": "spectrum",
+        "font": True,
+    },
+    "cpc": {
+        "model": "CPC",
+        "punctuation": 0x210C,
+        "nouns": 0x4000,
+        "adverbs": 0x4002,
+        "objects": 0x4004,
+        "rooms": 0x4006,
+        "hpcs": 0x4008,
+        "lcs": 0x400A,
+        "lpcs": 0x400C,
+        "messages": 0x400E,
+        "graphics": 0x4012,
+        "tokens": 0x4014,
+        "startroom": 0x4018,
+        "verbs": 0x4100,
+        "dbase": 0x210C,
+        "min_ram": 0x0000,
+        "max_ram": 0xFFFF,
+        "pictures": "amstrad",
+        "font": False,
+    },
+    "c64": {
+        "model": "C64",
+        "punctuation": 0x7EBF,
+        "nouns": 0x0002,
+        "adverbs": 0x0004,
+        "objects": 0x0006,
+        "rooms": 0x0008,
+        "hpcs": 0x000A,
+        "lcs": 0x000C,
+        "lpcs": 0x000E,
+        "messages": 0x0010,
+        "graphics": 0x0012,
+        "tokens": 0x0014,
+        "startroom": 0xA54D,
+        "verbs": 0x0856,
+        "dbase": 0x0002,
+        "min_ram": 0x0000,
+        "max_ram": 0xFFFF,
+        "pictures": "amstrad",
+        "font": False,
+    },
+}
+
+MACHINE = MACHINES["spectrum"]
+
+PUNCTUATION_ADDR = MACHINE["punctuation"]
+NOUNS_ADDR = MACHINE["nouns"]
+ADVERBS_ADDR = MACHINE["adverbs"]
+OBJECTS_ADDR = MACHINE["objects"]
+ROOMS_ADDR = MACHINE["rooms"]
+HPCS_ADDR = MACHINE["hpcs"]
+LCS_ADDR = MACHINE["lcs"]
+LPCS_ADDR = MACHINE["lpcs"]
+MESSAGES_ADDR = MACHINE["messages"]
+GRAPHICS_ADDR = MACHINE["graphics"]
+TOKENS_ADDR = MACHINE["tokens"]
+STARTROOM_ADDR = MACHINE["startroom"]
+VERBS_ADDR = MACHINE["verbs"]
+DBASE_ADDR = MACHINE["dbase"]
+MINRAM = MACHINE["min_ram"]
+MAXRAM = MACHINE["max_ram"]
+
+# The picture a room shows is 128 rows tall on every machine.  The Spectrum
+# counts its y from the bottom of the screen, so a picture lives between 48
+# and 175; the Amstrad counts from the bottom of the picture itself.  Ours is
+# written the Spectrum's way, so the others are moved up to meet it.
+PICTURE_BOTTOM = 48
+
+
+def use_machine(name):
+    """Point the decompiler at one machine's tables."""
+    global MACHINE, PUNCTUATION_ADDR, NOUNS_ADDR, ADVERBS_ADDR, OBJECTS_ADDR
+    global ROOMS_ADDR, HPCS_ADDR, LCS_ADDR, LPCS_ADDR, MESSAGES_ADDR
+    global GRAPHICS_ADDR, TOKENS_ADDR, STARTROOM_ADDR, VERBS_ADDR, DBASE_ADDR
+    global MINRAM, MAXRAM
+    MACHINE = MACHINES[name]
+    PUNCTUATION_ADDR = MACHINE["punctuation"]
+    NOUNS_ADDR = MACHINE["nouns"]
+    ADVERBS_ADDR = MACHINE["adverbs"]
+    OBJECTS_ADDR = MACHINE["objects"]
+    ROOMS_ADDR = MACHINE["rooms"]
+    HPCS_ADDR = MACHINE["hpcs"]
+    LCS_ADDR = MACHINE["lcs"]
+    LPCS_ADDR = MACHINE["lpcs"]
+    MESSAGES_ADDR = MACHINE["messages"]
+    GRAPHICS_ADDR = MACHINE["graphics"]
+    TOKENS_ADDR = MACHINE["tokens"]
+    STARTROOM_ADDR = MACHINE["startroom"]
+    VERBS_ADDR = MACHINE["verbs"]
+    DBASE_ADDR = MACHINE["dbase"]
+    MINRAM = MACHINE["min_ram"]
+    MAXRAM = MACHINE["max_ram"]
 
 
 def dir_path(string):
@@ -103,18 +206,43 @@ def valid_path(string):
         raise NotADirectoryError(string)
 
 
-def load_file(file_path):
-    file_array = []
+def load_file(file_path, machine=None):
+    """The 64K the machine had, and which machine it was.
+
+    A Spectrum snapshot has no mark of its own and is known by its size; the
+    Amstrad and Commodore ones say so at the front.  A plain memory image,
+    which is what comes off an Amstrad disk, says nothing at all, so that one
+    has to be told.
+    """
     with open(file_path, "rb") as file:
-        file.seek(SEEKPOS)
-        file_array = file.read()
+        blob = file.read()
 
-    if len(file_array) != (49179 - SEEKPOS):
-        sys.exit("Invalid file size")
+    if blob[:8] == b"MV - SNA":
+        # A CPCEMU snapshot: a header of 256 bytes and then the memory.
+        use_machine(machine or "cpc")
+        return list(blob[0x100:0x100 + 0x10000]) + [0] * 0x10000
 
-    sysmem = [0] * MEM_BASE
-    sysmem += file_array[0:MEM_SIZE]
-    return sysmem
+    if blob[:19] == b"VICE Snapshot File":
+        # Untested: written from the reference decompiler, which looks for the
+        # block of memory by name and takes what follows it.
+        at = blob[:256].find(b"C64MEM")
+        if at < 0:
+            sys.exit("No C64MEM block in that snapshot")
+        use_machine(machine or "c64")
+        return list(blob[at + 0x1A:at + 0x1A + 0x10000]) + [0] * 0x10000
+
+    if len(blob) == 49179:
+        use_machine(machine or "spectrum")
+        return [0] * MEM_BASE + list(blob[SEEKPOS:SEEKPOS + MEM_SIZE])
+
+    if len(blob) >= 0x10000:
+        # A plain image of the memory, where a byte's address is where it sits
+        if machine is None:
+            sys.exit("Say which machine that memory image is from, with -m")
+        use_machine(machine)
+        return list(blob[:0x10000])
+
+    sys.exit("Invalid file size")
 
 
 def peek1(sysram, addr):
@@ -241,7 +369,7 @@ def get_rooms(sysram):
     return result
 
 
-def get_graphics(sysram):
+def get_graphics_spectrum(sysram):
     result = {}
     gfx = peek2(sysram, GRAPHICS_ADDR)
     id = peek2(sysram, gfx)
@@ -387,6 +515,83 @@ def get_graphics(sysram):
         gfx = base + length
         id = peek2(sysram, gfx)
     return result
+
+
+# What the Amstrad and the Commodore call each order.  The numbers are not
+# the Spectrum's, and there are fewer of them: no border, no background fill,
+# no half tone.  Anything not named here sets the pen to its own low bits.
+AMSTRAD_COMMANDS = {
+    0x01: ("LINE", 4),
+    0x02: ("ELLIPSE", 4),
+    0x03: ("FILL", 2),
+    0x08: ("RECT", 4),
+    0x09: ("PENS", 2),
+    0x0A: ("CALL", 2),
+    0x0B: ("PLOT", 2),
+}
+
+
+def get_graphics_amstrad(sysram):
+    """The pictures of an Amstrad or a Commodore, and the inks of each.
+
+    The orders are the same shapes as the Spectrum's but numbered differently,
+    and the second byte of every pair carries bit 7, which the interpreter
+    takes off as it reads: that is why a picture is 128 rows tall there too.
+    Each record opens with eight bytes that are not orders at all, four pairs
+    of them, which read as the four inks that picture wants.
+    """
+    pictures = {}
+    inks = {}
+    gfx = peek2(sysram, GRAPHICS_ADDR)
+    while True:
+        id = peek2(sysram, gfx)
+        if id == 0:
+            return pictures, inks
+        length = peek2(sysram, gfx + 2)
+        if length <= 8:  # no record is shorter than its own inks
+            return pictures, inks
+        at = gfx + 4
+        end = at + length
+        inks[id] = [peek1(sysram, at + n) for n in range(8)]
+        at += 8
+        inst = []
+        while at < end:
+            cmd = peek1(sysram, at)
+            at += 1
+            if cmd == 0:
+                break
+            name, argc = AMSTRAD_COMMANDS.get(cmd, (None, 0))
+            args = [peek1(sysram, at + n) for n in range(argc)]
+            at += argc
+            if name is None:
+                inst.append(("INK", cmd & 3))
+            elif name == "PENS":
+                # one order sets both pens of the dither; ours are apart
+                inst.append(("INK", args[0] & 3))
+                inst.append(("PAPER", args[1] & 3))
+            elif name == "CALL":
+                inst.append(("CALL", args[0] + 256 * (args[1] & 0x7F)))
+            elif argc == 2:
+                inst.append((name, args[0], (args[1] & 0x7F) + PICTURE_BOTTOM))
+            else:
+                inst.append(
+                    (
+                        name,
+                        args[0],
+                        (args[1] & 0x7F) + PICTURE_BOTTOM,
+                        args[2],
+                        (args[3] & 0x7F) + PICTURE_BOTTOM,
+                    )
+                )
+        pictures[id] = inst
+        gfx = end
+    return pictures, inks
+
+
+def get_graphics(sysram):
+    if MACHINE["pictures"] == "spectrum":
+        return get_graphics_spectrum(sysram), {}
+    return get_graphics_amstrad(sysram)
 
 
 def get_cond(sysram, cond):
@@ -615,7 +820,7 @@ def get_adverbs(sysram):
 def get_database(sysram):
     database = {}
 
-    font = get_font(sysram)
+    font = get_font(sysram) if MACHINE["font"] else []
     verbs = get_verbs(sysram)
     nouns = get_nouns(sysram)
     adverbs = get_adverbs(sysram)
@@ -625,7 +830,7 @@ def get_database(sysram):
     hpcs = get_hpcs(sysram)
     lpcs = get_lpcs(sysram)
     lcs = get_lcs(sysram)
-    gfx = get_graphics(sysram)
+    gfx, inks = get_graphics(sysram)
 
     database["font"] = [0 for x in range(8 * 32)] + font
     database["verbs"] = verbs
@@ -644,7 +849,12 @@ def get_database(sysram):
     database["lpcs"] = lpcs
     database["lcs"] = lcs
     database["gfx"] = gfx
-    database["model"] = "SPECTRUM"
+    if inks:
+        # What the Amstrad keeps at the head of every picture.  It has no
+        # place among the orders, and throwing it away would lose the only
+        # record of what colour that picture was meant to be.
+        database["gfx_inks"] = inks
+    database["model"] = MACHINE["model"]
     database["punctuation"] = list("\0 .,-!?:")
     # GAC parts one order from the next at a mark of punctuation, and
     # nowhere in its database is there a list of words that do the same.
@@ -688,7 +898,13 @@ def main():
         "input_path",
         type=file_path,
         metavar=_("INPUT_FILE"),
-        help=_("sna file"),
+        help=_("snapshot, or a plain image of the memory"),
+    )
+    arg_parser.add_argument(
+        "-m",
+        "--machine",
+        choices=sorted(MACHINES),
+        help=_("which machine it came off; only needed for a plain image"),
     )
     arg_parser.add_argument(
         "output_path",
@@ -706,7 +922,8 @@ def main():
 
     print(f"Processing file {args.input_path}...")
 
-    sysram = load_file(args.input_path)
+    sysram = load_file(args.input_path, args.machine)
+    print(f"Reading it as {MACHINE['model']}")
 
     # The 8 bytes that should be at PUNCTUATION. UnGAC uses this as a magic number  to detect a GAC database.
     punc_magic = list("\0 .,-!?:".encode(encoding="ascii"))

@@ -178,9 +178,19 @@ De la versión de CPC quedan tres cabos:
 
 ## Cosas menores
 
-`deGAC` sólo lee instantáneas de Spectrum. El decompilador de referencia en C
-también entiende las de Amstrad y Commodore 64, lo que ampliaría el catálogo de
-aventuras recuperables.
+`deGAC` ya lee las tres máquinas. Reconoce por sí solo una instantánea de
+Spectrum, una de CPCEMU y una de VICE, y a una imagen plana de memoria, que es
+lo que sale de un disco de Amstrad, hay que decirle de qué máquina viene con
+`-m`. Las tablas están en sitios distintos en cada una, y las láminas usan
+órdenes distintas, así que eso va aparte; lo demás sale igual.
+
+Comprobado con Los pájaros de Bangkok de Amstrad contra la misma aventura de
+Spectrum: 47 nombres en las dos, 11 objetos, 27 condiciones locales, y el
+vocabulario palabra por palabra el mismo. Las 44 láminas coinciden con una
+lectura independiente de los bytes en crudo.
+
+Lo de Commodore está escrito a partir del decompilador de referencia y **no se
+ha probado nunca**, porque no tenemos ningún fichero de C64 a mano.
 
 Lo de casar palabras por prefijo estaba al revés de como lo habíamos contado.
 El que se equivocaba era el nuestro, no el de Python: al original le tecleas

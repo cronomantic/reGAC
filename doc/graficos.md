@@ -435,6 +435,19 @@ Las láminas no son las mismas. La versión de CPC de Bangkok trae 44 y la de
 Spectrum 32, y no coincide ninguna, ni siquiera corrigiendo el origen de la y.
 Se volvieron a dibujar para la máquina.
 
+### Leer una aventura de Amstrad
+
+`deGAC` las lee, con `-m cpc` cuando lo que se le da es una imagen plana de
+memoria como la que saca `disk.py`. Las coordenadas salen ya en las del
+Spectrum: la y se le quita el bit 7, que allí siempre está puesto, y se le
+suman 48, porque la lámina mide 128 filas en las dos máquinas y lo único que
+cambia es desde dónde se cuentan.
+
+Las órdenes de color no tienen equivalente exacto. La que lleva dos plumas se
+parte en tinta y papel, y la que fija una sola pluma queda como tinta. Los ocho
+bytes de cabecera de cada lámina no caben entre las órdenes, así que se guardan
+aparte, en `gfx_inks`, para no perder lo único que dice de qué color iba.
+
 ### Lo que no está claro todavía
 
 Cada lámina empieza con ocho bytes que no son órdenes. Van en cuatro parejas y
