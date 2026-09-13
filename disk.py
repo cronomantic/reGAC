@@ -13,9 +13,16 @@ machine would have had in memory, which is what the decompiler wants.
 A file that ends by moving itself somewhere else is followed there, because
 that is what the machine would have in memory; --at overrides both.
 
-Both the plain and the extended image formats are read.  Disks whose sectors
-were renumbered to stop them being copied are not: those still have to be
-loaded on the machine, which is what grab.py is for.
+Both the plain and the extended image formats are read.  A disk laid out to
+stop it being copied keeps nothing in its directory, and its own loader reads
+tracks AMSDOS would not recognise; but those tracks are still an image of what
+the machine loads, so they are read too:
+
+    python disk.py VAJILLAS.DSK              # says what is in the raw tracks
+    python disk.py VAJILLAS.DSK --part 1 salida.mem
+
+What tells where such an image goes is the database itself, which always
+starts with the same eight marks of punctuation at $210C.
 """
 
 import argparse
@@ -150,6 +157,76 @@ def memory(blob, at=None):
     return bytes(image), dict(head, laid=where, moved=bool(moved))
 
 
+# The eight marks of punctuation are the first thing in a GAC database and are
+# the same eight in every one there is, which is what the reference decompiler
+# uses to recognise one at all.  Here they say where in a heap of sectors an
+# adventure is, and, because they sit at $210C in memory, where it loads.
+DATABASE_MARK = bytes([0x00, 0x20, 0x2E, 0x2C, 0x2D, 0x21, 0x3F, 0x3A])
+PUNCTUATION_AT = 0x210C
+
+
+def raw_stream(data):
+    """Every track but the first, end to end, as the loader would read them.
+
+    A protected disk keeps nothing in its directory, so there is no file to
+    join; what there is instead is the data itself, laid down track after
+    track.  The first track is left out because that one is a normal one, with
+    the boot sector and the empty directory on it.
+    """
+    out = bytearray()
+    for n, track in enumerate(tracks(data)):
+        if n == 0:
+            continue
+        for _, blob in sorted(sectors(track), key=lambda s: s[0]):
+            out += blob
+    return bytes(out)
+
+
+# Where the Amstrad keeps the pointers to its tables, and how many of them
+# run one after another from there.
+TABLES_AT = 0x4000
+TABLES = 10
+
+
+def has_tables(stream, base):
+    """Whether the pointers of an adventure laid from `base` climb through the
+    database as they should.  Eight marks of punctuation could turn up by
+    chance in a picture; ten climbing pointers on top of that could not."""
+    at = base + TABLES_AT
+    if at < 0 or at + TABLES * 2 > len(stream):
+        return False
+    last = PUNCTUATION_AT
+    for n in range(TABLES):
+        pointer = stream[at + n * 2] | stream[at + n * 2 + 1] << 8
+        if not last < pointer <= 0xFFFF:
+            return False
+        last = pointer
+    return True
+
+
+def adventures(stream):
+    """Where each adventure in that heap begins, as the address of its $0000.
+
+    La guerra de las vajillas keeps its two parts one after the other, so this
+    finds two.
+    """
+    found, at = [], stream.find(DATABASE_MARK)
+    while at >= 0:
+        base = at - PUNCTUATION_AT
+        if has_tables(stream, base):
+            found.append(base)
+        at = stream.find(DATABASE_MARK, at + 1)
+    return found
+
+
+def raw_memory(stream, base):
+    """A 64K image of the machine, taken from that point of the heap."""
+    image = bytearray(0x10000)
+    piece = stream[max(base, 0):base + 0x10000]
+    image[max(-base, 0):max(-base, 0) + len(piece)] = piece
+    return bytes(image)
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("image", help="the disk image")
@@ -157,15 +234,38 @@ def main(argv=None):
     parser.add_argument("output", nargs="?", help="where to write the memory image")
     parser.add_argument("--at", type=lambda n: int(n, 0), default=None,
                         help="lay it at this address instead of its own")
+    parser.add_argument("--part", type=int, default=None,
+                        help="which adventure to take off a disk with no directory")
     args = parser.parse_args(argv)
 
     data = open(args.image, "rb").read()
     area = data_area(data)
     listing = directory(area)
+
+    if args.part is not None:
+        # With --part the one name given is where to write, because there is
+        # no directory to name a file in.
+        out = args.output or args.name or "part.mem"
+        stream = raw_stream(data)
+        where = adventures(stream)
+        if not 1 <= args.part <= len(where):
+            print(f"the disk has {len(where)} of them", file=sys.stderr)
+            return 1
+        base = where[args.part - 1]
+        with open(out, "wb") as f:
+            f.write(raw_memory(stream, base))
+        print(f"adventure {args.part} of {len(where)} laid where it loads, "
+              f"from ${base:04X} of the raw tracks, in {out}")
+        return 0
+
     if not args.name:
         first = sectors(tracks(data)[0])
         kind = SECTOR_BASES.get(min(s[0] for s in first), "unknown") if first else "unknown"
         print(f"{len(listing)} files, {kind} format")
+        if not listing:
+            where = adventures(raw_stream(data))
+            print(f"  no directory, but {len(where)} adventures in the raw "
+                  f"tracks: take them with --part")
         for name, pieces in listing.items():
             blob = contents(area, pieces)
             head = header(blob)

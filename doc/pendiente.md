@@ -153,26 +153,28 @@ Sergio puede conseguir las mismas aventuras en su versión de Amstrad CPC. Es la
 mejor fuente que hay para el PCW, porque es el único sitio donde se ve qué hizo
 el original al llevar las láminas a una máquina que no es el Spectrum.
 
-Lo que se encuentra por ahí son imágenes de disco y de cinta, no instantáneas,
-así que hay que cargarlas en la máquina que les toca y leer la memoria después.
-Eso es lo que hace `grab.py`: arranca el emulador en la máquina que se le diga,
-mete el medio, espera a que cargue y escribe la memoria en un fichero plano
-donde la dirección de un byte es su posición.
+Lo que se encuentra por ahí son imágenes de disco y de cinta, no instantáneas.
+Las de disco se leen sin encender nada, con `disk.py`, hasta las protegidas.
+Para una cinta sí hace falta la máquina, y eso es lo que hace `grab.py`:
+arranca el emulador en la máquina que se le diga, mete el medio, espera a que
+cargue y escribe la memoria en un fichero plano donde la dirección de un byte
+es su posición.
 
     python grab.py --machine CPC464 juego.cdt juego.bin
     python grab.py --machine CPC6128 juego.dsk juego.bin
 
 Está comprobado contra una instantánea de Spectrum, que se puede comparar
 consigo misma: los 48K vuelven byte a byte salvo el contador de fotogramas y
-los dos bytes de pila que usa la propia instantánea para arrancar. Falta
-enseñar al decompilador a leer un volcado plano y a situar las tablas donde el
-Amstrad las tiene, a partir de $4000, con la base de datos en $210C.
+los dos bytes de pila que usa la propia instantánea para arrancar. Eso sí, con
+una cinta pide paciencia y puntería: una de CPC tarda seis o siete minutos de
+reloj en cargar, y hay que leerla cuando ha acabado de cargar y antes de que el
+juego eche a andar. Antes faltan las láminas, que van al final; después el
+juego ya se ha escrito encima de lo suyo.
 
 Las versiones de Amstrad ya están, en `juegos`, acabadas en `_ams.zip`: son
 Megacorp, Los pájaros de Bangkok y La guerra de las vajillas, cada una en
-disco y en cinta. Las dos primeras las tenemos también de Spectrum, así que la
-misma aventura se puede comparar en las dos máquinas, que es justo lo que hace
-falta.
+disco y en cinta. De las tres tenemos también la de Spectrum, así que la misma
+aventura se puede comparar en las dos máquinas, que es justo lo que hace falta.
 
 Al final el emulador no hizo falta para el disco: `disk.py` lee el directorio
 de AMSDOS, junta el fichero y lo deja en una imagen de 64K en la dirección que
@@ -241,6 +243,27 @@ primera, 60 de 64 en la segunda— y las láminas dibujan las mismas escenas, co
 más color. Lo que difiere es de versión, no de lectura: en el CPC el verbo es
 `INVENTARIO` y en el Spectrum `INVE`.
 
+**La guerra de las vajillas** tampoco necesita la máquina. Su disco no tiene
+nada en el directorio: la pista 0 es una pista normal, con su sector de
+arranque —el disco se pone en marcha con `|CPM`— y el directorio vacío, y las
+demás llevan cinco sectores de mil veinticuatro bytes numerados del 1 al 5, que
+AMSDOS no sabe qué son. Pero esas pistas son el dato tal cual, una detrás de
+otra, así que no hay nada que descifrar: basta buscar los ocho signos de
+puntuación, que en memoria están en $210C, y eso dice dónde empieza todo. Hay
+dos aventuras dentro, que son las dos partes, y `disk.py --part 1` o `--part 2`
+las saca.
+
+Contrastado contra la cinta cargada en la máquina, que es la vía lenta: con la
+cinta a medio cargar, todo lo que llevaba metido —de $0040 a $57D7, veintidós
+kilobytes— es byte a byte lo que sale del disco, y la tabla de punteros de
+$4000 es la misma. Dejarla acabar del todo no sirve para comparar, porque el
+juego arranca y se escribe encima. Y contra la
+versión de Spectrum: 55 verbos, 17 objetos, 26 cuartos y 73 mensajes en las
+dos, un nombre de más en el CPC (`COCINA`), y en la segunda parte `SPIELBERG`,
+que en el Spectrum es nombre y en el CPC verbo. Láminas tiene más el CPC, 14
+contra 11 en la primera parte y 21 contra 16 en la segunda, y dibujan las
+mismas escenas.
+
 De paso, `deGAC` avisa cuando las tablas de una máquina no parecen punteros. Sin
 ese aviso, una imagen de memoria puesta donde la máquina no la pondría se lee
 como una aventura con un solo nombre y nadie se entera.
@@ -257,6 +280,10 @@ Comprobado con Los pájaros de Bangkok de Amstrad contra la misma aventura de
 Spectrum: 47 nombres en las dos, 11 objetos, 27 condiciones locales, y el
 vocabulario palabra por palabra el mismo. Las 44 láminas coinciden con una
 lectura independiente de los bytes en crudo.
+
+Con eso son ya las tres de Amstrad leídas, las seis partes, cada una contra su
+versión de Spectrum: Bangkok, Megacorp y La guerra de las vajillas. Ninguna
+necesita el emulador; las tres salen del disco.
 
 Lo de Commodore está escrito a partir del decompilador de referencia y **no se
 ha probado nunca**, porque no tenemos ningún fichero de C64 a mano.
