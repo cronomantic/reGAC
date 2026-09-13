@@ -39,6 +39,7 @@ done_flag:      db      0
                 include "../common/unpack.asm"
                 include "screen.asm"
                 include "keyboard.asm"
+                include "tape.asm"
                 include "../common/conditions.asm"
                 include "../common/opcodes.asm"
                 include "../common/parser.asm"

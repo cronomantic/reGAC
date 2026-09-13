@@ -21,9 +21,23 @@ prueba tarda doce minutos, así que sólo corre con `REGAC_SLOW=1`.
 
 ## Del intérprete
 
-Cuatro opcodes siguen sin hacer nada, y los cuatro necesitaban el bucle
-principal para tener dónde engancharse: la espera de tecla, la cinta, el disco
-y la confirmación que pide salir.
+Los cuatro opcodes que faltaban ya están. `HOLD` espera las cincuentavas de
+segundo que le digan o hasta que se toque una tecla, lo que antes pase; lo que
+estuviera pulsado al empezar no cuenta, o el mismo enter que cerró la orden
+acabaría con la espera. `QUIT` pregunta antes, con el mensaje 244, y sólo se va
+si la respuesta es sí; vale S, SI, Y o YES, comparados en los códigos de la
+aventura y no en letras.
+
+`SAVE` y `LOAD` usan la cinta a través de la ROM, un bloque de datos sin
+cabecera delante, que es como lo hacía el original. Lo que viaja es sólo la
+partida, de `vm_state` a `vm_state_end`: la aventura no cambia nunca, así que
+no hace falta guardarla. El original sí la guardaba entera, de $5DC0 al final
+de su base de datos, porque tenía el estado metido dentro.
+
+De esos dos no hay prueba automática: el banco de pruebas no sabe grabar lo
+que sale por la cinta ni reproducir nada, así que sólo están comprobados a
+mano. Si algún día hace falta, la vía sería que el emulador escribiese un
+fichero de cinta.
 
 Falta partir la línea tecleada en varias órdenes separadas por conectores. El
 vocabulario de las aventuras españolas no trae los separadores en inglés que

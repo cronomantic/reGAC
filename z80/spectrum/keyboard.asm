@@ -9,6 +9,12 @@
 CAPS_ROW        equ $FE
 KEY_ENTER       equ 13
 KEY_DELETE      equ 8
+INPUT_MAX       equ 64                  ; as much of a line as is kept
+
+; A fiftieth of a second is about seventy thousand clock cycles, and one look
+; at the whole keyboard is about nineteen hundred, so this many looks fill a
+; frame.  Nothing here turns on it being exact.
+LOOKS_A_FRAME   equ 38
 
 ; Look once at the whole keyboard.  The character comes back in A, and zero
 ; with the zero flag set when nothing useful is held.
@@ -130,8 +136,46 @@ store_key:
                 inc     (hl)
                 jp      print_char
 
+; Wait for a key, or for HL fiftieths of a second, whichever comes first.
+; There is no interrupt to count frames with, the runtime keeps them off, so
+; the time is counted in looks at the keyboard.
+;
+; What is already held when the wait starts does not count, or the enter that
+; ended the order would end the wait as well.  The keyboard has to come clear
+; first, which is the same courtesy read_key does.
+; Corrupts: everything
+wait_or_key:
+                ld      c, 0                    ; nothing let go yet
+.each_frame:
+                ld      a, h
+                or      l
+                ret     z                       ; the time went
+                dec     hl
+                push    hl
+                ld      b, LOOKS_A_FRAME
+.look:
+                push    bc
+                call    scan_keyboard
+                pop     bc
+                or      a
+                jr      nz, .something
+                ld      c, 1                    ; the keyboard came clear
+                jr      .keep_looking
+.something:
+                ld      a, c
+                or      a
+                jr      nz, .a_key
+.keep_looking:
+                djnz    .look
+                pop     hl
+                jr      .each_frame
+.a_key:
+                pop     hl
+                ret
+
 line_ptr:       dw      0
 line_length:    db      0
+input_buffer:   ds      INPUT_MAX
 
 ; The five keys of each half row, in the order their bits come out.  A zero
 ; is a shift key, which is not a character on its own.

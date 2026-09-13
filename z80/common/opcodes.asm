@@ -192,8 +192,11 @@ op_not:
                 call    vm_push_true
                 jp      vm_loop
 
-op_hold:                                        ; waiting for a key comes later
+; HOLD n: hold everything for n fiftieths of a second, or until the player
+; presses something, whichever comes first.
+op_hold:
                 call    vm_pop
+                call    wait_or_key
                 jp      vm_loop
 
 op_get:
@@ -454,8 +457,20 @@ op_equal:
                 call    vm_push_true
                 jp      vm_loop
 
-op_save:                                        ; tape and disc come later
+; SAVE and LOAD: the game, not the adventure, on one block of tape.  A load
+; that goes wrong leaves what was there alone, because the ROM only writes
+; what it reads and the player can try again.
+op_save:
+                ld      ix, vm_state
+                ld      de, vm_state_end - vm_state
+                call    tape_save
+                jp      vm_loop
 op_load:
+                ld      ix, vm_state
+                ld      de, vm_state_end - vm_state
+                call    tape_load
+                ld      a, 1
+                ld      (vm_new_room), a        ; wherever we are now, say so
                 jp      vm_loop
 
 op_here:
@@ -602,12 +617,75 @@ op_wait:
                 ld      (vm_done), a
                 jp      vm_loop
 
-op_quit:                                        ; asking first comes later
+; QUIT asks first and only stops if the answer is yes; EXIT just stops.
+op_quit:
+                ld      a, MSG_YOUSURE
+                call    print_message
+                call    read_line               ; HL = the codes, BC = how many
+                call    said_yes
+                jp      nc, vm_loop
 op_exit:
                 ld      a, 1
                 ld      (vm_over), a
                 ld      (vm_done), a
                 jp      vm_loop
+
+; Whether the line at HL, BC characters of it, says yes.  The words are kept
+; in plain letters and turned into this adventure's own codes as they are
+; compared, because that is what was typed into the buffer.
+; Carry set when it does.
+; Corrupts: everything
+said_yes:
+                ld      a, b
+                or      a
+                ret     nz                      ; nothing that long is a yes
+                ld      a, c
+                or      a
+                ret     z
+                ld      (yes_length), a
+                ld      (yes_line), hl
+                ld      ix, yes_words
+.each_word:
+                ld      a, (ix+0)
+                or      a
+                ret     z                       ; none of them matched
+                ld      c, a
+                ld      a, (yes_length)
+                cp      c
+                jr      nz, .next
+                push    ix
+                ld      de, (yes_line)
+                ld      b, c
+                inc     ix
+.each_letter:
+                ld      a, (ix+0)
+                call    ascii_to_code
+                ld      c, a
+                ld      a, (de)
+                cp      c
+                jr      nz, .no_match
+                inc     ix
+                inc     de
+                djnz    .each_letter
+                pop     ix
+                scf
+                ret
+.no_match:
+                pop     ix
+.next:
+                ld      c, (ix+0)
+                ld      b, 0
+                inc     ix
+                add     ix, bc                  ; on past this one
+                jr      .each_word
+
+yes_words:      db      1, "S"
+                db      2, "SI"
+                db      1, "Y"
+                db      3, "YES"
+                db      0
+yes_length:     db      0
+yes_line:       dw      0
 
 op_room:
                 ld      hl, (vm_location)

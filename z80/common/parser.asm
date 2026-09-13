@@ -23,7 +23,6 @@ WORD_NOUN       equ 1
 WORD_ADVERB     equ 2
 WORD_PRONOUN    equ 3
 
-INPUT_MAX       equ 64
 
 ; Read the vocabulary out of the database.
 ; Corrupts: AF, BC, DE, HL
@@ -234,4 +233,3 @@ parse_ptr:      dw      0
 parse_left:     dw      0
 word_length:    db      0
 vm_old_noun:    db      0
-input_buffer:   ds      INPUT_MAX

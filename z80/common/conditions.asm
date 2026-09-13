@@ -18,6 +18,8 @@ CARRIED         equ 255                 ; the location an object carried is in
 NOWHERE         equ 0
 
 ; The messages the interpreter itself prints
+MSG_PRESSKEY    equ 243
+MSG_YOUSURE     equ 244
 MSG_DONTHAVE    equ 246
 MSG_CANTSEE     equ 247
 MSG_TOOMUCH     equ 248
@@ -330,6 +332,10 @@ vm_noun1:       db      0
 vm_noun2:       db      0
 vm_adverb:      db      0
 vm_max_weight:  db      0
+; Everything from here to vm_state_end is what a game amounts to, so it is
+; what SAVE writes out and LOAD reads back.  The adventure itself never
+; changes, which is why only this much has to travel.
+vm_state:
 vm_location:    dw      0
 vm_seed:        dw      $A55A
 vm_stack:       ds      VM_STACK_DEPTH * 2
@@ -337,3 +343,4 @@ vm_flags:       ds      FLAG_BYTES
 vm_counters:    ds      COUNTERS
 obj_entry:      ds      512                     ; where each object's record is
 obj_loc:        ds      512                     ; and where it is now
+vm_state_end:
