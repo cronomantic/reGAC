@@ -17,6 +17,17 @@ to_row:
                 add     a, GAC_TOP
                 ret
 
+; The colours a picture starts in: black on white, as the screen starts.
+; Corrupts: AF
+gfx_start_colours:
+                xor     a
+                ld      (gfx_ink), a
+                ld      (gfx_bright), a
+                ld      (gfx_flash), a
+                ld      a, 7
+                ld      (gfx_paper), a
+                ret
+
 ; The border, which on a Spectrum is three bits of a port.
 ; Corrupts: AF
 gfx_border:

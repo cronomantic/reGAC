@@ -550,18 +550,31 @@ de otra forma**. Con la tabla amañada se le hace dibujar el mismo tramo
 encadenado detrás de otro y suelto como una orden, y salen los mismos once
 puntos.
 
-Lo que queda son unos pocos píxeles, y están donde un extremo de la elipse cae
-en una unidad impar. Parecía que bastaría con trazar también en medios píxeles,
-y se probó: **no es eso**. Llevar el dispositivo entero a medios píxeles, con
-la recta recorriendo unidades y bajando cada punto a píxel al ponerlo, empeora
-mucho, de 158 puntos de 168 a 112 en la elipse pequeña y de 333 de 336 a 216 en
-la grande. Con los extremos puestos a mano en unidades y recorridos a mano, por
-los dos sentidos, el escalón tampoco cae donde la máquina lo pone.
+Antes de dar con ello se probó trazar también en medios píxeles, y **no es
+eso**: llevar el dispositivo entero a medios, con la recta recorriendo unidades
+y bajando cada punto a píxel al ponerlo, empeora mucho. El firmware baja los
+extremos a píxel y traza en píxeles.
 
-O sea que el firmware baja los extremos a píxel y traza en píxeles, que es lo
-que hacemos; sólo la aritmética de la elipse vive en medios. Dónde pone el
-escalón cuando el extremo viene de una unidad impar sigue sin saberse, y son
-diez puntos de ciento sesenta y ocho.
+### Y una recta empinada empieza por abajo
+
+Lo que faltaba era un detalle de las rectas, y costó verlo porque las que se
+habían medido no lo distinguían. Al poner las dos puntas en orden por el lado
+mayor, cuando ese lado es el vertical hay que empezar por la de abajo en las
+coordenadas de las órdenes, que en filas de pantalla es la de abajo del todo.
+Nosotros empezábamos por la contraria.
+
+Se midió con una recta que sí las distingue, y de sus sesenta y un puntos el
+orden bueno acierta los sesenta y uno y el otro cincuenta y uno.
+
+Con eso, todo lo medido contra la máquina sale exacto:
+
+| lo que se dibuja | coincide |
+|---|---|
+| sólo el marco | 100% |
+| las láminas 3, 15, 23 y 36 sueltas | 100% |
+| el cuarto del aeropuerto entero | 100% |
+| una elipse de radio 30 | 168 de 168 |
+| una de radio 60 | 336 de 336 |
 
 ### Una comparación que no valía
 

@@ -211,7 +211,11 @@ class Renderer:
         dx = abs(x1 - x0)
         dy = abs(y1 - y0)
         if self.device.sorts_line_ends:
-            if (x1 < x0) if dx >= dy else (y1 < y0):
+            # In order along the longer side, as the firmware puts them.  The
+            # y here counts down the screen and the machine's counts up, so a
+            # line that is more up than across starts at the larger row: that
+            # was measured, with a line the two orders disagree about.
+            if (x1 < x0) if dx >= dy else (y1 > y0):
                 x0, y0, x1, y1 = x1, y1, x0, y0
         sx = 1 if x1 > x0 else -1
         sy = 1 if y1 > y0 else -1

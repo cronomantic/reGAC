@@ -107,13 +107,7 @@ draw_picture:
                 ld      (gfx_depth), a
                 call    gfx_clear
                 pop     hl
-                ; the colours a picture starts with
-                xor     a
-                ld      (gfx_ink), a
-                ld      (gfx_bright), a
-                ld      (gfx_flash), a
-                ld      a, 7
-                ld      (gfx_paper), a
+                call    gfx_start_colours       ; what a picture starts in
                 jr      run_picture
 
 ; Draw picture HL without clearing first, which is what CALL needs.
