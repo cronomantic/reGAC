@@ -550,10 +550,18 @@ de otra forma**. Con la tabla amañada se le hace dibujar el mismo tramo
 encadenado detrás de otro y suelto como una orden, y salen los mismos once
 puntos.
 
-Lo que queda son unos pocos píxeles, y se sabe de dónde vienen: la recta
-también se traza en medios píxeles, así que cuando un extremo cae en una unidad
-impar el escalón cambia de sitio. Para que cuadre del todo habría que trazar
-también en medios píxeles.
+Lo que queda son unos pocos píxeles, y están donde un extremo de la elipse cae
+en una unidad impar. Parecía que bastaría con trazar también en medios píxeles,
+y se probó: **no es eso**. Llevar el dispositivo entero a medios píxeles, con
+la recta recorriendo unidades y bajando cada punto a píxel al ponerlo, empeora
+mucho, de 158 puntos de 168 a 112 en la elipse pequeña y de 333 de 336 a 216 en
+la grande. Con los extremos puestos a mano en unidades y recorridos a mano, por
+los dos sentidos, el escalón tampoco cae donde la máquina lo pone.
+
+O sea que el firmware baja los extremos a píxel y traza en píxeles, que es lo
+que hacemos; sólo la aritmética de la elipse vive en medios. Dónde pone el
+escalón cuando el extremo viene de una unidad impar sigue sin saberse, y son
+diez puntos de ciento sesenta y ocho.
 
 ### Una comparación que no valía
 
