@@ -8,6 +8,10 @@ machine would have had in memory, which is what the decompiler wants.
 
     python disk.py juego.dsk                 # list what is on it
     python disk.py juego.dsk CARVALHO.FAC salida.mem
+    python disk.py juego.dsk MEGACOR2.BIN salida.mem --at 0x40
+
+A file that ends by moving itself somewhere else is followed there, because
+that is what the machine would have in memory; --at overrides both.
 
 Both the plain and the extended image formats are read.  Disks whose sectors
 were renumbered to stop them being copied are not: those still have to be
@@ -104,15 +108,46 @@ def header(blob):
     }
 
 
-def memory(blob):
-    """A 64K image with the file laid where it loads."""
+def self_mover(body, load):
+    """Where a file moves itself to, if the last thing in it is the move.
+
+    Megacorp loads at $0428 and its last fourteen bytes are
+
+        LD DE,$0040 / LD HL,$0428 / LD BC,length / LDIR / JP $1F2C
+
+    so what the machine ends up with is the adventure at $0040, which is where
+    Los pájaros de Bangkok loads outright.  Its BASIC loader calls straight
+    into that, and nothing else in the file is touched, so doing the move here
+    gives the same memory the machine would have without running anything.
+    """
+    tail = body[-14:]
+    if len(tail) < 14 or tail[0] != 0x11 or tail[3] != 0x21 or tail[6] != 0x01:
+        return None
+    if tail[9] != 0xED or tail[10] != 0xB0 or tail[11] != 0xC3:
+        return None
+    to = struct.unpack("<H", tail[1:3])[0]
+    frm = struct.unpack("<H", tail[4:6])[0]
+    count = struct.unpack("<H", tail[7:9])[0]
+    if frm != load or count > len(body):
+        return None
+    return to, count
+
+
+def memory(blob, at=None):
+    """A 64K image with the file laid where it loads, or where it is told."""
     head = header(blob)
     if not head:
         raise ValueError("the file has no AMSDOS header, so where it goes is unknown")
     body = blob[128:128 + head["length"]]
+    where = head["load"] if at is None else at
     image = bytearray(0x10000)
-    image[head["load"]:head["load"] + len(body)] = body
-    return bytes(image), head
+    image[where:where + len(body)] = body
+    moved = None if at is not None else self_mover(body, where)
+    if moved:
+        to, count = moved
+        image[to:to + count] = body[:count]
+        where = to
+    return bytes(image), dict(head, laid=where, moved=bool(moved))
 
 
 def main(argv=None):
@@ -120,6 +155,8 @@ def main(argv=None):
     parser.add_argument("image", help="the disk image")
     parser.add_argument("name", nargs="?", help="the file to take off it")
     parser.add_argument("output", nargs="?", help="where to write the memory image")
+    parser.add_argument("--at", type=lambda n: int(n, 0), default=None,
+                        help="lay it at this address instead of its own")
     args = parser.parse_args(argv)
 
     data = open(args.image, "rb").read()
@@ -140,11 +177,12 @@ def main(argv=None):
     if args.name not in listing:
         print(f"no {args.name} on the disk", file=sys.stderr)
         return 1
-    image, head = memory(contents(area, listing[args.name]))
+    image, head = memory(contents(area, listing[args.name]), args.at)
     out = args.output or args.name.replace(".", "_") + ".mem"
     with open(out, "wb") as f:
         f.write(image)
-    print(f"{args.name} laid at ${head['load']:04X} in {out}")
+    how = " after moving itself there" if head["moved"] else ""
+    print(f"{args.name} laid at ${head['laid']:04X}{how} in {out}")
     return 0
 
 

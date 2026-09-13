@@ -220,15 +220,30 @@ semilla repetida, la tabla de la elipse es la misma sin una cifra distinta, y
 las coordenadas sí pasan por una escala, con una perilla de un byte y dos
 orígenes que es justo lo que el PCW necesita.
 
-De la versión de CPC quedan tres cabos:
+De la versión de CPC quedaban tres cabos, y los tres están atados.
 
-- Los ocho bytes de cabecera de cada lámina. Se leen como las cuatro tintas,
-  pero sobran tres bits por byte sin explicar.
-- Megacorp está repartido de otra manera, con el intérprete en `MEGACOR1.BIN` a
-  $2710 y las dos partes en $0428, así que sus tablas no están en $4000. Habrá
-  que situarlas antes de poder leerlo.
-- El disco de La guerra de las vajillas tiene los sectores renumerados para que
-  no se copie, así que ése sí hay que cargarlo en la máquina con `grab.py`.
+**Los ocho bytes de cada lámina** son las cuatro tintas, y los bits que
+sobraban —dos, no tres, porque el séptimo no se pone nunca— son porque el color
+se tecleaba como una letra. El propio intérprete lo lleva escrito dentro: «Ink
+#: Colours (A..Z or SPACE)?». Guarda el carácter tal cual y el firmware se
+queda con los cinco bits de abajo, así que la A y la a son 1, la Z y la z son
+26 y el espacio es negro. Está contado en `graficos.md`, y `deGAC` guarda ya el
+color y no la letra.
+
+**Megacorp** no tenía las tablas en otro sitio, que era lo que parecía. Su
+fichero dice que carga en $0428, pero sus últimos catorce bytes son un `LDIR`
+que lo baja a $0040 y salta dentro, que es justo donde carga Los pájaros de
+Bangkok; el `.BAS` que lo arranca no hace más que cargarlo y llamar ahí.
+`disk.py` sigue ese salto por su cuenta y lo dice al escribir la imagen, y
+admite `--at` para poner el fichero donde se le diga. Leídas así, las dos
+partes traen el mismo vocabulario que las de Spectrum —55 nombres iguales en la
+primera, 60 de 64 en la segunda— y las láminas dibujan las mismas escenas, con
+más color. Lo que difiere es de versión, no de lectura: en el CPC el verbo es
+`INVENTARIO` y en el Spectrum `INVE`.
+
+De paso, `deGAC` avisa cuando las tablas de una máquina no parecen punteros. Sin
+ese aviso, una imagen de memoria puesta donde la máquina no la pondría se lee
+como una aventura con un solo nombre y nadie se entera.
 
 ## Cosas menores
 
