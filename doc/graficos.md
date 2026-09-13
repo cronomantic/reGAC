@@ -290,6 +290,105 @@ mirar el mapa de diferencias se ve que esas pantallas no tienen lámina
 dibujada, así que lo que coincidía eran dos imágenes casi vacías. Para
 contrastar de verdad hay que ejecutar el juego hasta que dibuje.
 
+## La versión de Amstrad CPC, leída entera
+
+Las aventuras de CPC vienen en disco, y de ahí salen los ficheros sin encender
+nada: el directorio de AMSDOS dice dónde está cada uno y su cabecera dice a qué
+dirección se carga. `CARVALHO.FAC`, que es Los pájaros de Bangkok, se carga en
+$0040 y ocupa hasta $A2F4, y trae dentro el intérprete y la aventura. En $4000
+están los punteros en fila, tal como decía el decompilador de referencia, y en
+$4012 el de las láminas. Con eso se lee el intérprete del CPC igual que se leyó
+el del Spectrum, pero sin emulador de por medio.
+
+### Las órdenes y sus argumentos
+
+El repertorio es más corto que el del Spectrum: 1 recta, 2 elipse, 3 relleno,
+8 rectángulo, 9 color, A llamada, B punto, y el 0 termina. Cualquier otro byte
+cae en el caso por defecto, que fija la pluma con la que se dibuja. No hay
+relleno de fondo ni media tinta aparte, porque aquí no hacen falta.
+
+Los argumentos van en parejas, y **el segundo byte de cada pareja lleva siempre
+el bit 7 puesto**; el intérprete lo quita al leerlo, con un `RES 7,E`. Por eso
+la y de una lámina va de 0 a 127: la lámina del CPC mide 256 por 128, los
+mismos números que la del Spectrum. El que escribe las láminas hace lo propio
+al revés, con un `OR $80` sobre el byte alto.
+
+### Sí escalaba, con una sola perilla
+
+Cada coordenada pasa por lo mismo antes de dibujarse: se multiplica por un
+factor de un byte, se divide por 64 y se le suma un origen, uno para la x y
+otro para la y. El factor que trae el fichero es 128, que en las coordenadas
+del firmware del CPC, que van de 0 a 639 por 0 a 399 sea cual sea el modo, deja
+la lámina a tamaño natural, un píxel por punto.
+
+Así que la lámina no se estira, pero **la perilla para estirarla está puesta**:
+un byte de escala y dos orígenes colocan los mismos datos en cualquier
+pantalla. Eso es exactamente lo que le hace falta al PCW, y no hay que
+inventarlo.
+
+### Se apoya en el firmware, como el Spectrum en su ROM
+
+Mover, trazar la recta, poner el punto, preguntar por un punto, elegir pluma,
+fijar el origen, la ventana y borrarla: todo eso lo pide a la máquina. El
+Spectrum hacía lo mismo con su ROM. Lo que ninguna de las dos delega es el
+relleno.
+
+### El relleno, y el atajo que nos faltaba
+
+El modelo es el mismo que en el Spectrum: recorrer la columna de la semilla
+hacia arriba y hacia abajo tendiendo un tramo horizontal en cada fila. Lo que
+cambia es cómo busca los extremos del tramo, y aquí está lo que llevábamos
+buscando.
+
+Antes de empezar pregunta por el punto de la semilla, y con el número de pluma
+que le devuelven monta un byte en el que los cuatro píxeles son esa pluma. Ese
+byte es la referencia. Para buscar el extremo hace un `XOR` de la referencia
+contra el byte de pantalla: si la parte que toca al píxel no sale cero, ahí se
+acaba el tramo. Y cuando el recorrido entra en un byte nuevo, compara el byte
+entero: **si todo el byte coincide con la referencia, se lleva sus cuatro
+píxeles de una vez** y salta al siguiente.
+
+Es la optimización por bytes que intenté y deshice. El original la tiene, hecha
+así: comparar primero el byte completo, y sólo bajar a máscara de bit en los
+dos extremos.
+
+### El color es una trama de dos plumas
+
+La orden 9 lleva dos números de pluma. El intérprete convierte cada uno en su
+byte de cuatro píxeles, se queda con las columnas pares del primero y las
+impares del segundo, y los junta. Eso da un damero de las dos plumas. Después
+guarda el mismo byte con las dos plumas intercambiadas, para las filas
+alternas.
+
+Es la pareja de patrones del Spectrum, generalizada: con las dos plumas iguales
+sale un color sólido, y con dos distintas sale una mezcla que en modo 1 da
+muchos más colores de los cuatro que hay. En una máquina de un bit por píxel
+las dos plumas sólo pueden ser negro y blanco, y de ahí salen exactamente los
+tres rellenos del Spectrum: lleno, vacío y damero. El PCW no necesita un modelo
+de color propio, le basta esta orden.
+
+### La elipse es la misma, byte por byte
+
+En $22B0 está la tabla de dieciséis valores, la misma que el Spectrum guarda en
+$A1ED, sin una cifra distinta. El primer par de la orden es el centro y el
+segundo da los radios, como allí. Queda demostrado que la geometría de las
+láminas no depende de la máquina.
+
+### El dibujo, en cambio, no se reaprovechó
+
+Las láminas no son las mismas. La versión de CPC de Bangkok trae 44 y la de
+Spectrum 32, y no coincide ninguna, ni siquiera corrigiendo el origen de la y.
+Se volvieron a dibujar para la máquina.
+
+### Lo que no está claro todavía
+
+Cada lámina empieza con ocho bytes que no son órdenes. Van en cuatro parejas y
+las dos mitades de cada pareja son siempre iguales. Los valores son un color de
+0 a 26, que es justo la gama del CPC, más tres bits sueltos por encima. Leído
+así son las cuatro tintas de la lámina, con la pareja repetida porque una tinta
+del CPC admite dos colores y parpadea si difieren. Para qué son los tres bits
+de arriba no lo sé todavía.
+
 ## Lo que queda por confirmar
 
 La diferencia exacta entre `FILL` y `BGFILL` se ha deducido, no verificado

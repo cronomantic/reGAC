@@ -98,13 +98,12 @@ disco y en cinta. Las dos primeras las tenemos también de Spectrum, así que la
 misma aventura se puede comparar en las dos máquinas, que es justo lo que hace
 falta.
 
-Ahí es donde lo dejamos el 2026-09-13. El disco de Megacorp trae `MEGACORP.BAS`
-de cargador y tres partes, `MEGACOR1.BIN` a `MEGACOR3.BIN`. Arrancarlo con
-`run"megacorp` en un CPC 6128 y leer la memoria funciona, pero en $4000 todavía
-no aparecen las tablas, así que o hace falta más espera, o el cargador se queda
-esperando una tecla, o en el 6128 la aventura no está en los 64K visibles y hay
-que leer el banco que toque. Lo primero que hay que mirar mañana es qué hay de
-verdad en ese volcado.
+Al final el emulador no hizo falta para el disco: `disk.py` lee el directorio
+de AMSDOS, junta el fichero y lo deja en una imagen de 64K en la dirección que
+dice su propia cabecera. `CARVALHO.FAC`, que es Los pájaros de Bangkok, se
+carga en $0040 y trae dentro el intérprete entero, con los punteros en $4000.
+De ahí sale todo lo que está contado en `graficos.md`, en el apartado de la
+versión de CPC.
 
 Vale la pena saber que el emulador que ya usamos hace también el PCW 8256 y el
 8512 con disquetera, así que el banco de pruebas del runtime del PCW no hay que
@@ -135,17 +134,23 @@ cada tinta.
 de espejo y volteo que el Spectrum no tiene, y no tiene relleno de fondo.
 Añadir órdenes propias de una máquina no rompe nada, es lo que ya se hacía.
 
-Y lo que hay que sacar de las instantáneas cuando estén:
+Eso era lo que se sacaba del decompilador. Leyendo el intérprete de CPC entero
+quedan contestadas las preguntas que quedaban, y están escritas en
+`graficos.md`: la trama es un damero de dos plumas, la prueba de bloqueo
+compara el byte de pantalla contra un byte de referencia con la pluma de la
+semilla repetida, la tabla de la elipse es la misma sin una cifra distinta, y
+las coordenadas sí pasan por una escala, con una perilla de un byte y dos
+orígenes que es justo lo que el PCW necesita.
 
-- Las tramas del relleno. Con cuatro colores por píxel, dos bits cada uno, los
-  bytes $FF, $00 y $AA no pueden significar lo mismo. Cómo expresaron ahí el
-  sólido, el borrado y la media tinta es el molde para las tramas del PCW.
-- La prueba de bloqueo. En el Spectrum un punto detiene el relleno si está
-  encendido; con dos bits por píxel hay que decidir contra qué se compara, y
-  esa decisión es la que hace falta entender.
-- Si la tabla de la elipse y el trazado de rectas son los mismos. Si lo son,
-  queda demostrado que sólo cambian las seis primitivas.
-- Qué hace la paleta de ocho bytes con las tintas del Spectrum.
+De la versión de CPC quedan tres cabos:
+
+- Los ocho bytes de cabecera de cada lámina. Se leen como las cuatro tintas,
+  pero sobran tres bits por byte sin explicar.
+- Megacorp está repartido de otra manera, con el intérprete en `MEGACOR1.BIN` a
+  $2710 y las dos partes en $0428, así que sus tablas no están en $4000. Habrá
+  que situarlas antes de poder leerlo.
+- El disco de La guerra de las vajillas tiene los sectores renumerados para que
+  no se copie, así que ése sí hay que cargarlo en la máquina con `grab.py`.
 
 ## Cosas menores
 
