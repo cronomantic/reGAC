@@ -16,7 +16,7 @@ block_starts:   dw      0, 80, 160, 240, 320, 400, 480, 560
                 dw      640, 720, 800, 880, 960, 1040, 1120, 1200
                 dw      1280, 1360, 1440, 1520, 1600, 1680, 1760, 1840, 1920
 GATE_ARRAY      equ $7F00
-MODE_1          equ %10001100           ; mode 1, both ROMs out of the way
+MODE_1          equ %10001101           ; mode 1, both ROMs out of the way
 
 ; Mode 1 is forty characters across and twenty five down, of which the picture
 ; takes the top sixteen and the text the nine below.  A character is eight
