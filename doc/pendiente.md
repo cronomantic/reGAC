@@ -3,27 +3,21 @@
 Estado a 13 de septiembre de 2026, para retomarlo sin tener que reconstruir el
 contexto.
 
-## Lo inmediato, en orden
+## Los gráficos, cerrados
 
-**Buscar los extremos de un tramo por bytes.** Es lo que falta para la
-velocidad. Hoy la búsqueda va píxel a píxel rotando una máscara; el original
-mira el byte entero cuando entra en uno nuevo y, si vale cero, se lleva los
-ocho píxeles de una vez. Lo escribí, ensambla, y rompe tres de las once
-comprobaciones de primitivas, así que está revertido. El fallo estará en el
-cruce de byte, en el momento de pasar de la máscara al byte completo y volver.
+Las 196 láminas de las ocho aventuras salen idénticas a la referencia, y las
+cuatro que fallaban se han comparado además contra la pantalla que deja el GAC
+original, byte a byte, que es la única prueba que vale de verdad.
 
-**Volver a pasar las 196 láminas.** La última pasada completa dio 192 de 196, y
-las cuatro que fallaban ya están arregladas, así que debería dar 196. Son unos
-quince minutos de máquina sin intervención con el guion que hay en el
-directorio temporal de la sesión; conviene meterlo en `tests/` como prueba
-lenta marcada aparte. Importante: no reensamblar mientras corre, que es lo que
-me tumbó la última.
+La más lenta son 4,5 segundos de Spectrum real, dentro del tope de cuatro o
+cinco. Se llegó por tres sitios: el salto de byte entero en la búsqueda de
+extremos, recordar la última lámina encontrada, y llevar el puntero y la cuenta
+de órdenes en registros en lugar de en memoria. Está contado en `graficos.md`.
 
-**Objetivo de velocidad: cuatro o cinco segundos en el peor caso.** Ahora el
-peor caso son 23 segundos y la mayoría están por debajo de doce. La búsqueda
-por bytes debería dar el factor que falta; si no llega, lo siguiente que
-miraría es el trazado de rectas, que en las láminas con muchas rectas cortas
-pesa más que el relleno.
+Dos cosas que conviene no olvidar. El emulador de esta máquina corre a 2,03
+MHz, no a 3,5, así que los segundos de reloj engañan: hay que medir con el
+contador de ciclos del Z80, como hace `tests/test_all_pictures.py`. Y esa
+prueba tarda doce minutos, así que sólo corre con `REGAC_SLOW=1`.
 
 ## Del intérprete
 
