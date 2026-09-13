@@ -15,18 +15,11 @@
 ; and is written up in doc/graficos.md: a line is the same whichever end it
 ; starts from, and an ellipse counts in halves of a pixel.
 
-SCREEN          equ $C000
-PICTURE_LEFT    equ 32                  ; where the picture starts across
-PICTURE_ROWS    equ 128                 ; and how deep it is
 GAC_TOP         equ 175                 ; y=175 is its first row
-
 ; The pens with all four pixels the same, which is what SCR INK ENCODE gives.
 pen_bytes:      db      $00, $F0, $0F, $FF
 ; The two bits belonging to each pixel of a byte.
 pixel_masks:    db      %10001000, %01000100, %00100010, %00010001
-; Eighty bytes a line, for each of the sixteen lines of a block.
-block_starts:   dw      0, 80, 160, 240, 320, 400, 480, 560
-                dw      640, 720, 800, 880, 960, 1040, 1120, 1200
 
 ; Turn a command's y into a screen row, keeping sixteen bits with their sign.
 ; In A, out HL.
@@ -437,3 +430,54 @@ line_dy:        db      0
 line_sx:        db      0
 line_sy:        db      0
 line_err:       db      0
+
+; The colours a picture starts in.  Pen one, and nothing in the picture data
+; says so: the frame every room of the Amstrad adventures draws carries no
+; colour order at all and comes out in pen one on the machine.
+; Corrupts: AF
+gfx_start_colours:
+                ld      a, 1
+                ld      (gfx_ink), a
+                ld      (gfx_pen1), a
+                ld      (gfx_pen2), a
+                xor     a
+                ld      (gfx_paper), a
+                ld      (gfx_bright), a
+                ld      (gfx_flash), a
+                ret
+
+; The border, which here is one more pen.
+; Corrupts: everything
+gfx_border:
+                push    af
+                ld      bc, GATE_ARRAY
+                ld      a, %01010000
+                out     (c), a
+                pop     af
+                call    hardware_ink
+                or      %01000000
+                ld      bc, GATE_ARRAY
+                out     (c), a
+                ret
+
+; Wipe the picture area to pen nought.  It is 64 bytes of every line, 32
+; pixels in from the left, and 128 lines of them.
+; Corrupts: everything
+gfx_clear:
+                ld      e, 0
+.each_row:
+                ld      d, 0
+                push    de
+                call    pixel_address
+                ld      b, 64
+                xor     a
+.across:
+                ld      (hl), a
+                inc     hl
+                djnz    .across
+                pop     de
+                inc     e
+                ld      a, e
+                cp      PICTURE_ROWS
+                jr      nz, .each_row
+                ret

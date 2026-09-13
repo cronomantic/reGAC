@@ -59,9 +59,22 @@ tecla de mayúsculas y se quedaba ahí.
 
 ## Las máquinas
 
-En Python están modeladas Spectrum, Sam Coupé, Next, MSX1, MSX2 y Amstrad, y
-las seis dibujan las láminas igual que el Spectrum. En Z80 sólo existe el
-Spectrum.
+En Python están modeladas Spectrum, Sam Coupé, Next, MSX1, MSX2 y Amstrad. En
+Z80 están el Spectrum, que está entero, y el Amstrad CPC, que juega.
+
+### Lo que le falta al Amstrad
+
+Dibuja, escribe y lee el teclado, y con eso ya describe el cuarto, entiende lo
+que se teclea y contesta. Queda la cinta, que en el Spectrum son dos llamadas a
+la ROM y aquí no, porque el firmware está paginado fuera mientras corre el
+intérprete; habría que traerlo de vuelta alrededor de la llamada o escribir la
+grabación desde cero. Por ahora guardar y cargar dicen que no han hecho nada.
+
+Del teclado no hay prueba automática. Funciona, pero el emulador pierde teclas
+cuando se las manda a un CPC, y eso ya se vio cargando el juego original: de
+cinco letras llegan tres. Para probarlo de verdad haría falta mover la matriz
+del teclado a mano, como se hace con el Spectrum, y el emulador no ofrece eso
+para esta máquina.
 
 ### Amstrad PCW, target nuevo
 

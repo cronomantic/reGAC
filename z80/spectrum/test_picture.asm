@@ -37,6 +37,7 @@ picture_wanted: dw      1
                 include "../common/config.asm"
                 include "../common/unpack.asm"
                 include "screen.asm"
+                include "../common/textout.asm"
                 include "draw.asm"
                 include "shapes.asm"
                 include "fill.asm"

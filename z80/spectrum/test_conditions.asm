@@ -46,6 +46,7 @@ done_flag:      db      0
                 include "../common/config.asm"
                 include "../common/unpack.asm"
                 include "screen.asm"
+                include "../common/textout.asm"
                 include "keyboard.asm"
                 include "tape.asm"
                 include "../common/conditions.asm"

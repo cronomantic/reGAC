@@ -1,15 +1,15 @@
 ; MIT License, Copyright (c) 2025 Cronomantic
 ;
-; The Spectrum interpreter: everything put together and playing.
+; The Amstrad interpreter: everything put together and playing.
 
-                DEVICE  ZXSPECTRUM48
+                DEVICE  AMSTRADCPC6128
 
-                ORG     $8000
+                ; above the lower ROM, which covers anything under $4000
+                ORG     $4000
 start:
                 di
-                ld      sp, $7FF0
-                xor     a
-                out     ($FE), a
+                ld      sp, $BF00
+                call    keyboard_init
                 call    db_init
                 call    config_init
                 call    text_init
@@ -41,13 +41,18 @@ done_flag:      db      0
                 include "../common/textout.asm"
                 include "keyboard.asm"
                 include "tape.asm"
+                include "draw.asm"
+                include "shapes.asm"
+                include "fill.asm"
                 include "../common/conditions.asm"
                 include "../common/opcodes.asm"
                 include "../common/parser.asm"
                 include "../common/loop.asm"
+                include "../common/picture.asm"
 
                 ALIGN   256
 database:
                 INCBIN  "game.rgac"
+last:
 
-                SAVESNA "game.sna", start
+                SAVEBIN "game.bin", start, last - start

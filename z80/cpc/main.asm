@@ -1,21 +1,21 @@
 ; MIT License, Copyright (c) 2025 Cronomantic
 ;
-; First slice of the Spectrum interpreter: find the database, unpack messages
+; First slice of the Amstrad interpreter: find the database, unpack messages
 ; out of it and print them in the text window.
 ;
-; This is the part of the runtime most likely to disagree with the builder, so
-; it comes first and the tests read the screen back to check it.
+; The same shape as the Spectrum's, and on purpose: everything above the
+; screen layer is the same code, so if this prints what that prints then the
+; layer underneath is doing its job.
 
-                DEVICE  ZXSPECTRUM48
+                DEVICE  AMSTRADCPC6128
 
 TEST_MESSAGES   equ 6                   ; how many to print
 
-                ORG     $8000
+                ; above the lower ROM, which covers anything under $4000
+                ORG     $4000
 start:
                 di
-                ld      sp, $7FF0
-                xor     a
-                out     ($FE), a        ; black border
+                ld      sp, $BF00
                 call    db_init
                 call    config_init
                 call    text_init
@@ -48,13 +48,10 @@ done_flag:      db      0
                 include "../common/unpack.asm"
                 include "screen.asm"
                 include "../common/textout.asm"
-                include "keyboard.asm"
-                include "tape.asm"
-                include "../common/conditions.asm"
-                include "../common/opcodes.asm"
 
                 ALIGN   256
 database:
-                INCBIN  "game.rgac"
+                INCBIN  "text.rgac"
+last:
 
-                SAVESNA "out.sna", start
+                SAVEBIN "text.bin", start, last - start
