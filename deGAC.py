@@ -646,7 +646,11 @@ def get_database(sysram):
     database["gfx"] = gfx
     database["model"] = "SPECTRUM"
     database["punctuation"] = list("\0 .,-!?:")
-    database["separators"] = ["then", "and"]
+    # GAC parts one order from the next at a mark of punctuation, and
+    # nowhere in its database is there a list of words that do the same.
+    # The field is left empty rather than filled with words the original
+    # never knew; an adventure written from now on may name its own.
+    database["separators"] = []
     database["init_loc"] = peek2(sysram, STARTROOM_ADDR)
     database["no_objs_msg"] = "Nothing"
 

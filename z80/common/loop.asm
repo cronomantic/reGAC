@@ -160,8 +160,13 @@ play_turn:
                 or      a
                 ret     nz
 
-                ; ask, and keep asking until something is typed
+                ; ask, and keep asking until something is typed; a line
+                ; may hold several orders and they are taken one at a time
 .ask:
+                ld      hl, (line_left)
+                ld      a, h
+                or      l
+                jr      nz, .take_one
                 call    new_line
                 ld      a, MSG_ASK
                 call    print_message
@@ -169,6 +174,13 @@ play_turn:
                 ld      a, b
                 or      c
                 jr      z, .ask
+                ld      (line_at), hl
+                ld      (line_left), bc
+.take_one:
+                call    next_statement
+                ld      a, b
+                or      c
+                jr      z, .ask                 ; nothing in that piece
                 call    parse_sentence
                 ld      (vm_understood), a
                 push    af

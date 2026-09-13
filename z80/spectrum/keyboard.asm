@@ -18,8 +18,16 @@ LOOKS_A_FRAME   equ 38
 
 ; Look once at the whole keyboard.  The character comes back in A, and zero
 ; with the zero flag set when nothing useful is held.
+;
+; The two shifts are passed over rather than reported, or holding one would
+; look like nothing being typed at all; what they do is decided afterwards.
+; Symbol shift turns a key into the mark printed on it in red, which is the
+; only way to type the full stop and the comma that part one order from the
+; next.
 ; Corrupts: BC, DE, HL
 scan_keyboard:
+                xor     a
+                ld      (key_found), a
                 ld      hl, key_table
                 ld      bc, $FEFE
                 ld      d, 8
@@ -30,21 +38,75 @@ scan_keyboard:
                 ld      e, 5
 .key:
                 rra
-                jr      c, .found
+                jr      nc, .next_key
+                push    af
+                ld      a, (hl)
+                or      a
+                jr      z, .a_shift             ; a shift on its own says nothing
+                ld      (key_found), a
+.a_shift:
+                pop     af
+.next_key:
                 inc     hl
                 dec     e
                 jr      nz, .key
-                jr      .next_row
-.found:
-                ld      a, (hl)
-                or      a
-                ret
-.next_row:
                 rlc     b                       ; on to the next half row
                 dec     d
                 jr      nz, .row
+                ld      a, (key_found)
+                or      a
+                ret     z
+                call    symbol_held
+                ld      a, (key_found)
+                ret     z                       ; plain, as it is printed
+                jp      to_symbol
+
+; Whether symbol shift is held; zero flag clear if it is.
+; Corrupts: A, BC
+symbol_held:
+                ld      bc, $7FFE
+                in      a, (c)
+                cpl
+                and     2
+                ret
+
+; What the key in A says with symbol shift held, or nothing.
+; Corrupts: AF, C, HL
+to_symbol:
+                ld      c, a
+                ld      hl, symbol_pairs
+.each:
+                ld      a, (hl)
+                or      a
+                jr      z, .none
+                cp      c
+                inc     hl
+                ld      a, (hl)
+                inc     hl
+                jr      nz, .each
+                or      a
+                ret
+.none:
                 xor     a
                 ret
+
+; The marks in red on the keys, as far as an adventure ever needs them: the
+; six that part one order from the next come first.
+symbol_pairs:   db      'M', '.'
+                db      'N', ','
+                db      'J', '-'
+                db      '1', '!'
+                db      'C', '?'
+                db      'Z', ':'
+                db      'O', ';'
+                db      'P', '"'
+                db      'V', '/'
+                db      'K', '+'
+                db      'L', '='
+                db      '7', 39                 ; an apostrophe
+                db      0
+
+key_found:      db      0
 
 ; Whether caps shift is held; zero flag clear if it is.
 ; Corrupts: A, BC

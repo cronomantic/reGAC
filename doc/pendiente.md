@@ -39,9 +39,23 @@ que sale por la cinta ni reproducir nada, así que sólo están comprobados a
 mano. Si algún día hace falta, la vía sería que el emulador escribiese un
 fichero de cinta.
 
-Falta partir la línea tecleada en varias órdenes separadas por conectores. El
-vocabulario de las aventuras españolas no trae los separadores en inglés que
-deGAC pone por defecto, así que hay que decidir de dónde salen.
+Partir la línea en varias órdenes ya está, y de paso se aclaró de dónde salen
+los separadores: de ningún sitio. GAC parte al llegar a un signo de
+puntuación, y en su base de datos no hay ninguna lista de palabras que hagan lo
+mismo; los ocho caracteres son fijos e iguales en las ocho aventuras, hasta el
+punto de que el decompilador de referencia los usa como firma para reconocer un
+GAC. Las palabras `then` y `and` que traía todo lo decompilado se las inventaba
+`deGAC`, y ya no las pone.
+
+La lista de separadores se queda en el formato como extensión, y el intérprete
+la respeta: una aventura escrita de ahora en adelante puede decir que "y"
+separa dos órdenes. Sin ninguna declarada, se comporta exactamente como el
+original.
+
+Para que eso sirva de algo hubo que enseñar al teclado a dar los signos, que
+en el Spectrum piden símbolo y otra tecla a la vez. De paso se arregló que
+mayúsculas con cero, que es el borrado, no funcionaba: el rastreo devolvía la
+tecla de mayúsculas y se quedaba ahí.
 
 ## Las máquinas
 

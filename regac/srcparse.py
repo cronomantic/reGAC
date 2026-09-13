@@ -114,7 +114,7 @@ class Parser:
             "gfx": {},
             "model": "SPECTRUM",
             "punctuation": list("\0 .,-!?:"),
-            "separators": ["then", "and"],
+            "separators": [],
             "init_loc": 1,
             "no_objs_msg": "Nothing",
         }

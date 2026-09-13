@@ -164,6 +164,13 @@ class Session:
                 # "@" stands for enter, which has no printable character
                 KEY_MATRIX[chr(13) if _key == "@" else _key] = (_row, _bit)
 
+    # The two shifts, which have no character of their own, and the marks
+    # that need one held with them.  A full stop on a Spectrum is symbol
+    # shift and M together.
+    SYMBOL_SHIFT = (7, 1)
+    CAPS_SHIFT = (0, 0)
+    SYMBOLS = {".": "M", ",": "N", "-": "J", "!": "1", "?": "C", ":": "Z"}
+
     def hold(self, row=None, bit=None):
         """Hold one key down, or let everything go when given nothing."""
         rows = ["FF"] * 8
@@ -171,15 +178,28 @@ class Session:
             rows[row] = f"{0xFF ^ (1 << bit):02X}"
         return self.command("set-ui-io-ports " + "".join(rows) + "00")
 
+    def hold_both(self, first, second):
+        """Hold two keys at once, which is how a mark is typed."""
+        rows = [0xFF] * 8
+        for row, bit in (first, second):
+            rows[row] ^= 1 << bit
+        return self.command(
+            "set-ui-io-ports " + "".join(f"{r:02X}" for r in rows) + "00"
+        )
+
     def type(self, text, hold_for=0.12):
         """Type at the keyboard, one key at a time, letting each go before the
         next.  Driving the matrix directly keeps the timing ours rather than
         the emulator's, which drops keys when they are sent in a stream."""
         for char in text.upper():
-            where = self.KEY_MATRIX.get(char)
-            if where is None:
-                continue
-            self.hold(*where)
+            with_shift = self.SYMBOLS.get(char)
+            if with_shift:
+                self.hold_both(self.SYMBOL_SHIFT, self.KEY_MATRIX[with_shift])
+            else:
+                where = self.KEY_MATRIX.get(char)
+                if where is None:
+                    continue
+                self.hold(*where)
             time.sleep(hold_for)
             self.hold()
             time.sleep(hold_for)

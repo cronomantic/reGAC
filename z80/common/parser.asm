@@ -37,6 +37,140 @@ vocab_init:
                 ld      (vocab_start), hl
                 ret
 
+; The next order on the line, in HL with its length in BC.
+;
+; A line may hold more than one order.  The original parted them at a mark of
+; punctuation: typing "XYZY.SUR" at it makes it answer that it does not know
+; the first word and then walk south.  An adventure may also name words that
+; part two orders, which the original never did; those are honoured here, for
+; adventures written from now on, and an adventure that names none behaves
+; exactly as the original.
+; Corrupts: everything
+next_statement:
+                ld      hl, (line_at)
+                ld      (stmt_start), hl
+                ld      hl, 0
+                ld      (stmt_len), hl
+                xor     a
+                ld      (word_len), a
+.each:
+                ld      hl, (line_left)
+                ld      a, h
+                or      l
+                jr      z, .line_ended
+                ld      hl, (line_at)
+                ld      c, (hl)
+                ld      a, c
+                call    ends_statement
+                jr      z, .a_mark
+                ld      a, (space_code)
+                cp      c
+                jr      z, .a_space
+                ld      hl, word_len            ; it belongs to the word
+                inc     (hl)
+                call    .keep
+                jr      .each
+.a_space:
+                call    .parting_word
+                jr      c, .cut_before_word
+                xor     a
+                ld      (word_len), a
+                call    .keep
+                jr      .each
+.a_mark:
+                call    .step                   ; the mark belongs to neither
+                jr      .done
+.line_ended:
+                call    .parting_word
+                jr      c, .cut_before_word
+                jr      .done
+.cut_before_word:
+                ld      a, (word_len)           ; the order ends before it
+                ld      c, a
+                ld      b, 0
+                ld      hl, (stmt_len)
+                or      a
+                sbc     hl, bc
+                ld      (stmt_len), hl
+.done:
+                ld      bc, (stmt_len)
+                ld      hl, (stmt_start)
+                ret
+
+; Whether the word that has just ended parts two orders.  Carry set when it
+; does.
+.parting_word:
+                ld      a, (word_len)
+                or      a
+                ret     z
+                ld      c, a
+                ld      b, 0
+                ld      hl, (line_at)
+                or      a
+                sbc     hl, bc                  ; where the word began
+                ld      b, c
+                jp      separator_find
+
+; One character further along, and it counts towards this order.
+.keep:
+                ld      hl, (stmt_len)
+                inc     hl
+                ld      (stmt_len), hl
+                ; and on along the line
+.step:
+                ld      hl, (line_at)
+                inc     hl
+                ld      (line_at), hl
+                ld      hl, (line_left)
+                dec     hl
+                ld      (line_left), hl
+                ret
+
+; Whether the word of B codes at HL is one the adventure names as parting two
+; orders.  Carry set when it is.
+; Corrupts: everything
+separator_find:
+                ld      (sep_word), hl
+                ld      a, b
+                ld      (sep_length), a
+                ld      hl, (seps_at)
+                ld      a, (hl)
+                inc     hl
+                or      a
+                ret     z                       ; the adventure names none
+                ld      (seps_left), a
+.each:
+                ld      c, (hl)                 ; how long this one is
+                inc     hl
+                ld      a, (sep_length)
+                cp      c
+                jr      nz, .skip
+                push    hl
+                ld      de, (sep_word)
+                ld      b, c
+.compare:
+                ld      a, (de)
+                cp      (hl)
+                jr      nz, .no
+                inc     hl
+                inc     de
+                djnz    .compare
+                pop     hl
+                scf
+                ret
+.no:
+                pop     hl
+.skip:
+                ld      b, 0
+                add     hl, bc                  ; past this word's codes
+                push    hl
+                ld      hl, seps_left
+                dec     (hl)
+                pop     hl
+                jr      nz, .each
+                or      a
+                ret
+
 ; Look for the word of B codes at HL among the entries of kind find_kind.
 ; The number comes back in A, zero when nothing matched.
 ; Corrupts: everything
@@ -230,6 +364,15 @@ find_word:      dw      0
 find_length:    db      0
 find_kind:      db      0
 parse_ptr:      dw      0
+line_at:        dw      0                       ; what is left of the line
+line_left:      dw      0
+stmt_start:     dw      0
+stmt_len:       dw      0
+word_len:       db      0
+sep_word:       dw      0
+sep_length:     db      0
+seps_left:      db      0
+
 parse_left:     dw      0
 word_length:    db      0
 vm_old_noun:    db      0
