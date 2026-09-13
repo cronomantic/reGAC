@@ -472,6 +472,7 @@ class AmstradDevice(Device):
     # out in pen one on the machine.
     start_ink = 1
     start_paper = 1
+    sorts_line_ends = True
 
     def __init__(self, palette, name=None):
         self.palette = list(palette)

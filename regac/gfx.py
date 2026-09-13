@@ -92,6 +92,12 @@ class Device:
     height = SOURCE_ROWS
     start_ink = 0  # what it draws in before a picture says otherwise
     start_paper = 7
+    # Whether a line is the same whichever end it starts from.  The Spectrum
+    # ROM's is not: where it puts the diagonal steps depends on which end it
+    # was given first.  The Amstrad's firmware puts the two ends in order
+    # along the longer side before it draws, so A to B and B to A come out
+    # the same points, which was measured on the machine.
+    sorts_line_ends = False
 
     def to_device(self, x, y):
         """Map a coordinate of the commands onto this screen."""
@@ -194,6 +200,9 @@ class Renderer:
         x1, y1 = self.at_most_the_edge(x1, y1)
         dx = abs(x1 - x0)
         dy = abs(y1 - y0)
+        if self.device.sorts_line_ends:
+            if (x1 < x0) if dx >= dy else (y1 < y0):
+                x0, y0, x1, y1 = x1, y1, x0, y0
         sx = 1 if x1 > x0 else -1
         sy = 1 if y1 > y0 else -1
         self.plot(x0, y0)

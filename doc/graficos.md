@@ -500,11 +500,26 @@ Cómo queda, midiendo contra la pantalla de la máquina:
 | el marco y la lámina 3 | 99,36% |
 | el cuarto del aeropuerto entero | 99,15% |
 
-Lo que falta son píxeles sueltos a lo largo de las líneas, uno aquí y otro
-allá, y el reparto de los fallos lo dice: la mitad son puntos que la máquina
-deja en el fondo y nosotros encendemos, y la otra mitad al revés. Es el trazado
-de rectas del firmware del Amstrad, que no rompe los empates como la ROM del
-Spectrum. Eso es lo siguiente si se quiere exactitud.
+### La recta del Amstrad da igual por qué punta se empiece
+
+Se midió dibujando rectas de extremos conocidos en la máquina y anotando qué
+puntos encendía. Siete rectas bastaron, y dicen dos cosas.
+
+La primera: **ir de A a B enciende exactamente los mismos puntos que ir de B a
+A**. La ROM del Spectrum no hace eso; dónde caen los pasos diagonales depende
+de por qué punta se empiece.
+
+La segunda: en cuanto se ponen las dos puntas en orden a lo largo del lado
+mayor, el resto es el mismo Bresenham que ya teníamos, error a la mitad del
+lado mayor, subiendo por el menor, y paso diagonal al alcanzarlo. Con eso las
+siete rectas salen exactas.
+
+Queda un fleco, y está localizado: **la elipse**. Una sola, de radio 30, da 168
+puntos en la máquina y 168 en el nuestro, pero sesenta y cuatro caen un píxel
+corridos, siempre del lado en que el radio se resta. La máquina parece cambiar
+el signo antes de dividir por 256 y nosotros después, que redondea al otro
+lado; corregirlo recupera la mitad de esos puntos, así que hay algo más. Con
+todo lo demás puesto, un cuarto entero se queda en el 99,2 por ciento.
 
 ### Lo que no está claro todavía
 
