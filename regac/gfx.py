@@ -109,6 +109,16 @@ class Device:
     def set_colours(self, ink, paper, bright, flash):
         raise NotImplementedError
 
+    def ellipse_offset(self, radius, value, sign):
+        """How far from the centre one step of an ellipse falls, with the
+        sign saying which way it goes along the machine's own axis.
+
+        The Spectrum works in its own pixels and simply takes the top byte of
+        radius by table value.  The Amstrad does not, which is why its
+        ellipses come out a pixel wider on the side the radius is taken from.
+        """
+        return sign * ((radius * value) >> 8)
+
     def set_fill_pens(self, first, second):
         """The two pens a fill weaves together, on a machine that has them.
 
@@ -260,9 +270,13 @@ class Renderer:
             # what brings it back is the edge, in at_most_the_edge
             place = (cx + across * rx, cy)
             for step in range(ELLIPSE_STEPS):
+                # y counts the other way on the screen than in the commands,
+                # so the sign the machine would see is the other one
                 following = (
-                    cx + across * ((rx * ELLIPSE_TABLE[step]) >> 8),
-                    cy + down * ((ry * ELLIPSE_TABLE[ELLIPSE_STEPS + step]) >> 8),
+                    cx + self.device.ellipse_offset(rx, ELLIPSE_TABLE[step], across),
+                    cy - self.device.ellipse_offset(
+                        ry, ELLIPSE_TABLE[ELLIPSE_STEPS + step], -down
+                    ),
                 )
                 if following != place:
                     self.line(place[0], place[1], following[0], following[1])

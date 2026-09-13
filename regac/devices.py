@@ -496,6 +496,18 @@ class AmstradDevice(Device):
         self.first = first & 3
         self.second = second & 3
 
+    def ellipse_offset(self, radius, value, sign):
+        """The Amstrad keeps its coordinates in halves of a pixel, because
+        the firmware's screen is 640 by 400 whatever the mode is.  So the step
+        is worked out in halves and only then brought down to a pixel, and
+        since that is a whole position rather than a distance it always goes
+        down: away from the centre on the side the step is taken from, towards
+        it on the other.  That one pixel is the whole difference between an
+        ellipse of ours and one of theirs.
+        """
+        halves = (2 * radius * value) >> 8
+        return (halves >> 1) if sign > 0 else -((halves + 1) >> 1)
+
     def inside(self, x, y):
         return 0 <= x < self.width and 0 <= y < self.height
 

@@ -514,6 +514,224 @@ mayor, el resto es el mismo Bresenham que ya teníamos, error a la mitad del
 lado mayor, subiendo por el menor, y paso diagonal al alcanzarlo. Con eso las
 siete rectas salen exactas.
 
+### La elipse trabaja en medios píxeles
+
+Aquí estaba lo que faltaba, y no era ni el redondeo ni el trazado: es que las
+coordenadas del Amstrad no son píxeles.
+
+El firmware tiene una pantalla de 640 por 400 sea cual sea el modo, así que el
+intérprete multiplica por dos antes de dibujar. La elipse saca sus distancias
+en esas unidades, o sea en medios píxeles, y sólo al final se bajan a píxel. Y
+como lo que se baja es una posición y no una distancia, siempre se redondea
+hacia abajo: eso aleja el punto del centro por el lado del que se resta y lo
+acerca por el otro. De ahí que el cuarto en el que las dos coordenadas se suman
+saliera perfecto y los otros tres no.
+
+Con una distancia de 55 medios píxeles, sumar da 27 y restar da 28. Ese píxel
+era toda la diferencia.
+
+Se midió doblándole al Amstrad su propia tabla de senos en memoria: poniendo
+las dieciséis entradas iguales, cada cuarto de la elipse dibuja un solo tramo
+con el largo que uno quiera, y se lee dónde cae exactamente.
+
+Cómo queda ahora, contra la pantalla de la máquina:
+
+| lo que se dibuja | antes | ahora |
+|---|---|---|
+| sólo el marco | 100,00% | 100,00% |
+| la lámina 3 | 99,38% | 99,85% |
+| la 15 | 99,44% | 99,83% |
+| la 23 | 99,75% | 99,94% |
+| la 36 | 99,57% | 99,70% |
+| el cuarto entero | 99,23% | 99,77% |
+
+De paso quedó descartada la otra sospecha: **el firmware no encadena las rectas
+de otra forma**. Con la tabla amañada se le hace dibujar el mismo tramo
+encadenado detrás de otro y suelto como una orden, y salen los mismos once
+puntos.
+
+Lo que queda son unos pocos píxeles, y se sabe de dónde vienen: la recta
+también se traza en medios píxeles, así que cuando un extremo cae en una unidad
+impar el escalón cambia de sitio. Para que cuadre del todo habría que trazar
+también en medios píxeles.
+
+### Una comparación que no valía
+
+Intenté contrastar contra la pantalla que guardan las propias instantáneas, y
+el resultado engañaba: salían coincidencias del cero por ciento de error. Al
+mirar el mapa de diferencias se ve que esas pantallas no tienen lámina
+dibujada, así que lo que coincidía eran dos imágenes casi vacías. Para
+contrastar de verdad hay que ejecutar el juego hasta que dibuje.
+
+## La versión de Amstrad CPC, leída entera
+
+Las aventuras de CPC vienen en disco, y de ahí salen los ficheros sin encender
+nada: el directorio de AMSDOS dice dónde está cada uno y su cabecera dice a qué
+dirección se carga. `CARVALHO.FAC`, que es Los pájaros de Bangkok, se carga en
+$0040 y ocupa hasta $A2F4, y trae dentro el intérprete y la aventura. En $4000
+están los punteros en fila, tal como decía el decompilador de referencia, y en
+$4012 el de las láminas. Con eso se lee el intérprete del CPC igual que se leyó
+el del Spectrum, pero sin emulador de por medio.
+
+### Las órdenes y sus argumentos
+
+El repertorio es más corto que el del Spectrum: 1 recta, 2 elipse, 3 relleno,
+8 rectángulo, 9 color, A llamada, B punto, y el 0 termina. Cualquier otro byte
+cae en el caso por defecto, que fija la pluma con la que se dibuja. No hay
+relleno de fondo ni media tinta aparte, porque aquí no hacen falta.
+
+Los argumentos van en parejas, y **el segundo byte de cada pareja lleva siempre
+el bit 7 puesto**; el intérprete lo quita al leerlo, con un `RES 7,E`. Por eso
+la y de una lámina va de 0 a 127: la lámina del CPC mide 256 por 128, los
+mismos números que la del Spectrum. El que escribe las láminas hace lo propio
+al revés, con un `OR $80` sobre el byte alto.
+
+### Sí escalaba, con una sola perilla
+
+Cada coordenada pasa por lo mismo antes de dibujarse: se multiplica por un
+factor de un byte, se divide por 64 y se le suma un origen, uno para la x y
+otro para la y. El factor que trae el fichero es 128, que en las coordenadas
+del firmware del CPC, que van de 0 a 639 por 0 a 399 sea cual sea el modo, deja
+la lámina a tamaño natural, un píxel por punto.
+
+Así que la lámina no se estira, pero **la perilla para estirarla está puesta**:
+un byte de escala y dos orígenes colocan los mismos datos en cualquier
+pantalla. Eso es exactamente lo que le hace falta al PCW, y no hay que
+inventarlo.
+
+### Se apoya en el firmware, como el Spectrum en su ROM
+
+Mover, trazar la recta, poner el punto, preguntar por un punto, elegir pluma,
+fijar el origen, la ventana y borrarla: todo eso lo pide a la máquina. El
+Spectrum hacía lo mismo con su ROM. Lo que ninguna de las dos delega es el
+relleno.
+
+### El relleno, y el atajo que nos faltaba
+
+El modelo es el mismo que en el Spectrum: recorrer la columna de la semilla
+hacia arriba y hacia abajo tendiendo un tramo horizontal en cada fila. Lo que
+cambia es cómo busca los extremos del tramo, y aquí está lo que llevábamos
+buscando.
+
+Antes de empezar pregunta por el punto de la semilla, y con el número de pluma
+que le devuelven monta un byte en el que los cuatro píxeles son esa pluma. Ese
+byte es la referencia. Para buscar el extremo hace un `XOR` de la referencia
+contra el byte de pantalla: si la parte que toca al píxel no sale cero, ahí se
+acaba el tramo. Y cuando el recorrido entra en un byte nuevo, compara el byte
+entero: **si todo el byte coincide con la referencia, se lleva sus cuatro
+píxeles de una vez** y salta al siguiente.
+
+Es la optimización por bytes que intenté y deshice. El original la tiene, hecha
+así: comparar primero el byte completo, y sólo bajar a máscara de bit en los
+dos extremos.
+
+### El color es una trama de dos plumas
+
+La orden 9 lleva dos números de pluma. El intérprete convierte cada uno en su
+byte de cuatro píxeles, se queda con las columnas pares del primero y las
+impares del segundo, y los junta. Eso da un damero de las dos plumas. Después
+guarda el mismo byte con las dos plumas intercambiadas, para las filas
+alternas.
+
+Es la pareja de patrones del Spectrum, generalizada: con las dos plumas iguales
+sale un color sólido, y con dos distintas sale una mezcla que en modo 1 da
+muchos más colores de los cuatro que hay. En una máquina de un bit por píxel
+las dos plumas sólo pueden ser negro y blanco, y de ahí salen exactamente los
+tres rellenos del Spectrum: lleno, vacío y damero. El PCW no necesita un modelo
+de color propio, le basta esta orden.
+
+### La elipse es la misma, byte por byte
+
+En $22B0 está la tabla de dieciséis valores, la misma que el Spectrum guarda en
+$A1ED, sin una cifra distinta. El primer par de la orden es el centro y el
+segundo da los radios, como allí. Queda demostrado que la geometría de las
+láminas no depende de la máquina.
+
+### El dibujo, en cambio, no se reaprovechó
+
+Las láminas no son las mismas. La versión de CPC de Bangkok trae 44 y la de
+Spectrum 32, y no coincide ninguna, ni siquiera corrigiendo el origen de la y.
+Se volvieron a dibujar para la máquina.
+
+### Leer una aventura de Amstrad
+
+`deGAC` las lee, con `-m cpc` cuando lo que se le da es una imagen plana de
+memoria como la que saca `disk.py`. Las coordenadas salen ya en las del
+Spectrum: la y se le quita el bit 7, que allí siempre está puesto, y se le
+suman 48, porque la lámina mide 128 filas en las dos máquinas y lo único que
+cambia es desde dónde se cuentan.
+
+Las órdenes de color no tienen equivalente exacto. La que lleva dos plumas se
+parte en tinta y papel, y la que fija una sola pluma queda como tinta. Los ocho
+bytes de cabecera de cada lámina no caben entre las órdenes, así que se guardan
+aparte, en `gfx_inks`, para no perder lo único que dice de qué color iba.
+
+### Las mismas escenas, dibujadas otra vez
+
+Con eso se pueden poner las dos versiones de Los pájaros de Bangkok una al
+lado de la otra. Los cuartos llevan el mismo número en las dos, así que se
+emparejan solas, y de cuarenta que tienen lámina en ambas salen veintiséis
+parejas distintas.
+
+Son las mismas escenas y ninguna es la misma lámina. El autobús con la cara
+del hombre, la calle con sus dos edificios, el corro de gente, la mujer: se
+reconocen todas, pero están vueltas a dibujar, con más color en pantalla y más
+detalle, y sin el marco que el Spectrum pinta alrededor. No coincide ni una
+sola orden, ni corrigiendo el origen de la y.
+
+Para verlas hizo falta un dispositivo que dibuje como el Amstrad, porque con
+el modelo del Spectrum salen manchas planas: un relleno que allí se para al
+cambiar de pluma aquí se lo lleva todo por delante. Está en
+[`AmstradDevice`](../regac/devices.py).
+
+### Contrastarlo contra la máquina
+
+Lo anterior no bastaba: las láminas seguían saliendo con fallos, y sólo se
+podía saber preguntándole a un Amstrad. El cargador del disco quiere una
+comilla tecleada en BASIC que el emulador no manda, así que la aventura entra
+en memoria a mano, en la dirección que dice su propia cabecera, y la arranca un
+`CALL` en decimal. Desde ahí se lee la pantalla y se convierte en números de
+pluma, que es una comparación que no depende de los colores. Y escribiendo un
+cero en medio de las órdenes de una lámina se la corta donde se quiera, que es
+lo que permite ir acorralando un fallo.
+
+Con eso salieron cuatro cosas:
+
+**La lámina se dibuja en el 32,1 de la pantalla**, no pegada a la esquina.
+
+**Empieza con la pluma 1**, y eso no lo dice el dato en ninguna parte: el marco
+que pinta cada cuarto no lleva ni una orden de color y sale amarillo.
+
+**Los ocho bytes de cabecera no son órdenes.** Merecía la pena probarlo porque
+habría explicado el marco: cambiando el último en la máquina, lo que dibuja no
+se mueve.
+
+**El damero elige pluma por la y de las órdenes, no por la fila de pantalla.**
+Es un bit de diferencia y volvía del revés todas las tramas. Esto solo llevó
+una lámina entera del 89 al 99 por ciento.
+
+Cómo queda, midiendo contra la pantalla de la máquina:
+
+| lo que se dibuja | coincide |
+|---|---|
+| sólo el marco | 100,00% |
+| el marco y la lámina 3 | 99,36% |
+| el cuarto del aeropuerto entero | 99,15% |
+
+### La recta del Amstrad da igual por qué punta se empiece
+
+Se midió dibujando rectas de extremos conocidos en la máquina y anotando qué
+puntos encendía. Siete rectas bastaron, y dicen dos cosas.
+
+La primera: **ir de A a B enciende exactamente los mismos puntos que ir de B a
+A**. La ROM del Spectrum no hace eso; dónde caen los pasos diagonales depende
+de por qué punta se empiece.
+
+La segunda: en cuanto se ponen las dos puntas en orden a lo largo del lado
+mayor, el resto es el mismo Bresenham que ya teníamos, error a la mitad del
+lado mayor, subiendo por el menor, y paso diagonal al alcanzarlo. Con eso las
+siete rectas salen exactas.
+
 ### La elipse, que sigue sin cuadrar
 
 Es lo único que queda, y no está resuelto. Lo medido, para quien lo retome:
