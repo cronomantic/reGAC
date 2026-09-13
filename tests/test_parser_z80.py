@@ -41,7 +41,7 @@ ADVENTURE = {
     "lcs": {},
     "model": "SPECTRUM",
     "punctuation": list("\0 .,-!?:"),
-    "separators": ["then", "and"],
+    "separators": [],
     "init_loc": 1,
     "no_objs_msg": "nada",
     "gfx": {},
@@ -82,21 +82,37 @@ def test_a_verb_and_a_noun():
 
 
 @needs_tools
-def test_an_abbreviation_is_its_own_word():
-    """N reaches NORTE because the vocabulary holds both under one number, not
-    because the matching guesses at it."""
+def test_the_shortest_of_the_words_a_letter_starts():
+    """N is in the vocabulary in its own right, and so is NORTE; both carry
+    the same number, and the shorter one is the one found."""
     assert parse("N")["vm_verb"] == 1
 
 
 @needs_tools
-def test_words_it_does_not_know_are_passed_over():
-    """LA must not be swallowed by LAMPARA, which is what matching on the
-    start of a word would do."""
+def test_the_start_of_a_word_is_enough():
+    """Typing EX at the original makes it ask what to examine, so it is enough
+    here too."""
+    assert parse("EX")["vm_verb"] == 9
+
+
+@needs_tools
+def test_more_than_the_word_holds_matches_nothing():
+    """EXAMINAR is one letter longer than the word the adventure knows, and
+    the original answers that one with a shrug."""
+    state = parse("EXAMINAR")
+    assert state["vm_verb"] == 0
+    assert state["understood"] == 0
+
+
+@needs_tools
+def test_a_short_word_is_swallowed_by_a_longer_one():
+    """The price of matching on the start of a word: LA finds LAMPARA, since
+    the adventure holds no LA of its own.  The original does the same."""
     state = parse("EXAMINA LA PUERTA DESPACIO")
     assert state["vm_verb"] == 9
-    assert state["vm_noun1"] == 4
+    assert state["vm_noun1"] == 7
+    assert state["vm_noun2"] == 4
     assert state["vm_adverb"] == 1
-    assert state["vm_noun2"] == 0
 
 
 @needs_tools
@@ -113,8 +129,10 @@ def test_nothing_understood():
 
 
 if __name__ == "__main__":
-    for check in (test_a_verb_and_a_noun, test_an_abbreviation_is_its_own_word,
-                  test_words_it_does_not_know_are_passed_over, test_a_second_noun,
+    for check in (test_a_verb_and_a_noun, test_the_shortest_of_the_words_a_letter_starts,
+                  test_the_start_of_a_word_is_enough,
+                  test_more_than_the_word_holds_matches_nothing,
+                  test_a_short_word_is_swallowed_by_a_longer_one, test_a_second_noun,
                   test_nothing_understood):
         check()
         print(f"{check.__name__}: correcto")

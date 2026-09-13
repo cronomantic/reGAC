@@ -391,14 +391,15 @@ class GAC_Interpreter:
         return True
 
     def __find_word(self, word_dictionary, word):
-        # The real interpreter cuts the found words until it finds a match
-        l = len(word)
-        for k, v in word_dictionary.items():
-            k = k.upper()
-            if len(k) > l:
-                k = k[0:l]
-            if k == word:
-                return v
+        # Typing the start of a word is enough, which is what the original
+        # does: EX at MegaCorp makes it ask what to examine, and EXAMINAR, one
+        # letter more than the word it holds, means nothing to it.  So a typed
+        # word matches an entry it is the start of, never one shorter than
+        # itself.  Taking them in order means the shortest of the entries a
+        # word starts wins, which is what the 8 bit side does too.
+        for k in sorted(word_dictionary):
+            if k.upper().startswith(word):
+                return word_dictionary[k]
         return 0
 
     def __get_location_objects(self, loc_id):
@@ -469,7 +470,7 @@ class GAC_Interpreter:
             if self.adverb == 0 and not matched:
                 self.adverb = self.__find_word(self.adverbs, word)
                 matched = self.adverb != 0
-            if self.noun2 == 0 and self.noun2 != 0 and not matched:
+            if self.noun2 == 0 and self.noun1 != 0 and not matched:
                 self.noun2 = self.__find_word(self.nouns, word)
                 matched = self.noun2 != 0
         return (self.verb != 0 or self.noun1 != 0, False)

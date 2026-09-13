@@ -7,10 +7,16 @@
 ; obeyed one after the other.  Each sentence is then cut into words and each
 ; word is looked for in the vocabulary.
 ;
-; A word has to be typed in full to match, which is what the original did:
-; abbreviations like N for NORTE or INVENT for INVENTARIO are separate entries
-; in the vocabulary sharing a number, not something the matching works out.
-; Matching on the start of a word instead would have LA swallowed by LAMPARA.
+; It is enough to type the start of a word, which is what the original does:
+; typing EX at MegaCorp makes it ask what to examine, and typing EXAMINAR, one
+; letter more than the word it holds, makes it say it does not understand.  So
+; a typed word matches an entry it is the start of, and never one shorter than
+; itself.  The price is that LA is swallowed by LAMPARA, and the original pays
+; it too.
+;
+; Our vocabulary is kept in alphabetical order, so of the entries a short word
+; starts, the shortest wins: typing LA where both LA and LAMPARA exist finds
+; LA.
 ;
 ; The first word that matches takes the first empty slot: verb, then noun,
 ; then adverb, then second noun.
@@ -200,8 +206,12 @@ vocab_find:
                 jr      nz, .next
                 ld      a, (find_length)
                 cp      c
-                jr      nz, .next               ; the whole word or nothing
+                jr      z, .long_enough
+                jr      nc, .next               ; more typed than the word holds
+.long_enough:
                 ld      b, a
+                or      a
+                jr      z, .next
                 ld      de, (find_word)
 .letters:
                 ld      a, (de)

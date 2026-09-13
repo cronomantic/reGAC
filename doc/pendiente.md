@@ -182,11 +182,15 @@ De la versión de CPC quedan tres cabos:
 también entiende las de Amstrad y Commodore 64, lo que ampliaría el catálogo de
 aventuras recuperables.
 
-El intérprete de Python casa palabras por prefijo, recortando la del
-vocabulario a lo que se haya tecleado, así que "LA" casa con "LAMPARA". El
-original y el nuestro casan la palabra entera. Conviene alinearlo o dejar
-dicho por qué no.
+Lo de casar palabras por prefijo estaba al revés de como lo habíamos contado.
+El que se equivocaba era el nuestro, no el de Python: al original le tecleas
+`EX` y pregunta qué examinar, y le tecleas `EXAMINAR`, una letra más de las que
+guarda, y dice que no entiende. O sea que basta escribir el principio de una
+palabra, y nunca vale una más larga que la guardada. El precio es que `LA` se
+la come `LAMPARA`, y el original lo paga igual. Los dos intérpretes lo hacen ya
+así, y como nuestro vocabulario va en orden alfabético, de las entradas que
+empiezan igual gana la más corta.
 
-En ese mismo intérprete, `__parse_input` tiene una condición que no puede ser
-cierta nunca, `self.noun2 == 0 and self.noun2 != 0`, así que en Python el
-segundo nombre no se lee jamás.
+El segundo nombre tampoco se leía en Python: `__parse_input` tenía una
+condición que no podía ser cierta nunca. Arreglado, y con la misma regla que el
+Z80, que pide que haya un primer nombre antes de aceptar el segundo.
