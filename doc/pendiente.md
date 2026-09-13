@@ -70,11 +70,12 @@ la ROM y aquí no, porque el firmware está paginado fuera mientras corre el
 intérprete; habría que traerlo de vuelta alrededor de la llamada o escribir la
 grabación desde cero. Por ahora guardar y cargar dicen que no han hecho nada.
 
-Del teclado no hay prueba automática. Funciona, pero el emulador pierde teclas
-cuando se las manda a un CPC, y eso ya se vio cargando el juego original: de
-cinco letras llegan tres. Para probarlo de verdad haría falta mover la matriz
-del teclado a mano, como se hace con el Spectrum, y el emulador no ofrece eso
-para esta máquina.
+El teclado sí tiene prueba, y lo de que el emulador perdiera teclas era cosa de
+cómo se las mandábamos. Darle una cadena entera pierde letras; mandarle la
+pulsación y la suelta por separado, que es lo que hace `type_keys`, no pierde
+ninguna: de cinco teclas llegan cinco. Los números de tecla del emulador son
+casi siempre el ASCII de lo que lleva impreso, salvo unos pocos, y el punto es
+uno de ellos.
 
 ### Amstrad PCW, target nuevo
 

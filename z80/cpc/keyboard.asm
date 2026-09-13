@@ -116,7 +116,12 @@ scan_keyboard:
                 call    shift_held
                 ld      a, (key_found)
                 ret     z                       ; plain, as it is printed
-                jp      to_shifted
+                call    to_shifted
+                or      a
+                ret     nz
+                ld      a, (key_found)          ; shift says nothing about it
+                or      a
+                ret
 
 ; Whether either shift is held; zero flag clear if one is.
 ; Corrupts: AF, BC

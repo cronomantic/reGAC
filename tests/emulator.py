@@ -204,6 +204,23 @@ class Session:
             self.hold()
             time.sleep(hold_for)
 
+    # Most of the emulator's key numbers are the ASCII of what is printed on
+    # the key, but not all: these are the ones that are not.
+    EVENT_KEYS = {chr(13): 129, chr(10): 129, chr(8): 132, ".": 183}
+
+    def type_keys(self, text, hold_for=0.06):
+        """Type at a keyboard the matrix cannot be reached through, which is
+        every machine here but the Spectrum.  The emulator will press and
+        release a key on demand, which comes to the same thing and keeps the
+        timing ours: sending a whole string at it drops letters.  The codes
+        are ASCII, a letter in lower case, and enter is 129."""
+        for char in text:
+            code = self.EVENT_KEYS.get(char, ord(char.lower()))
+            self.command(f"send-keys-event {code} 1")
+            time.sleep(hold_for)
+            self.command(f"send-keys-event {code} 0")
+            time.sleep(hold_for)
+
     def keys(self, text, pause=100):
         """Type something, as if at the keyboard.  The pause is how long each
         key is held, in milliseconds."""
