@@ -36,13 +36,29 @@ picture_init:
                 inc     hl
                 ld      (gfx_count), de
                 ld      (gfx_index), hl
+                ld      hl, 0                   ; nothing known yet, and no
+                ld      (gfx_known), hl         ; picture is numbered zero
                 ret
 
 ; Find picture HL.  Its commands come back in HL with their length in BC;
 ; carry set when there is no such picture.
+;
+; The last one found is kept, because a picture that calls another calls it
+; over and over: the animations are built as one small picture called a dozen
+; times, from a picture called a dozen times, four deep.  Without this the
+; index is walked from the top for every one of those.
 ; Corrupts: AF, DE
 picture_find:
                 ld      (gfx_wanted), hl
+                ld      de, (gfx_known)
+                or      a
+                sbc     hl, de
+                jr      nz, .look
+                ld      hl, (gfx_known_at)
+                ld      bc, (gfx_known_size)
+                or      a
+                ret
+.look:
                 ld      hl, (gfx_index)
                 ld      bc, (gfx_count)
 .each:
@@ -74,6 +90,10 @@ picture_find:
                 inc     hl
                 ld      b, (hl)
                 inc     hl                      ; BC = how many bytes of commands
+                ld      (gfx_known_at), hl
+                ld      (gfx_known_size), bc
+                ld      de, (gfx_wanted)
+                ld      (gfx_known), de
                 or      a
                 ret
 
@@ -99,21 +119,19 @@ draw_picture:
 run_picture:
                 call    picture_find
                 ret     c
-                ld      (gfx_code), hl
-                ld      (gfx_left), bc
+                ld      d, b
+                ld      e, c                    ; DE counts the bytes left
 .next:
-                ld      bc, (gfx_left)
-                ld      a, b
-                or      c
+                ld      a, d
+                or      e
                 ret     z
-                dec     bc
-                ld      (gfx_left), bc
-                ld      hl, (gfx_code)
+                dec     de
                 ld      a, (hl)
                 inc     hl
-                ld      (gfx_code), hl
                 ld      c, a
                 ; one byte commands first
+                cp      CMD_BORDER
+                jr      z, .one_byte
                 cp      CMD_INK
                 jr      z, .one_byte
                 cp      CMD_PAPER
@@ -121,8 +139,6 @@ run_picture:
                 cp      CMD_BRIGHT
                 jr      z, .one_byte
                 cp      CMD_FLASH
-                jr      z, .one_byte
-                cp      CMD_BORDER
                 jr      z, .one_byte
                 cp      CMD_CALL
                 jp      z, .call_picture
@@ -135,29 +151,52 @@ run_picture:
                 cp      CMD_SHADE
                 jr      z, .two_bytes
                 ; the rest take four
-                call    take_byte
+                ld      a, (hl)
+                inc     hl
+                dec     de
                 ld      (gfx_x0), a
-                call    take_byte
+                ld      a, (hl)
+                inc     hl
+                dec     de
                 ld      (gfx_y0), a
-                call    take_byte
+                ld      a, (hl)
+                inc     hl
+                dec     de
                 ld      (gfx_x1), a
-                call    take_byte
+                ld      a, (hl)
+                inc     hl
+                dec     de
                 ld      (gfx_y1), a
+                call    .keep_place
                 ld      a, c
                 cp      CMD_LINE
                 jr      nz, .not_line
                 call    gfx_line
-                jp      .next
+                jr      .resume
 .not_line:
                 cp      CMD_RECT
                 jr      nz, .not_rect
                 call    gfx_rect
-                jp      .next
+                jr      .resume
 .not_rect:
                 call    gfx_ellipse
+.resume:
+                ld      hl, (gfx_code)
+                ld      de, (gfx_left)
                 jp      .next
+
+; Drawing treads on every register, so the place in the commands goes to
+; memory for as long as that takes.  The commands that only set a colour cost
+; nothing at all, which matters: the animations are thousands of them.
+.keep_place:
+                ld      (gfx_code), hl
+                ld      (gfx_left), de
+                ret
+
 .one_byte:
-                call    take_byte
+                ld      a, (hl)
+                inc     hl
+                dec     de
                 ld      b, a
                 ld      a, c
                 cp      CMD_BORDER
@@ -167,6 +206,7 @@ run_picture:
                 out     ($FE), a
                 jp      .next
 .not_border:
+                push    hl
                 ld      hl, gfx_ink
                 cp      CMD_INK
                 jr      z, .store
@@ -179,17 +219,23 @@ run_picture:
                 ld      hl, gfx_flash
 .store:
                 ld      (hl), b
+                pop     hl
                 jp      .next
 .two_bytes:
-                call    take_byte
+                ld      a, (hl)
+                inc     hl
+                dec     de
                 ld      (gfx_x0), a
-                call    take_byte
+                ld      a, (hl)
+                inc     hl
+                dec     de
                 ld      (gfx_y0), a
+                call    .keep_place
                 ld      a, c
                 cp      CMD_PLOT
                 jr      nz, .a_fill
                 call    gfx_plot
-                jp      .next
+                jr      .resume
 .a_fill:
                 ld      b, FILL_INK
                 cp      CMD_FILL
@@ -202,50 +248,40 @@ run_picture:
                 ld      a, b
                 call    set_fill_pattern
                 call    gfx_fill
-                jp      .next
+                jr      .resume
 .call_picture:
-                call    take_byte
-                ld      e, a
-                call    take_byte
-                ld      d, a                    ; the number is two bytes here
+                ld      a, (hl)
+                inc     hl
+                dec     de
+                ld      c, a
+                ld      a, (hl)
+                inc     hl
+                dec     de
+                ld      b, a                    ; the number is two bytes here
                 ld      a, (gfx_depth)
                 inc     a
                 cp      GFX_MAX_DEPTH
                 jp      nc, .next               ; too deep, leave it
                 ld      (gfx_depth), a
-                ; keep our place, draw the other one, then carry on
-                ld      hl, (gfx_code)
-                push    hl
-                ld      hl, (gfx_left)
-                push    hl
-                ex      de, hl
+                push    hl                      ; keep our place, draw the
+                push    de                      ; other one, then carry on
+                ld      h, b
+                ld      l, c
                 call    run_picture
+                pop     de
                 pop     hl
-                ld      (gfx_left), hl
-                pop     hl
-                ld      (gfx_code), hl
-                ld      hl, gfx_depth
-                dec     (hl)
+                ld      a, (gfx_depth)
+                dec     a
+                ld      (gfx_depth), a
                 jp      .next
-
-; The next byte of the commands, in A.
-; Corrupts: HL
-take_byte:
-                ld      hl, (gfx_code)
-                ld      a, (hl)
-                inc     hl
-                ld      (gfx_code), hl
-                push    hl
-                ld      hl, (gfx_left)
-                dec     hl
-                ld      (gfx_left), hl
-                pop     hl
-                ret
 
 gfx_section:    dw      0
 gfx_index:      dw      0
 gfx_count:      dw      0
 gfx_wanted:     dw      0
+gfx_known:      dw      0                       ; the last picture looked up
+gfx_known_at:   dw      0
+gfx_known_size: dw      0
 gfx_code:       dw      0
 gfx_left:       dw      0
 gfx_depth:      db      0

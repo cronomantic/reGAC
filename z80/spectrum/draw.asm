@@ -90,6 +90,44 @@ attribute_address:
                 add     hl, bc
                 ret
 
+; The attribute byte the colours in force come to, when it does not depend on
+; what is already in the cell.  Carry clear and the byte in A when they do not;
+; carry set when one of them is an eight, meaning leave what is there, or the
+; ink is nine, meaning choose against the paper.  A fill that colours a long
+; run wants this once instead of working it out for every cell.
+; Corrupts: AF, B
+attr_const:
+                ld      a, (gfx_ink)
+                cp      8
+                jr      nc, .varies
+                ld      b, a
+                ld      a, (gfx_paper)
+                cp      8
+                jr      nc, .varies
+                rlca
+                rlca
+                rlca
+                or      b
+                ld      b, a
+                ld      a, (gfx_bright)
+                cp      8
+                jr      nc, .varies
+                and     1
+                rrca
+                rrca                            ; into bit six
+                or      b
+                ld      b, a
+                ld      a, (gfx_flash)
+                cp      8
+                jr      nc, .varies
+                and     1
+                rrca                            ; into bit seven
+                or      b
+                ret                             ; carry is clear after OR
+.varies:
+                scf
+                ret
+
 ; Give the cell holding pixel (D, E) the colours in force.  A colour of eight
 ; means leave what is there, and an ink of nine means pick black or white,
 ; whichever will be read against the paper.

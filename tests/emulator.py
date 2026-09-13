@@ -142,11 +142,13 @@ class Session:
             length -= piece
         return bytes(out)
 
-    def wait_for(self, address, wanted, timeout=20.0):
-        """Run until a byte in memory takes a value, and say whether it did."""
+    def wait_for(self, address, wanted, timeout=20.0, every=0.4):
+        """Run until a byte in memory takes a value, and say whether it did.
+        Look often when what happens after the wait is being measured, because
+        whatever runs between the end and the next look is counted too."""
         deadline = time.time() + timeout
         while time.time() < deadline:
-            time.sleep(0.4)
+            time.sleep(every)
             if self.pc() and self.read(address, 1)[0] == wanted:
                 return True
         return False

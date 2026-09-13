@@ -229,11 +229,44 @@ acelera el rastreo de las filas vecinas.
 relleno liso: se escribe un byte y cubre ocho píxeles igual. Cambiar la trama es
 cambiar la tabla.
 
-Quedan 7 segundos para una pantalla entera, que sigue siendo mucho. El resto se
-va en el rastreo de las filas de arriba y abajo, que todavía recalcula la
-dirección en cada píxel en lugar de arrastrarla. Lo siguiente es leer las
-rutinas originales, que están dentro de las propias instantáneas, para
-contrastar el método antes de seguir optimizando a ciegas.
+### Dónde estaba el tiempo de verdad
+
+Después de rehacer el relleno con el modelo original quedaba una lámina que
+tardaba doce segundos y medio, y todas las demás por debajo de dos. Medir en
+lugar de suponer costó tres intentos fallidos: el salto por bytes en la
+búsqueda de extremos, que es lo que hace el Amstrad, ganó medio segundo; y
+colorear con un byte calculado una vez en vez de por celda, otro medio.
+
+La lámina cara es la 28 de Bangkok2, y no dibuja nada raro: es un parpadeo de
+borde montado por anidamiento. La 28 llama a la 27, que llama cuatro veces a la
+26, que llama trece veces a la 25, que llama catorce veces a la 24, y la 24 son
+diez cambios de borde. Salen 43.821 órdenes y 4.382 llamadas. Así que el gasto
+no estaba en dibujar, estaba en el coste por orden del intérprete.
+
+Dos cosas lo arreglan:
+
+**Recordar la última lámina encontrada.** Buscar una recorría el índice desde
+el principio, y una animación llama catorce veces seguidas a la misma. Doce
+segundos y medio pasan a ocho.
+
+**Llevar el puntero y la cuenta en registros.** El bucle los guardaba y los
+volvía a leer de memoria en cada orden, y cada argumento repetía la operación
+dentro de una subrutina. Ahora sólo bajan a memoria las órdenes que dibujan,
+que son las que pisan todos los registros. Ocho segundos pasan a cuatro y
+medio.
+
+### Medir en ciclos, no en segundos
+
+El emulador de este ordenador no corre a la velocidad de un Spectrum. Con un
+bucle de duración conocida, en tres tamaños, sale recto en 2,03 MHz, el 58% de
+los 3,5 de la máquina real. Todos los segundos que habíamos contado abultaban
+un 72%.
+
+Por eso la medición se hace ahora con el contador de ciclos del propio Z80, que
+el emulador deja leer, dividido por tres millones y medio. Está en
+[`tests/test_all_pictures.py`](../tests/test_all_pictures.py), que dibuja las
+196 láminas, las compara con la referencia y comprueba que ninguna pase de
+cinco segundos. Es lenta, media hora, así que sólo corre con `REGAC_SLOW=1`.
 
 ## Cómo lo hacía GAC, leído de las propias aventuras
 

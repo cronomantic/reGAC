@@ -123,6 +123,15 @@ fill_run:
 
 ; How far the clear run through (D, E) reaches, into fill_left and fill_right.
 ; The address is worked out once and the mask rotated from there.
+;
+; Whenever the walk steps into a byte it has not looked at yet, it looks at the
+; whole byte first: eight clear pixels are a byte of zero, and one comparison
+; takes all eight.  Only a byte with something in it is picked apart pixel by
+; pixel, which happens twice in a run, at its two ends.  The Amstrad does the
+; same thing, comparing the byte against one holding the pen of the seed four
+; times over; here the seed is clear by definition, so the byte to match is
+; zero.  See doc/graficos.md.
+;
 ; Corrupts: everything
 span_extent:
                 call    row_address
@@ -136,9 +145,17 @@ span_extent:
                 or      a
                 jr      z, .left_done
                 rlc     b                       ; one pixel to the left
-                jr      nc, .same_byte_left
+                jr      nc, .pixel_left
                 dec     l                       ; over into the byte before
-.same_byte_left:
+                ld      a, (hl)
+                or      a
+                jr      nz, .pixel_left         ; something in it: one at a time
+                ld      a, (fill_left)          ; the walk arrived at a byte
+                sub     8                       ; boundary, so this byte is all
+                ld      (fill_left), a          ; of the next eight pixels
+                ld      b, %10000000            ; and we stand at its first
+                jr      .leftwards
+.pixel_left:
                 ld      a, (hl)
                 and     b
                 jr      nz, .left_done
@@ -155,9 +172,17 @@ span_extent:
                 inc     a
                 jr      z, .right_done          ; the edge of the screen
                 rrc     b                       ; one pixel to the right
-                jr      nc, .same_byte_right
+                jr      nc, .pixel_right
                 inc     l                       ; over into the next byte
-.same_byte_right:
+                ld      a, (hl)
+                or      a
+                jr      nz, .pixel_right
+                ld      a, (fill_right)
+                add     a, 8
+                ld      (fill_right), a
+                ld      b, %00000001            ; standing at its last pixel
+                jr      .rightwards
+.pixel_right:
                 ld      a, (hl)
                 and     b
                 ret     nz
@@ -272,12 +297,41 @@ blend_byte:
 
 ; Give every cell the run passes through the colours in force.  A colour
 ; belongs to a cell of eight by eight, so this steps by bytes.
+;
+; Almost always the same byte goes into every cell of the run, because the
+; colours in force do not depend on what is already there.  Then the whole run
+; is one address worked out once and a byte written along it, which is what
+; makes a fill affordable: the slow way was to work out the address and the
+; colours again for every cell of every row.
 ; Corrupts: everything
 colour_span:
                 ld      a, (fill_row)
                 ld      e, a
                 ld      a, (fill_left)
                 ld      d, a
+                call    attr_const
+                jr      c, .cell_by_cell
+                push    af
+                call    attribute_address       ; the first cell of the run
+                pop     af
+                ld      c, a                    ; the byte all of them get
+                ld      a, (fill_right)
+                srl     a
+                srl     a
+                srl     a
+                ld      b, a                    ; the last cell across
+                ld      a, d
+                srl     a
+                srl     a
+                srl     a                       ; the first
+.each_byte:
+                ld      (hl), c
+                cp      b
+                ret     z
+                inc     a
+                inc     l
+                jr      .each_byte
+.cell_by_cell:
                 ld      a, (fill_right)
                 srl     a
                 srl     a
