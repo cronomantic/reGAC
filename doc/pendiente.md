@@ -323,6 +323,13 @@ y **no lleva base de datos ninguna**: si esa disciplina se saltara, el salto a
 $0038 iría a memoria vacía y no llegaría a terminar nada. Que termine es la
 mitad de lo que se comprueba.
 
+Lo que no está automatizado, y se ha mirado a mano en la máquina, es la
+cadena entera desde el verbo: cargada la aventura de la cinta, se teclea
+`SAVE` y el intérprete llama a la rutina, la ROM escribe durante medio minuto
+—que es lo que tarda de verdad una partida a 1200 baudios— y al acabar el
+juego sigue donde estaba, con su pantalla intacta. Automatizarlo no añadiría
+nada: el emulador tampoco podría decir qué se grabó.
+
 Una diferencia con el Amstrad que conviene saber: aquí no hay que devolverle
 nada a la pantalla. Las rutinas de cinta de la BIOS dejan el chip de vídeo
 exactamente como estaba, encendido y con sus registros; está mirado en la
