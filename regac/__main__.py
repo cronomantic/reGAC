@@ -29,8 +29,9 @@ import sys
 from .binary import MACHINES, SECTION_NAMES, Database, Reader
 from .devices import DEVICES, device_for, make
 from .gfx import Renderer
-from .media import (PCW_SCREEN_BYTES, banks_of, cpc_disk, cpc_tape,
-                    msx_tape, pcw_release, plus3_banked_disk, plus3_disk)
+from .media import (MSX_SCREEN_BYTES, PCW_SCREEN_BYTES, banks_of, cpc_disk,
+                    cpc_tape, msx_screen, msx_tape, pcw_release,
+                    plus3_banked_disk, plus3_disk)
 from .project import (TARGETS, ProjectError, assemble, screen_for,
                       wide)
 from .project import read as read_project
@@ -176,7 +177,7 @@ LOADS_AT = {"cpc": 0x4000, "plus3": 0x8000, "pcw": 0x0100, "msx": 0x8000}
 # And how big a dump of each machine's screen is, which is what a loading
 # screen has to be.
 SCREEN_BYTES = {"cpc": 0x4000, "plus3": 6912, "pcw": PCW_SCREEN_BYTES,
-                "msx": 0}
+                "msx": MSX_SCREEN_BYTES}
 
 
 def cmd_build(args):
@@ -239,9 +240,10 @@ def write_media(machine, code, where, name, load, entry, screen=None,
         # reads itself once it has somewhere to put them.
         path = os.path.join(where, name.lower() + ".cas")
         with open(path, "wb") as f:
-            f.write(msx_tape(code, database or b"", load, entry, name))
+            f.write(msx_tape(code, database or b"", screen, load, entry, name))
         written.append(path)
-        how = f'BLOAD"CAS:",R, with {len(database or b"")} bytes behind it'
+        how = (f'BLOAD"CAS:",R, with {"a screen and " if screen else ""}'
+               f'{len(database or b"")} bytes behind it')
     elif machine == "cpc":
         for suffix, make in ((".dsk", cpc_disk), (".cdt", cpc_tape)):
             path = os.path.join(where, name.lower() + suffix)
@@ -280,9 +282,8 @@ def cmd_release(args):
         with open(args.screen, "rb") as f:
             screen = f.read()
         wanted = SCREEN_BYTES[args.machine]
-        if not wanted:
-            sys.exit(f"ERROR: a {args.machine} release has nowhere to put a "
-                     "loading screen yet")
+        if args.machine == "msx":
+            screen = msx_screen(screen)
         if len(screen) != wanted:
             sys.exit(f"ERROR: a {args.machine} screen is {wanted} bytes and "
                      f"{args.screen} is {len(screen)}")

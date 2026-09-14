@@ -348,6 +348,14 @@ MSX_CODE_AT = 0x8000                    # where the interpreter is built to run
 # stops while that happens, so every chunk is a block of its own.
 MSX_CHUNK = 8192
 
+# A loading screen here is the video chip's own memory: its patterns, its
+# names and its colours, one after another, which is what a screen 2 picture
+# amounts to.  What a person will have is a .SC2, which is exactly that with
+# seven bytes of BSAVE header in front of it.
+MSX_SCREEN_BYTES = 0x3800
+MSX_BSAVE = 7
+MSX_BSAVE_MARK = 0xFE
+
 
 def msx_block(out, body):
     """One block onto the tape, marker and all, on the eighth byte."""
@@ -367,7 +375,17 @@ def msx_file(out, name, data, load, entry):
     return msx_block(out, head + bytes(data))
 
 
-def msx_tape(code, database=b"", load=MSX_CODE_AT, entry=None, name=PCW_PAYLOAD):
+def msx_screen(data):
+    """A loading screen as the video chip holds it, whichever of the two ways
+    it was handed over: a dump of those tables, or the .SC2 an MSX drawing
+    program writes, which is the same thing behind a BSAVE header."""
+    if len(data) == MSX_SCREEN_BYTES + MSX_BSAVE and data[0] == MSX_BSAVE_MARK:
+        return bytes(data[MSX_BSAVE:])
+    return bytes(data)
+
+
+def msx_tape(code, database=b"", screen=None, load=MSX_CODE_AT, entry=None,
+             name=PCW_PAYLOAD):
     """The whole of an adventure on one cassette, which a person starts with
     `BLOAD"CAS:",R` and nothing else.
 
@@ -378,14 +396,21 @@ def msx_tape(code, database=b"", load=MSX_CODE_AT, entry=None, name=PCW_PAYLOAD)
     and reads the rest of the tape with the machine's own routines, a chunk at
     a time, and the chunks are blocks with no name on them.
 
-    The first chunk is headed by the size of the whole database, so that
-    nothing about the adventure is built into the loader.
+    What comes behind the interpreter starts with three bytes that say what is
+    coming -- how big the database is, and whether a loading screen is in
+    front of it -- so that nothing about one adventure is built into the
+    loader.  The screen goes in the same block as the first chunk, because
+    stopping the motor between them would buy nothing: the screen needs no
+    memory at all, it goes straight into the chip as it is read.
     """
     out = bytearray()
     msx_file(out, name, code, load, load if entry is None else entry)
-    first = True
-    for at in range(0, len(database), MSX_CHUNK):
-        piece = bytes(database[at:at + MSX_CHUNK])
-        msx_block(out, struct.pack("<H", len(database)) + piece if first else piece)
-        first = False
+    header = struct.pack("<HB", len(database), 1 if screen else 0)
+    if screen:
+        header += msx_screen(screen)
+    chunks = [bytes(database[at:at + MSX_CHUNK])
+              for at in range(0, len(database), MSX_CHUNK)]
+    msx_block(out, header + (chunks[0] if chunks else b""))
+    for piece in chunks[1:]:
+        msx_block(out, piece)
     return bytes(out)

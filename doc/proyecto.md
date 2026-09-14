@@ -62,7 +62,8 @@ tamaño natural y decirles otra cosa es un error.
 
 **La pantalla de carga se comprueba**: si no mide lo que mide la pantalla de esa
 máquina, protesta y no escribe nada. Qué es cada una está en
-[`binario.md`](binario.md).
+[`binario.md`](binario.md); del MSX se admite además el `.SC2` tal cual sale de
+un programa de dibujo, que es el volcado con siete bytes de cabecera delante.
 
 ## Lo que *no* va aquí
 

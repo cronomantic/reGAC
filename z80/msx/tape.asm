@@ -46,8 +46,9 @@ DB_CHUNK        equ 8192
 ; takes.  The motor stops each time that happens, which is why every chunk is
 ; a block of its own on the tape.
 ;
-; The first block starts with the size of the whole, so there is nothing about
-; one adventure built into this.
+; The first block starts with three bytes that say what is coming -- the size
+; of the whole database, and whether a loading screen comes in front of it --
+; so there is nothing about one adventure built into this.
 ; Corrupts: everything
 load_database:
                 ld      hl, database
@@ -64,6 +65,12 @@ load_database:
                 jr      c, tape_gave_out
                 ld      h, a
                 ld      (db_left), hl
+                call    read_byte               ; and whether a screen comes
+                jr      c, tape_gave_out
+                or      a
+                jr      z, .chunk
+                call    screen_from_tape
+                jr      c, tape_gave_out
 .chunk:
                 ; the whole of a chunk, or what is left if that is less
                 ld      hl, (db_left)
@@ -117,6 +124,28 @@ tape_gave_out:
 db_where:       dw      0                       ; where the next chunk goes
 db_left:        dw      0                       ; and how much there is to come
 db_count:       dw      0
+
+; The loading screen, straight from the cassette into the video chip, which
+; wants no room in memory at all: the chip counts its own address up, so every
+; byte goes out as it comes in and the picture fills in while the tape runs.
+; It is in the same block as the first chunk of the database, so the motor
+; does not stop between the two.
+; Carry set when the tape gave out.
+; Corrupts: everything
+screen_from_tape:
+                call    vdp_setup
+                ld      hl, VRAM_PATTERNS
+                call    vram_write
+                ld      de, VRAM_SHOWN
+.each:
+                call    read_byte
+                ret     c
+                out     (VDP_DATA), a
+                dec     de
+                ld      a, d
+                or      e
+                jr      nz, .each
+                ret                             ; the `or` left no carry: it came
 
 ; Find the lead and get in step.  Carry set when nothing came.
 ; Corrupts: AF

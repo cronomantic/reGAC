@@ -54,6 +54,8 @@ try:
 except ImportError:                     # pragma: no cover - Python below 3.11
     tomllib = None
 
+from .media import MSX_SCREEN_BYTES, msx_screen
+
 
 class ProjectError(Exception):
     pass
@@ -122,6 +124,7 @@ TARGETS = {
     "msx": Target(
         machine="msx", folder=MSX, source="game.asm", database="game.rgac",
         release="msx", binary="game.bin",
+        screen_bytes=MSX_SCREEN_BYTES,
     ),
     "pcw": Target(
         machine="pcw", folder=PCW, source="game.asm", database="game.rgac",
@@ -217,6 +220,8 @@ def screen_for(target, path, root):
     """Read a loading screen and make sure it is that machine's own."""
     with open(os.path.join(root, path), "rb") as f:
         screen = f.read()
+    if target.machine == "msx":
+        screen = msx_screen(screen)
     if len(screen) != target.screen_bytes:
         raise ProjectError(
             f"{path} is {len(screen)} bytes and a {target.machine} screen is "

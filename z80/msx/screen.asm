@@ -38,6 +38,8 @@ VRAM_PATTERNS   equ $0000               ; the three tables, in the chip
 VRAM_NAMES      equ $1800
 VRAM_COLOURS    equ $2000
 VRAM_COLOUR_ROW equ (VRAM_COLOURS - VRAM_PATTERNS) >> 8         ; rows apart
+VRAM_SHOWN      equ VRAM_COLOURS + $1800        ; patterns, names and colours:
+                                                ; what a dump of this screen is
 ROW_BYTES       equ 256                 ; one character row of either table
 
 SCREEN_COLS     equ 32
@@ -70,11 +72,10 @@ screen_setup:   db      $02             ; graphics two
                 db      $07
                 db      MSX_BLACK       ; the border
 
-; Put the machine in screen 2 and lay its tables out.  The BIOS could do this,
-; but the BIOS is not there once the interpreter takes all sixty four
-; kilobytes for itself, so it is done here.
-; Corrupts: AF, BC, DE, HL
-screen_init:
+; The eight registers, and nothing else: the loader wants this on its own, to
+; put a loading screen up before there is a database to take a font out of.
+; Corrupts: AF, C, HL
+vdp_setup:
                 ld      hl, screen_setup
                 ld      c, $80                  ; register nought
 .each_register:
@@ -87,6 +88,14 @@ screen_init:
                 ld      a, c
                 cp      $88
                 jr      nz, .each_register
+                ret
+
+; Put the machine in screen 2 and lay its tables out.  The BIOS could do this,
+; but the BIOS is not there once the interpreter takes all sixty four
+; kilobytes for itself, so it is done here.
+; Corrupts: AF, BC, DE, HL
+screen_init:
+                call    vdp_setup
                 ; The name table says which pattern each cell shows: its own,
                 ; counting round every 256.  That is what turns a table of
                 ; characters into a bitmap.

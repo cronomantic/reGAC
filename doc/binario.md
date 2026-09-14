@@ -296,8 +296,12 @@ siempre —TAPION $00E1, TAPIN $00E4, TAPIOF $00E7— en el buffer de $C000 (que
 es la copia de la pantalla, que todavía no se usa), vuelve a tomar la máquina
 y lo copia debajo de donde estaba la BIOS. El motor se para en cada vuelta, y
 por eso cada trozo es un bloque suyo en la cinta, sin nombre y sin cabecera.
-El primero lleva delante el tamaño entero, para que no haya nada de una
-aventura metido en el cargador.
+
+Delante de todo eso van tres bytes que dicen qué viene: el tamaño entero de la
+base de datos y si trae pantalla de carga. Así no hay nada de una aventura
+metido en el cargador. La pantalla, si la hay, va justo detrás de esos tres
+bytes y en el mismo bloque que el primer trozo, porque no le hace falta
+memoria: entra directa en el chip de vídeo según se lee.
 
 De ahí sale una regla que cuesta cara si se olvida: **nunca se vuelve a
 nuestro mapa con las interrupciones puestas**. Las rutinas de cinta las dejan
@@ -321,9 +325,13 @@ de verdad y la carga también.
 Cualquiera de los destinos puede llevar una, y lo que se le da es **un volcado
 crudo de la pantalla de esa máquina**: 6912 bytes en el Spectrum, que es un
 `.SCR` de toda la vida; dieciséis kilobytes en el Amstrad, que es su modo 1
-entero; y 23040 en el PCW, que son las treinta y dos filas de 720 bytes tal y
-como las lee su vídeo. No se convierte nada ni se dibuja nada: lo que se
-entrega es exactamente lo que la máquina enseña.
+entero; 23040 en el PCW, que son las treinta y dos filas de 720 bytes tal y
+como las lee su vídeo; y 14336 en el MSX, que es la memoria del chip de vídeo
+—patrones, nombres y colores— tal cual. No se convierte nada ni se dibuja
+nada: lo que se entrega es exactamente lo que la máquina enseña. Del MSX se
+admite además el `.SC2` que escribe cualquier programa de dibujo de esa
+máquina, que es ese mismo volcado con siete bytes de cabecera de BSAVE
+delante; la cabecera se quita y ya está.
 
 Dónde entra en cada medio:
 
@@ -342,6 +350,13 @@ Dónde entra en cada medio:
   alguien monta la tabla de líneas. La mitad de arriba va donde el mapa ya la
   enseña; la de abajo vive en un banco propio y entra por la misma ventana que
   la base de datos.
+- **MSX**: delante del primer trozo de la base de datos y en el mismo bloque,
+  porque no necesita sitio en memoria: el chip de vídeo lleva su propia
+  dirección y la va subiendo sola, así que cada byte leído sale por el puerto
+  según entra y la lámina se va rellenando mientras la cinta corre. Lo único
+  que hace falta antes es poner los ocho registros del modo 2, que es lo que
+  `vdp_setup` hace sin tocar nada más —el resto del arranque de pantalla
+  necesita la fuente, y la fuente todavía no ha llegado.
 
         python -m regac release z80/cpc/game.bin salida/ -m cpc                --screen pantalla.scr
 

@@ -299,12 +299,18 @@ guardando desde `start` cuando delante ya había otra entrada, la de la cinta,
 así que el fichero salía corrido doce bytes y la máquina saltaba a mitad de una
 instrucción; desde fuera parecía que la cinta no cargaba.
 
-**Lo que queda de esta máquina**: la pantalla de carga, que aquí tendría que
-entrar en la VRAM con `BLOAD"CAS:",S` y con el modo puesto antes; probar grabar
-y cargar partidas, que está escrito y no probado porque el emulador no graba
-cintas; y que dibujar cuesta aproximadamente vez y media lo que en el Spectrum
-—6,15 segundos contra 4,31 en la lámina más pesada—, repartido y sin un solo
-sitio donde apretar.
+**Y la pantalla de carga, puesta**, sin `BLOAD"CAS:",S` ni segunda orden que
+teclear: va en la cinta detrás del intérprete y la mete el intérprete mismo,
+directa al chip de vídeo según la lee, porque el chip lleva su propia
+dirección y la sube solo. Se ve mientras entra la base de datos, que son dos
+tercios de la cinta. Se le da el volcado de la memoria de vídeo, 14336 bytes,
+o el `.SC2` de cualquier programa de dibujo de MSX, que es lo mismo con siete
+bytes de cabecera delante.
+
+**Lo que queda de esta máquina**: probar grabar y cargar partidas, que está
+escrito y no probado porque el emulador no graba cintas; y que dibujar cuesta
+aproximadamente vez y media lo que en el Spectrum —6,15 segundos contra 4,31
+en la lámina más pesada—, repartido y sin un solo sitio donde apretar.
 
 ### Mirar las versiones de CPC, que es la lección para el PCW
 
