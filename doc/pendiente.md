@@ -65,7 +65,8 @@ PCW. En Z80 están el Spectrum y el Amstrad CPC, los dos enteros, el Spectrum de
 128K con la base de datos repartida en bancos, **el PCW entero** —arranca solo
 de un disco que se hace con `release`, dibuja láminas idénticas a las de la
 referencia, imprime, lee el teclado y guarda la partida en un fichero de
-verdad— y **el MSX1 entero**, que carga de cinta.
+verdad—, **el MSX1 entero**, que carga de cinta, y **el Spectrum Next**, que se
+entrega en un `.nex` que escribe el propio ensamblador.
 
 Y todos se entregan en el medio que les toca, con su cargador: cinta para el
 Spectrum de 48 y el de 128, disco y cinta para el Amstrad, disco para el +3,
@@ -257,6 +258,62 @@ sus sectores directamente, sin tocar directorio ni reserva de bloques, y aun
 así la partida es un fichero de verdad que se puede copiar con las
 herramientas de CP/M. El sistema de ficheros existe para la persona; el
 intérprete sólo toca sectores que ya le dijeron cuáles son.
+
+### Spectrum Next, en layer 2 y con la máquina llena
+
+Juega de principio a fin: dibuja, imprime, lee el teclado —que es el del
+Spectrum, así que es el mismo fichero—, entiende lo que se le teclea y graba y
+carga partidas. Se entrega en un `.nex` que escribe `sjasmplus`, con su
+pantalla de carga dentro, y se arranca como cualquier juego de Next.
+
+**Layer 2**: un byte por píxel, dieciséis colores que son los del Spectrum
+porque la paleta es nuestra, y ni un solo conflicto de atributos. Y es memoria
+normal que lee el vídeo, así que no hay copia de pantalla ni nada que enviar al
+acabar una lámina: se dibuja donde se ve, y `gfx_show` no hace nada.
+
+De ahí salen las dos cosas propias de esta máquina.
+
+**La ventana.** En 64K no caben la base de datos, el intérprete y los 48K de
+layer 2, así que layer 2 se ve de dieciséis en dieciséis en $C000 —la mitad de
+arriba de la lámina, la de abajo, o el texto— y qué trozo toca sale de la fila,
+así que nada por encima de la suma de direcciones se entera. Dentro de un trozo
+una línea son 256 bytes, con lo que un píxel es la fila en H y la columna en L:
+más barato que la pantalla del propio Spectrum. El reparto entero está en
+[`game.asm`](../z80/next/game.asm) y no sobra nada.
+
+**La máscara.** Con color por píxel la lámina ya no dice dónde para un relleno
+—en el Spectrum un píxel encendido es a la vez marca negra y pared—, así que al
+lado se lleva una máscara de un bit por píxel con exactamente lo que tendría la
+pantalla de un Spectrum. Va fila a fila, treinta y dos bytes por fila, y por eso
+el relleno que la recorre es el de aquella máquina sin tocar una línea.
+
+**Los colores pidieron un gancho.** El dispositivo de esta máquina resuelve una
+tinta de nueve —blanco o negro, el que se lea— contra el papel del momento, y
+una lámina de Megacorp cambia el papel después y espera la tinta que ya tenía.
+Así que el intérprete de láminas ofrece ahora `GFX_COLOURS` donde guarda un
+color, vacío en las máquinas que los asientan una vez por figura.
+
+**Comprobado contra la referencia**: cada primitiva por separado y las 31
+láminas de Megacorp enteras, píxel a píxel, leyendo layer 2 por la propia
+ventana de la máquina. La más lenta son 0,52 segundos a 28 MHz.
+
+**Las partidas** van por la ROM del 48K, como en el Spectrum, con dos vueltas
+de tuerca: la ROM no está en la máquina —los primeros 16K son la ventana de la
+base de datos, así que se trae y se devuelve— y el procesador no va a la
+velocidad en la que la ROM cuenta, así que baja a 3,5 MHz mientras dura y
+vuelve a 28. Los dos sentidos se miran por separado, como en el Amstrad y el
+MSX.
+
+De eso salió un detalle que conviene no olvidar: **la ROM quiere la máquina
+para la que se escribió**. Un Next que ha arrancado su sistema la tiene —que es
+como se arranca un `.nex`—, pero un TBBlue recién encendido en el emulador no:
+nada ha puesto las variables que las rutinas de cinta leen, y la última de
+ellas manda la máquina al BASIC en lugar de devolverla. La prueba usa
+`--tbblue-fast-boot-mode`, que es como el emulador da una máquina ya arrancada.
+
+**Lo que queda de esta máquina**: nada urgente. Guardar en fichero por el API
+de NextZXOS, si alguna vez se quiere en vez de la cinta; y el sonido, cuando
+haya.
 
 ### MSX1, con la máquina entera y una cinta
 

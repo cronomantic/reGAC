@@ -275,6 +275,38 @@ La prueba lo hace como lo haría su dueño: esos dos comandos y encender un PCW
 con el disco dentro. Arranca solo, lee lo suyo, dice lo que la aventura dice y
 contesta a lo que se teclea.
 
+## El Next, que lleva su medio dentro del ensamblador
+
+Como en el Spectrum, el medio lo escribe el propio ensamblador: `SAVENEX` deja
+un `.nex`, que es lo que carga un Next de verdad. Dentro van la pantalla de
+carga —si la hay—, el banco con el intérprete, el banco con lo residente de la
+base de datos y un banco por cada banco de ésta.
+
+El reparto de memoria es lo que manda, y está lleno:
+
+| dónde | qué |
+|---|---|
+| $0000 | la ventana de un banco de la base de datos, o la ROM del 48K mientras dura una grabación |
+| $5C00 | libre, que es donde la ROM guarda sus variables |
+| $5D00 | lo residente de la base de datos |
+| $8000 | el intérprete, sus buffers y su pila |
+| $A000 | la máscara con la que se rellena |
+| $C000 | los dieciséis kilobytes de layer 2 que toquen |
+
+Los bancos de la base de datos son de 16K, que aquí son dos páginas de las de
+8K, y se mapean con `NEXTREG $50` y `$51`; la tabla que dice qué página es cada
+banco está en [`paging.asm`](../z80/next/paging.asm) y la escribe el mismo
+fichero que mete los datos ahí, para que no haya dos listas.
+
+Una trampa que costó un rato: el fichero se ensambla con `-DSCREEN` cuando hay
+pantalla de carga, y más abajo hay una línea `SAVENEX SCREEN`. Un `DEFINE` es
+una sustitución de texto, así que el ensamblador ponía el valor de `SCREEN`
+—nada— en medio de esa línea y luego no sabía qué era. Se guarda como otro
+nombre y se deshace el primero.
+
+    python -m regac build partida.json game.rgac -m next -b 16k            --defs banks.inc
+    python -m regac make megacorp.toml -t next
+
 ## El MSX, que carga de cinta y no cabe en lo que BASIC alcanza
 
 El intérprete corre con RAM en las cuatro páginas —la BIOS fuera— porque un

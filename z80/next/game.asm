@@ -1,0 +1,229 @@
+; MIT License, Copyright (c) 2025 Cronomantic
+;
+; The Spectrum Next interpreter: everything put together and playing.
+;
+; The map is the whole of what is this machine's own, and it is full:
+;
+;   $0000  the window a bank of the database appears in -- or the 48K ROM,
+;          for as long as a save takes
+;   $5C00  left free, because that is where the ROM keeps its variables and
+;          the ROM is borrowed to save a game
+;   $5D00  what is resident of the database
+;   $8000  this, its buffers and its stack
+;   $A000  the mask a fill walks, four kilobytes on its own boundary
+;   $C000  whichever sixteen kilobytes of layer 2 are wanted: the top half of
+;          the picture, the bottom half, or the text
+;
+; Nothing of the machine is left over.  That is why layer 2 is seen a piece at
+; a time rather than all at once: the database, the interpreter and forty
+; eight kilobytes of screen do not fit in sixty four together.
+;
+; regac build writes banks.inc, which says how much of the file is resident
+; and how many banks follow it:
+;
+;   python -m regac build partida.json game.rgac -m next -b 16k \
+;          --defs banks.inc
+
+                DEFINE  BANKED
+                DEVICE  ZXSPECTRUMNEXT
+
+                include "banks.inc"
+
+; A build with a loading screen is told so with -DSCREEN, as on the Spectrum.
+; The word is taken away again at once, and kept as another one: further down
+; there is a `SAVENEX SCREEN` line, and a define is a substitution, so the
+; assembler would put the value of SCREEN -- nothing at all -- in the middle
+; of it and then not know what the line was.
+                IFDEF SCREEN
+                DEFINE  WITH_SCREEN
+                UNDEFINE SCREEN
+                ENDIF
+
+STACK_AT        equ $BF00
+DB_FIRST_PAGE   equ 32                  ; the 8K pages the banks are put in,
+                                        ; clear of the ones a Spectrum has and
+                                        ; of layer 2's own
+database        equ $5D00
+
+; A bank of the database is sixteen kilobytes, which is two of this machine's
+; pages; they are mapped into the two slots the window is made of.
+DB_PAGE_0       equ DB_FIRST_PAGE
+DB_PAGE_1       equ DB_FIRST_PAGE + 2
+DB_PAGE_2       equ DB_FIRST_PAGE + 4
+DB_PAGE_3       equ DB_FIRST_PAGE + 6
+DB_PAGE_4       equ DB_FIRST_PAGE + 8
+DB_PAGE_5       equ DB_FIRST_PAGE + 10
+
+; The banks themselves, each written across the two pages it is made of.
+                IF DB_BANK_COUNT > 0
+                SLOT    0
+                PAGE    DB_PAGE_0
+                SLOT    1
+                PAGE    DB_PAGE_0 + 1
+                SLOT    0
+                ORG     $0000
+                INCBIN  "game.rgac", DB_RESIDENT_SIZE, DB_BANK_BYTES
+                ENDIF
+                IF DB_BANK_COUNT > 1
+                SLOT    0
+                PAGE    DB_PAGE_1
+                SLOT    1
+                PAGE    DB_PAGE_1 + 1
+                SLOT    0
+                ORG     $0000
+                INCBIN  "game.rgac", DB_RESIDENT_SIZE + DB_BANK_BYTES, DB_BANK_BYTES
+                ENDIF
+                IF DB_BANK_COUNT > 2
+                SLOT    0
+                PAGE    DB_PAGE_2
+                SLOT    1
+                PAGE    DB_PAGE_2 + 1
+                SLOT    0
+                ORG     $0000
+                INCBIN  "game.rgac", DB_RESIDENT_SIZE + 2 * DB_BANK_BYTES, DB_BANK_BYTES
+                ENDIF
+                IF DB_BANK_COUNT > 3
+                SLOT    0
+                PAGE    DB_PAGE_3
+                SLOT    1
+                PAGE    DB_PAGE_3 + 1
+                SLOT    0
+                ORG     $0000
+                INCBIN  "game.rgac", DB_RESIDENT_SIZE + 3 * DB_BANK_BYTES, DB_BANK_BYTES
+                ENDIF
+                IF DB_BANK_COUNT > 4
+                SLOT    0
+                PAGE    DB_PAGE_4
+                SLOT    1
+                PAGE    DB_PAGE_4 + 1
+                SLOT    0
+                ORG     $0000
+                INCBIN  "game.rgac", DB_RESIDENT_SIZE + 4 * DB_BANK_BYTES, DB_BANK_BYTES
+                ENDIF
+                IF DB_BANK_COUNT > 5
+                SLOT    0
+                PAGE    DB_PAGE_5
+                SLOT    1
+                PAGE    DB_PAGE_5 + 1
+                SLOT    0
+                ORG     $0000
+                INCBIN  "game.rgac", DB_RESIDENT_SIZE + 5 * DB_BANK_BYTES, DB_BANK_BYTES
+                ENDIF
+
+; What is resident goes in the page that is always at $4000, next to the mask.
+                SLOT    2
+                PAGE    10
+                ORG     database
+db_resident_image:
+                INCBIN  "game.rgac", 0, DB_RESIDENT_SIZE
+                ASSERT  $ <= $8000      ; or it would run into the interpreter
+
+                SLOT    4
+                PAGE    4
+                ORG     $8000
+start:
+                di
+                ld      sp, STACK_AT
+                nextreg REG_TURBO, TURBO_28     ; the speed this machine has
+                xor     a
+                out     ($FE), a
+                call    db_init
+                call    config_init
+                call    text_init
+                call    screen_init
+                call    picture_init
+                call    vm_init
+                call    vocab_init
+                call    loop_init
+                ; the player starts where the adventure says
+                ld      a, SECTION_CONFIG
+                call    db_section
+                ld      e, (hl)
+                inc     hl
+                ld      d, (hl)
+                ld      (vm_location), de
+                ld      a, 1
+                ld      (vm_new_room), a
+                call    play
+                ld      a, $FF
+                ld      (done_flag), a
+.stop:
+                jr      .stop
+
+done_flag:      db      0
+
+                include "paging.asm"
+                include "../common/database.asm"
+                include "../common/config.asm"
+                include "../common/unpack.asm"
+                include "screen.asm"
+                include "../common/textout.asm"
+                include "../spectrum/keyboard.asm"
+                include "tape.asm"
+                include "draw.asm"
+                include "../common/shapes.asm"
+                include "fill.asm"
+                include "../common/conditions.asm"
+                include "../common/opcodes.asm"
+                include "../common/parser.asm"
+                include "../common/loop.asm"
+                include "../common/picture.asm"
+
+last:
+                ASSERT  last < STACK_AT         ; or the stack would land in it
+
+; A loading screen, if the build says there is one.  It is put where layer 2
+; keeps its own memory and the file carries it in front of everything else, so
+; the machine's own loader has it up before a byte of the adventure is in.
+                IFDEF WITH_SCREEN
+                SLOT    0
+                PAGE    L2_FIRST_PAGE
+                SLOT    1
+                PAGE    L2_FIRST_PAGE + 1
+                SLOT    2
+                PAGE    L2_FIRST_PAGE + 2
+                SLOT    3
+                PAGE    L2_FIRST_PAGE + 3
+                SLOT    0
+                ORG     $0000
+                INCBIN  "screen.bin", 0, 4 * $2000
+                SLOT    0
+                PAGE    L2_FIRST_PAGE + 4
+                SLOT    1
+                PAGE    L2_FIRST_PAGE + 5
+                SLOT    0
+                ORG     $0000
+                INCBIN  "screen.bin", 4 * $2000
+                ENDIF
+
+                SAVENEX OPEN "game.nex", start, STACK_AT
+                SAVENEX CORE 3, 0, 0
+                IFDEF WITH_SCREEN
+                SAVENEX CFG  0                  ; black border while it loads
+                SAVENEX SCREEN L2
+                ELSE
+                SAVENEX CFG  0
+                ENDIF
+                ; The banks are named rather than gathered, so that layer 2's
+                ; own three do not travel twice over: the loading screen is in
+                ; the file already, in front.
+                SAVENEX BANK 5, 2
+                IF DB_BANK_COUNT > 0
+                SAVENEX BANK DB_PAGE_0 / 2
+                ENDIF
+                IF DB_BANK_COUNT > 1
+                SAVENEX BANK DB_PAGE_1 / 2
+                ENDIF
+                IF DB_BANK_COUNT > 2
+                SAVENEX BANK DB_PAGE_2 / 2
+                ENDIF
+                IF DB_BANK_COUNT > 3
+                SAVENEX BANK DB_PAGE_3 / 2
+                ENDIF
+                IF DB_BANK_COUNT > 4
+                SAVENEX BANK DB_PAGE_4 / 2
+                ENDIF
+                IF DB_BANK_COUNT > 5
+                SAVENEX BANK DB_PAGE_5 / 2
+                ENDIF
+                SAVENEX CLOSE

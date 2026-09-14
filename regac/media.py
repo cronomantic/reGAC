@@ -332,6 +332,14 @@ def cpc_tape(code, name=NAME, load=CODE_AT, entry=CODE_AT, screen=None):
     return tape(files)
 
 
+# -- the Spectrum Next, whose medium the assembler writes itself --------------
+
+# A .nex file carries its own loading screen, so there is nothing here for the
+# Next but the size of one: layer 2 at 256 by 192, a byte to a pixel, which is
+# what the machine shows and what a dump of it is.
+NEXT_SCREEN_BYTES = 256 * 192
+
+
 # -- the MSX, whose tape is a file of blocks and nothing else -----------------
 
 # A block on an MSX cassette is this marker and then its bytes, and a marker

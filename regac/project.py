@@ -54,7 +54,7 @@ try:
 except ImportError:                     # pragma: no cover - Python below 3.11
     tomllib = None
 
-from .media import MSX_SCREEN_BYTES, msx_screen
+from .media import MSX_SCREEN_BYTES, NEXT_SCREEN_BYTES, msx_screen
 
 
 class ProjectError(Exception):
@@ -94,6 +94,7 @@ SPECTRUM = os.path.join("z80", "spectrum")
 CPC = os.path.join("z80", "cpc")
 PCW = os.path.join("z80", "pcw")
 MSX = os.path.join("z80", "msx")
+NEXT = os.path.join("z80", "next")
 
 # What each machine needs.  A tape is written by the assembler itself, because
 # on a Spectrum the medium is blocks of the very thing being assembled; a disk
@@ -120,6 +121,11 @@ TARGETS = {
         machine="cpc", folder=CPC, source="game.asm", database="game.rgac",
         release="cpc", binary="game.bin",
         screen_bytes=0x4000,
+    ),
+    "next": Target(
+        machine="next", folder=NEXT, source="game.asm", database="game.rgac",
+        banks="16k", defs="banks.inc", media=("game.nex",),
+        screen_bytes=NEXT_SCREEN_BYTES, screen_when="assembly",
     ),
     "msx": Target(
         machine="msx", folder=MSX, source="game.asm", database="game.rgac",

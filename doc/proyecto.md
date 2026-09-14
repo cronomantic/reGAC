@@ -38,7 +38,7 @@ instalar nada:
     scale  = [2, 1]
 
 Las rutas se cuentan desde el propio fichero de proyecto. Las máquinas se
-llaman `spectrum48`, `spectrum128`, `plus3`, `cpc`, `msx` y `pcw`.
+llaman `spectrum48`, `spectrum128`, `plus3`, `cpc`, `msx`, `next` y `pcw`.
 
 ## Las perillas
 

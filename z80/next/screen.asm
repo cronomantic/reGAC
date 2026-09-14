@@ -64,6 +64,15 @@ START_PAPER     equ 7                   ; what a picture starts on
 ; because everything shown afterwards is one of them.
 ; Corrupts: AF, BC, DE, HL
 screen_init:
+                ; Which sixteen kilobyte bank layer 2 starts at is a register
+                ; like any other, and what is in it depends on who loaded us:
+                ; a .nex with a loading screen in it does not leave the same
+                ; value as a bare one.  So it is said rather than assumed --
+                ; the pages this file maps and the ones the video reads have to
+                ; be the same pages, and a picture drawn into the wrong ones is
+                ; invisible and looks like a picture that was never drawn.
+                ld      a, L2_FIRST_PAGE / 2
+                nextreg REG_L2_BANK, a
                 ld      bc, L2_PORT
                 ld      a, %00000010            ; layer 2 shown
                 out     (c), a

@@ -205,6 +205,13 @@ class Session:
 
     MAPPED = -1  # what the processor itself would see
 
+    # Where the Next's own page zero begins inside that zone.  The emulator
+    # keeps a quarter of a megabyte of its own in front of it, so page p of
+    # the machine is at (p + 32) * 8192 and not at p * 8192; layer 2, which is
+    # pages sixteen to twenty one, is therefore at 48 * 8192.  Measured by
+    # writing through a mapped window and looking for it.
+    NEXT_PAGE_0 = 32 * 8192
+
     def read(self, address, length, zone=None):
         # A zone is set for this read and put back afterwards.  Leaving it set
         # is a trap: everything else, the flag a test waits on included, would
