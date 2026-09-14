@@ -15,12 +15,16 @@
 ; nine bytes of command, the data, and seven bytes of answer.
 ;
 ; What to read and where to put it is a table the builder writes into the end
-; of this same sector: which track and record the pieces start at, and then,
-; for each piece, where it goes, how many sectors it is, and which of the
-; machine's banks to put in the window first.  The pieces lie one after
-; another on the disc, so reading is simply going on to the next record and,
-; when a track runs out, to the next track.  A piece that goes nowhere ends
-; the table, and then the first piece is jumped into.
+; of this same sector: which track and record the pieces start at, where to
+; jump when they are all in, and then, for each piece, where it goes, how many
+; sectors it is, and which of the machine's banks to put in the window first.
+; The pieces lie one after another on the disc, so reading is simply going on
+; to the next record and, when a track runs out, to the next track.  A piece
+; that goes nowhere ends the table.
+;
+; The last four bytes of the table are not read here at all: they are where
+; the saved game lives, and they are for the interpreter, which finds this
+; sector still sitting at $F000 because nothing is ever loaded over it.
 
                 DEVICE  NOSLOT64K
 
@@ -77,7 +81,7 @@ boot:
                 ld      a, b
                 or      a
                 call    nz, seek        ; which may not be where the head is
-                ld      de, 2
+                ld      de, 4           ; past the track and the entry point
                 add     ix, de
 .each_piece:
                 ld      l, (ix+0)
@@ -102,7 +106,7 @@ boot:
 .run:
                 ld      a, MOTOR_OFF
                 out     (SYSTEM), a
-                ld      hl, (TABLE_AT + 2)      ; the first piece is the one to run
+                ld      hl, (TABLE_AT + 2)      ; where the builder says to go
                 jp      (hl)
 
 ; One sector into HL, from track B and record C, moving both on afterwards.

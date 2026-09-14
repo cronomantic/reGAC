@@ -245,19 +245,33 @@ def banks_of(image):
 # -- the PCW, which starts itself and has nothing to ask ----------------------
 
 PCW_TABLE_AT = 0x1C0            # where boot.asm keeps its table, in its sector
+PCW_TABLE_BYTES = 64            # to the end of the sector, and no further
+PCW_SAVE_ENTRY = 60             # the last four of them: the saved game
 PCW_NO_BANK = 0xFF              # a piece that goes where the map already is
 PCW_SECTOR = 512
 PCW_PAYLOAD = "GAME"
+PCW_SAVE = "GAME.SAV"
+PCW_SAVE_SECTORS = 4            # what a game amounts to, rounded up
+
+PCW_CODE_AT = 0x0100            # where the interpreter is put
+PCW_WINDOW = 0x4000             # and the window the database is paged through
+PCW_DB_BANK = 5                 # whose first bank goes here: see game.asm
 
 
-def pcw_disk(boot, pieces):
+def pcw_disk(boot, pieces, entry=PCW_CODE_AT, save=PCW_SAVE_SECTORS):
     """A disk a PCW starts by itself.
 
     `pieces` are what to load, in the order they lie on the disk: where each
     goes, what it is, and which of the machine's banks to put in the window
     first.  They travel as one file, so that the disk still has a filesystem
     on it that a person can read, and the loader is told where that file
-    begins and reads on from there.  The first piece is the one that is run.
+    begins and reads on from there.  `entry` is where to jump when they are
+    all in.
+
+    The saved game is a second file, made here, of the right size and empty.
+    Where it starts goes in the table too, and the interpreter reads it from
+    there: it writes those sectors itself, without touching the directory,
+    and the result is still a file CP/M's own tools can copy about.
     """
     disk = Disk("pcw")
     payload, table = bytearray(), bytearray()
@@ -267,9 +281,25 @@ def pcw_disk(boot, pieces):
         payload += padded
     table += bytes(4)                           # and nowhere, to end it
     disk.add(PCW_PAYLOAD, bytes(payload))
-    track, record = disk.where(PCW_PAYLOAD)
-    disk.boot(boot, bytes([track, record]) + bytes(table), PCW_TABLE_AT)
+    header = bytes(disk.where(PCW_PAYLOAD)) + struct.pack("<H", entry)
+    table = header + bytes(table)
+    if len(table) > PCW_SAVE_ENTRY:
+        raise ValueError("too many pieces to fit in the boot sector's table")
+    table = table.ljust(PCW_SAVE_ENTRY, b"\0")
+    if save:
+        disk.add(PCW_SAVE, bytes(save * PCW_SECTOR))
+        table += bytes(disk.where(PCW_SAVE)) + bytes([save, 0])
+    disk.boot(boot, table.ljust(PCW_TABLE_BYTES, b"\0"), PCW_TABLE_AT)
     return disk.image()
+
+
+def pcw_release(boot, code, banks, screen=None):
+    """The whole of an adventure on one PCW disk: the interpreter, the banks
+    its database is split into, and the saved game waiting to be written."""
+    pieces = [(PCW_CODE_AT, bytes(code), PCW_NO_BANK)]
+    pieces += [(PCW_WINDOW, bytes(bank), PCW_DB_BANK + n)
+               for n, bank in enumerate(banks)]
+    return pcw_disk(boot, pieces)
 
 
 def cpc_tape(code, name=NAME, load=CODE_AT, entry=CODE_AT, screen=None):

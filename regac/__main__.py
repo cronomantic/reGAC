@@ -28,7 +28,8 @@ import sys
 from .binary import MACHINES, SECTION_NAMES, Database, Reader
 from .devices import DEVICES, device_for, make
 from .gfx import Renderer
-from .media import banks_of, cpc_disk, cpc_tape, plus3_banked_disk, plus3_disk
+from .media import (banks_of, cpc_disk, cpc_tape, pcw_release,
+                    plus3_banked_disk, plus3_disk)
 from .png import save_picture
 from .srcgen import generate
 from .text import TextStore
@@ -166,7 +167,7 @@ BANK_SIZES = {"none": 0, "8k": 13, "16k": 14}
 
 # Where each machine's interpreter is built to sit, which is where its medium
 # has to put it.
-LOADS_AT = {"cpc": 0x4000, "plus3": 0x8000}
+LOADS_AT = {"cpc": 0x4000, "plus3": 0x8000, "pcw": 0x0100}
 
 # And how big a dump of each machine's screen is, which is what a loading
 # screen has to be.
@@ -231,7 +232,21 @@ def cmd_release(args):
             sys.exit(f"ERROR: a {args.machine} screen is {wanted} bytes and "
                      f"{args.screen} is {len(screen)}")
     written = []
-    if args.machine == "cpc":
+    if args.machine == "pcw":
+        # A machine that starts itself: no operating system, no loader in
+        # BASIC, just the sector it boots from and the pieces behind it.
+        if not (args.boot and args.database):
+            sys.exit("ERROR: a pcw release wants --boot and --database")
+        with open(args.boot, "rb") as f:
+            starter = f.read()
+        with open(args.database, "rb") as f:
+            banks = banks_of(f.read())
+        path = os.path.join(args.output, name.lower() + ".dsk")
+        with open(path, "wb") as f:
+            f.write(pcw_release(starter, code, banks))
+        written.append(path)
+        how = f"nothing: the machine starts it, with {len(banks)} banks behind it"
+    elif args.machine == "cpc":
         for suffix, make in ((".dsk", cpc_disk), (".cdt", cpc_tape)):
             path = os.path.join(args.output, name.lower() + suffix)
             with open(path, "wb") as f:
