@@ -66,9 +66,10 @@ con la base de datos repartida en bancos.
 
 Y los tres se entregan en el medio que les toca, con su cargador: cinta para el
 Spectrum de 48 y el de 128, disco y cinta para el Amstrad, y disco para el +3.
-Cómo está hecho cada uno está en `binario.md`. Lo que falta por ese lado es el
-+3 con bancos, que necesita un cargador en código máquina en vez del BASIC, y
-el PCW, que primero necesita intérprete.
+El +3 los lleva además con la base de datos repartida en bancos, con un
+cargador en código máquina que se los pide a +3DOS. Cómo está hecho cada uno
+está en `binario.md`. Lo que falta por ese lado es el PCW, que primero necesita
+intérprete.
 
 ### Los bancos, que ya se usan
 

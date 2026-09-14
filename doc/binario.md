@@ -207,14 +207,29 @@ número tecleado, que son cinco bytes que se pueden escribir mal para nada.
 
     python -m regac release z80/spectrum/game.bin salida/ -m plus3
 
-Lo que va a ese disco, de momento, es la versión sin bancos, la misma que carga
-la cinta de 48. La de 128 repartida en bancos pide que el cargador pagine antes
-de leer cada bloque, y eso el BASIC no lo puede hacer: hace falta un cargador
-en código máquina que use las llamadas de +3DOS, como el de la cinta usa las de
-la ROM.
+Y también con la base de datos repartida en bancos, que es donde se pone
+interesante, porque paginar no es cosa que el BASIC pueda hacer. Ahí el
+programa que corre el menú lleva dentro un cargador en código máquina
+—[`loader3.asm`](../z80/spectrum/loader3.asm)— que abre un fichero sin
+cabecera y lo va leyendo a trozos con `DOS READ`, diciéndole a +3DOS en qué
+página va cada uno: **+3DOS pagina solo**, así que el cargador no toca el
+puerto ni una vez. La tabla de bloques es exactamente la misma que lee el
+cargador de cinta, en `blocks.asm`.
 
-La prueba lo arranca como lo arrancaría su dueño: enter en el menú, y a esperar
-a que la aventura describa dónde está el jugador.
+Antes de nada hay que pedirle a +3DOS que suelte lo suyo. De las ocho páginas
+se queda la siete para él y retiene las impares para su disco en RAM y su
+caché; `DOS SET 1346` es como se le dice que conserve la caché y devuelva el
+resto. Lo que queda libre es la cero, la uno, la tres y la cuatro, que son las
+cuatro que reparte esta construcción, y hay un `ASSERT` que para el ensamblado
+si una aventura pide más.
+
+    python -m regac build partida.json game3.rgac -m spectrum128 -b 16k            --defs banks3.inc
+    python -m regac release z80/spectrum/game3_code.bin salida/ -m plus3            --boot z80/spectrum/game3_boot.bin --database z80/spectrum/game3.rgac
+
+Las pruebas lo arrancan como lo arrancaría su dueño: enter en el menú y a
+esperar. La del disco con bancos usa una aventura engordada hasta necesitar
+dos, y compara la lámina de la pantalla byte a byte contra la referencia, que
+sólo cuadra si cada banco acabó en su página.
 
 ## La música con AY, que es lo que condiciona el diseño
 

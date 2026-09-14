@@ -17,6 +17,7 @@ statements to encode, so the table below is three tokens long.
 import struct
 
 from .cdt import BASIC, BINARY, File, tape
+from .binary import Reader
 from .dsk import Disk
 
 # The three words the loader is made of, as Locomotive BASIC keeps them, plus
@@ -161,6 +162,37 @@ def plus3_disk(code, load=PLUS3_CODE_AT):
     disk.add(PLUS3_LOADER, plus3_file(FILE_BASIC, basic, 10, len(basic)))
     disk.add(PLUS3_GAME, plus3_file(FILE_CODE, code, load, 0x8000))
     return disk.image()
+
+
+def plus3_banked_disk(boot, code, banks):
+    """A +3 disk for an adventure whose database lives in banks.
+
+    The loader is not BASIC any more -- BASIC cannot page -- so what goes in
+    the file the menu runs is the one in loader3.asm, already assembled, with
+    its BASIC around it.  The rest is one file with no header: the
+    interpreter, and then each bank end to end in the order the loader asks
+    for them.
+    """
+    disk = Disk("plus3")
+    disk.add(PLUS3_LOADER, plus3_file(FILE_BASIC, boot, 10, len(boot)))
+    disk.add(PLUS3_GAME, bytes(code) + b"".join(bytes(b) for b in banks))
+    return disk.image()
+
+
+def banks_of(image):
+    """The banked part of a built database, bank by bank and without the
+    padding that makes them all the same size."""
+    reader = Reader(image)
+    if not reader.bank_count:
+        return []
+    page = 1 << reader.page_bits
+    used = [0] * reader.bank_count
+    for bank, offset, size in reader.directory:
+        if bank != 0xFF:
+            used[bank] = max(used[bank], offset + size)
+    at = reader.resident_size
+    return [image[at + n * page:at + n * page + used[n]]
+            for n in range(reader.bank_count)]
 
 
 def cpc_tape(code, name=NAME, load=CODE_AT, entry=CODE_AT):

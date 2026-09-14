@@ -30,7 +30,7 @@ import sys
 from .binary import MACHINES, SECTION_NAMES, Database, Reader
 from .devices import DEVICES, device_for, make
 from .gfx import Renderer
-from .media import cpc_disk, cpc_tape, plus3_disk
+from .media import banks_of, cpc_disk, cpc_tape, plus3_banked_disk, plus3_disk
 from .png import save_picture
 from .srcgen import generate
 from .text import TextStore
@@ -231,9 +231,20 @@ def cmd_release(args):
     else:
         path = os.path.join(args.output, name.lower() + ".dsk")
         with open(path, "wb") as f:
-            f.write(plus3_disk(code, load))
+            if args.boot:
+                # A banked one: the loader is machine code, because paging is
+                # not something BASIC can do, and the database follows the
+                # interpreter in one file.
+                with open(args.boot, "rb") as boot:
+                    starter = boot.read()
+                with open(args.database, "rb") as database:
+                    banks = banks_of(database.read())
+                f.write(plus3_banked_disk(starter, code, banks))
+                how = f"the Loader entry of its menu, and {len(banks)} banks"
+            else:
+                f.write(plus3_disk(code, load))
+                how = "the Loader entry of the machine's own menu"
         written.append(path)
-        how = "the Loader entry of the machine's own menu"
     print(f"{args.input} -> " + ", ".join(written))
     print(f"  loads at    ${load:04X}, {len(code)} bytes")
     print(f"  starts with {how}")
@@ -313,6 +324,8 @@ def main():
                    help="where the binary loads, if not where that machine has it")
     p.add_argument("--entry", type=lambda n: int(n, 0), default=None,
                    help="where it starts, if not where it loads")
+    p.add_argument("--boot", help="the assembled loader, for a +3 with banks")
+    p.add_argument("--database", help="the built database the banks come from")
     p.set_defaults(func=cmd_release)
 
     p = sub.add_parser("text", help="report what the text costs once packed")

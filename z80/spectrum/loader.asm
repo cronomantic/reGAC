@@ -16,15 +16,10 @@
 ; The table is built here from what the build said, so a 48 has one block and
 ; a 128 has one plus a page each for the banks.
 
-BASIC_START     equ 23755               ; where a BASIC program begins
+                include "basic.asm"
+
 DATA_BLOCK      equ $FF                 ; ROM_LD_BYTES is in tape.asm, which
                                         ; is where the ROM's tape calls live
-TOKEN_REM       equ 234
-TOKEN_CLEAR     equ 253
-TOKEN_RANDOMIZE equ 249
-TOKEN_USR       equ 192
-NUMBER_MARK     equ 14                  ; what hides a number after its digits
-ENTER           equ 13
 
                 ORG     BASIC_START
 basic:
@@ -86,46 +81,7 @@ loader_page:
                 ret
                 ENDIF
 
-; Where each block goes, how long it is, and on a 128 which page.  A block
-; that goes nowhere ends it.
-load_table:
-                dw      start
-                dw      last - start
-                IFDEF BANKED
-                db      2               ; the interpreter's own page, always in
-                IF DB_BANK_COUNT > 0
-                dw      DB_WINDOW
-                dw      DB_BANK_USED_0
-                db      DB_PAGE_0
-                ENDIF
-                IF DB_BANK_COUNT > 1
-                dw      DB_WINDOW
-                dw      DB_BANK_USED_1
-                db      DB_PAGE_1
-                ENDIF
-                IF DB_BANK_COUNT > 2
-                dw      DB_WINDOW
-                dw      DB_BANK_USED_2
-                db      DB_PAGE_2
-                ENDIF
-                IF DB_BANK_COUNT > 3
-                dw      DB_WINDOW
-                dw      DB_BANK_USED_3
-                db      DB_PAGE_3
-                ENDIF
-                IF DB_BANK_COUNT > 4
-                dw      DB_WINDOW
-                dw      DB_BANK_USED_4
-                db      DB_PAGE_4
-                ENDIF
-                IF DB_BANK_COUNT > 5
-                dw      DB_WINDOW
-                dw      DB_BANK_USED_5
-                db      DB_PAGE_5
-                ENDIF
-                ENDIF
-                dw      0
-                db      ENTER
+                include "blocks.asm"
 line0_end:
 
 ; Line 10: clear below the interpreter and call the loader.  The numbers are
