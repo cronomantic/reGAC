@@ -171,9 +171,54 @@ condiciona el reparto de bancos no aplica aquí. La sección de música del
 formato seguirá estando, vacía, y este destino no necesitará ni buffer
 residente ni ranura propia.
 
-**Por confirmar antes de escribir nada**: la disposición exacta de la memoria
-de pantalla, que no es lineal ni como la del Spectrum, y cómo se lee el
-teclado.
+**La pantalla, ya medida.** No es un mapa de bits fijo: hay una *roller RAM* de
+256 entradas, una por línea de barrido, y la máquina dibuja la línea que cada
+entrada diga. Los puertos, comprobados en el emulador uno a uno:
+
+| puerto | qué hace |
+|---|---|
+| $F0-$F3 | qué banco de 16K se ve en cada una de las cuatro ranuras |
+| $F4 | el candado; a cero se pueden remapear |
+| $F5 | dónde está la roller RAM: banco = valor>>5, desplazamiento = (valor&31)×512 |
+| $F6 | por qué línea de la tabla empieza a pintar |
+| $F7 | bit 6 enciende la pantalla, bit 7 la invierte |
+
+Cada entrada son dos bytes con la forma `bbb xxxxxxxxxxx yyy`: tres bits de
+banco, once de bloque de dieciséis bytes y tres de línea dentro del bloque. Y
+lo que hace que todo encaje: **una línea son 720 bytes y no 90**, porque el
+vídeo lee de ocho en ocho — los ocho píxeles de la columna `c` están en
+`base + 8c`. Está en la documentación de John Elliott y en la de Zigazou, y
+además se ha leído la tabla que monta el propio CP/M del PCW: dentro de una
+fila de caracteres las entradas suben de una en una (las ocho líneas de la
+fila) y al cambiar de fila suben 360, que son 45 bloques de 16 bytes, o sea
+720 bytes: una fila de 90 celdas.
+
+Con eso la dirección de un punto sale tan barata como en el Spectrum:
+
+    dirección = base + fila*720 + 8*(x>>3) + (y&7)
+
+**El tamaño: doblado en horizontal.** El píxel del PCW es 2,1 veces más alto
+que ancho (720 por 256 en un cristal de cuatro tercios; el propio emulador lo
+pinta 1 por 2). Una lámina de 256×128 puesta píxel a píxel sale casi cuadrada
+y ocupa un tercio del ancho: eso *rompe* la proporción. Doblando sólo en
+horizontal quedan 512×128, que es la proporción de 2:1 que tiene en el
+Spectrum, y sobran 128 líneas para el texto, dieciséis filas. Se dobla al
+poner el punto, dos píxeles por punto, no volviendo a trazar al doble, que es
+la regla que costó aprender en el Amstrad. Y va con perilla: escala por eje en
+el fichero de proyecto, que es lo que el intérprete de CPC ya traía.
+
+**El color, a tramas por luminancia.** Un bit por píxel: líneas y puntos
+sólidos, rellenos tramados según el brillo del color que pida la lámina. El
+mecanismo es el que ya usa `SHADE` en el Spectrum.
+
+**Una advertencia sobre el banco de pruebas**: el emulador no vuelca la
+pantalla del PCW. Sale negra siempre, incluso arrancando su propio CP/M y
+habiendo escrito a mano en la memoria que la tabla señala. Así que aquí la
+comprobación no será por imagen sino leyendo la memoria de pantalla y
+comparándola contra el renderizador de referencia, que es justo lo que ya
+hacen las pruebas de láminas del Spectrum y del Amstrad.
+
+**Lo que queda por medir**: el teclado.
 
 ### Mirar las versiones de CPC, que es la lección para el PCW
 
