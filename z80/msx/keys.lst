@@ -22,20 +22,20 @@
  21   8000 F3                           di
  22   8001 31 00 EF                     ld      sp, STACK_AT
  23   8004 CD 64 80                     call    take_the_machine
- 24   8007 CD 85 86                     call    keyboard_init
+ 24   8007 CD 89 86                     call    keyboard_init
  25   800A CD 84 80                     call    db_init
  26   800D CD DA 80                     call    config_init
  27   8010 CD BD 81                     call    text_init
- 28   8013 CD 91 83                     call    screen_init
+ 28   8013 CD A4 83                     call    screen_init
  29   8016 3E 01                        ld      a, 1
  30   8018 32 5E 80                     ld      (ready_flag), a
  31   801B AF                           xor     a
  32   801C 32 62 80                     ld      (was_clear), a
  33   801F              .look:
  34   801F 3E 02                        ld      a, 2                    ; the row A and B sit on
- 35   8021 CD 8D 86                     call    read_row
+ 35   8021 CD 91 86                     call    read_row
  36   8024 32 60 80                     ld      (raw_row), a
- 37   8027 CD 9B 86                     call    scan_keyboard
+ 37   8027 CD 9F 86                     call    scan_keyboard
  38   802A 32 61 80                     ld      (scan_result), a
  39   802D B7                           or      a
  40   802E 28 13                        jr      z, .nothing
@@ -57,7 +57,7 @@
  56   804A              ; it: this is the path the runtime really uses, rubbing out and all.
  57   804A              read_a_line:
  58   804A 31 00 EF                     ld      sp, STACK_AT
- 59   804D CD 1F 87                     call    read_line
+ 59   804D CD 23 87                     call    read_line
  60   8050 ED 43 5C 80                  ld      (line_seen), bc
  61   8054 3E FF                        ld      a, $FF
  62   8056 32 5B 80                     ld      (line_done), a
@@ -92,7 +92,7 @@
  91   8073 E6 F0                        and     %11110000
  92   8075 B1                           or      c
  93   8076 D3 A8                        out     (PPI_SLOTS), a
- 94   8078 21 23 88                     ld      hl, db_source
+ 94   8078 21 27 88                     ld      hl, db_source
  95   807B 11 00 00                     ld      de, database
  96   807E 01 AD 4E                     ld      bc, db_length
  97   8081 ED B0                        ldir
@@ -545,727 +545,736 @@
  38+  8389              VRAM_NAMES      equ $1800
  39+  8389              VRAM_COLOURS    equ $2000
  40+  8389              VRAM_COLOUR_ROW equ (VRAM_COLOURS - VRAM_PATTERNS) >> 8         ; rows apart
- 41+  8389              ROW_BYTES       equ 256                 ; one character row of either table
- 42+  8389
- 43+  8389              SCREEN_COLS     equ 32
- 44+  8389              TEXT_TOP        equ 16                  ; the first row the text may use
- 45+  8389              TEXT_ROWS       equ 24 - TEXT_TOP
- 46+  8389              PICTURE_ROWS    equ TEXT_TOP * 8        ; the picture, in pixel lines
- 47+  8389              PICTURE_BYTES   equ TEXT_TOP * ROW_BYTES
- 48+  8389
- 49+  8389              ; And the copy we draw into: four kilobytes of patterns and four of colours,
- 50+  8389              ; row by row, on a four kilobyte boundary so that the eight rows of a page are
- 51+  8389              ; the high byte of an address and nothing else.
- 52+  8389              SHADOW          equ $C000
- 53+  8389              SHADOW_COLOURS  equ SHADOW + $1000
- 54+  8389
- 55+  8389              ; Colours, as this machine numbers them.  A picture asks in the Spectrum's
- 56+  8389              ; sixteen and gets the nearest of the fifteen here; the table that does the
- 57+  8389              ; matching is in draw.asm and comes from the reference renderer, so that both
- 58+  8389              ; ends of the comparison agree.
- 59+  8389              MSX_BLACK       equ 1
- 60+  8389              MSX_WHITE       equ 14
- 61+  8389              TEXT_COLOUR     equ (MSX_WHITE << 4) | MSX_BLACK
- 62+  8389
- 63+  8389              ; The eight registers screen 2 wants.
- 64+  8389 02           screen_setup:   db      $02             ; graphics two
- 65+  838A C0                           db      $C0             ; sixteen K, display on, no interrupt
- 66+  838B 06                           db      VRAM_NAMES / $400
- 67+  838C FF                           db      $FF             ; the colour table, and all of it
- 68+  838D 03                           db      $03             ; the patterns
- 69+  838E 36                           db      $36             ; sprites, which are never used
- 70+  838F 07                           db      $07
- 71+  8390 01                           db      MSX_BLACK       ; the border
- 72+  8391
- 73+  8391              ; Put the machine in screen 2 and lay its tables out.  The BIOS could do this,
- 74+  8391              ; but the BIOS is not there once the interpreter takes all sixty four
- 75+  8391              ; kilobytes for itself, so it is done here.
- 76+  8391              ; Corrupts: AF, BC, DE, HL
- 77+  8391              screen_init:
- 78+  8391 21 89 83                     ld      hl, screen_setup
- 79+  8394 0E 80                        ld      c, $80                  ; register nought
- 80+  8396              .each_register:
- 81+  8396 7E                           ld      a, (hl)
- 82+  8397 D3 99                        out     (VDP_ADDR), a
- 83+  8399 79                           ld      a, c
- 84+  839A D3 99                        out     (VDP_ADDR), a
- 85+  839C 23                           inc     hl
- 86+  839D 0C                           inc     c
- 87+  839E 79                           ld      a, c
- 88+  839F FE 88                        cp      $88
- 89+  83A1 20 F3                        jr      nz, .each_register
- 90+  83A3                              ; The name table says which pattern each cell shows: its own,
- 91+  83A3                              ; counting round every 256.  That is what turns a table of
- 92+  83A3                              ; characters into a bitmap.
- 93+  83A3 21 00 18                     ld      hl, VRAM_NAMES
- 94+  83A6 CD C9 83                     call    vram_write
- 95+  83A9 06 03                        ld      b, 3                    ; three blocks of 256
- 96+  83AB              .each_block:
- 97+  83AB 0E 00                        ld      c, 0
- 98+  83AD              .each_name:
- 99+  83AD 79                           ld      a, c
-100+  83AE D3 98                        out     (VDP_DATA), a
-101+  83B0 0C                           inc     c
-102+  83B1 20 FA                        jr      nz, .each_name
-103+  83B3 10 F6                        djnz    .each_block
-104+  83B5                              ; the font, out of the database, as on every machine
-105+  83B5 3E 06                        ld      a, SECTION_FONT
-106+  83B7 CD 9B 80                     call    db_section
-107+  83BA 7E                           ld      a, (hl)
-108+  83BB 32 2C 85                     ld      (font_first), a
-109+  83BE 23                           inc     hl
-110+  83BF 7E                           ld      a, (hl)
-111+  83C0 32 2D 85                     ld      (font_count), a
-112+  83C3 23                           inc     hl
-113+  83C4 22 2A 85                     ld      (font_glyphs), hl
-114+  83C7 18 4F                        jr      cls_window
-115+  83C9
-116+  83C9              ; Point the chip at address HL, to be written to.
-117+  83C9              ; Corrupts: AF
-118+  83C9              vram_write:
-119+  83C9 7D                           ld      a, l
-120+  83CA D3 99                        out     (VDP_ADDR), a
-121+  83CC 7C                           ld      a, h
-122+  83CD F6 40                        or      $40                     ; writing, not reading
-123+  83CF D3 99                        out     (VDP_ADDR), a
-124+  83D1 C9                           ret
-125+  83D2
-126+  83D2              ; And to be read from.
-127+  83D2              ; Corrupts: AF
-128+  83D2              vram_read:
-129+  83D2 7D                           ld      a, l
-130+  83D3 D3 99                        out     (VDP_ADDR), a
-131+  83D5 7C                           ld      a, h
-132+  83D6 D3 99                        out     (VDP_ADDR), a
-133+  83D8 C9                           ret
-134+  83D9
-135+  83D9              ; DE bytes of C from where the chip is pointed.
-136+  83D9              ; Corrupts: AF, DE
-137+  83D9              vram_same:
-138+  83D9 79                           ld      a, c
-139+  83DA D3 98                        out     (VDP_DATA), a
-140+  83DC 1B                           dec     de
-141+  83DD 7A                           ld      a, d
-142+  83DE B3                           or      e
-143+  83DF 20 F8                        jr      nz, vram_same
-144+  83E1 C9                           ret
-145+  83E2
-146+  83E2              ; Send the picture across: four kilobytes of patterns and four of colours.
-147+  83E2              ; Once a room, not once a shape, which is what the picture interpreter's own
-148+  83E2              ; hook is for.
-149+  83E2              ; Corrupts: AF, BC, DE, HL
-150+  83E2              gfx_show:
-151+  83E2 21 00 00                     ld      hl, VRAM_PATTERNS
-152+  83E5 CD C9 83                     call    vram_write
-153+  83E8 21 00 C0                     ld      hl, SHADOW
-154+  83EB CD F7 83                     call    .a_table
-155+  83EE 21 00 20                     ld      hl, VRAM_COLOURS
-156+  83F1 CD C9 83                     call    vram_write
-157+  83F4 21 00 D0                     ld      hl, SHADOW_COLOURS
-158+  83F7                              ; fall through
-159+  83F7
-160+  83F7              ; One table across, gathering as it goes: the chip wants the eight lines of a
-161+  83F7              ; cell one after another, and in our copy those are eight rows apart.
-162+  83F7              .a_table:
-163+  83F7 11 20 00                     ld      de, SCREEN_COLS         ; from one line to the next
-164+  83FA 0E 10                        ld      c, TEXT_TOP             ; sixteen rows of the picture
-165+  83FC              .each_row:
-166+  83FC E5                           push    hl
-167+  83FD 06 20                        ld      b, SCREEN_COLS          ; and thirty two cells in each
-168+  83FF              .each_cell:
-169+  83FF E5                           push    hl
-170+  8400 C5                           push    bc
-171+  8401 06 08                        ld      b, 8                    ; the eight lines of the cell
-172+  8403              .each_line:
-173+  8403 7E                           ld      a, (hl)
-174+  8404 D3 98                        out     (VDP_DATA), a
-175+  8406 19                           add     hl, de
-176+  8407 10 FA                        djnz    .each_line
-177+  8409 C1                           pop     bc
-178+  840A E1                           pop     hl
-179+  840B 23                           inc     hl                      ; on to the next cell along
-180+  840C 10 F1                        djnz    .each_cell
-181+  840E E1                           pop     hl
-182+  840F 24                           inc     h                       ; and on to the next row, which
-183+  8410                                                              ; is eight lines of thirty two
-184+  8410 0D                           dec     c
-185+  8411 20 E9                        jr      nz, .each_row
-186+  8413 C9                           ret
-187+  8414
-188+  8414              ; Where row A of either of the chip's tables starts: a row is 256 bytes, so it
-189+  8414              ; is the high byte and nothing else.  (The fill has a row_address of its own,
-190+  8414              ; for the copy in our memory, which is not the same thing.)
-191+  8414              ; Corrupts: AF
-192+  8414              vram_row:
-193+  8414 67                           ld      h, a
-194+  8415 2E 00                        ld      l, 0
+ 41+  8389              VRAM_SHOWN      equ VRAM_COLOURS + $1800        ; patterns, names and colours:
+ 42+  8389                                                              ; what a dump of this screen is
+ 43+  8389              ROW_BYTES       equ 256                 ; one character row of either table
+ 44+  8389
+ 45+  8389              SCREEN_COLS     equ 32
+ 46+  8389              TEXT_TOP        equ 16                  ; the first row the text may use
+ 47+  8389              TEXT_ROWS       equ 24 - TEXT_TOP
+ 48+  8389              PICTURE_ROWS    equ TEXT_TOP * 8        ; the picture, in pixel lines
+ 49+  8389              PICTURE_BYTES   equ TEXT_TOP * ROW_BYTES
+ 50+  8389
+ 51+  8389              ; And the copy we draw into: four kilobytes of patterns and four of colours,
+ 52+  8389              ; row by row, on a four kilobyte boundary so that the eight rows of a page are
+ 53+  8389              ; the high byte of an address and nothing else.
+ 54+  8389              SHADOW          equ $C000
+ 55+  8389              SHADOW_COLOURS  equ SHADOW + $1000
+ 56+  8389
+ 57+  8389              ; Colours, as this machine numbers them.  A picture asks in the Spectrum's
+ 58+  8389              ; sixteen and gets the nearest of the fifteen here; the table that does the
+ 59+  8389              ; matching is in draw.asm and comes from the reference renderer, so that both
+ 60+  8389              ; ends of the comparison agree.
+ 61+  8389              MSX_BLACK       equ 1
+ 62+  8389              MSX_WHITE       equ 14
+ 63+  8389              TEXT_COLOUR     equ (MSX_WHITE << 4) | MSX_BLACK
+ 64+  8389
+ 65+  8389              ; The eight registers screen 2 wants.
+ 66+  8389 02           screen_setup:   db      $02             ; graphics two
+ 67+  838A C0                           db      $C0             ; sixteen K, display on, no interrupt
+ 68+  838B 06                           db      VRAM_NAMES / $400
+ 69+  838C FF                           db      $FF             ; the colour table, and all of it
+ 70+  838D 03                           db      $03             ; the patterns
+ 71+  838E 36                           db      $36             ; sprites, which are never used
+ 72+  838F 07                           db      $07
+ 73+  8390 01                           db      MSX_BLACK       ; the border
+ 74+  8391
+ 75+  8391              ; The eight registers, and nothing else: the loader wants this on its own, to
+ 76+  8391              ; put a loading screen up before there is a database to take a font out of.
+ 77+  8391              ; Corrupts: AF, C, HL
+ 78+  8391              vdp_setup:
+ 79+  8391 21 89 83                     ld      hl, screen_setup
+ 80+  8394 0E 80                        ld      c, $80                  ; register nought
+ 81+  8396              .each_register:
+ 82+  8396 7E                           ld      a, (hl)
+ 83+  8397 D3 99                        out     (VDP_ADDR), a
+ 84+  8399 79                           ld      a, c
+ 85+  839A D3 99                        out     (VDP_ADDR), a
+ 86+  839C 23                           inc     hl
+ 87+  839D 0C                           inc     c
+ 88+  839E 79                           ld      a, c
+ 89+  839F FE 88                        cp      $88
+ 90+  83A1 20 F3                        jr      nz, .each_register
+ 91+  83A3 C9                           ret
+ 92+  83A4
+ 93+  83A4              ; Put the machine in screen 2 and lay its tables out.  The BIOS could do this,
+ 94+  83A4              ; but the BIOS is not there once the interpreter takes all sixty four
+ 95+  83A4              ; kilobytes for itself, so it is done here.
+ 96+  83A4              ; Corrupts: AF, BC, DE, HL
+ 97+  83A4              screen_init:
+ 98+  83A4 CD 91 83                     call    vdp_setup
+ 99+  83A7                              ; The name table says which pattern each cell shows: its own,
+100+  83A7                              ; counting round every 256.  That is what turns a table of
+101+  83A7                              ; characters into a bitmap.
+102+  83A7 21 00 18                     ld      hl, VRAM_NAMES
+103+  83AA CD CD 83                     call    vram_write
+104+  83AD 06 03                        ld      b, 3                    ; three blocks of 256
+105+  83AF              .each_block:
+106+  83AF 0E 00                        ld      c, 0
+107+  83B1              .each_name:
+108+  83B1 79                           ld      a, c
+109+  83B2 D3 98                        out     (VDP_DATA), a
+110+  83B4 0C                           inc     c
+111+  83B5 20 FA                        jr      nz, .each_name
+112+  83B7 10 F6                        djnz    .each_block
+113+  83B9                              ; the font, out of the database, as on every machine
+114+  83B9 3E 06                        ld      a, SECTION_FONT
+115+  83BB CD 9B 80                     call    db_section
+116+  83BE 7E                           ld      a, (hl)
+117+  83BF 32 30 85                     ld      (font_first), a
+118+  83C2 23                           inc     hl
+119+  83C3 7E                           ld      a, (hl)
+120+  83C4 32 31 85                     ld      (font_count), a
+121+  83C7 23                           inc     hl
+122+  83C8 22 2E 85                     ld      (font_glyphs), hl
+123+  83CB 18 4F                        jr      cls_window
+124+  83CD
+125+  83CD              ; Point the chip at address HL, to be written to.
+126+  83CD              ; Corrupts: AF
+127+  83CD              vram_write:
+128+  83CD 7D                           ld      a, l
+129+  83CE D3 99                        out     (VDP_ADDR), a
+130+  83D0 7C                           ld      a, h
+131+  83D1 F6 40                        or      $40                     ; writing, not reading
+132+  83D3 D3 99                        out     (VDP_ADDR), a
+133+  83D5 C9                           ret
+134+  83D6
+135+  83D6              ; And to be read from.
+136+  83D6              ; Corrupts: AF
+137+  83D6              vram_read:
+138+  83D6 7D                           ld      a, l
+139+  83D7 D3 99                        out     (VDP_ADDR), a
+140+  83D9 7C                           ld      a, h
+141+  83DA D3 99                        out     (VDP_ADDR), a
+142+  83DC C9                           ret
+143+  83DD
+144+  83DD              ; DE bytes of C from where the chip is pointed.
+145+  83DD              ; Corrupts: AF, DE
+146+  83DD              vram_same:
+147+  83DD 79                           ld      a, c
+148+  83DE D3 98                        out     (VDP_DATA), a
+149+  83E0 1B                           dec     de
+150+  83E1 7A                           ld      a, d
+151+  83E2 B3                           or      e
+152+  83E3 20 F8                        jr      nz, vram_same
+153+  83E5 C9                           ret
+154+  83E6
+155+  83E6              ; Send the picture across: four kilobytes of patterns and four of colours.
+156+  83E6              ; Once a room, not once a shape, which is what the picture interpreter's own
+157+  83E6              ; hook is for.
+158+  83E6              ; Corrupts: AF, BC, DE, HL
+159+  83E6              gfx_show:
+160+  83E6 21 00 00                     ld      hl, VRAM_PATTERNS
+161+  83E9 CD CD 83                     call    vram_write
+162+  83EC 21 00 C0                     ld      hl, SHADOW
+163+  83EF CD FB 83                     call    .a_table
+164+  83F2 21 00 20                     ld      hl, VRAM_COLOURS
+165+  83F5 CD CD 83                     call    vram_write
+166+  83F8 21 00 D0                     ld      hl, SHADOW_COLOURS
+167+  83FB                              ; fall through
+168+  83FB
+169+  83FB              ; One table across, gathering as it goes: the chip wants the eight lines of a
+170+  83FB              ; cell one after another, and in our copy those are eight rows apart.
+171+  83FB              .a_table:
+172+  83FB 11 20 00                     ld      de, SCREEN_COLS         ; from one line to the next
+173+  83FE 0E 10                        ld      c, TEXT_TOP             ; sixteen rows of the picture
+174+  8400              .each_row:
+175+  8400 E5                           push    hl
+176+  8401 06 20                        ld      b, SCREEN_COLS          ; and thirty two cells in each
+177+  8403              .each_cell:
+178+  8403 E5                           push    hl
+179+  8404 C5                           push    bc
+180+  8405 06 08                        ld      b, 8                    ; the eight lines of the cell
+181+  8407              .each_line:
+182+  8407 7E                           ld      a, (hl)
+183+  8408 D3 98                        out     (VDP_DATA), a
+184+  840A 19                           add     hl, de
+185+  840B 10 FA                        djnz    .each_line
+186+  840D C1                           pop     bc
+187+  840E E1                           pop     hl
+188+  840F 23                           inc     hl                      ; on to the next cell along
+189+  8410 10 F1                        djnz    .each_cell
+190+  8412 E1                           pop     hl
+191+  8413 24                           inc     h                       ; and on to the next row, which
+192+  8414                                                              ; is eight lines of thirty two
+193+  8414 0D                           dec     c
+194+  8415 20 E9                        jr      nz, .each_row
 195+  8417 C9                           ret
 196+  8418
-197+  8418              ; Clear the text window, which is the last eight rows of both tables.
-198+  8418              ; Corrupts: AF, BC, DE, HL
-199+  8418              cls_window:
-200+  8418 3E 10                        ld      a, TEXT_TOP
-201+  841A CD 14 84                     call    vram_row
-202+  841D CD C9 83                     call    vram_write
-203+  8420 11 00 08                     ld      de, TEXT_ROWS * ROW_BYTES
-204+  8423 0E 00                        ld      c, 0
-205+  8425 CD D9 83                     call    vram_same
-206+  8428 3E 30                        ld      a, TEXT_TOP + VRAM_COLOUR_ROW
-207+  842A CD 14 84                     call    vram_row
-208+  842D CD C9 83                     call    vram_write
-209+  8430 11 00 08                     ld      de, TEXT_ROWS * ROW_BYTES
-210+  8433 0E E1                        ld      c, TEXT_COLOUR
-211+  8435 CD D9 83                     call    vram_same
-212+  8438 AF                           xor     a
-213+  8439 32 2E 85                     ld      (cursor_x), a
-214+  843C 3E 10                        ld      a, TEXT_TOP
-215+  843E 32 2F 85                     ld      (cursor_y), a
-216+  8441 C9                           ret
-217+  8442
-218+  8442              ; Where the cursor is, in the chip's memory.
-219+  8442              ; Corrupts: AF
-220+  8442              cursor_address:
-221+  8442 3A 2F 85                     ld      a, (cursor_y)
-222+  8445 67                           ld      h, a
-223+  8446 3A 2E 85                     ld      a, (cursor_x)
-224+  8449 87                           add     a, a
-225+  844A 87                           add     a, a
-226+  844B 87                           add     a, a                    ; eight bytes to a cell
-227+  844C 6F                           ld      l, a
-228+  844D C9                           ret
-229+  844E
-230+  844E              ; Move the text window up by one row.  There is no copy of the text to move
-231+  844E              ; about, so it comes back out of the chip a row at a time -- which is 256
-232+  844E              ; bytes, because of how these tables are laid out.
-233+  844E              ; Corrupts: everything
-234+  844E              scroll_window:
-235+  844E 06 07                        ld      b, TEXT_ROWS - 1
-236+  8450 0E 10                        ld      c, TEXT_TOP                     ; the row it lands on
-237+  8452              .each_row:
-238+  8452 C5                           push    bc
-239+  8453 16 00                        ld      d, 0                            ; the patterns
-240+  8455 CD 83 84                     call    copy_row
-241+  8458 C1                           pop     bc
-242+  8459 C5                           push    bc
-243+  845A 16 20                        ld      d, VRAM_COLOUR_ROW              ; and the colours
-244+  845C CD 83 84                     call    copy_row
-245+  845F C1                           pop     bc
-246+  8460 0C                           inc     c
-247+  8461 10 EF                        djnz    .each_row
-248+  8463                              ; the row that came free is wiped
-249+  8463 3E 17                        ld      a, TEXT_TOP + TEXT_ROWS - 1
-250+  8465 CD 14 84                     call    vram_row
-251+  8468 CD C9 83                     call    vram_write
-252+  846B 11 00 01                     ld      de, ROW_BYTES
-253+  846E 0E 00                        ld      c, 0
-254+  8470 CD D9 83                     call    vram_same
-255+  8473 3E 37                        ld      a, TEXT_TOP + TEXT_ROWS - 1 + VRAM_COLOUR_ROW
-256+  8475 CD 14 84                     call    vram_row
-257+  8478 CD C9 83                     call    vram_write
-258+  847B 11 00 01                     ld      de, ROW_BYTES
-259+  847E 0E E1                        ld      c, TEXT_COLOUR
-260+  8480 C3 D9 83                     jp      vram_same
-261+  8483
-262+  8483              ; The row above C down onto C, in the table D rows up.
-263+  8483              ; Corrupts: everything
-264+  8483              copy_row:
-265+  8483 79                           ld      a, c
-266+  8484 3C                           inc     a
-267+  8485 82                           add     a, d
-268+  8486 CD 14 84                     call    vram_row
-269+  8489 D5                           push    de
-270+  848A C5                           push    bc
-271+  848B CD D2 83                     call    vram_read
-272+  848E 21 30 85                     ld      hl, line_buffer
-273+  8491 06 00                        ld      b, 0                            ; 256 of them
-274+  8493              .take:
-275+  8493 DB 98                        in      a, (VDP_DATA)
-276+  8495 77                           ld      (hl), a
-277+  8496 23                           inc     hl
-278+  8497 10 FA                        djnz    .take
-279+  8499 C1                           pop     bc
-280+  849A D1                           pop     de
-281+  849B 79                           ld      a, c
-282+  849C 82                           add     a, d
-283+  849D CD 14 84                     call    vram_row
-284+  84A0 CD C9 83                     call    vram_write
-285+  84A3 21 30 85                     ld      hl, line_buffer
-286+  84A6 06 00                        ld      b, 0
-287+  84A8              .give:
-288+  84A8 7E                           ld      a, (hl)
-289+  84A9 D3 98                        out     (VDP_DATA), a
-290+  84AB 23                           inc     hl
-291+  84AC 10 FA                        djnz    .give
-292+  84AE C9                           ret
-293+  84AF
-294+  84AF              ; Start a new line, scrolling if the window is full.
-295+  84AF              ; Corrupts: everything
-296+  84AF              new_line:
-297+  84AF AF                           xor     a
-298+  84B0 32 2E 85                     ld      (cursor_x), a
-299+  84B3 3A 2F 85                     ld      a, (cursor_y)
-300+  84B6 3C                           inc     a
-301+  84B7 FE 18                        cp      TEXT_TOP + TEXT_ROWS
-302+  84B9 38 05                        jr      c, .fits
-303+  84BB CD 4E 84                     call    scroll_window
-304+  84BE 3E 17                        ld      a, TEXT_TOP + TEXT_ROWS - 1
-305+  84C0              .fits:
-306+  84C0 32 2F 85                     ld      (cursor_y), a
-307+  84C3 C9                           ret
-308+  84C4
-309+  84C4              ; Draw the glyph for code A at the cursor and step right: eight bytes of
-310+  84C4              ; pattern and eight of colour, which is what a line of colour costs here.
-311+  84C4              ; Corrupts: everything
-312+  84C4              print_char:
-313+  84C4 F5                           push    af
-314+  84C5 21 2C 85                     ld      hl, font_first
-315+  84C8 96                           sub     (hl)
-316+  84C9 6F                           ld      l, a
-317+  84CA 26 00                        ld      h, 0
-318+  84CC 29                           add     hl, hl
-319+  84CD 29                           add     hl, hl
-320+  84CE 29                           add     hl, hl                  ; eight bytes a glyph
-321+  84CF ED 5B 2A 85                  ld      de, (font_glyphs)
-322+  84D3 19                           add     hl, de
-323+  84D4 EB                           ex      de, hl                  ; DE = the glyph
-324+  84D5 CD 42 84                     call    cursor_address
-325+  84D8 E5                           push    hl
-326+  84D9 CD C9 83                     call    vram_write
-327+  84DC 06 08                        ld      b, 8
-328+  84DE              .line:
-329+  84DE 1A                           ld      a, (de)
-330+  84DF D3 98                        out     (VDP_DATA), a
-331+  84E1 13                           inc     de
-332+  84E2 10 FA                        djnz    .line
-333+  84E4 E1                           pop     hl
-334+  84E5 7C                           ld      a, h
-335+  84E6 C6 20                        add     a, VRAM_COLOUR_ROW
-336+  84E8 67                           ld      h, a
-337+  84E9 CD C9 83                     call    vram_write
-338+  84EC 06 08                        ld      b, 8
-339+  84EE              .colour:
-340+  84EE 3E E1                        ld      a, TEXT_COLOUR
-341+  84F0 D3 98                        out     (VDP_DATA), a
-342+  84F2 10 FA                        djnz    .colour
-343+  84F4 F1                           pop     af
-344+  84F5                              ; step right, wrapping to the next line at the edge
-345+  84F5 3A 2E 85                     ld      a, (cursor_x)
-346+  84F8 3C                           inc     a
-347+  84F9 FE 20                        cp      SCREEN_COLS
-348+  84FB 38 03                        jr      c, .same_line
-349+  84FD C3 AF 84                     jp      new_line
-350+  8500              .same_line:
-351+  8500 32 2E 85                     ld      (cursor_x), a
-352+  8503 C9                           ret
-353+  8504
-354+  8504              ; Step back one place and rub out what was there.
-355+  8504              ; Corrupts: everything
-356+  8504              backspace:
-357+  8504 3A 2E 85                     ld      a, (cursor_x)
-358+  8507 B7                           or      a
-359+  8508 20 0E                        jr      nz, .same_line
-360+  850A 3A 2F 85                     ld      a, (cursor_y)
-361+  850D FE 10                        cp      TEXT_TOP
-362+  850F C8                           ret     z                       ; nothing left to rub out
-363+  8510 3D                           dec     a
-364+  8511 32 2F 85                     ld      (cursor_y), a
-365+  8514 3E 1F                        ld      a, SCREEN_COLS - 1
-366+  8516 18 01                        jr      .place
-367+  8518              .same_line:
-368+  8518 3D                           dec     a
-369+  8519              .place:
-370+  8519 32 2E 85                     ld      (cursor_x), a
-371+  851C CD 42 84                     call    cursor_address
-372+  851F CD C9 83                     call    vram_write
-373+  8522 06 08                        ld      b, 8
-374+  8524 AF                           xor     a
-375+  8525              .line:
-376+  8525 D3 98                        out     (VDP_DATA), a
-377+  8527 10 FC                        djnz    .line
-378+  8529 C9                           ret
-379+  852A
-380+  852A 00 00        font_glyphs:    dw      0
-381+  852C 00           font_first:     db      0
-382+  852D 00           font_count:     db      0
-383+  852E 00           cursor_x:       db      0
-384+  852F 10           cursor_y:       db      TEXT_TOP
-385+  8530 00 00 00...  line_buffer:    ds      ROW_BYTES
-386+  8630
+197+  8418              ; Where row A of either of the chip's tables starts: a row is 256 bytes, so it
+198+  8418              ; is the high byte and nothing else.  (The fill has a row_address of its own,
+199+  8418              ; for the copy in our memory, which is not the same thing.)
+200+  8418              ; Corrupts: AF
+201+  8418              vram_row:
+202+  8418 67                           ld      h, a
+203+  8419 2E 00                        ld      l, 0
+204+  841B C9                           ret
+205+  841C
+206+  841C              ; Clear the text window, which is the last eight rows of both tables.
+207+  841C              ; Corrupts: AF, BC, DE, HL
+208+  841C              cls_window:
+209+  841C 3E 10                        ld      a, TEXT_TOP
+210+  841E CD 18 84                     call    vram_row
+211+  8421 CD CD 83                     call    vram_write
+212+  8424 11 00 08                     ld      de, TEXT_ROWS * ROW_BYTES
+213+  8427 0E 00                        ld      c, 0
+214+  8429 CD DD 83                     call    vram_same
+215+  842C 3E 30                        ld      a, TEXT_TOP + VRAM_COLOUR_ROW
+216+  842E CD 18 84                     call    vram_row
+217+  8431 CD CD 83                     call    vram_write
+218+  8434 11 00 08                     ld      de, TEXT_ROWS * ROW_BYTES
+219+  8437 0E E1                        ld      c, TEXT_COLOUR
+220+  8439 CD DD 83                     call    vram_same
+221+  843C AF                           xor     a
+222+  843D 32 32 85                     ld      (cursor_x), a
+223+  8440 3E 10                        ld      a, TEXT_TOP
+224+  8442 32 33 85                     ld      (cursor_y), a
+225+  8445 C9                           ret
+226+  8446
+227+  8446              ; Where the cursor is, in the chip's memory.
+228+  8446              ; Corrupts: AF
+229+  8446              cursor_address:
+230+  8446 3A 33 85                     ld      a, (cursor_y)
+231+  8449 67                           ld      h, a
+232+  844A 3A 32 85                     ld      a, (cursor_x)
+233+  844D 87                           add     a, a
+234+  844E 87                           add     a, a
+235+  844F 87                           add     a, a                    ; eight bytes to a cell
+236+  8450 6F                           ld      l, a
+237+  8451 C9                           ret
+238+  8452
+239+  8452              ; Move the text window up by one row.  There is no copy of the text to move
+240+  8452              ; about, so it comes back out of the chip a row at a time -- which is 256
+241+  8452              ; bytes, because of how these tables are laid out.
+242+  8452              ; Corrupts: everything
+243+  8452              scroll_window:
+244+  8452 06 07                        ld      b, TEXT_ROWS - 1
+245+  8454 0E 10                        ld      c, TEXT_TOP                     ; the row it lands on
+246+  8456              .each_row:
+247+  8456 C5                           push    bc
+248+  8457 16 00                        ld      d, 0                            ; the patterns
+249+  8459 CD 87 84                     call    copy_row
+250+  845C C1                           pop     bc
+251+  845D C5                           push    bc
+252+  845E 16 20                        ld      d, VRAM_COLOUR_ROW              ; and the colours
+253+  8460 CD 87 84                     call    copy_row
+254+  8463 C1                           pop     bc
+255+  8464 0C                           inc     c
+256+  8465 10 EF                        djnz    .each_row
+257+  8467                              ; the row that came free is wiped
+258+  8467 3E 17                        ld      a, TEXT_TOP + TEXT_ROWS - 1
+259+  8469 CD 18 84                     call    vram_row
+260+  846C CD CD 83                     call    vram_write
+261+  846F 11 00 01                     ld      de, ROW_BYTES
+262+  8472 0E 00                        ld      c, 0
+263+  8474 CD DD 83                     call    vram_same
+264+  8477 3E 37                        ld      a, TEXT_TOP + TEXT_ROWS - 1 + VRAM_COLOUR_ROW
+265+  8479 CD 18 84                     call    vram_row
+266+  847C CD CD 83                     call    vram_write
+267+  847F 11 00 01                     ld      de, ROW_BYTES
+268+  8482 0E E1                        ld      c, TEXT_COLOUR
+269+  8484 C3 DD 83                     jp      vram_same
+270+  8487
+271+  8487              ; The row above C down onto C, in the table D rows up.
+272+  8487              ; Corrupts: everything
+273+  8487              copy_row:
+274+  8487 79                           ld      a, c
+275+  8488 3C                           inc     a
+276+  8489 82                           add     a, d
+277+  848A CD 18 84                     call    vram_row
+278+  848D D5                           push    de
+279+  848E C5                           push    bc
+280+  848F CD D6 83                     call    vram_read
+281+  8492 21 34 85                     ld      hl, line_buffer
+282+  8495 06 00                        ld      b, 0                            ; 256 of them
+283+  8497              .take:
+284+  8497 DB 98                        in      a, (VDP_DATA)
+285+  8499 77                           ld      (hl), a
+286+  849A 23                           inc     hl
+287+  849B 10 FA                        djnz    .take
+288+  849D C1                           pop     bc
+289+  849E D1                           pop     de
+290+  849F 79                           ld      a, c
+291+  84A0 82                           add     a, d
+292+  84A1 CD 18 84                     call    vram_row
+293+  84A4 CD CD 83                     call    vram_write
+294+  84A7 21 34 85                     ld      hl, line_buffer
+295+  84AA 06 00                        ld      b, 0
+296+  84AC              .give:
+297+  84AC 7E                           ld      a, (hl)
+298+  84AD D3 98                        out     (VDP_DATA), a
+299+  84AF 23                           inc     hl
+300+  84B0 10 FA                        djnz    .give
+301+  84B2 C9                           ret
+302+  84B3
+303+  84B3              ; Start a new line, scrolling if the window is full.
+304+  84B3              ; Corrupts: everything
+305+  84B3              new_line:
+306+  84B3 AF                           xor     a
+307+  84B4 32 32 85                     ld      (cursor_x), a
+308+  84B7 3A 33 85                     ld      a, (cursor_y)
+309+  84BA 3C                           inc     a
+310+  84BB FE 18                        cp      TEXT_TOP + TEXT_ROWS
+311+  84BD 38 05                        jr      c, .fits
+312+  84BF CD 52 84                     call    scroll_window
+313+  84C2 3E 17                        ld      a, TEXT_TOP + TEXT_ROWS - 1
+314+  84C4              .fits:
+315+  84C4 32 33 85                     ld      (cursor_y), a
+316+  84C7 C9                           ret
+317+  84C8
+318+  84C8              ; Draw the glyph for code A at the cursor and step right: eight bytes of
+319+  84C8              ; pattern and eight of colour, which is what a line of colour costs here.
+320+  84C8              ; Corrupts: everything
+321+  84C8              print_char:
+322+  84C8 F5                           push    af
+323+  84C9 21 30 85                     ld      hl, font_first
+324+  84CC 96                           sub     (hl)
+325+  84CD 6F                           ld      l, a
+326+  84CE 26 00                        ld      h, 0
+327+  84D0 29                           add     hl, hl
+328+  84D1 29                           add     hl, hl
+329+  84D2 29                           add     hl, hl                  ; eight bytes a glyph
+330+  84D3 ED 5B 2E 85                  ld      de, (font_glyphs)
+331+  84D7 19                           add     hl, de
+332+  84D8 EB                           ex      de, hl                  ; DE = the glyph
+333+  84D9 CD 46 84                     call    cursor_address
+334+  84DC E5                           push    hl
+335+  84DD CD CD 83                     call    vram_write
+336+  84E0 06 08                        ld      b, 8
+337+  84E2              .line:
+338+  84E2 1A                           ld      a, (de)
+339+  84E3 D3 98                        out     (VDP_DATA), a
+340+  84E5 13                           inc     de
+341+  84E6 10 FA                        djnz    .line
+342+  84E8 E1                           pop     hl
+343+  84E9 7C                           ld      a, h
+344+  84EA C6 20                        add     a, VRAM_COLOUR_ROW
+345+  84EC 67                           ld      h, a
+346+  84ED CD CD 83                     call    vram_write
+347+  84F0 06 08                        ld      b, 8
+348+  84F2              .colour:
+349+  84F2 3E E1                        ld      a, TEXT_COLOUR
+350+  84F4 D3 98                        out     (VDP_DATA), a
+351+  84F6 10 FA                        djnz    .colour
+352+  84F8 F1                           pop     af
+353+  84F9                              ; step right, wrapping to the next line at the edge
+354+  84F9 3A 32 85                     ld      a, (cursor_x)
+355+  84FC 3C                           inc     a
+356+  84FD FE 20                        cp      SCREEN_COLS
+357+  84FF 38 03                        jr      c, .same_line
+358+  8501 C3 B3 84                     jp      new_line
+359+  8504              .same_line:
+360+  8504 32 32 85                     ld      (cursor_x), a
+361+  8507 C9                           ret
+362+  8508
+363+  8508              ; Step back one place and rub out what was there.
+364+  8508              ; Corrupts: everything
+365+  8508              backspace:
+366+  8508 3A 32 85                     ld      a, (cursor_x)
+367+  850B B7                           or      a
+368+  850C 20 0E                        jr      nz, .same_line
+369+  850E 3A 33 85                     ld      a, (cursor_y)
+370+  8511 FE 10                        cp      TEXT_TOP
+371+  8513 C8                           ret     z                       ; nothing left to rub out
+372+  8514 3D                           dec     a
+373+  8515 32 33 85                     ld      (cursor_y), a
+374+  8518 3E 1F                        ld      a, SCREEN_COLS - 1
+375+  851A 18 01                        jr      .place
+376+  851C              .same_line:
+377+  851C 3D                           dec     a
+378+  851D              .place:
+379+  851D 32 32 85                     ld      (cursor_x), a
+380+  8520 CD 46 84                     call    cursor_address
+381+  8523 CD CD 83                     call    vram_write
+382+  8526 06 08                        ld      b, 8
+383+  8528 AF                           xor     a
+384+  8529              .line:
+385+  8529 D3 98                        out     (VDP_DATA), a
+386+  852B 10 FC                        djnz    .line
+387+  852D C9                           ret
+388+  852E
+389+  852E 00 00        font_glyphs:    dw      0
+390+  8530 00           font_first:     db      0
+391+  8531 00           font_count:     db      0
+392+  8532 00           cursor_x:       db      0
+393+  8533 10           cursor_y:       db      TEXT_TOP
+394+  8534 00 00 00...  line_buffer:    ds      ROW_BYTES
+395+  8634
 # file closed: screen.asm
-104   8630                              include "../common/textout.asm"
+104   8634                              include "../common/textout.asm"
 # file opened: textout.asm
-  1+  8630              ; MIT License, Copyright (c) 2025 Cronomantic
-  2+  8630              ;
-  3+  8630              ; Printing a run of text, breaking it between words.
-  4+  8630              ;
-  5+  8630              ; This knows nothing about any screen beyond how wide it is and where the
-  6+  8630              ; cursor sits, both of which the machine's own screen layer names, so every
-  7+  8630              ; machine shares it.
-  8+  8630
-  9+  8630              ; Print BC characters from HL, breaking between words so none is split.
- 10+  8630              ; Corrupts: AF, BC, DE, HL
- 11+  8630              print_text:
- 12+  8630              .word:
- 13+  8630 78                           ld      a, b
- 14+  8631 B1                           or      c
- 15+  8632 C8                           ret     z
- 16+  8633                              ; how long is the run up to the next space
- 17+  8633 E5                           push    hl
- 18+  8634 C5                           push    bc
- 19+  8635 11 00 00                     ld      de, 0                   ; E counts it
- 20+  8638              .measure:
- 21+  8638 78                           ld      a, b
- 22+  8639 B1                           or      c
- 23+  863A 28 0E                        jr      z, .measured
- 24+  863C 7E                           ld      a, (hl)
- 25+  863D E5                           push    hl
- 26+  863E 21 B1 81                     ld      hl, space_code
- 27+  8641 BE                           cp      (hl)
- 28+  8642 E1                           pop     hl
- 29+  8643 28 05                        jr      z, .measured
- 30+  8645 23                           inc     hl
- 31+  8646 0B                           dec     bc
- 32+  8647 1C                           inc     e
- 33+  8648 18 EE                        jr      .measure
- 34+  864A              .measured:
- 35+  864A C1                           pop     bc
- 36+  864B E1                           pop     hl
- 37+  864C                              ; does it fit on what is left of this line?
- 38+  864C 3A 2E 85                     ld      a, (cursor_x)
- 39+  864F 83                           add     a, e
- 40+  8650 FE 21                        cp      SCREEN_COLS + 1
- 41+  8652 38 0F                        jr      c, .fits
- 42+  8654 3A 2E 85                     ld      a, (cursor_x)
- 43+  8657 B7                           or      a
- 44+  8658 28 09                        jr      z, .fits                ; no point breaking at column 0
- 45+  865A E5                           push    hl
- 46+  865B C5                           push    bc
- 47+  865C D5                           push    de
- 48+  865D CD AF 84                     call    new_line                ; this treads on every register
- 49+  8660 D1                           pop     de
- 50+  8661 C1                           pop     bc
- 51+  8662 E1                           pop     hl
- 52+  8663              .fits:
- 53+  8663                              ; print the run, then the space that ended it
- 54+  8663 7B                           ld      a, e
- 55+  8664 B7                           or      a
- 56+  8665 28 0F                        jr      z, .space
- 57+  8667              .emit:
- 58+  8667 7E                           ld      a, (hl)
- 59+  8668 23                           inc     hl
- 60+  8669 0B                           dec     bc
- 61+  866A C5                           push    bc
- 62+  866B E5                           push    hl
- 63+  866C D5                           push    de
- 64+  866D CD C4 84                     call    print_char
- 65+  8670 D1                           pop     de
- 66+  8671 E1                           pop     hl
- 67+  8672 C1                           pop     bc
- 68+  8673 1D                           dec     e
- 69+  8674 20 F1                        jr      nz, .emit
- 70+  8676              .space:
- 71+  8676 78                           ld      a, b
- 72+  8677 B1                           or      c
- 73+  8678 C8                           ret     z
- 74+  8679 7E                           ld      a, (hl)                 ; the space itself
- 75+  867A 23                           inc     hl
- 76+  867B 0B                           dec     bc
- 77+  867C C5                           push    bc
- 78+  867D E5                           push    hl
- 79+  867E CD C4 84                     call    print_char
- 80+  8681 E1                           pop     hl
- 81+  8682 C1                           pop     bc
- 82+  8683 18 AB                        jr      .word
- 83+  8685
+  1+  8634              ; MIT License, Copyright (c) 2025 Cronomantic
+  2+  8634              ;
+  3+  8634              ; Printing a run of text, breaking it between words.
+  4+  8634              ;
+  5+  8634              ; This knows nothing about any screen beyond how wide it is and where the
+  6+  8634              ; cursor sits, both of which the machine's own screen layer names, so every
+  7+  8634              ; machine shares it.
+  8+  8634
+  9+  8634              ; Print BC characters from HL, breaking between words so none is split.
+ 10+  8634              ; Corrupts: AF, BC, DE, HL
+ 11+  8634              print_text:
+ 12+  8634              .word:
+ 13+  8634 78                           ld      a, b
+ 14+  8635 B1                           or      c
+ 15+  8636 C8                           ret     z
+ 16+  8637                              ; how long is the run up to the next space
+ 17+  8637 E5                           push    hl
+ 18+  8638 C5                           push    bc
+ 19+  8639 11 00 00                     ld      de, 0                   ; E counts it
+ 20+  863C              .measure:
+ 21+  863C 78                           ld      a, b
+ 22+  863D B1                           or      c
+ 23+  863E 28 0E                        jr      z, .measured
+ 24+  8640 7E                           ld      a, (hl)
+ 25+  8641 E5                           push    hl
+ 26+  8642 21 B1 81                     ld      hl, space_code
+ 27+  8645 BE                           cp      (hl)
+ 28+  8646 E1                           pop     hl
+ 29+  8647 28 05                        jr      z, .measured
+ 30+  8649 23                           inc     hl
+ 31+  864A 0B                           dec     bc
+ 32+  864B 1C                           inc     e
+ 33+  864C 18 EE                        jr      .measure
+ 34+  864E              .measured:
+ 35+  864E C1                           pop     bc
+ 36+  864F E1                           pop     hl
+ 37+  8650                              ; does it fit on what is left of this line?
+ 38+  8650 3A 32 85                     ld      a, (cursor_x)
+ 39+  8653 83                           add     a, e
+ 40+  8654 FE 21                        cp      SCREEN_COLS + 1
+ 41+  8656 38 0F                        jr      c, .fits
+ 42+  8658 3A 32 85                     ld      a, (cursor_x)
+ 43+  865B B7                           or      a
+ 44+  865C 28 09                        jr      z, .fits                ; no point breaking at column 0
+ 45+  865E E5                           push    hl
+ 46+  865F C5                           push    bc
+ 47+  8660 D5                           push    de
+ 48+  8661 CD B3 84                     call    new_line                ; this treads on every register
+ 49+  8664 D1                           pop     de
+ 50+  8665 C1                           pop     bc
+ 51+  8666 E1                           pop     hl
+ 52+  8667              .fits:
+ 53+  8667                              ; print the run, then the space that ended it
+ 54+  8667 7B                           ld      a, e
+ 55+  8668 B7                           or      a
+ 56+  8669 28 0F                        jr      z, .space
+ 57+  866B              .emit:
+ 58+  866B 7E                           ld      a, (hl)
+ 59+  866C 23                           inc     hl
+ 60+  866D 0B                           dec     bc
+ 61+  866E C5                           push    bc
+ 62+  866F E5                           push    hl
+ 63+  8670 D5                           push    de
+ 64+  8671 CD C8 84                     call    print_char
+ 65+  8674 D1                           pop     de
+ 66+  8675 E1                           pop     hl
+ 67+  8676 C1                           pop     bc
+ 68+  8677 1D                           dec     e
+ 69+  8678 20 F1                        jr      nz, .emit
+ 70+  867A              .space:
+ 71+  867A 78                           ld      a, b
+ 72+  867B B1                           or      c
+ 73+  867C C8                           ret     z
+ 74+  867D 7E                           ld      a, (hl)                 ; the space itself
+ 75+  867E 23                           inc     hl
+ 76+  867F 0B                           dec     bc
+ 77+  8680 C5                           push    bc
+ 78+  8681 E5                           push    hl
+ 79+  8682 CD C8 84                     call    print_char
+ 80+  8685 E1                           pop     hl
+ 81+  8686 C1                           pop     bc
+ 82+  8687 18 AB                        jr      .word
+ 83+  8689
 # file closed: textout.asm
-105   8685                              include "keyboard.asm"
+105   8689                              include "keyboard.asm"
 # file opened: keyboard.asm
-  1+  8685              ; MIT License, Copyright (c) 2025 Cronomantic
-  2+  8685              ;
-  3+  8685              ; Reading the keyboard on an MSX1, which hangs off the same 8255 the Amstrad's
-  4+  8685              ; does: the row wanted goes in the low four bits of port C and its eight keys
-  5+  8685              ; come back on port B, with a bit low while its key is held.
-  6+  8685              ;
-  7+  8685              ; The BIOS has a routine for this and keeps the whole matrix in memory for
-  8+  8685              ; anyone to read, at $FBE5 -- which is where the eleven rows below were
-  9+  8685              ; measured, one key at a time.  None of that is any use once the interpreter
- 10+  8685              ; takes the machine for itself: the BIOS is paged out and its interrupt is not
- 11+  8685              ; running, so nothing is scanning any more.  So this scans.
- 12+  8685              ;
- 13+  8685              ; The top four bits of port C are the cassette motor, the tape output, the key
- 14+  8685              ; click and the caps lamp, and none of them are ours to change; whatever the
- 15+  8685              ; machine had in them when we arrived is what it keeps.
- 16+  8685
- 17+  8685              PPI_B           equ $A9                 ; the eight keys of the row chosen
- 18+  8685              PPI_C           equ $AA                 ; and, in its low half, which row
- 19+  8685
- 20+  8685              KEY_ROWS        equ 11
- 21+  8685              SHIFT_ROW       equ 6                   ; and the bit of it the shift is on
- 22+  8685              SHIFT_BIT       equ %00000001
- 23+  8685
- 24+  8685              KEY_ENTER       equ 13
- 25+  8685              KEY_DELETE      equ 8
- 26+  8685              INPUT_MAX       equ 64                  ; as much of a line as is kept
- 27+  8685
- 28+  8685              ; A fiftieth of a second is about seventy thousand clock cycles here, and one
- 29+  8685              ; look at the whole keyboard is about two thousand five hundred, so this many
- 30+  8685              ; looks fill a frame.  Nothing turns on it being exact.
- 31+  8685              LOOKS_A_FRAME   equ 28
- 32+  8685
- 33+  8685              ; Take note of what the machine has in the top half of port C, which is not
- 34+  8685              ; ours to change.
- 35+  8685              ; Corrupts: AF
- 36+  8685              keyboard_init:
- 37+  8685 DB AA                        in      a, (PPI_C)
- 38+  8687 E6 F0                        and     %11110000
- 39+  8689 32 9A 86                     ld      (ppi_top), a
- 40+  868C C9                           ret
- 41+  868D
- 42+  868D              ; Read the eight keys of row A, into A.  A bit high means held.
- 43+  868D              ; Corrupts: AF, C
- 44+  868D              read_row:
- 45+  868D E6 0F                        and     %00001111
- 46+  868F 4F                           ld      c, a
- 47+  8690 3A 9A 86                     ld      a, (ppi_top)
- 48+  8693 B1                           or      c
- 49+  8694 D3 AA                        out     (PPI_C), a
- 50+  8696 DB A9                        in      a, (PPI_B)
- 51+  8698 2F                           cpl                             ; now one means held
- 52+  8699 C9                           ret
- 53+  869A
- 54+  869A 00           ppi_top:        db      0
- 55+  869B
- 56+  869B              ; Look once at the whole keyboard.  The character comes back in A, and zero
- 57+  869B              ; with the zero flag set when nothing useful is held.
- 58+  869B              ;
- 59+  869B              ; The shifts are passed over rather than reported, or holding one would look
- 60+  869B              ; like nothing being typed at all; what they do is decided afterwards.
- 61+  869B              ; Corrupts: BC, DE, HL
- 62+  869B              scan_keyboard:
- 63+  869B AF                           xor     a
- 64+  869C 32 DF 87                     ld      (key_found), a
- 65+  869F 21 7E 87                     ld      hl, key_table
- 66+  86A2 16 00                        ld      d, 0                    ; which row
- 67+  86A4              .row:
- 68+  86A4 D5                           push    de
- 69+  86A5 7A                           ld      a, d
- 70+  86A6 CD 8D 86                     call    read_row
- 71+  86A9 D1                           pop     de
- 72+  86AA 1E 08                        ld      e, 8
- 73+  86AC              .key:
- 74+  86AC 1F                           rra
- 75+  86AD 30 09                        jr      nc, .next_key
- 76+  86AF F5                           push    af
- 77+  86B0 7E                           ld      a, (hl)
- 78+  86B1 B7                           or      a
- 79+  86B2 28 03                        jr      z, .a_shift             ; a shift on its own says nothing
- 80+  86B4 32 DF 87                     ld      (key_found), a
- 81+  86B7              .a_shift:
- 82+  86B7 F1                           pop     af
- 83+  86B8              .next_key:
- 84+  86B8 23                           inc     hl
- 85+  86B9 1D                           dec     e
- 86+  86BA 20 F0                        jr      nz, .key
- 87+  86BC 14                           inc     d
- 88+  86BD 7A                           ld      a, d
- 89+  86BE FE 0B                        cp      KEY_ROWS
- 90+  86C0 20 E2                        jr      nz, .row
- 91+  86C2 3A DF 87                     ld      a, (key_found)
- 92+  86C5 B7                           or      a
- 93+  86C6 C8                           ret     z
- 94+  86C7 CD D8 86                     call    shift_held
- 95+  86CA 3A DF 87                     ld      a, (key_found)
- 96+  86CD C8                           ret     z                       ; plain, as it is printed
- 97+  86CE CD E0 86                     call    to_shifted
- 98+  86D1 B7                           or      a
- 99+  86D2 C0                           ret     nz
-100+  86D3 3A DF 87                     ld      a, (key_found)          ; shift says nothing about it
-101+  86D6 B7                           or      a
-102+  86D7 C9                           ret
-103+  86D8
-104+  86D8              ; Whether the shift is held; zero flag clear if it is.
-105+  86D8              ; Corrupts: AF, C
-106+  86D8              shift_held:
-107+  86D8 3E 06                        ld      a, SHIFT_ROW
-108+  86DA CD 8D 86                     call    read_row
-109+  86DD E6 01                        and     SHIFT_BIT
-110+  86DF C9                           ret
-111+  86E0
-112+  86E0              ; What the key in A says with shift held, or nothing.
-113+  86E0              ; Corrupts: AF, C, HL
-114+  86E0              to_shifted:
-115+  86E0 4F                           ld      c, a
-116+  86E1 21 D6 87                     ld      hl, shifted_pairs
-117+  86E4              .each:
-118+  86E4 7E                           ld      a, (hl)
-119+  86E5 B7                           or      a
-120+  86E6 28 08                        jr      z, .none
-121+  86E8 B9                           cp      c
-122+  86E9 23                           inc     hl
-123+  86EA 7E                           ld      a, (hl)
-124+  86EB 23                           inc     hl
-125+  86EC 20 F6                        jr      nz, .each
-126+  86EE B7                           or      a
-127+  86EF C9                           ret
-128+  86F0              .none:
-129+  86F0 AF                           xor     a
-130+  86F1 C9                           ret
-131+  86F2
-132+  86F2              ; Wait for a key and give it back in A, having waited for the last one to be
-133+  86F2              ; let go first.
-134+  86F2              ; Corrupts: everything
-135+  86F2              read_key:
-136+  86F2              .wait_release:
-137+  86F2 CD 9B 86                     call    scan_keyboard
-138+  86F5 B7                           or      a
-139+  86F6 20 FA                        jr      nz, .wait_release
-140+  86F8              .wait_press:
-141+  86F8 CD 9B 86                     call    scan_keyboard
-142+  86FB B7                           or      a
-143+  86FC 28 FA                        jr      z, .wait_press
-144+  86FE C9                           ret
-145+  86FF
-146+  86FF              ; Wait for a key, or for HL fiftieths of a second, whichever comes first.
-147+  86FF              ;
-148+  86FF              ; What is already held when the wait starts does not count, or the enter that
-149+  86FF              ; ended the order would end the wait as well.
-150+  86FF              ; Corrupts: everything
-151+  86FF              wait_or_key:
-152+  86FF 0E 00                        ld      c, 0                    ; nothing let go yet
-153+  8701              .each_frame:
-154+  8701 7C                           ld      a, h
-155+  8702 B5                           or      l
-156+  8703 C8                           ret     z                       ; the time went
-157+  8704 2B                           dec     hl
-158+  8705 E5                           push    hl
-159+  8706 06 1C                        ld      b, LOOKS_A_FRAME
-160+  8708              .look:
-161+  8708 C5                           push    bc
-162+  8709 CD 9B 86                     call    scan_keyboard
-163+  870C C1                           pop     bc
-164+  870D B7                           or      a
-165+  870E 20 04                        jr      nz, .something
-166+  8710 0E 01                        ld      c, 1                    ; the keyboard came clear
-167+  8712 18 04                        jr      .keep_looking
-168+  8714              .something:
-169+  8714 79                           ld      a, c
-170+  8715 B7                           or      a
-171+  8716 20 05                        jr      nz, .a_key
-172+  8718              .keep_looking:
-173+  8718 10 EE                        djnz    .look
-174+  871A E1                           pop     hl
-175+  871B 18 E4                        jr      .each_frame
-176+  871D              .a_key:
-177+  871D E1                           pop     hl
-178+  871E C9                           ret
-179+  871F
-180+  871F              ; Read a line into input_buffer, as this adventure's codes.  The length comes
-181+  871F              ; back in BC.  What is typed is shown as it goes.
-182+  871F              ; Corrupts: everything
-183+  871F              read_line:
-184+  871F 21 E3 87                     ld      hl, input_buffer
-185+  8722 22 E0 87                     ld      (line_ptr), hl
-186+  8725 AF                           xor     a
-187+  8726 32 E2 87                     ld      (line_length), a
-188+  8729              .next_key:
-189+  8729 CD F2 86                     call    read_key
-190+  872C FE 0D                        cp      KEY_ENTER
-191+  872E 28 2C                        jr      z, .finished
-192+  8730 FE 08                        cp      KEY_DELETE
-193+  8732 28 12                        jr      z, .rub_out
-194+  8734 FE 20                        cp      32
-195+  8736 38 F1                        jr      c, .next_key            ; nothing else is worth having
-196+  8738 47                           ld      b, a
-197+  8739 3A E2 87                     ld      a, (line_length)
-198+  873C FE 40                        cp      INPUT_MAX
-199+  873E 30 E9                        jr      nc, .next_key           ; the line is full
-200+  8740 78                           ld      a, b
-201+  8741 CD 69 87                     call    store_key
-202+  8744 18 E3                        jr      .next_key
-203+  8746              .rub_out:
-204+  8746 3A E2 87                     ld      a, (line_length)
-205+  8749 B7                           or      a
-206+  874A 28 DD                        jr      z, .next_key
-207+  874C 3D                           dec     a
-208+  874D 32 E2 87                     ld      (line_length), a
-209+  8750 2A E0 87                     ld      hl, (line_ptr)
-210+  8753 2B                           dec     hl
-211+  8754 22 E0 87                     ld      (line_ptr), hl
-212+  8757 CD 04 85                     call    backspace
-213+  875A 18 CD                        jr      .next_key
-214+  875C              .finished:
-215+  875C CD AF 84                     call    new_line
-216+  875F 3A E2 87                     ld      a, (line_length)
-217+  8762 4F                           ld      c, a
-218+  8763 06 00                        ld      b, 0
-219+  8765 21 E3 87                     ld      hl, input_buffer
-220+  8768 C9                           ret
-221+  8769
-222+  8769              ; Put the character in A into the line and show it.
-223+  8769              ; Corrupts: everything
-224+  8769              store_key:
-225+  8769 CD 31 81                     call    ascii_to_code
-226+  876C FE FF                        cp      NO_CHARACTER
-227+  876E C8                           ret     z                       ; not a character this one has
-228+  876F 2A E0 87                     ld      hl, (line_ptr)
-229+  8772 77                           ld      (hl), a
-230+  8773 23                           inc     hl
-231+  8774 22 E0 87                     ld      (line_ptr), hl
-232+  8777 21 E2 87                     ld      hl, line_length
-233+  877A 34                           inc     (hl)
-234+  877B C3 C4 84                     jp      print_char
-235+  877E
-236+  877E              ; The eleven rows of eight, in the order the bits come out of each byte, as
-237+  877E              ; they were measured key by key.  Letters come back in upper case because the
-238+  877E              ; vocabulary is stored that way; a nought is a key with nothing to say here --
-239+  877E              ; a shift, a cursor, a function key.
-240+  877E              key_table:
-241+  877E 30 31 32 33                  db      '0', '1', '2', '3', '4', '5', '6', '7'
-241+  8782 34 35 36 37
-242+  8786 38 39 2D 5E                  db      '8', '9', '-', '^', '\', '[', ']', ';'
-242+  878A 5C 5B 5D 3B
-243+  878E 27 60 2C 2E                  db      39, '`', ',', '.', '/', '_', 'A', 'B'
-243+  8792 2F 5F 41 42
-244+  8796 43 44 45 46                  db      'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'
-244+  879A 47 48 49 4A
-245+  879E 4B 4C 4D 4E                  db      'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R'
-245+  87A2 4F 50 51 52
-246+  87A6 53 54 55 56                  db      'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'
-246+  87AA 57 58 59 5A
-247+  87AE 00 00 00 00                  db      0, 0, 0, 0, 0, 0, 0, 0          ; shift, control, the rest
-247+  87B2 00 00 00 00
-248+  87B6 00 00 00 00                  db      0, 0, 0, 0, 0, KEY_DELETE, 0, KEY_ENTER
-248+  87BA 00 08 00 0D
-249+  87BE 20 00 00 00                  db      ' ', 0, 0, 0, 0, 0, 0, 0
-249+  87C2 00 00 00 00
-250+  87C6 00 00 00 00                  db      0, 0, 0, 0, 0, 0, 0, 0          ; the number pad
-250+  87CA 00 00 00 00
-251+  87CE 00 00 00 00                  db      0, 0, 0, 0, 0, 0, 0, 0
-251+  87D2 00 00 00 00
-252+  87D6
-253+  87D6              ; What a key says with shift held, as far as an adventure ever needs: the
-254+  87D6              ; marks that part one order from the next and have no key of their own.
-255+  87D6 31 21        shifted_pairs:  db      '1', '!'
-256+  87D8 2F 3F                        db      '/', '?'
-257+  87DA 3B 3A                        db      ';', ':'
-258+  87DC 32 22                        db      '2', '"'
-259+  87DE 00                           db      0
-260+  87DF
-261+  87DF 00           key_found:      db      0
-262+  87E0 00 00        line_ptr:       dw      0
-263+  87E2 00           line_length:    db      0
-264+  87E3 00 00 00...  input_buffer:   ds      INPUT_MAX
-265+  8823
+  1+  8689              ; MIT License, Copyright (c) 2025 Cronomantic
+  2+  8689              ;
+  3+  8689              ; Reading the keyboard on an MSX1, which hangs off the same 8255 the Amstrad's
+  4+  8689              ; does: the row wanted goes in the low four bits of port C and its eight keys
+  5+  8689              ; come back on port B, with a bit low while its key is held.
+  6+  8689              ;
+  7+  8689              ; The BIOS has a routine for this and keeps the whole matrix in memory for
+  8+  8689              ; anyone to read, at $FBE5 -- which is where the eleven rows below were
+  9+  8689              ; measured, one key at a time.  None of that is any use once the interpreter
+ 10+  8689              ; takes the machine for itself: the BIOS is paged out and its interrupt is not
+ 11+  8689              ; running, so nothing is scanning any more.  So this scans.
+ 12+  8689              ;
+ 13+  8689              ; The top four bits of port C are the cassette motor, the tape output, the key
+ 14+  8689              ; click and the caps lamp, and none of them are ours to change; whatever the
+ 15+  8689              ; machine had in them when we arrived is what it keeps.
+ 16+  8689
+ 17+  8689              PPI_B           equ $A9                 ; the eight keys of the row chosen
+ 18+  8689              PPI_C           equ $AA                 ; and, in its low half, which row
+ 19+  8689
+ 20+  8689              KEY_ROWS        equ 11
+ 21+  8689              SHIFT_ROW       equ 6                   ; and the bit of it the shift is on
+ 22+  8689              SHIFT_BIT       equ %00000001
+ 23+  8689
+ 24+  8689              KEY_ENTER       equ 13
+ 25+  8689              KEY_DELETE      equ 8
+ 26+  8689              INPUT_MAX       equ 64                  ; as much of a line as is kept
+ 27+  8689
+ 28+  8689              ; A fiftieth of a second is about seventy thousand clock cycles here, and one
+ 29+  8689              ; look at the whole keyboard is about two thousand five hundred, so this many
+ 30+  8689              ; looks fill a frame.  Nothing turns on it being exact.
+ 31+  8689              LOOKS_A_FRAME   equ 28
+ 32+  8689
+ 33+  8689              ; Take note of what the machine has in the top half of port C, which is not
+ 34+  8689              ; ours to change.
+ 35+  8689              ; Corrupts: AF
+ 36+  8689              keyboard_init:
+ 37+  8689 DB AA                        in      a, (PPI_C)
+ 38+  868B E6 F0                        and     %11110000
+ 39+  868D 32 9E 86                     ld      (ppi_top), a
+ 40+  8690 C9                           ret
+ 41+  8691
+ 42+  8691              ; Read the eight keys of row A, into A.  A bit high means held.
+ 43+  8691              ; Corrupts: AF, C
+ 44+  8691              read_row:
+ 45+  8691 E6 0F                        and     %00001111
+ 46+  8693 4F                           ld      c, a
+ 47+  8694 3A 9E 86                     ld      a, (ppi_top)
+ 48+  8697 B1                           or      c
+ 49+  8698 D3 AA                        out     (PPI_C), a
+ 50+  869A DB A9                        in      a, (PPI_B)
+ 51+  869C 2F                           cpl                             ; now one means held
+ 52+  869D C9                           ret
+ 53+  869E
+ 54+  869E 00           ppi_top:        db      0
+ 55+  869F
+ 56+  869F              ; Look once at the whole keyboard.  The character comes back in A, and zero
+ 57+  869F              ; with the zero flag set when nothing useful is held.
+ 58+  869F              ;
+ 59+  869F              ; The shifts are passed over rather than reported, or holding one would look
+ 60+  869F              ; like nothing being typed at all; what they do is decided afterwards.
+ 61+  869F              ; Corrupts: BC, DE, HL
+ 62+  869F              scan_keyboard:
+ 63+  869F AF                           xor     a
+ 64+  86A0 32 E3 87                     ld      (key_found), a
+ 65+  86A3 21 82 87                     ld      hl, key_table
+ 66+  86A6 16 00                        ld      d, 0                    ; which row
+ 67+  86A8              .row:
+ 68+  86A8 D5                           push    de
+ 69+  86A9 7A                           ld      a, d
+ 70+  86AA CD 91 86                     call    read_row
+ 71+  86AD D1                           pop     de
+ 72+  86AE 1E 08                        ld      e, 8
+ 73+  86B0              .key:
+ 74+  86B0 1F                           rra
+ 75+  86B1 30 09                        jr      nc, .next_key
+ 76+  86B3 F5                           push    af
+ 77+  86B4 7E                           ld      a, (hl)
+ 78+  86B5 B7                           or      a
+ 79+  86B6 28 03                        jr      z, .a_shift             ; a shift on its own says nothing
+ 80+  86B8 32 E3 87                     ld      (key_found), a
+ 81+  86BB              .a_shift:
+ 82+  86BB F1                           pop     af
+ 83+  86BC              .next_key:
+ 84+  86BC 23                           inc     hl
+ 85+  86BD 1D                           dec     e
+ 86+  86BE 20 F0                        jr      nz, .key
+ 87+  86C0 14                           inc     d
+ 88+  86C1 7A                           ld      a, d
+ 89+  86C2 FE 0B                        cp      KEY_ROWS
+ 90+  86C4 20 E2                        jr      nz, .row
+ 91+  86C6 3A E3 87                     ld      a, (key_found)
+ 92+  86C9 B7                           or      a
+ 93+  86CA C8                           ret     z
+ 94+  86CB CD DC 86                     call    shift_held
+ 95+  86CE 3A E3 87                     ld      a, (key_found)
+ 96+  86D1 C8                           ret     z                       ; plain, as it is printed
+ 97+  86D2 CD E4 86                     call    to_shifted
+ 98+  86D5 B7                           or      a
+ 99+  86D6 C0                           ret     nz
+100+  86D7 3A E3 87                     ld      a, (key_found)          ; shift says nothing about it
+101+  86DA B7                           or      a
+102+  86DB C9                           ret
+103+  86DC
+104+  86DC              ; Whether the shift is held; zero flag clear if it is.
+105+  86DC              ; Corrupts: AF, C
+106+  86DC              shift_held:
+107+  86DC 3E 06                        ld      a, SHIFT_ROW
+108+  86DE CD 91 86                     call    read_row
+109+  86E1 E6 01                        and     SHIFT_BIT
+110+  86E3 C9                           ret
+111+  86E4
+112+  86E4              ; What the key in A says with shift held, or nothing.
+113+  86E4              ; Corrupts: AF, C, HL
+114+  86E4              to_shifted:
+115+  86E4 4F                           ld      c, a
+116+  86E5 21 DA 87                     ld      hl, shifted_pairs
+117+  86E8              .each:
+118+  86E8 7E                           ld      a, (hl)
+119+  86E9 B7                           or      a
+120+  86EA 28 08                        jr      z, .none
+121+  86EC B9                           cp      c
+122+  86ED 23                           inc     hl
+123+  86EE 7E                           ld      a, (hl)
+124+  86EF 23                           inc     hl
+125+  86F0 20 F6                        jr      nz, .each
+126+  86F2 B7                           or      a
+127+  86F3 C9                           ret
+128+  86F4              .none:
+129+  86F4 AF                           xor     a
+130+  86F5 C9                           ret
+131+  86F6
+132+  86F6              ; Wait for a key and give it back in A, having waited for the last one to be
+133+  86F6              ; let go first.
+134+  86F6              ; Corrupts: everything
+135+  86F6              read_key:
+136+  86F6              .wait_release:
+137+  86F6 CD 9F 86                     call    scan_keyboard
+138+  86F9 B7                           or      a
+139+  86FA 20 FA                        jr      nz, .wait_release
+140+  86FC              .wait_press:
+141+  86FC CD 9F 86                     call    scan_keyboard
+142+  86FF B7                           or      a
+143+  8700 28 FA                        jr      z, .wait_press
+144+  8702 C9                           ret
+145+  8703
+146+  8703              ; Wait for a key, or for HL fiftieths of a second, whichever comes first.
+147+  8703              ;
+148+  8703              ; What is already held when the wait starts does not count, or the enter that
+149+  8703              ; ended the order would end the wait as well.
+150+  8703              ; Corrupts: everything
+151+  8703              wait_or_key:
+152+  8703 0E 00                        ld      c, 0                    ; nothing let go yet
+153+  8705              .each_frame:
+154+  8705 7C                           ld      a, h
+155+  8706 B5                           or      l
+156+  8707 C8                           ret     z                       ; the time went
+157+  8708 2B                           dec     hl
+158+  8709 E5                           push    hl
+159+  870A 06 1C                        ld      b, LOOKS_A_FRAME
+160+  870C              .look:
+161+  870C C5                           push    bc
+162+  870D CD 9F 86                     call    scan_keyboard
+163+  8710 C1                           pop     bc
+164+  8711 B7                           or      a
+165+  8712 20 04                        jr      nz, .something
+166+  8714 0E 01                        ld      c, 1                    ; the keyboard came clear
+167+  8716 18 04                        jr      .keep_looking
+168+  8718              .something:
+169+  8718 79                           ld      a, c
+170+  8719 B7                           or      a
+171+  871A 20 05                        jr      nz, .a_key
+172+  871C              .keep_looking:
+173+  871C 10 EE                        djnz    .look
+174+  871E E1                           pop     hl
+175+  871F 18 E4                        jr      .each_frame
+176+  8721              .a_key:
+177+  8721 E1                           pop     hl
+178+  8722 C9                           ret
+179+  8723
+180+  8723              ; Read a line into input_buffer, as this adventure's codes.  The length comes
+181+  8723              ; back in BC.  What is typed is shown as it goes.
+182+  8723              ; Corrupts: everything
+183+  8723              read_line:
+184+  8723 21 E7 87                     ld      hl, input_buffer
+185+  8726 22 E4 87                     ld      (line_ptr), hl
+186+  8729 AF                           xor     a
+187+  872A 32 E6 87                     ld      (line_length), a
+188+  872D              .next_key:
+189+  872D CD F6 86                     call    read_key
+190+  8730 FE 0D                        cp      KEY_ENTER
+191+  8732 28 2C                        jr      z, .finished
+192+  8734 FE 08                        cp      KEY_DELETE
+193+  8736 28 12                        jr      z, .rub_out
+194+  8738 FE 20                        cp      32
+195+  873A 38 F1                        jr      c, .next_key            ; nothing else is worth having
+196+  873C 47                           ld      b, a
+197+  873D 3A E6 87                     ld      a, (line_length)
+198+  8740 FE 40                        cp      INPUT_MAX
+199+  8742 30 E9                        jr      nc, .next_key           ; the line is full
+200+  8744 78                           ld      a, b
+201+  8745 CD 6D 87                     call    store_key
+202+  8748 18 E3                        jr      .next_key
+203+  874A              .rub_out:
+204+  874A 3A E6 87                     ld      a, (line_length)
+205+  874D B7                           or      a
+206+  874E 28 DD                        jr      z, .next_key
+207+  8750 3D                           dec     a
+208+  8751 32 E6 87                     ld      (line_length), a
+209+  8754 2A E4 87                     ld      hl, (line_ptr)
+210+  8757 2B                           dec     hl
+211+  8758 22 E4 87                     ld      (line_ptr), hl
+212+  875B CD 08 85                     call    backspace
+213+  875E 18 CD                        jr      .next_key
+214+  8760              .finished:
+215+  8760 CD B3 84                     call    new_line
+216+  8763 3A E6 87                     ld      a, (line_length)
+217+  8766 4F                           ld      c, a
+218+  8767 06 00                        ld      b, 0
+219+  8769 21 E7 87                     ld      hl, input_buffer
+220+  876C C9                           ret
+221+  876D
+222+  876D              ; Put the character in A into the line and show it.
+223+  876D              ; Corrupts: everything
+224+  876D              store_key:
+225+  876D CD 31 81                     call    ascii_to_code
+226+  8770 FE FF                        cp      NO_CHARACTER
+227+  8772 C8                           ret     z                       ; not a character this one has
+228+  8773 2A E4 87                     ld      hl, (line_ptr)
+229+  8776 77                           ld      (hl), a
+230+  8777 23                           inc     hl
+231+  8778 22 E4 87                     ld      (line_ptr), hl
+232+  877B 21 E6 87                     ld      hl, line_length
+233+  877E 34                           inc     (hl)
+234+  877F C3 C8 84                     jp      print_char
+235+  8782
+236+  8782              ; The eleven rows of eight, in the order the bits come out of each byte, as
+237+  8782              ; they were measured key by key.  Letters come back in upper case because the
+238+  8782              ; vocabulary is stored that way; a nought is a key with nothing to say here --
+239+  8782              ; a shift, a cursor, a function key.
+240+  8782              key_table:
+241+  8782 30 31 32 33                  db      '0', '1', '2', '3', '4', '5', '6', '7'
+241+  8786 34 35 36 37
+242+  878A 38 39 2D 5E                  db      '8', '9', '-', '^', '\', '[', ']', ';'
+242+  878E 5C 5B 5D 3B
+243+  8792 27 60 2C 2E                  db      39, '`', ',', '.', '/', '_', 'A', 'B'
+243+  8796 2F 5F 41 42
+244+  879A 43 44 45 46                  db      'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'
+244+  879E 47 48 49 4A
+245+  87A2 4B 4C 4D 4E                  db      'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R'
+245+  87A6 4F 50 51 52
+246+  87AA 53 54 55 56                  db      'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'
+246+  87AE 57 58 59 5A
+247+  87B2 00 00 00 00                  db      0, 0, 0, 0, 0, 0, 0, 0          ; shift, control, the rest
+247+  87B6 00 00 00 00
+248+  87BA 00 00 00 00                  db      0, 0, 0, 0, 0, KEY_DELETE, 0, KEY_ENTER
+248+  87BE 00 08 00 0D
+249+  87C2 20 00 00 00                  db      ' ', 0, 0, 0, 0, 0, 0, 0
+249+  87C6 00 00 00 00
+250+  87CA 00 00 00 00                  db      0, 0, 0, 0, 0, 0, 0, 0          ; the number pad
+250+  87CE 00 00 00 00
+251+  87D2 00 00 00 00                  db      0, 0, 0, 0, 0, 0, 0, 0
+251+  87D6 00 00 00 00
+252+  87DA
+253+  87DA              ; What a key says with shift held, as far as an adventure ever needs: the
+254+  87DA              ; marks that part one order from the next and have no key of their own.
+255+  87DA 31 21        shifted_pairs:  db      '1', '!'
+256+  87DC 2F 3F                        db      '/', '?'
+257+  87DE 3B 3A                        db      ';', ':'
+258+  87E0 32 22                        db      '2', '"'
+259+  87E2 00                           db      0
+260+  87E3
+261+  87E3 00           key_found:      db      0
+262+  87E4 00 00        line_ptr:       dw      0
+263+  87E6 00           line_length:    db      0
+264+  87E7 00 00 00...  input_buffer:   ds      INPUT_MAX
+265+  8827
 # file closed: keyboard.asm
-106   8823
-107   8823              last_code:
-108   8823                              ASSERT  last_code < SHADOW
-109   8823
-110   8823              db_source:
-111   8823                              INCBIN  "text.rgac"
-112   D6D0              db_length       equ     $ - db_source
-113   D6D0              last:
-114   D6D0
-115   D6D0                              SAVEBIN "keys.bin", start, last - start
-116   D6D0
+106   8827
+107   8827              last_code:
+108   8827                              ASSERT  last_code < SHADOW
+109   8827
+110   8827              db_source:
+111   8827                              INCBIN  "text.rgac"
+112   D6D4              db_length       equ     $ - db_source
+113   D6D4              last:
+114   D6D4
+115   D6D4                              SAVEBIN "keys.bin", start, last - start
+116   D6D4
 # file closed: test_keyboard.asm

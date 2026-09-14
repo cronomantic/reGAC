@@ -303,12 +303,20 @@ metido en el cargador. La pantalla, si la hay, va justo detrás de esos tres
 bytes y en el mismo bloque que el primer trozo, porque no le hace falta
 memoria: entra directa en el chip de vídeo según se lee.
 
+Y por esa misma BIOS van las partidas, en la misma cinta: un bloque sin
+cabecera con la partida sola, de `vm_state` a `vm_state_end`, escrito y leído
+con TAPOON/TAPOUT y TAPION/TAPIN. Es el mismo baile de devolver la BIOS y
+volver a tomar la máquina, y lo hace `tape.asm`; el cargador de arriba vive
+aparte, en `loader.asm`, y quien dice qué página ve qué ranura es `slots.asm`.
+
 De ahí sale una regla que cuesta cara si se olvida: **nunca se vuelve a
 nuestro mapa con las interrupciones puestas**. Las rutinas de cinta las dejan
 puestas al parar el motor, y una interrupción con la máquina nuestra es un
 salto a $0038, que para entonces es la base de datos. Por eso
 [`tape.asm`](../z80/msx/tape.asm) hace `di` detrás de cada llamada a la BIOS y
-otro dentro de `the_machine_back`.
+`the_machine_back` otro dentro. Lo que no hace falta devolver es la pantalla:
+estas rutinas dejan el chip de vídeo como estaba, que es una diferencia con el
+firmware del Amstrad y está mirado en la máquina.
 
     python -m regac build partida.json game.rgac -m msx
     python -m regac release z80/msx/game.bin salida/ -m msx            --database z80/msx/game.rgac

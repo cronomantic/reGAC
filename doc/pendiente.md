@@ -36,9 +36,9 @@ de su base de datos, porque tenía el estado metido dentro.
 
 De esos dos, en el Spectrum, no hay prueba automática: el emulador no sabe
 grabar lo que sale por la cinta, así que sólo están comprobados a mano. En el
-Amstrad sí la hay, y la mitad que se puede probar aquí también se podría:
-darle una cinta de Spectrum de verdad y leer un bloque de ella, como se hace
-allí.
+Amstrad y en el MSX sí la hay, y la mitad que se puede probar aquí también se
+podría: darle una cinta de Spectrum de verdad y leer un bloque de ella, como
+se hace allí.
 
 Partir la línea en varias órdenes ya está, y de paso se aclaró de dónde salen
 los separadores: de ningún sitio. GAC parte al llegar a un signo de
@@ -307,10 +307,30 @@ tercios de la cinta. Se le da el volcado de la memoria de vídeo, 14336 bytes,
 o el `.SC2` de cualquier programa de dibujo de MSX, que es lo mismo con siete
 bytes de cabecera delante.
 
-**Lo que queda de esta máquina**: probar grabar y cargar partidas, que está
-escrito y no probado porque el emulador no graba cintas; y que dibujar cuesta
-aproximadamente vez y media lo que en el Spectrum —6,15 segundos contra 4,31
-en la lámina más pesada—, repartido y sin un solo sitio donde apretar.
+**Y las partidas**, por la misma cinta y por la misma BIOS. Lo que viaja es
+sólo la partida, de `vm_state` a `vm_state_end`, como en todas. Los dos
+sentidos se miran por separado, igual que en el Amstrad, porque el emulador
+reproduce cintas pero no las graba: grabar se comprueba viendo que la BIOS
+acepta el bloque y dice que lo escribió —y tarda trece segundos de reloj, que
+es lo que tarda de verdad, porque escribir no lo acelera nadie—, y leer se
+comprueba contra una cinta con un bloque de bytes conocidos, comparados uno a
+uno con lo que llega.
+
+Las dos pruebas miran además lo que es de esta máquina: que el mapa vuelve a
+ser el nuestro y que las interrupciones siguen apagadas. Y lo miran de la
+manera más dura posible, porque el build que las corre toma la máquina entera
+y **no lleva base de datos ninguna**: si esa disciplina se saltara, el salto a
+$0038 iría a memoria vacía y no llegaría a terminar nada. Que termine es la
+mitad de lo que se comprueba.
+
+Una diferencia con el Amstrad que conviene saber: aquí no hay que devolverle
+nada a la pantalla. Las rutinas de cinta de la BIOS dejan el chip de vídeo
+exactamente como estaba, encendido y con sus registros; está mirado en la
+máquina, con una pantalla puesta y un bloque escrito encima.
+
+**Lo que queda de esta máquina**: que dibujar cuesta aproximadamente vez y
+media lo que en el Spectrum —6,15 segundos contra 4,31 en la lámina más
+pesada—, repartido y sin un solo sitio donde apretar.
 
 ### Mirar las versiones de CPC, que es la lección para el PCW
 

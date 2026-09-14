@@ -20,7 +20,6 @@
 
                 DEVICE  NOSLOT64K
 
-PPI_SLOTS       equ $A8                 ; two bits a page: which slot it sees
 STACK_AT        equ $EF00               ; above everything that travels
 database        equ $0000
 
@@ -78,34 +77,7 @@ begin:
 done_flag:      db      0
 database_ready: db      1               ; a cassette has it there already
 
-; Put RAM in all four pages, and remember both maps: the one the machine had,
-; which is the one the BIOS is in, and ours.  Which slot the RAM is in is not
-; assumed -- it is the one pages two and three are already showing, because
-; that is where a machine of this size keeps it.
-; Corrupts: AF, C
-take_the_machine:
-                in      a, (PPI_SLOTS)
-                ld      (bios_slots), a
-                and     %00110000               ; the slot page two is in
-                rrca
-                rrca
-                rrca
-                rrca
-                ld      c, a
-                add     a, a
-                add     a, a
-                or      c                       ; the same in pages nought and one
-                ld      c, a
-                ld      a, (bios_slots)
-                and     %11110000
-                or      c
-                ld      (our_slots), a
-                out     (PPI_SLOTS), a
-                ret
-
-bios_slots:     db      0
-our_slots:      db      0
-
+                include "slots.asm"
                 include "../common/database.asm"
                 include "../common/config.asm"
                 include "../common/unpack.asm"
@@ -113,6 +85,7 @@ our_slots:      db      0
                 include "../common/textout.asm"
                 include "keyboard.asm"
                 include "tape.asm"
+                include "loader.asm"
                 include "draw.asm"
                 include "../common/shapes.asm"
                 include "fill.asm"
