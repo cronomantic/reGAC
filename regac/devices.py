@@ -600,15 +600,26 @@ def luminance(colour):
     return (299 * red + 587 * green + 114 * blue) // 1000
 
 
-# A two by two ordered dither, indexed by the low bit of y then of x.  With
-# four thresholds it gives five levels: none of the pixels lit, a quarter,
-# half, three quarters, all.
-DITHER = (0, 2, 3, 1)
-DITHER_LEVELS = 4
+# A four by four ordered dither, indexed by the low two bits of y then of x.
+# Sixteen thresholds give seventeen levels, which is what it takes to keep the
+# eight colours of the original apart: with four of them the dark blue of a
+# window came out the same black as the outline around it.
+#
+# Four across is also as wide as it can be and still cost nothing.  What a fill
+# lays down repeats every four points, so eight points are still one byte and a
+# whole run of them is still that byte written along it, which is what makes a
+# fill affordable on the machine.
+DITHER = (
+    0, 8, 2, 10,
+    12, 4, 14, 6,
+    3, 11, 1, 9,
+    15, 7, 13, 5,
+)
+DITHER_LEVELS = 16
 
 
 def dithered(level, x, y):
-    return level > DITHER[((y & 1) << 1) | (x & 1)]
+    return level > DITHER[((y & 3) << 2) | (x & 3)]
 
 
 class PcwDevice(Device):
@@ -656,7 +667,7 @@ class PcwDevice(Device):
         )
 
     def level_of(self, colour):
-        """How many of the four thresholds a colour lights.
+        """How many of the sixteen thresholds a colour lights.
 
         The lightness is measured against white rather than against the
         brightest the Spectrum's hardware can manage, and that is why the

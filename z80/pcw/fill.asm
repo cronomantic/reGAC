@@ -12,11 +12,11 @@
 ; screen, which carries no colour and so lays down a dither instead.
 ;
 ; That dither is one byte for the whole run.  The ink's dither and the paper's
-; both repeat every two points, and the pattern GAC lays down is itself either
-; solid, empty or a chequer, so whatever the pattern takes from one and leaves
-; to the other repeats every two points as well.  Work it out once for the row
-; and the run is a byte written along it, which is what makes a fill
-; affordable.
+; both repeat every four points, and the pattern GAC lays down is itself
+; either solid, empty or a chequer, so whatever the pattern takes from one and
+; leaves to the other repeats every four points as well.  Work it out once for
+; the row and the run is a byte written along it, which is what makes a fill
+; affordable -- and it is why the dither is four points wide and no more.
 
 PICTURE_TOP     equ 175                 ; the y a picture reaches
 PICTURE_BOTTOM  equ 48
@@ -313,9 +313,11 @@ paint_span:
                 cpl
                 and     c
                 or      b                       ; and the rest from the paper
-                rlca
-                rlca
-                and     3                       ; two points tell the whole byte
+                rrca
+                rrca
+                rrca
+                rrca
+                and     15                      ; four points tell the whole byte
                 ld      hl, pair_bytes
                 add     a, l
                 ld      l, a
@@ -515,9 +517,10 @@ mask_to:        db      %10000000, %11000000, %11100000, %11110000
 pair_from:      db      %11111111, %00111111, %00001111, %00000011
 pair_to:        db      %11000000, %11110000, %11111100, %11111111
 
-; A row's dither, four points of it, doubled into the byte it becomes.  Two
-; points are enough to know it, because every dither here repeats every two.
-pair_bytes:     db      $00, $33, $CC, $FF
+; A row's dither, four points of it, doubled into the byte it becomes.  Four
+; points are enough to know it, because every dither here repeats every four.
+pair_bytes:     db      $00, $03, $0C, $0F, $30, $33, $3C, $3F
+                db      $C0, $C3, $CC, $CF, $F0, $F3, $FC, $FF
 
 fill_x:         db      0
 fill_seed_y:    db      0

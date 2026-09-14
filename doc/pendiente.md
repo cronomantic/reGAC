@@ -208,13 +208,6 @@ teclado, con los cuatro bancos mapeados del 0 al 3, que es justo el estado en
 que lo dejaría su propio sector de arranque, así que se escribe el bloque en
 memoria y se apunta el procesador al principio.
 
-**Un tono que falta.** Con cinco niveles, el azul y el negro caen los dos en
-cero, así que en Megacorp las ventanas azul oscuro desaparecen: quedan del
-mismo negro que el contorno que las rodea. Se ve en la lámina 1. Hay donde
-elegir -- una trama de 4x4 con más niveles, o separar a mano los colores que
-chocan en vez de fiarlo todo a la luminancia -- pero conviene decidirlo
-mirando láminas, no en abstracto.
-
 **El teclado, medido.** No hay puerto que preguntar: el controlador del propio
 teclado deja el estado de cada tecla en los dieciséis últimos bytes de los
 primeros 64K de RAM — con nuestro mapa, de $FFF0 a $FFFF — y los escribe mire
@@ -238,7 +231,7 @@ esperando—, y la prueba lo enciende con ese disco dentro y teclea. Cómo está
 hecho está en [`binario.md`](binario.md).
 
 **Lo que queda de esta máquina**: nada urgente. El zumbador, si alguna vez hay
-sonido; y los niveles de gris, que es lo del azul oscuro de aquí arriba.
+sonido.
 
 **Arranca solo, y no hace falta CP/M.** Los juegos de PCW son autoarrancables
 y el mecanismo es simple: la máquina **no tiene ROM**; al encender se trae un

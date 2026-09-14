@@ -668,13 +668,25 @@ del procesador. El reparto queda así:
 ### El color se va y quedan las tramas
 
 Un bit de luz por píxel. Una superficie se tiende como una trama elegida por
-lo clara que era el color, con un damero ordenado de dos por dos que da cinco
-niveles; un contorno no se trama, porque media línea no es una línea, y sale
-sólido, blanco o negro según esa misma claridad. Los ocho colores caen así:
+lo clara que era el color, con un damero ordenado de **cuatro por cuatro** que
+da diecisiete niveles; un contorno no se trama, porque media línea no es una
+línea, y sale sólido, blanco o negro según esa misma claridad. Los ocho
+colores caen así:
 
 | color | negro | azul | rojo | magenta | verde | cian | amarillo | blanco |
 |---|---|---|---|---|---|---|---|---|
-| nivel | 0 | 0 | 1 | 2 | 2 | 3 | 4 | 4 |
+| nivel | 0 | 2 | 5 | 7 | 10 | 11 | 14 | 16 |
+
+Empezó con un damero de dos por dos y cinco niveles, y se quedó corto por una
+razón que se ve de un vistazo en la primera lámina de Megacorp: **el azul
+oscuro y el negro caían los dos en cero**, así que las ventanas desaparecían y
+quedaban del mismo negro que el contorno que las rodeaba. Con diecisiete
+niveles cada color del Spectrum cae en uno distinto.
+
+Y cuatro de ancho es todo lo que puede medir la trama sin costar nada. Lo que
+tiende un relleno se repite cada cuatro puntos, así que ocho puntos siguen
+siendo dos vueltas del damero y por tanto **un solo byte**; con una trama de
+ocho de ancho habría que mirar en qué punto del tramo se está.
 
 **El brillo no hace nada.** La claridad se mide contra el blanco, no contra lo
 más brillante que puede dar el hardware del Spectrum, para que una lámina que
@@ -699,10 +711,10 @@ tiene la máquina.
 
 ### Un relleno es un byte por fila
 
-La trama de la tinta y la del papel se repiten cada dos puntos, y el patrón que
-tiende GAC es lleno, vacío o damero, así que lo que el patrón coge de una y deja
-a la otra se repite también cada dos puntos: **el byte que va a la pantalla es
-el mismo en todo el tramo**. Se calcula una vez por fila y el tramo es escribir
+La trama de la tinta y la del papel se repiten cada cuatro puntos, y el patrón
+que tiende GAC es lleno, vacío o damero, así que lo que el patrón coge de una y
+deja a la otra se repite también cada cuatro puntos: **el byte que va a la
+pantalla es el mismo en todo el tramo**. Se calcula una vez por fila y el tramo es escribir
 un byte a lo largo, con máscara sólo en las dos puntas, igual que en el
 Spectrum.
 

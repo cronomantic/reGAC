@@ -92,7 +92,7 @@ settle_colours:
                 ld      (ink_level), a
                 ; a line is solid: white if the ink is more than half light
                 ld      b, 0
-                cp      3 * 2
+                cp      9 * 4
                 jr      c, .dark
                 ld      b, $FF
 .dark:
@@ -100,9 +100,9 @@ settle_colours:
                 ld      (line_lit), a
                 ret
 
-; How light colour A is, as twice the level, which is how the dithers below
-; are indexed.  Nought is black and four is white; the bright bit is not
-; looked at.
+; How light colour A is, as four times the level, which is how the dithers
+; below are indexed.  Nought is black and sixteen is white; the bright bit is
+; not looked at.
 ; Corrupts: AF, HL
 level_of:
                 and     7
@@ -115,22 +115,35 @@ level_of:
                 ld      a, (hl)
                 ret
 
-; Twice the level of each of the eight colours: black, blue, red, magenta,
-; green, cyan, yellow, white, weighed the way the eye weighs them.
-levels:         db      0, 0, 2, 4, 4, 6, 8, 8
+; Four times the level of each of the eight colours: black, blue, red,
+; magenta, green, cyan, yellow, white, weighed the way the eye weighs them.
+; Seventeen levels and not five, because with five the dark blue of a window
+; came out the same black as the outline drawn around it.
+levels:         db      0, 8, 20, 28, 40, 44, 56, 64
 
-; What a level lays down along a row, eight points of the picture to the byte:
-; none of them, every other one, every other one the other way about, and so
-; on up to all of them.  Two entries to a level, the second for odd rows,
-; which is what makes a quarter and three quarters out of a pattern only two
-; pixels wide.
-dither_bytes:   db      $00, $00                ; nothing lit
-                db      $AA, $00                ; a quarter
-                db      $AA, $55                ; half, the chequer
-                db      $FF, $55                ; three quarters
-                db      $FF, $FF                ; all of it
+; What a level lays down along a row, eight points of the picture to the byte.
+; Four entries to a level, one for each row of a four by four dither, and four
+; points across is as wide as that dither can be and still cost nothing: eight
+; points are two turns of it, so a whole run is still one byte written along.
+dither_bytes:   db      $00, $00, $00, $00      ; nothing lit
+                db      $88, $00, $00, $00
+                db      $88, $00, $22, $00
+                db      $AA, $00, $22, $00
+                db      $AA, $00, $AA, $00      ; a quarter
+                db      $AA, $44, $AA, $00
+                db      $AA, $44, $AA, $11
+                db      $AA, $55, $AA, $11
+                db      $AA, $55, $AA, $55      ; half, the chequer
+                db      $EE, $55, $AA, $55
+                db      $EE, $55, $BB, $55
+                db      $FF, $55, $BB, $55
+                db      $FF, $55, $FF, $55      ; three quarters
+                db      $FF, $DD, $FF, $55
+                db      $FF, $DD, $FF, $77
+                db      $FF, $FF, $FF, $77
+                db      $FF, $FF, $FF, $FF      ; all of it
 
-; The dither for level A (already doubled) on screen row E, in A.
+; The dither for level A (already four times it) on screen row E, in A.
 ; Corrupts: AF, HL
 dither_for:
                 ld      hl, dither_bytes
@@ -140,7 +153,7 @@ dither_for:
                 adc     a, h
                 ld      h, a
                 ld      a, e
-                and     1
+                and     3
                 add     a, l
                 ld      l, a
                 ld      a, 0
@@ -488,5 +501,5 @@ line_err:       db      0
 pcw_ink:        db      0                       ; the colours as they came
 pcw_paper:      db      7
 ink_level:      db      0                       ; and as this screen has them
-paper_level:    db      8
+paper_level:    db      16 * 4
 line_lit:       db      0                       ; $FF when an outline is white
