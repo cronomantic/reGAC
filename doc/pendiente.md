@@ -213,8 +213,26 @@ elegir -- una trama de 4x4 con más niveles, o separar a mano los colores que
 chocan en vez de fiarlo todo a la luminancia -- pero conviene decidirlo
 mirando láminas, no en abstracto.
 
-**Lo que queda de esta máquina**: el teclado, que es lo único que sigue sin
-medir, y con eso el intérprete entero y su `release -m pcw`.
+**El teclado, medido.** No hay puerto que preguntar: el controlador del propio
+teclado deja el estado de cada tecla en los dieciséis últimos bytes de los
+primeros 64K de RAM — con nuestro mapa, de $FFF0 a $FFFF — y los escribe mire
+alguien o no. **Un bit a uno significa tecla pulsada**, al revés que en el
+Spectrum y el Amstrad. Las dos cosas salieron de tener una tecla apretada y
+buscar qué byte de los 256K se movía.
+
+Y la sorpresa: medida tecla a tecla, **la matriz es la del Amstrad CPC**. Todas
+las letras, todos los dígitos, el espacio, la coma, el punto, el enter y la
+mayúscula caen exactamente en el bit que tienen en el CPC. Los seis signos de
+la fila tres no se pueden pulsar desde el teclado del anfitrión, así que se dan
+por buenos los del CPC.
+
+Un detalle que costó un susto: la tabla que lee el vídeo estaba puesta donde el
+controlador escribe las teclas, y no lo notaba nadie porque esa tabla no se
+vuelve a leer nunca. Ahora hay un `ASSERT` en el fuente que lo dice.
+
+**Lo que queda de esta máquina**: juntarlo todo en el intérprete y su
+`release -m pcw`, con la pantalla de carga y las partidas en ficheros
+preasignados.
 
 **Arranca solo, y no hace falta CP/M.** Los juegos de PCW son autoarrancables
 y el mecanismo es simple: la máquina **no tiene ROM**; al encender se trae un
