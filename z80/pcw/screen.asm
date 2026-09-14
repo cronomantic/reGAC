@@ -32,9 +32,25 @@ PICTURE_BANK    equ 2
 TEXT_BANK       equ 4
 
 ROW_BYTES       equ 720                 ; one row of eight lines
-SCREEN_COLS     equ 64                  ; the columns a picture or a line uses
-MARGIN          equ 13                  ; and the ones to the left of them
+COLUMNS         equ 90                  ; and ninety columns of eight pixels
 SCREEN_ROWS     equ 16                  ; rows to each half
+
+; How wide a point of the picture is drawn.  Two keeps the shape it has on a
+; Spectrum, because a pixel here is about half as wide as it is tall; one puts
+; it small in the middle of the screen.  The project file says which, and the
+; reference renderer is given the same number.
+                IFNDEF PICTURE_SCALE
+PICTURE_SCALE   equ 2
+                ENDIF
+                IF PICTURE_SCALE != 1 && PICTURE_SCALE != 2
+                DISPLAY "the picture is drawn one or two points wide, not ", PICTURE_SCALE
+                ASSERT 0
+                ENDIF
+
+PICTURE_COLS    equ (256 * PICTURE_SCALE) / 8
+PICTURE_MARGIN  equ (COLUMNS - PICTURE_COLS) / 2
+SCREEN_COLS     equ 64                  ; what the text is wide, whatever the
+TEXT_MARGIN     equ (COLUMNS - SCREEN_COLS) / 2  ; picture does
 PICTURE_ROWS    equ SCREEN_ROWS * 8     ; the picture in pixel lines
 SCREEN_BYTES    equ SCREEN_ROWS * ROW_BYTES
 
@@ -125,14 +141,19 @@ screen_bank:
                 out     (SCREEN_SLOT), a
                 ret
 
-; Where row A of a half starts, in HL: the first byte of the first column the
-; text and the picture use, which is the same for both halves.
+; Where row A of the text starts, in HL, and the same for a row of the
+; picture.  The two are the same place while the picture is drawn double, and
+; not when it is not, which is the whole of what the scale changes up here.
 ; Corrupts: AF, DE
 row_base:
+                ld      de, text_rows
+                jr      a_row
+picture_base:
+                ld      de, picture_rows
+a_row:
                 add     a, a
-                ld      e, a
-                ld      d, 0
-                ld      hl, screen_rows
+                ld      l, a
+                ld      h, 0
                 add     hl, de
                 ld      a, (hl)
                 inc     hl
@@ -140,8 +161,15 @@ row_base:
                 ld      l, a
                 ret
 
-screen_rows:
-row_at = SCREEN_AT + MARGIN * 8
+text_rows:
+row_at = SCREEN_AT + TEXT_MARGIN * 8
+                DUP     SCREEN_ROWS
+                dw      row_at
+row_at = row_at + ROW_BYTES
+                EDUP
+
+picture_rows:
+row_at = SCREEN_AT + PICTURE_MARGIN * 8
                 DUP     SCREEN_ROWS
                 dw      row_at
 row_at = row_at + ROW_BYTES

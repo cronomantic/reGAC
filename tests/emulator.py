@@ -157,7 +157,16 @@ class Session:
         found = re.search(r"PC=([0-9A-Fa-f]{4})", reply)
         return int(found.group(1), 16) if found else None
 
-    def read(self, address, length):
+    # The emulator's memory zones.  Reading without one gives what the
+    # processor would read, which on an Amstrad is the upper ROM at $C000 and
+    # not the screen underneath it: a loading screen put up by BASIC is
+    # invisible that way until the interpreter pages the ROM out.  Zone zero
+    # is the machine's RAM, as it is laid out.
+    RAM = 0
+
+    def read(self, address, length, zone=None):
+        if zone is not None:
+            self.command(f"set-memory-zone {zone}")
         out = bytearray()
         while length:
             piece = min(length, 1024)

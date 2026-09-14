@@ -25,6 +25,7 @@
 
 MASK_AT         equ $C000               ; four kilobytes, thirty two to a row
 GAC_TOP         equ 175                 ; y=175 is the first row of the screen
+POINT_MASK      equ (8 / PICTURE_SCALE) - 1      ; which points share a byte
 
 ; Turn the adventure's y into a screen row.  In A, out A.
 to_row:
@@ -248,21 +249,25 @@ mask_address:
 bit_masks:      db      %10000000, %01000000, %00100000, %00010000
                 db      %00001000, %00000100, %00000010, %00000001
 
-; The two bits of the screen belonging to one point of the picture.  A point
-; is two pixels across, and the pair never straddles a byte because it starts
-; on an even pixel.
-pair_masks:     db      %11000000, %00110000, %00001100, %00000011
+; The bits of the screen belonging to one point of the picture.  Drawn double,
+; a point is two pixels across and the pair never straddles a byte because it
+; starts on an even one; drawn single it is one pixel like anywhere else.
+                IF PICTURE_SCALE = 2
+point_masks:    db      %11000000, %00110000, %00001100, %00000011
+                ELSE
+point_masks     equ     bit_masks
+                ENDIF
 
-; The byte of the screen holding point (D across, E down) in HL, with the two
-; bits of the point in C.  Four points to the byte, and the eight lines of a
-; byte column are the eight bytes in a row.
+; The byte of the screen holding point (D across, E down) in HL, with the bits
+; of the point in C.  Four points to the byte drawn double and eight drawn
+; single, and the eight lines of a byte column are the eight bytes in a row.
 ; Corrupts: AF, B
 screen_address:
                 ld      a, e
                 and     %01111000
                 rrca
                 rrca                    ; twice the row, for a table of words
-                ld      hl, screen_rows
+                ld      hl, picture_rows
                 add     a, l
                 ld      l, a
                 ld      a, 0
@@ -272,12 +277,19 @@ screen_address:
                 inc     hl
                 ld      h, (hl)
                 ld      l, a                    ; the first byte of the row
+                IF PICTURE_SCALE = 2
                 ld      a, d
                 and     %11111100
                 ld      c, a
                 ld      b, 0
                 sla     c
                 rl      b                       ; eight bytes to four points
+                ELSE
+                ld      a, d
+                and     %11111000
+                ld      c, a
+                ld      b, 0                    ; and eight bytes to eight
+                ENDIF
                 add     hl, bc
                 ld      a, e
                 and     7                       ; and the line inside the row
@@ -287,9 +299,9 @@ screen_address:
                 adc     a, h
                 ld      h, a
                 ld      a, d
-                and     3
+                and     POINT_MASK
                 push    hl
-                ld      hl, pair_masks
+                ld      hl, point_masks
                 add     a, l
                 ld      l, a
                 jr      nc, .no_carry

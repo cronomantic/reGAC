@@ -313,6 +313,7 @@ paint_span:
                 cpl
                 and     c
                 or      b                       ; and the rest from the paper
+                IF PICTURE_SCALE = 2
                 rrca
                 rrca
                 rrca
@@ -325,6 +326,7 @@ paint_span:
                 adc     a, h
                 ld      h, a
                 ld      a, (hl)
+                ENDIF                           ; drawn single it goes as it is
                 ld      (screen_byte), a
                 ; where it goes, and how many bytes of the screen it covers
                 ld      a, (fill_left)
@@ -333,28 +335,24 @@ paint_span:
                 ld      e, a
                 call    screen_address          ; HL the first byte of the run
                 ld      a, (fill_left)
-                and     3
-                ld      de, pair_from
+                and     POINT_MASK
+                ld      de, screen_from
                 add     a, e
                 ld      e, a
                 ld      a, (de)
                 ld      c, a                    ; the mask of its first byte
                 ld      a, (fill_right)
-                and     3
-                ld      de, pair_to
+                and     POINT_MASK
+                ld      de, screen_to
                 add     a, e
                 ld      e, a
                 ld      a, (de)
                 ld      (screen_last), a
                 ld      a, (fill_right)
-                rrca
-                rrca
-                and     %00111111
+                call    which_byte
                 ld      e, a
                 ld      a, (fill_left)
-                rrca
-                rrca
-                and     %00111111
+                call    which_byte
                 ld      d, a
                 ld      a, e
                 sub     d
@@ -488,12 +486,12 @@ gfx_clear:
 .each_row:
                 push    af
                 push    bc
-                call    row_base
+                call    picture_base
                 ld      d, h
                 ld      e, l
                 inc     de
                 ld      (hl), PAPER_BYTE
-                ld      bc, SCREEN_COLS * 8 - 1
+                ld      bc, PICTURE_COLS * 8 - 1
                 ldir
                 pop     bc
                 pop     af
@@ -519,8 +517,28 @@ pair_to:        db      %11000000, %11110000, %11111100, %11111111
 
 ; A row's dither, four points of it, doubled into the byte it becomes.  Four
 ; points are enough to know it, because every dither here repeats every four.
+                IF PICTURE_SCALE = 2
 pair_bytes:     db      $00, $03, $0C, $0F, $30, $33, $3C, $3F
                 db      $C0, $C3, $CC, $CF, $F0, $F3, $FC, $FF
+screen_from     equ     pair_from
+screen_to       equ     pair_to
+                ELSE
+screen_from     equ     mask_from
+screen_to       equ     mask_to
+                ENDIF
+
+; Which byte of the screen a point of the picture falls in, in A.
+; Corrupts: AF
+which_byte:
+                rrca
+                rrca
+                IF PICTURE_SCALE = 2
+                and     %00111111
+                ELSE
+                rrca
+                and     %00011111
+                ENDIF
+                ret
 
 fill_x:         db      0
 fill_seed_y:    db      0

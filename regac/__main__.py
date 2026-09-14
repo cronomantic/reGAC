@@ -21,6 +21,7 @@
 """ReGAC: convert between the JSON database and the editable source format."""
 
 import argparse
+import shutil
 import json
 import os
 import sys
@@ -30,6 +31,9 @@ from .devices import DEVICES, device_for, make
 from .gfx import Renderer
 from .media import (PCW_SCREEN_BYTES, banks_of, cpc_disk, cpc_tape,
                     pcw_release, plus3_banked_disk, plus3_disk)
+from .project import (TARGETS, ProjectError, assemble, screen_for,
+                      wide)
+from .project import read as read_project
 from .png import save_picture
 from .srcgen import generate
 from .text import TextStore
@@ -213,6 +217,44 @@ def cmd_build(args):
         print(f"  {name:<12}{size:7}  {where}")
 
 
+def write_media(machine, code, where, name, load, entry, screen=None,
+                boot=None, banks=None):
+    """Put an assembled interpreter on the medium its machine loads from, and
+    say what was written and how a person starts it."""
+    written = []
+    if machine == "pcw":
+        # A machine that starts itself: no operating system, no loader in
+        # BASIC, just the sector it boots from and the pieces behind it.
+        if boot is None or banks is None:
+            sys.exit("ERROR: a pcw release wants --boot and --database")
+        path = os.path.join(where, name.lower() + ".dsk")
+        with open(path, "wb") as f:
+            f.write(pcw_release(boot, code, banks, screen))
+        written.append(path)
+        how = f"nothing: the machine starts it, with {len(banks)} banks behind it"
+    elif machine == "cpc":
+        for suffix, make in ((".dsk", cpc_disk), (".cdt", cpc_tape)):
+            path = os.path.join(where, name.lower() + suffix)
+            with open(path, "wb") as f:
+                f.write(make(code, name, load, entry, screen))
+            written.append(path)
+        how = f'RUN"{name}" on the disk, RUN"" on the tape'
+    else:
+        path = os.path.join(where, name.lower() + ".dsk")
+        with open(path, "wb") as f:
+            if boot is not None:
+                # A banked one: the loader is machine code, because paging is
+                # not something BASIC can do, and the database follows the
+                # interpreter in one file.
+                f.write(plus3_banked_disk(boot, code, banks or [], screen))
+                how = f"the Loader entry of its menu, and {len(banks or [])} banks"
+            else:
+                f.write(plus3_disk(code, load, screen))
+                how = "the Loader entry of the machine's own menu"
+        written.append(path)
+    return written, how
+
+
 def cmd_release(args):
     """Put the assembled interpreter on the medium its machine loads from.
 
@@ -231,48 +273,135 @@ def cmd_release(args):
         if len(screen) != wanted:
             sys.exit(f"ERROR: a {args.machine} screen is {wanted} bytes and "
                      f"{args.screen} is {len(screen)}")
-    written = []
-    if args.machine == "pcw":
-        # A machine that starts itself: no operating system, no loader in
-        # BASIC, just the sector it boots from and the pieces behind it.
-        if not (args.boot and args.database):
-            sys.exit("ERROR: a pcw release wants --boot and --database")
+    boot = banks = None
+    if args.boot:
         with open(args.boot, "rb") as f:
-            starter = f.read()
+            boot = f.read()
+    if args.database:
         with open(args.database, "rb") as f:
             banks = banks_of(f.read())
-        path = os.path.join(args.output, name.lower() + ".dsk")
-        with open(path, "wb") as f:
-            f.write(pcw_release(starter, code, banks, screen))
-        written.append(path)
-        how = f"nothing: the machine starts it, with {len(banks)} banks behind it"
-    elif args.machine == "cpc":
-        for suffix, make in ((".dsk", cpc_disk), (".cdt", cpc_tape)):
-            path = os.path.join(args.output, name.lower() + suffix)
-            with open(path, "wb") as f:
-                f.write(make(code, name, load, args.entry or load, screen))
-            written.append(path)
-        how = f'RUN"{name}" on the disk, RUN"" on the tape'
-    else:
-        path = os.path.join(args.output, name.lower() + ".dsk")
-        with open(path, "wb") as f:
-            if args.boot:
-                # A banked one: the loader is machine code, because paging is
-                # not something BASIC can do, and the database follows the
-                # interpreter in one file.
-                with open(args.boot, "rb") as boot:
-                    starter = boot.read()
-                with open(args.database, "rb") as database:
-                    banks = banks_of(database.read())
-                f.write(plus3_banked_disk(starter, code, banks, screen))
-                how = f"the Loader entry of its menu, and {len(banks)} banks"
-            else:
-                f.write(plus3_disk(code, load, screen))
-                how = "the Loader entry of the machine's own menu"
-        written.append(path)
+    written, how = write_media(args.machine, code, args.output, name, load,
+                               args.entry or load, screen, boot, banks)
     print(f"{args.input} -> " + ", ".join(written))
     print(f"  loads at    ${load:04X}, {len(code)} bytes")
     print(f"  starts with {how}")
+
+
+def write_database(ddb, path, machine, banks, music_buffer=0, defs=None):
+    """The binary database one machine reads, and the include an assembler
+    needs to cut it up."""
+    database = Database(ddb, machine=machine, page_bits=BANK_SIZES[banks],
+                        music_buffer=music_buffer)
+    with open(path, "wb") as f:
+        f.write(database.build())
+    if defs:
+        # What an assembler needs: where the banks start and how many there
+        # are.  Which of the machine's own pages they go to is the machine's
+        # business and not the database's.
+        lines = [
+            "; Written by regac.  See doc/binario.md.",
+            f"DB_RESIDENT_SIZE equ {database.resident_size}",
+            f"DB_BANK_COUNT    equ {len(database.banks)}",
+            f"DB_BANK_BYTES    equ {1 << database.page_bits if database.banks else 0}",
+        ]
+        # And how much of each bank is really used, because a loader has no
+        # reason to read the padding that makes them all the same size.
+        for number, bank in enumerate(database.banks):
+            lines.append(f"DB_BANK_USED_{number}  equ {len(bank)}")
+        with open(defs, "w", encoding="utf-8") as f:
+            f.write("\n".join(lines) + "\n")
+    return database
+
+
+def cmd_make(args):
+    """Build an adventure for every machine its project file names.
+
+    One file and one command instead of a dozen: what is of the machine --
+    which banks, which loading screen, how big the pictures are drawn -- is
+    said once, in the project, and this does the rest.
+    """
+    try:
+        project = read_project(args.input)
+    except ProjectError as e:
+        sys.exit(f"ERROR: {e}")
+    root = os.path.dirname(os.path.abspath(args.input)) or "."
+    source = os.path.join(root, project["source"])
+    if source.endswith(".gac"):
+        with open(source, encoding="utf-8") as f:
+            try:
+                ddb = parse(f.read(), os.path.basename(source))
+            except SourceError as e:
+                sys.exit(f"ERROR: {e}")
+    else:
+        ddb = read_json(source)
+    name = project["name"]
+    output = args.output or os.path.join(root, project["output"])
+
+    # The adventure and its loading screens sit beside the project file; the
+    # interpreters sit where reGAC itself is installed.
+    tree = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    wanted = args.target or sorted(project["targets"])
+    for which in wanted:
+        settings = project["targets"].get(which)
+        if settings is None:
+            sys.exit(f"ERROR: the project says nothing about {which}")
+        try:
+            written = make_one(TARGETS[which], settings, ddb, name, root, output,
+                               tree)
+        except ProjectError as e:
+            sys.exit(f"ERROR: {which}: {e}")
+        print(f"{which:12} -> " + ", ".join(
+            os.path.relpath(path, output) for path in written))
+
+
+def make_one(target, settings, ddb, name, root, output, where_regac_is):
+    """One machine, end to end: its database, its interpreter, its medium."""
+    tree = os.path.join(where_regac_is, target.folder)
+    database = write_database(
+        ddb, os.path.join(tree, target.database),
+        machine=target.machine,
+        banks=settings.get("banks", target.banks),
+        music_buffer=settings.get("music-buffer", 0),
+        defs=os.path.join(tree, target.defs) if target.defs else None,
+    )
+    screen = None
+    defines = []
+    if settings.get("screen"):
+        screen = screen_for(target, settings["screen"], root)
+        if target.screen_when == "assembly":
+            # This machine's medium is written by the assembler itself, or
+            # from pieces it saves, so the screen has to be there by then.
+            with open(os.path.join(tree, "screen.bin"), "wb") as f:
+                f.write(screen)
+            defines.append("SCREEN")
+    if settings.get("scale"):
+        across, _ = wide(settings["scale"])
+        defines.append(f"PICTURE_SCALE={across}")
+    assemble(target, where_regac_is, defines)
+
+    where = os.path.join(output, target.machine if target.release is None
+                         else target.release)
+    os.makedirs(where, exist_ok=True)
+    if target.media:
+        # The assembler wrote the medium as it went; it only has to be given
+        # the name the project asked for.
+        written = []
+        for made in target.media:
+            path = os.path.join(where, name.lower() + os.path.splitext(made)[1])
+            shutil.copyfile(os.path.join(tree, made), path)
+            written.append(path)
+        return written
+    with open(os.path.join(tree, target.binary), "rb") as f:
+        code = f.read()
+    boot = None
+    if target.boot:
+        with open(os.path.join(tree, target.boot), "rb") as f:
+            boot = f.read()
+    banks = banks_of(open(os.path.join(tree, target.database), "rb").read())         if target.defs else None
+    load = LOADS_AT[target.release]
+    written, _ = write_media(target.release, code, where, name, load, load,
+                             screen, boot, banks)
+    return written
 
 
 def main():
@@ -354,6 +483,15 @@ def main():
     p.add_argument("--screen", help="a dump of the machine's screen, to show "
                                     "while the rest loads")
     p.set_defaults(func=cmd_release)
+
+    p = sub.add_parser("make", help="build an adventure for every machine a "
+                                    "project file names")
+    p.add_argument("input", help="the project file")
+    p.add_argument("-o", "--output", help="where the media go, if not where "
+                                          "the project says")
+    p.add_argument("-t", "--target", action="append",
+                   help="only this machine, and again for more than one")
+    p.set_defaults(func=cmd_make)
 
     p = sub.add_parser("text", help="report what the text costs once packed")
     p.add_argument("input", help="JSON database")

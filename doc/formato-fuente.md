@@ -19,7 +19,8 @@ recompilable para cualquiera de las máquinas destino.
    opcional. Un fuente sin directivas nuevas compila como GAC clásico.
 4. **Lo que es de la aventura va en el fuente; lo que es de la máquina va en
    el fichero de proyecto.** Compresión, bancos de memoria y destino no
-   ensucian el texto de la aventura.
+   ensucian el texto de la aventura. El fichero de proyecto ya existe y está
+   contado en [`proyecto.md`](proyecto.md).
 
 ## Herramienta
 
@@ -151,9 +152,6 @@ nueva en el intérprete, que es también donde entra la compresión.
 
 **Compresión de textos.** Decisión del fichero de proyecto, no del fuente. La
 sección `/TOK` (tabla de tokens) será siempre generada, nunca escrita a mano.
-
-**Bancos de memoria.** Decisión del fichero de proyecto. El repartidor decide
-qué recursos van a qué banco a partir del tamaño y del destino.
 
 **Nombres simbólicos.** `.def PUERTA_ABIERTA 5` permitirá escribir
 `SET? PUERTA_ABIERTA`. El decompilador seguirá emitiendo números.

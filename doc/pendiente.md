@@ -195,8 +195,10 @@ La lámina va doblada en horizontal, 512 píxeles de los 720, centrada, y se
 dobla **al poner el punto**, que es la regla que costó aprender en el Amstrad.
 El cómo y el porqué de todo esto -- el reparto de memoria, la máscara de un
 bit, los niveles de gris, el relleno de un byte por fila -- está en
-[`graficos.md`](graficos.md); la escala por eje seguirá yendo con perilla en el
-fichero de proyecto cuando lo haya.
+[`graficos.md`](graficos.md); a cuántos píxeles sale un punto lo dice el
+fichero de proyecto, y va a las dos puntas —el intérprete se ensambla con ese
+número y la referencia lo recibe— así que la comparación entre los dos sigue
+valiendo. Ver [`proyecto.md`](proyecto.md).
 
 **Una advertencia sobre el banco de pruebas**: el emulador no vuelca la
 pantalla del PCW. Sale negra siempre, incluso arrancando su propio CP/M y

@@ -52,7 +52,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import emulator  # noqa: E402
 from regac.binary import Database  # noqa: E402
-from regac.devices import PCW_MARGIN, PcwDevice, pcw_address  # noqa: E402
+from regac.devices import PcwDevice, pcw_address, pcw_margin  # noqa: E402
 from regac.gfx import Renderer  # noqa: E402
 
 PCW = os.path.join(ROOT, "z80", "pcw")
@@ -134,19 +134,21 @@ def adventure(commands):
     }
 
 
-def point_at(screen, x, y):
+def point_at(screen, x, y, scale=2):
     """Whether point (x, y) of the picture is lit, out of the screen's bytes.
-    A point is two pixels across, and the picture sits in the middle of the
-    ninety columns, so this is also a check on where it was put."""
-    across = PCW_MARGIN * 8 + x * 2
+    A point is as many pixels across as the scale says, and the picture sits in
+    the middle of the ninety columns, so this is also a check on where it was
+    put."""
+    across = pcw_margin(scale) * 8 + x * scale
     return (screen[pcw_address(across, y)] >> (7 - (across & 7))) & 1
 
 
-def draw_on_both(commands):
+def draw_on_both(commands, scale=2):
     ddb = adventure(commands)
     with open(DATABASE, "wb") as f:
         f.write(Database(ddb).build())
-    listing = emulator.assemble(SOURCE, listing=LISTING)
+    listing = emulator.assemble(SOURCE, listing=LISTING,
+                                defines=[f"PICTURE_SCALE={scale}"])
     done = emulator.label_address(listing, "done_flag")
     with open(BINARY, "rb") as f:
         blob = f.read()
@@ -159,7 +161,7 @@ def draw_on_both(commands):
     finally:
         session.close()
 
-    reference = Renderer(ddb["gfx"], PcwDevice()).run(1)
+    reference = Renderer(ddb["gfx"], PcwDevice(scale)).run(1)
     return finished, screen, reference.screen()
 
 
@@ -177,6 +179,26 @@ def test_the_pcw_draws_what_the_reference_draws(name, commands):
     assert not wrong, f"{name}: {len(wrong)} points differ, first at {wrong[0]}"
     # and nothing outside the picture, margins included, was touched
     assert theirs == ours, "the screen differs somewhere off the picture"
+
+
+@needs_tools
+def test_it_draws_at_the_width_the_project_asked_for():
+    """The scale is a knob in the project file, and it is the same number at
+    both ends: the runtime is assembled with it and the reference is given
+    it.  One point wide puts the picture small in the middle of the screen,
+    two keeps the shape it has on a Spectrum."""
+    commands = [["RECT", 20, 60, 100, 120], ["PAPER", 4], ["BGFILL", 60, 90],
+                ["SHADE", 30, 70]]
+    finished, theirs, ours = draw_on_both(commands, scale=1)
+    assert finished, "the PCW never finished drawing"
+    assert theirs == ours, "drawn single it is not what the reference draws"
+    wrong = [
+        (row, x)
+        for row in range(PICTURE_ROWS)
+        for x in range(256)
+        if point_at(theirs, x, row, 1) != point_at(ours, x, row, 1)
+    ]
+    assert not wrong, f"{len(wrong)} points differ, first at {wrong[0]}"
 
 
 if __name__ == "__main__":

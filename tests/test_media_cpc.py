@@ -186,9 +186,14 @@ def test_the_disk_puts_up_a_loading_screen(tmp_path):
         time.sleep(4.0)
         session.type_keys('run"juego' + chr(13))
         deadline, seen = time.time() + 60.0, False
+        # Out of the machine's RAM and not through the processor's eyes: at
+        # $C000 an Amstrad reads its upper ROM, and the screen is underneath
+        # it.  Looked at the other way this only worked in the moment between
+        # the interpreter paging that ROM out and clearing the screen, which
+        # is what made it look flaky.
         while time.time() < deadline:
             time.sleep(0.2)
-            if bytes(session.read(SCREEN_AT, 256)) == screen[:256]:
+            if bytes(session.read(SCREEN_AT, 256, zone=session.RAM)) == screen[:256]:
                 seen = True
                 break
     finally:

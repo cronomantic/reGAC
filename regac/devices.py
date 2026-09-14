@@ -586,7 +586,15 @@ PCW_COLUMNS = 90                        # bytes across the screen
 PCW_ROW_BYTES = CHAR_SIDE * PCW_COLUMNS  # what one row of eight lines takes
 PCW_SCALE = 2                           # a picture pixel is two of its own
 PCW_PICTURE_ROWS = SOURCE_ROWS // CHAR_SIDE
-PCW_MARGIN = (PCW_COLUMNS - (SOURCE_WIDTH * PCW_SCALE) // CHAR_SIDE) // 2
+
+
+def pcw_margin(scale=PCW_SCALE):
+    """The columns to the left of a picture drawn this wide, which is what
+    puts it in the middle of the ninety the screen has."""
+    return (PCW_COLUMNS - (SOURCE_WIDTH * scale) // CHAR_SIDE) // 2
+
+
+PCW_MARGIN = pcw_margin()
 
 
 def pcw_address(x, y):
@@ -648,9 +656,15 @@ class PcwDevice(Device):
 
     name = "pcw"
     palette = [0x000000, 0xFFFFFF]
-    scale = PCW_SCALE
 
-    def __init__(self):
+    def __init__(self, scale=PCW_SCALE):
+        # How wide a point of the picture is drawn.  Two is what keeps the
+        # shape it has on a Spectrum, because a pixel here is about half as
+        # wide as it is tall; one puts it small in the middle of the screen.
+        # The runtime takes the same number, and both of them work it out the
+        # same way: it is the project file that says which.
+        self.scale = scale
+        self.margin = pcw_margin(scale)
         self.mask = bytearray(self.width * self.height)
         self.ink = 0
         self.paper = 7
@@ -742,8 +756,8 @@ class PcwDevice(Device):
             for x in range(self.width):
                 if not self.lit[y * self.width + x]:
                     continue
-                column = PCW_MARGIN * CHAR_SIDE + x * PCW_SCALE
-                for step in range(PCW_SCALE):
+                column = self.margin * CHAR_SIDE + x * self.scale
+                for step in range(self.scale):
                     place = column + step
                     out[pcw_address(place, y)] |= 0x80 >> (place & 7)
         return bytes(out)
