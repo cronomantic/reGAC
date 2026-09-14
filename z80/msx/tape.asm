@@ -27,6 +27,132 @@ TAPOOF          equ $00F0
 
 LEAD_LONG       equ 1                   ; the lead that goes before a file
 
+; Those routines come back with the interrupts on, and an interrupt with the
+; machine ours is a jump to $0038, which is the database by then.  So the
+; machine is never taken back without this.
+TAPE_ERROR      equ 2                   ; the border, when the tape gives out
+
+; Where the database comes in and how much of it at a time: the copy of the
+; screen, which the interpreter has not started using while this is loading.
+DB_BUFFER       equ SHADOW
+DB_CHUNK        equ 8192
+
+; Read the database off the cassette and put it where the BIOS was.
+;
+; It cannot be read straight there.  The BIOS is the only thing on this machine
+; that can read a cassette and it sits over the first two pages, which is
+; exactly where the database goes; so each chunk comes into the buffer up here
+; with the BIOS in, and the machine is taken back for as long as the copy
+; takes.  The motor stops each time that happens, which is why every chunk is
+; a block of its own on the tape.
+;
+; The first block starts with the size of the whole, so there is nothing about
+; one adventure built into this.
+; Corrupts: everything
+load_database:
+                ld      hl, database
+                ld      (db_where), hl
+                call    the_bios_back
+                call    start_reading
+                jr      c, tape_gave_out
+                call    read_byte               ; the size, low byte first
+                jr      c, tape_gave_out
+                ld      l, a
+                push    hl
+                call    read_byte
+                pop     hl
+                jr      c, tape_gave_out
+                ld      h, a
+                ld      (db_left), hl
+.chunk:
+                ; the whole of a chunk, or what is left if that is less
+                ld      hl, (db_left)
+                ld      de, DB_CHUNK
+                or      a
+                sbc     hl, de
+                jr      nc, .full
+                ld      de, (db_left)
+.full:
+                ld      (db_count), de
+                ld      ix, DB_BUFFER
+.each:
+                call    read_byte
+                jr      c, tape_gave_out
+                ld      (ix+0), a
+                inc     ix
+                dec     de
+                ld      a, d
+                or      e
+                jr      nz, .each
+                call    stop_reading
+                call    the_machine_back
+                ; and now that the first two pages are ours, into place
+                ld      hl, DB_BUFFER
+                ld      de, (db_where)
+                ld      bc, (db_count)
+                ldir
+                ld      (db_where), de
+                ld      hl, (db_left)
+                ld      bc, (db_count)
+                or      a
+                sbc     hl, bc
+                ld      (db_left), hl
+                ld      a, h
+                or      l
+                ret     z                       ; that was the last of it
+                call    the_bios_back
+                call    start_reading
+                jr      nc, .chunk
+
+; Nothing to be done and nothing to say it with: there is no screen yet and no
+; way back along a tape.  The border says it, as it always did.
+tape_gave_out:
+                call    stop_reading
+                call    the_machine_back
+                ld      a, TAPE_ERROR
+                call    set_border
+.stop:
+                jr      .stop
+
+db_where:       dw      0                       ; where the next chunk goes
+db_left:        dw      0                       ; and how much there is to come
+db_count:       dw      0
+
+; Find the lead and get in step.  Carry set when nothing came.
+; Corrupts: AF
+start_reading:
+                push    bc
+                push    de
+                push    hl
+                push    ix
+                call    TAPION
+                jr      tape_done
+; Stop the motor.  The interrupts come back on with it, and they are not
+; wanted: the routine that answers them is about to be paged out.
+; Corrupts: AF
+stop_reading:
+                push    bc
+                push    de
+                push    hl
+                push    ix
+                call    TAPIOF
+                jr      tape_done
+; One byte off the cassette, into A.  Carry set when it did not come.
+; Corrupts: AF
+read_byte:
+                push    bc
+                push    de
+                push    hl
+                push    ix
+                call    TAPIN
+tape_done:
+                pop     ix
+                pop     hl
+                pop     de
+                pop     bc
+                di
+                ret
+
 ; Put the block at IX, DE bytes of it, on the cassette.  Carry set when it
 ; went.
 ; Corrupts: everything
@@ -104,6 +230,7 @@ the_bios_back:
                 ret
 
 the_machine_back:
+                di                              ; before the BIOS goes away
                 ld      a, (our_slots)
                 out     (PPI_SLOTS), a
                 ret

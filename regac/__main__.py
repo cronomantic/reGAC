@@ -30,7 +30,7 @@ from .binary import MACHINES, SECTION_NAMES, Database, Reader
 from .devices import DEVICES, device_for, make
 from .gfx import Renderer
 from .media import (PCW_SCREEN_BYTES, banks_of, cpc_disk, cpc_tape,
-                    pcw_release, plus3_banked_disk, plus3_disk)
+                    msx_tape, pcw_release, plus3_banked_disk, plus3_disk)
 from .project import (TARGETS, ProjectError, assemble, screen_for,
                       wide)
 from .project import read as read_project
@@ -171,11 +171,12 @@ BANK_SIZES = {"none": 0, "8k": 13, "16k": 14}
 
 # Where each machine's interpreter is built to sit, which is where its medium
 # has to put it.
-LOADS_AT = {"cpc": 0x4000, "plus3": 0x8000, "pcw": 0x0100}
+LOADS_AT = {"cpc": 0x4000, "plus3": 0x8000, "pcw": 0x0100, "msx": 0x8000}
 
 # And how big a dump of each machine's screen is, which is what a loading
 # screen has to be.
-SCREEN_BYTES = {"cpc": 0x4000, "plus3": 6912, "pcw": PCW_SCREEN_BYTES}
+SCREEN_BYTES = {"cpc": 0x4000, "plus3": 6912, "pcw": PCW_SCREEN_BYTES,
+                "msx": 0}
 
 
 def cmd_build(args):
@@ -218,7 +219,7 @@ def cmd_build(args):
 
 
 def write_media(machine, code, where, name, load, entry, screen=None,
-                boot=None, banks=None):
+                boot=None, banks=None, database=None):
     """Put an assembled interpreter on the medium its machine loads from, and
     say what was written and how a person starts it."""
     written = []
@@ -232,6 +233,15 @@ def write_media(machine, code, where, name, load, entry, screen=None,
             f.write(pcw_release(boot, code, banks, screen))
         written.append(path)
         how = f"nothing: the machine starts it, with {len(banks)} banks behind it"
+    elif machine == "msx":
+        # A machine with a cassette and no banks: the interpreter is a file
+        # and the database is the blocks behind it, which the interpreter
+        # reads itself once it has somewhere to put them.
+        path = os.path.join(where, name.lower() + ".cas")
+        with open(path, "wb") as f:
+            f.write(msx_tape(code, database or b"", load, entry, name))
+        written.append(path)
+        how = f'BLOAD"CAS:",R, with {len(database or b"")} bytes behind it'
     elif machine == "cpc":
         for suffix, make in ((".dsk", cpc_disk), (".cdt", cpc_tape)):
             path = os.path.join(where, name.lower() + suffix)
@@ -270,18 +280,23 @@ def cmd_release(args):
         with open(args.screen, "rb") as f:
             screen = f.read()
         wanted = SCREEN_BYTES[args.machine]
+        if not wanted:
+            sys.exit(f"ERROR: a {args.machine} release has nowhere to put a "
+                     "loading screen yet")
         if len(screen) != wanted:
             sys.exit(f"ERROR: a {args.machine} screen is {wanted} bytes and "
                      f"{args.screen} is {len(screen)}")
-    boot = banks = None
+    boot = banks = database = None
     if args.boot:
         with open(args.boot, "rb") as f:
             boot = f.read()
     if args.database:
         with open(args.database, "rb") as f:
-            banks = banks_of(f.read())
+            database = f.read()
+        banks = banks_of(database)
     written, how = write_media(args.machine, code, args.output, name, load,
-                               args.entry or load, screen, boot, banks)
+                               args.entry or load, screen, boot, banks,
+                               database)
     print(f"{args.input} -> " + ", ".join(written))
     print(f"  loads at    ${load:04X}, {len(code)} bytes")
     print(f"  starts with {how}")
@@ -397,10 +412,12 @@ def make_one(target, settings, ddb, name, root, output, where_regac_is):
     if target.boot:
         with open(os.path.join(tree, target.boot), "rb") as f:
             boot = f.read()
-    banks = banks_of(open(os.path.join(tree, target.database), "rb").read())         if target.defs else None
+    with open(os.path.join(tree, target.database), "rb") as f:
+        image = f.read()
+    banks = banks_of(image) if target.defs else None
     load = LOADS_AT[target.release]
     written, _ = write_media(target.release, code, where, name, load, load,
-                             screen, boot, banks)
+                             screen, boot, banks, image)
     return written
 
 

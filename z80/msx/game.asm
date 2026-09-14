@@ -25,18 +25,31 @@ STACK_AT        equ $EF00               ; above everything that travels
 database        equ $0000
 
                 ORG     $8000
+; What the cassette starts, and what the file on it says to start: the whole
+; of it, with the database read in first.  Off a tape it is the interpreter
+; that has to fetch the database, because nothing else on this machine can
+; reach under the BIOS -- which is why this comes before anything else here,
+; where the medium can find it without being told an address.
+from_tape:
+                di
+                ld      sp, STACK_AT
+                call    take_the_machine
+                call    load_database
+                jr      begin
+
+; And what a test starts, which is the same without the tape: the database is
+; written in from outside while this waits, because nothing outside the
+; machine can reach under the BIOS until the switch below.
 start:
                 di
                 ld      sp, STACK_AT
                 call    take_the_machine
-                ; The database is under what was the BIOS by now: off the
-                ; cassette, a chunk at a time, before this was reached.  The
-                ; tests put it there while this waits, because nothing outside
-                ; the machine can reach under the BIOS until the switch above.
 .wait_for_it:
                 ld      a, (database_ready)
                 or      a
                 jr      z, .wait_for_it
+
+begin:
 
                 call    keyboard_init
                 call    db_init
@@ -112,4 +125,4 @@ our_slots:      db      0
 last:
                 ASSERT  last < SHADOW           ; or it would draw over itself
 
-                SAVEBIN "game.bin", start, last - start
+                SAVEBIN "game.bin", from_tape, last - from_tape

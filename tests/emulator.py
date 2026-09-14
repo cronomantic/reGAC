@@ -289,6 +289,30 @@ class Session:
             "set-ui-io-ports " + "".join(f"{r:02X}" for r in rows) + "00"
         )
 
+    # What an MSX keeps its typing in, and the two pointers that say how
+    # much of it there is: where the next character will be taken from, and
+    # where the next one typed would go.
+    MSX_KEYBUF = 0xFBF0
+    MSX_PUTPNT = 0xF3F8
+    MSX_GETPNT = 0xF3FA
+
+    def msx_type(self, text):
+        """Type a whole line at an MSX's BASIC, by putting it in the buffer
+        the keyboard fills and saying it is full.
+
+        Sending the keys themselves does not do here: the marks an order needs
+        -- the quotes, the colon, the comma of `BLOAD"CAS:",R` -- never arrive,
+        whether they are sent as keys or as a string, and a command without
+        them is not the command.  What BASIC reads is this buffer, so this is
+        what is written.
+        """
+        data = text.encode("ascii")
+        end = self.MSX_KEYBUF + len(data)
+        self.command(f"write-memory-raw {self.MSX_KEYBUF} " + data.hex().upper())
+        # Both pointers in one go, in the order they sit in memory.
+        pair = "".join(f"{v & 0xFF:02X}{v >> 8:02X}" for v in (end, self.MSX_KEYBUF))
+        return self.command(f"write-memory-raw {self.MSX_PUTPNT} " + pair)
+
     def type(self, text, hold_for=0.12):
         """Type at the keyboard, one key at a time, letting each go before the
         next.  Driving the matrix directly keeps the timing ours rather than

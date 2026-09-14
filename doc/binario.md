@@ -275,6 +275,47 @@ La prueba lo hace como lo haría su dueño: esos dos comandos y encender un PCW
 con el disco dentro. Arranca solo, lee lo suyo, dice lo que la aventura dice y
 contesta a lo que se teclea.
 
+## El MSX, que carga de cinta y no cabe en lo que BASIC alcanza
+
+El intérprete corre con RAM en las cuatro páginas —la BIOS fuera— porque un
+intérprete y una base de datos no caben en los 32K que ve el BASIC. Y ahí está
+el nudo: lo único de esta máquina que sabe leer una cinta es la BIOS, que está
+justo encima de donde tiene que ir la base de datos. De modo que la cinta se
+carga en dos tiempos.
+
+El primero lo hace la máquina: `BLOAD"CAS:",R` y nada más. Lo que entra es el
+intérprete, que es un fichero binario normal —bloque de cabecera con diez $D0
+y seis letras de nombre, y bloque de datos con dónde empieza, dónde acaba y
+por dónde arranca—, y arranca por donde dice, que es lo primero que hay en él:
+por eso [`game.asm`](../z80/msx/game.asm) pone `from_tape` delante de todo, y
+el medio no necesita saber ninguna dirección.
+
+El segundo lo hace el intérprete. Toma la máquina, y a partir de ahí, por cada
+trozo de base de datos: devuelve la BIOS, lee el trozo con las rutinas de
+siempre —TAPION $00E1, TAPIN $00E4, TAPIOF $00E7— en el buffer de $C000 (que
+es la copia de la pantalla, que todavía no se usa), vuelve a tomar la máquina
+y lo copia debajo de donde estaba la BIOS. El motor se para en cada vuelta, y
+por eso cada trozo es un bloque suyo en la cinta, sin nombre y sin cabecera.
+El primero lleva delante el tamaño entero, para que no haya nada de una
+aventura metido en el cargador.
+
+De ahí sale una regla que cuesta cara si se olvida: **nunca se vuelve a
+nuestro mapa con las interrupciones puestas**. Las rutinas de cinta las dejan
+puestas al parar el motor, y una interrupción con la máquina nuestra es un
+salto a $0038, que para entonces es la base de datos. Por eso
+[`tape.asm`](../z80/msx/tape.asm) hace `di` detrás de cada llamada a la BIOS y
+otro dentro de `the_machine_back`.
+
+    python -m regac build partida.json game.rgac -m msx
+    python -m regac release z80/msx/game.bin salida/ -m msx            --database z80/msx/game.rgac
+
+La prueba lo hace como lo haría su dueño: mete la cinta, teclea la orden y
+espera. Teclearla tiene su truco, porque de las teclas que el emulador manda
+no llegan ni las comillas ni los dos puntos ni la coma; lo que se hace es
+dejar la orden en el buffer del teclado del propio MSX, en $FBF0, y mover los
+dos punteros de $F3F8 —que es lo que lee el BASIC—, con lo que la orden es la
+de verdad y la carga también.
+
 ## La pantalla de carga
 
 Cualquiera de los destinos puede llevar una, y lo que se le da es **un volcado

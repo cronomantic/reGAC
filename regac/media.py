@@ -330,3 +330,62 @@ def cpc_tape(code, name=NAME, load=CODE_AT, entry=CODE_AT, screen=None):
         files.append(File(name, screen, kind=BINARY, load=SCREEN_AT))
     files.append(File(name, code, kind=BINARY, load=load, entry=entry))
     return tape(files)
+
+
+# -- the MSX, whose tape is a file of blocks and nothing else -----------------
+
+# A block on an MSX cassette is this marker and then its bytes, and a marker
+# only ever begins on an eighth byte.  A file is two blocks: the one that says
+# what it is and what it is called, and the one with the thing itself.
+MSX_MARKER = bytes([0x1F, 0xA6, 0xDE, 0xBA, 0xCC, 0x13, 0x7D, 0x74])
+MSX_BINARY = bytes([0xD0]) * 10         # what marks a header as a binary's
+MSX_NAME_BYTES = 6                      # and the name that follows it
+MSX_CODE_AT = 0x8000                    # where the interpreter is built to run
+
+# How much of the database comes in at a time.  It is read into the copy of
+# the screen the interpreter has not started using yet, so the size is that
+# buffer's; the machine has to be taken back for each chunk, and the motor
+# stops while that happens, so every chunk is a block of its own.
+MSX_CHUNK = 8192
+
+
+def msx_block(out, body):
+    """One block onto the tape, marker and all, on the eighth byte."""
+    while len(out) % 8:
+        out.append(0)
+    out += MSX_MARKER
+    out += bytes(body)
+    return out
+
+
+def msx_file(out, name, data, load, entry):
+    """A binary file as the machine's own BLOAD reads it: what it is called,
+    and then where it goes, where it ends and where to start it."""
+    msx_block(out, MSX_BINARY + name.upper().ljust(MSX_NAME_BYTES)[:MSX_NAME_BYTES]
+              .encode("ascii"))
+    head = struct.pack("<HHH", load, load + len(data) - 1, entry)
+    return msx_block(out, head + bytes(data))
+
+
+def msx_tape(code, database=b"", load=MSX_CODE_AT, entry=None, name=PCW_PAYLOAD):
+    """The whole of an adventure on one cassette, which a person starts with
+    `BLOAD"CAS:",R` and nothing else.
+
+    Only the interpreter is a file: it is what BLOAD can reach, because BLOAD
+    reaches no further than the thirty two kilobytes the BASIC can see, and a
+    database does not go there -- it goes under the BIOS, where nothing can
+    put it but the interpreter itself.  So the interpreter is started first
+    and reads the rest of the tape with the machine's own routines, a chunk at
+    a time, and the chunks are blocks with no name on them.
+
+    The first chunk is headed by the size of the whole database, so that
+    nothing about the adventure is built into the loader.
+    """
+    out = bytearray()
+    msx_file(out, name, code, load, load if entry is None else entry)
+    first = True
+    for at in range(0, len(database), MSX_CHUNK):
+        piece = bytes(database[at:at + MSX_CHUNK])
+        msx_block(out, struct.pack("<H", len(database)) + piece if first else piece)
+        first = False
+    return bytes(out)

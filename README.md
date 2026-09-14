@@ -18,10 +18,10 @@ Implementation of a decompiler and simple interpreter for Graphic Adventure Crea
   that was laid out so that it could not be copied.
 * grab.py: Load a disk, a tape or a snapshot on the machine it belongs to and
   write out what it left in memory, for the decompiler to read.
-* z80: The interpreters themselves, for the Spectrum, the Amstrad CPC and the
-  Amstrad PCW. The Spectrum ones write their own tape as they assemble; the
-  Amstrad's disk and tape and the PCW's self-starting disk are made with
-  `regac release`.
+* z80: The interpreters themselves, for the Spectrum, the Amstrad CPC, the
+  Amstrad PCW and the MSX. The Spectrum ones write their own tape as they
+  assemble; the Amstrad's disk and tape, the PCW's self-starting disk and the
+  MSX's cassette are made with `regac release`.
 
 ```
 python -m regac decompile game.json game.gac
@@ -34,6 +34,7 @@ python -m regac make      game.toml
 python -m regac build     game.json game.rgac -m spectrum128 -b 16k
 python -m regac release   game.bin  release/ -m cpc
 python -m regac release   game_code.bin release/ -m pcw        --boot boot.bin --database game.rgac
+python -m regac release   game.bin  release/ -m msx           --database game.rgac
 ```
 
 ## Licence

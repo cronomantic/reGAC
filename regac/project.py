@@ -91,6 +91,7 @@ class Target:
 SPECTRUM = os.path.join("z80", "spectrum")
 CPC = os.path.join("z80", "cpc")
 PCW = os.path.join("z80", "pcw")
+MSX = os.path.join("z80", "msx")
 
 # What each machine needs.  A tape is written by the assembler itself, because
 # on a Spectrum the medium is blocks of the very thing being assembled; a disk
@@ -117,6 +118,10 @@ TARGETS = {
         machine="cpc", folder=CPC, source="game.asm", database="game.rgac",
         release="cpc", binary="game.bin",
         screen_bytes=0x4000,
+    ),
+    "msx": Target(
+        machine="msx", folder=MSX, source="game.asm", database="game.rgac",
+        release="msx", binary="game.bin",
     ),
     "pcw": Target(
         machine="pcw", folder=PCW, source="game.asm", database="game.rgac",

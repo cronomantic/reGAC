@@ -144,7 +144,7 @@ def start_playing(session, where, database):
             f"write-memory-raw {CODE_AT + at} " + blob[at:at + 512].hex().upper()
         )
     session.command(f"write-memory-raw {where['database_ready']} 00")
-    session.command(f"set-register PC={CODE_AT:04X}H")
+    session.command(f"set-register PC={where['start']:04X}H")
     time.sleep(0.5)  # it switches to all RAM and waits for the word
     for at in range(0, len(database), 512):
         piece = database[at:at + 512]
@@ -159,7 +159,7 @@ def test_it_asks_and_answers_on_an_msx():
         ddb = json.load(f)
     listing = build()
     where = {name: emulator.label_address(listing, name)
-             for name in ("database_ready", "done_flag")}
+             for name in ("start", "database_ready", "done_flag")}
     with open(DATABASE, "rb") as f:
         database = f.read()
     built = Database(ddb, machine="msx")

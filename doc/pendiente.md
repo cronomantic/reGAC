@@ -62,17 +62,16 @@ tecla de mayúsculas y se quedaba ahí.
 
 En Python están modeladas Spectrum, Sam Coupé, Next, MSX1, MSX2, Amstrad y
 PCW. En Z80 están el Spectrum y el Amstrad CPC, los dos enteros, el Spectrum de
-128K con la base de datos repartida en bancos, y **el PCW entero**: arranca
-solo de un disco que se hace con `release`, dibuja láminas idénticas a las de
-la referencia, imprime, lee el teclado y guarda la partida en un fichero de
-verdad.
+128K con la base de datos repartida en bancos, **el PCW entero** —arranca solo
+de un disco que se hace con `release`, dibuja láminas idénticas a las de la
+referencia, imprime, lee el teclado y guarda la partida en un fichero de
+verdad— y **el MSX1 entero**, que carga de cinta.
 
-Y los tres se entregan en el medio que les toca, con su cargador: cinta para el
-Spectrum de 48 y el de 128, disco y cinta para el Amstrad, y disco para el +3.
-El +3 los lleva además con la base de datos repartida en bancos, con un
-cargador en código máquina que se los pide a +3DOS. Cómo está hecho cada uno
-está en `binario.md`. Lo que falta por ese lado es el PCW, que primero necesita
-intérprete.
+Y todos se entregan en el medio que les toca, con su cargador: cinta para el
+Spectrum de 48 y el de 128, disco y cinta para el Amstrad, disco para el +3,
+disco que arranca solo para el PCW y cinta para el MSX. El +3 los lleva además
+con la base de datos repartida en bancos, con un cargador en código máquina que
+se los pide a +3DOS. Cómo está hecho cada uno está en `binario.md`.
 
 ### Los bancos, que ya se usan
 
@@ -258,6 +257,54 @@ sus sectores directamente, sin tocar directorio ni reserva de bloques, y aun
 así la partida es un fichero de verdad que se puede copiar con las
 herramientas de CP/M. El sistema de ficheros existe para la persona; el
 intérprete sólo toca sectores que ya le dijeron cuáles son.
+
+### MSX1, con la máquina entera y una cinta
+
+Juega de principio a fin: dibuja láminas idénticas a las de la referencia,
+imprime, lee el teclado sin BIOS que lo rastree, y se carga de una cinta con
+`BLOAD"CAS:",R` y nada más.
+
+**Se toma la máquina entera**, RAM en las cuatro páginas, porque un intérprete
+y una base de datos no caben en los 32K que ve el BASIC. `out ($A8), $AA` y la
+BIOS desaparece; está medido, y es reversible, que es lo que hace posible lo de
+la cinta. El mapa queda plano y sin bancos: la base de datos en $0000, el
+intérprete en $8000, la copia de la pantalla en $C000 y la pila en $EF00, por
+encima de todo lo que viaja.
+
+De ahí salió el susto de esta máquina: **la pila estaba dentro de la copia de
+la base de datos que viajaba**, así que la dirección de retorno acabó metida en
+la base de datos y dos bytes de una lámina se convirtieron en `07 80`. Se veía
+como una raya verde saliéndose del marco.
+
+**La pantalla es el modo 2**, con la VRAM detrás de los puertos $98 y $99 y
+nada de acceso directo, así que se dibuja en una copia en RAM y se vuelca por
+láminas. El color va por grupo de ocho píxeles de una sola línea, que es mucho
+más suave que la celda del Spectrum. El teclado es el 8255 del Amstrad con
+otra matriz, once filas, y **un bit a cero significa pulsada**.
+
+**La cinta va en dos tiempos**, y el porqué está en
+[`binario.md`](binario.md): lo único que sabe leer una cinta es la BIOS, que
+está justo encima de donde va la base de datos, así que el BASIC carga el
+intérprete y el intérprete lee el resto, trozo a trozo, devolviendo la BIOS
+para cada uno y tomando la máquina otra vez para copiarlo debajo. La prueba lo
+hace como su dueño: mete la cinta, teclea la orden y espera a que la aventura
+pregunte.
+
+**Y dos cosas que costaron horas cada una.** La orden no se puede teclear:
+de las teclas que manda el emulador no llegan ni las comillas, ni los dos
+puntos, ni la coma, ni como teclas ni como cadena. Lo que sí llega es dejarla
+en el buffer del teclado del MSX, en $FBF0, y mover los dos punteros de $F3F8,
+que es lo que el BASIC lee de verdad. Y el `SAVEBIN` del intérprete seguía
+guardando desde `start` cuando delante ya había otra entrada, la de la cinta,
+así que el fichero salía corrido doce bytes y la máquina saltaba a mitad de una
+instrucción; desde fuera parecía que la cinta no cargaba.
+
+**Lo que queda de esta máquina**: la pantalla de carga, que aquí tendría que
+entrar en la VRAM con `BLOAD"CAS:",S` y con el modo puesto antes; probar grabar
+y cargar partidas, que está escrito y no probado porque el emulador no graba
+cintas; y que dibujar cuesta aproximadamente vez y media lo que en el Spectrum
+—6,15 segundos contra 4,31 en la lámina más pesada—, repartido y sin un solo
+sitio donde apretar.
 
 ### Mirar las versiones de CPC, que es la lección para el PCW
 
