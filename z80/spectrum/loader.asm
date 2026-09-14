@@ -18,8 +18,10 @@
 
                 include "basic.asm"
 
-DATA_BLOCK      equ $FF                 ; ROM_LD_BYTES is in tape.asm, which
-                                        ; is where the ROM's tape calls live
+DATA_BLOCK      equ $FF
+; The ROM's own tape read.  tape.asm knows it by another name for saving a
+; game, and the two are kept apart on purpose: a build may have either.
+LOADER_LD_BYTES equ $0556
 
                 ORG     BASIC_START
 basic:
@@ -59,7 +61,7 @@ loader:
                 push    hl
                 ld      a, DATA_BLOCK
                 scf                             ; load it, rather than compare
-                call    ROM_LD_BYTES
+                call    LOADER_LD_BYTES
                 pop     hl
                 jr      c, .each
                 jp      0                       ; it came in wrong: start again

@@ -201,7 +201,8 @@ def blocks_of(tape):
 def test_a_loading_screen_travels_first(tmp_path):
     """A dump of the machine's own screen, put on the tape ahead of everything
     so that there is something to look at while the rest comes in."""
-    screen = bytes(random.Random(11).randrange(256) for _ in range(6912))
+    filler = random.Random(11)
+    screen = bytes(filler.randrange(256) for _ in range(6912))
     with open(os.path.join(SPECTRUM, "screen.bin"), "wb") as f:
         f.write(screen)
     build(ADVENTURE, os.path.join(SPECTRUM, "game.rgac"), "spectrum48",
@@ -217,6 +218,36 @@ def test_a_loading_screen_travels_first(tmp_path):
     carried = with_screen[2]
     assert carried[1:-1] == screen, "what travelled is not the screen given"
     assert with_screen[3] == plain[2], "the interpreter changed as well"
+
+
+@needs_tools
+def test_the_loader_puts_the_screen_up_and_runs_what_follows():
+    """The same tape but with nothing worth running on it.
+
+    Watching this on the real tape is hopeless: the emulator swallows a whole
+    tape in a couple of seconds and the interpreter clears the screen the
+    moment it starts, so the screen is up and gone between two looks.  With a
+    program that does nothing, what the loader left is still there.
+    """
+    filler = random.Random(3)
+    screen = bytes(filler.randrange(256) for _ in range(6912))
+    with open(os.path.join(SPECTRUM, "screen.bin"), "wb") as f:
+        f.write(screen)
+    emulator.assemble(os.path.join(SPECTRUM, "test_loader.asm"),
+                      listing=os.path.join(SPECTRUM, "loader.lst"),
+                      defines=("SCREEN",))
+
+    session = emulator.Session(machine="48k")
+    try:
+        time.sleep(2.5)
+        session.command("smartload " + os.path.join(SPECTRUM, "loader.tap"))
+        time.sleep(12.0)
+        shown = bytes(session.read(0x4000, 6912))
+        ran = session.read(0x9000, 1)[0]
+    finally:
+        session.close()
+    assert shown == screen, "the loading screen is not what was put on the tape"
+    assert ran == 0x2A, "what came after the screen never ran"
 
 
 @needs_tools
