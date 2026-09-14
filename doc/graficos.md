@@ -757,9 +757,43 @@ bancos mapeados del 0 al 3, que es justo el estado en que lo dejaría su propio
 sector de arranque, así que la prueba escribe el bloque en memoria y apunta el
 procesador al principio, que es lo que habría hecho el disco.
 
-## Lo que queda por confirmar
+## Los tres rellenos, preguntados al original
 
-La diferencia exacta entre `FILL` y `BGFILL` se ha deducido, no verificado
-contra la máquina real. Igual que la trama concreta que pinta `SHADE`, que aquí
-es un damero de un píxel. Ambas cosas se pueden comprobar comparando una lámina
-con la que saca un emulador ejecutando la aventura original.
+Quedaban dos cosas deducidas y no comprobadas: en qué se diferencian `FILL` y
+`BGFILL`, y qué trama pinta `SHADE` exactamente. Las dos se contestan en el
+mismo sitio, porque **los tres rellenos son tres entradas de la misma rutina**,
+una detrás de otra en $6364:
+
+    6364  LD HL,0000      ; BGFILL: la pareja que borra
+    6367  JR 6371
+    6369  LD HL,FFAA      ; SHADE: la media tinta
+    636C  JR 6371
+    636E  LD HL,00FF      ; FILL: macizo
+    6371  LD (6343),HL    ; la pareja en curso
+    6374  ...             ; y de ahí al recorrido de la columna
+
+Y el tramo, en $63A5, coge el byte bajo de la pareja y le hace `XOR` con el
+alto en las filas impares —contando en la y de las órdenes, que va en B—:
+
+    63A6  LD HL,(6343)
+    63A9  LD A,L
+    63AA  BIT 0,B
+    63AC  JR Z,63AF
+    63AE  XOR H
+    63AF  LD (6345),A
+
+O sea: **la diferencia entre rellenar y rellenar con el fondo es una constante
+de dieciséis bits y nada más**, y la media tinta es $AA y $55 por turnos, que
+es un damero de un píxel. Justo lo que teníamos.
+
+Leerlo no bastaba, así que además se ejecuta. `tests/test_fills_original.py`
+dibuja una caja en la pantalla de la máquina, pone la semilla en $6341, deja un
+salto a sí mismo en el buffer de impresora y la pila apuntándole, entra en cada
+una de las tres direcciones y compara los 6144 bytes con los que deja el
+renderizador de referencia. **Los tres salen idénticos, byte a byte.**
+
+De ahí sólo se mira el mapa de bits: entrando en la rutina por en medio se
+salta lo que prepara los colores —el original guarda y restaura los 512
+atributos de la lámina alrededor del dibujo—, así que lo que quede en el
+fichero de atributos no dice nada. El color lo cubre `test_all_pictures`, que
+compara láminas enteras, atributos incluidos.
