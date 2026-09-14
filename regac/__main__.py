@@ -28,8 +28,8 @@ import sys
 from .binary import MACHINES, SECTION_NAMES, Database, Reader
 from .devices import DEVICES, device_for, make
 from .gfx import Renderer
-from .media import (banks_of, cpc_disk, cpc_tape, pcw_release,
-                    plus3_banked_disk, plus3_disk)
+from .media import (PCW_SCREEN_BYTES, banks_of, cpc_disk, cpc_tape,
+                    pcw_release, plus3_banked_disk, plus3_disk)
 from .png import save_picture
 from .srcgen import generate
 from .text import TextStore
@@ -171,7 +171,7 @@ LOADS_AT = {"cpc": 0x4000, "plus3": 0x8000, "pcw": 0x0100}
 
 # And how big a dump of each machine's screen is, which is what a loading
 # screen has to be.
-SCREEN_BYTES = {"cpc": 0x4000, "plus3": 6912}
+SCREEN_BYTES = {"cpc": 0x4000, "plus3": 6912, "pcw": PCW_SCREEN_BYTES}
 
 
 def cmd_build(args):
@@ -243,7 +243,7 @@ def cmd_release(args):
             banks = banks_of(f.read())
         path = os.path.join(args.output, name.lower() + ".dsk")
         with open(path, "wb") as f:
-            f.write(pcw_release(starter, code, banks))
+            f.write(pcw_release(starter, code, banks, screen))
         written.append(path)
         how = f"nothing: the machine starts it, with {len(banks)} banks behind it"
     elif args.machine == "cpc":

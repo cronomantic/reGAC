@@ -50,6 +50,24 @@ SECTORS         equ 9                   ; of them to a track
 GAP             equ $2A
 DTL             equ $FF
 
+; The screen, laid out exactly as screen.asm lays it out again later: thirty
+; two rows of eight lines, the top sixteen for the picture and the bottom
+; sixteen for the text, each half in a bank of its own.  It is set up here and
+; not left to the interpreter so that a loading screen can be seen while the
+; rest of the disk comes in; if one of the two layouts changes, so must the
+; other.
+ROLLER_AT       equ $FC00               ; in bank three, clear of the keyboard
+ROLLER_PORT     equ $F5
+ROLLER_VALUE    equ (3 << 5) | ((ROLLER_AT & $3FFF) / 512)
+ROLLER_STEP     equ 360                 ; from one row's entry to the next
+SCROLL_PORT     equ $F6
+DISPLAY_PORT    equ $F7
+DISPLAY_ON      equ %01000000
+PICTURE_BANK    equ 2
+TEXT_BANK       equ 4
+SCREEN_ROWS     equ 16
+SCREEN_BYTES    equ SCREEN_ROWS * 720
+
 BOOT_CODE_AT    equ $F010
 TABLE_AT        equ $F1C0               ; the last sixty four bytes of the
                                         ; sector, which the builder fills in
@@ -75,6 +93,8 @@ boot:
                 call    send            ; drive nought
                 call    settled
 
+                call    the_screen      ; so that a loading screen is seen
+                                        ; coming in, and not after it has
                 ld      ix, TABLE_AT
                 ld      b, (ix+0)       ; the track the pieces start on
                 ld      c, (ix+1)       ; and the record
@@ -108,6 +128,58 @@ boot:
                 out     (SYSTEM), a
                 ld      hl, (TABLE_AT + 2)      ; where the builder says to go
                 jp      (hl)
+
+; Give the video a table of its own, wipe what both halves of the screen had
+; in them, and turn it on.
+; Corrupts: AF, BC, DE, HL
+the_screen:
+                ld      hl, ROLLER_AT
+                ld      de, PICTURE_BANK << 13
+                call    .a_half
+                ld      de, TEXT_BANK << 13
+                call    .a_half
+                ld      a, PICTURE_BANK
+                call    .wipe
+                ld      a, TEXT_BANK
+                call    .wipe
+                ld      a, ROLLER_VALUE
+                out     (ROLLER_PORT), a
+                xor     a
+                out     (SCROLL_PORT), a
+                ld      a, DISPLAY_ON
+                out     (DISPLAY_PORT), a
+                ret
+
+.a_half:
+                ld      c, SCREEN_ROWS
+.each_row:
+                ld      b, 8            ; the eight lines of the row
+.each_line:
+                ld      (hl), e
+                inc     hl
+                ld      (hl), d
+                inc     hl
+                inc     de
+                djnz    .each_line
+                ld      a, e            ; and on to the next row, which is
+                add     a, (ROLLER_STEP - 8) & $FF      ; eight entries beyond
+                ld      e, a            ; where we stand
+                ld      a, d
+                adc     a, (ROLLER_STEP - 8) >> 8
+                ld      d, a
+                dec     c
+                jr      nz, .each_row
+                ret
+
+.wipe:
+                or      BANK_MARK
+                out     (BANK_AT_4000), a
+                ld      hl, $4000
+                ld      de, $4001
+                ld      bc, SCREEN_BYTES - 1
+                ld      (hl), 0
+                ldir
+                ret
 
 ; One sector into HL, from track B and record C, moving both on afterwards.
 ; Corrupts: AF

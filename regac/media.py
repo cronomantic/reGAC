@@ -257,6 +257,12 @@ PCW_CODE_AT = 0x0100            # where the interpreter is put
 PCW_WINDOW = 0x4000             # and the window the database is paged through
 PCW_DB_BANK = 5                 # whose first bank goes here: see game.asm
 
+PCW_SCREEN_AT = 0x8000          # the half of the screen the map can see
+PCW_PICTURE_BANK = 2            # which is this one, and the text is in
+PCW_TEXT_BANK = 4
+PCW_HALF = 16 * 720             # what a half of the screen takes
+PCW_SCREEN_BYTES = 2 * PCW_HALF
+
 
 def pcw_disk(boot, pieces, entry=PCW_CODE_AT, save=PCW_SAVE_SECTORS):
     """A disk a PCW starts by itself.
@@ -295,8 +301,19 @@ def pcw_disk(boot, pieces, entry=PCW_CODE_AT, save=PCW_SAVE_SECTORS):
 
 def pcw_release(boot, code, banks, screen=None):
     """The whole of an adventure on one PCW disk: the interpreter, the banks
-    its database is split into, and the saved game waiting to be written."""
-    pieces = [(PCW_CODE_AT, bytes(code), PCW_NO_BANK)]
+    its database is split into, and the saved game waiting to be written.
+
+    A loading screen is the whole of this machine's screen as the video reads
+    it, both halves one after the other, and it goes first so that it is there
+    for the rest of the load.  The top half is written where the map already
+    shows it; the bottom half is in a bank of its own, so it goes through the
+    same window the database uses.
+    """
+    pieces = []
+    if screen:
+        pieces.append((PCW_SCREEN_AT, bytes(screen[:PCW_HALF]), PCW_NO_BANK))
+        pieces.append((PCW_WINDOW, bytes(screen[PCW_HALF:]), PCW_TEXT_BANK))
+    pieces.append((PCW_CODE_AT, bytes(code), PCW_NO_BANK))
     pieces += [(PCW_WINDOW, bytes(bank), PCW_DB_BANK + n)
                for n, bank in enumerate(banks)]
     return pcw_disk(boot, pieces)
