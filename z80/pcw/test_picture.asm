@@ -14,7 +14,7 @@ UNLOCKED        equ 0
                 ORG     $0100
 start:
                 di
-                ld      sp, $FD00
+                ld      sp, $FC00
                 ld      a, UNLOCKED             ; the banks are ours to move
                 out     (LOCK), a
                 call    db_init
@@ -27,7 +27,7 @@ start:
 ; Drawing again needs none of the setting up, so the tests can poke a new
 ; number in here, clear the flag and point the processor back at this label.
 redraw:
-                ld      sp, $FD00
+                ld      sp, $FC00
                 ld      hl, (picture_wanted)
                 call    draw_picture
                 ld      a, $FF

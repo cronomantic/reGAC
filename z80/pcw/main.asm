@@ -18,7 +18,7 @@ UNLOCKED        equ 0
                 ORG     $0100
 start:
                 di
-                ld      sp, $FD00
+                ld      sp, $FC00
                 ld      a, UNLOCKED             ; the banks are ours to move
                 out     (LOCK), a
                 call    db_init

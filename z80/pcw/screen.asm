@@ -41,7 +41,8 @@ SCREEN_BYTES    equ SCREEN_ROWS * ROW_BYTES
 ; Where a row starts, as the video counts: sixteen bytes to a block, three bits
 ; of line inside it, and the bank on top.  The eight lines of a row are eight
 ; entries in a row, and the next row is 720 bytes on, which is 360 entries.
-ROLLER_AT       equ $FE00
+ROLLER_AT       equ $FC00               ; clear of the keyboard, which the
+                                        ; controller writes at the very top
 ROLLER_PORT     equ $F5                 ; bank = value >> 5, offset = 512 * low
 ROLLER_VALUE    equ (3 << 5) | ((ROLLER_AT & $3FFF) / 512)
 ROLLER_STEP     equ ROW_BYTES / 2       ; from one row's entry to the next
