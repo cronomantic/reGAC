@@ -38,7 +38,12 @@ GAP             equ $2A
 DTL             equ $FF
 
 SECTOR_BYTES    equ 512
-SAVE_SECTORS    equ 4                   ; what the builder sets aside
+SAVE_SECTORS    equ 4                   ; what the builder sets aside for it,
+                                        ; which is PCW_SAVE_SECTORS in
+                                        ; media.py: if one moves, so does the
+                                        ; other, and the loop below will not
+                                        ; write past the area whatever it is
+                                        ; told
 SAVE_BYTES      equ SAVE_SECTORS * SECTOR_BYTES
 SAVE_WHERE      equ $F1FC               ; track, record and how many sectors
 SAVE_AREA       equ $D000               ; and where it is put together, which
@@ -113,6 +118,9 @@ transfer:
                 ld      hl, SAVE_AREA
                 ld      a, (SAVE_WHERE + 2)
                 ld      e, a                    ; how many sectors it holds
+                cp      SAVE_SECTORS + 1
+                jr      c, .each_sector
+                ld      e, SAVE_SECTORS         ; and no more than we have
 .each_sector:
                 call    one_sector
                 dec     e

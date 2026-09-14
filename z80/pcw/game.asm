@@ -92,5 +92,7 @@ database:
                 INCBIN  "game.rgac", 0, DB_RESIDENT_SIZE
 last:
                 ASSERT  last <= DB_WINDOW       ; or it would page itself out
+                ; and a game has to fit in the file the builder sets aside
+                ASSERT  vm_state_end - vm_state <= SAVE_BYTES
 
                 SAVEBIN "game_code.bin", start, last - start

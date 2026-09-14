@@ -168,6 +168,27 @@ class Session:
             length -= piece
         return bytes(out)
 
+    def start_code(self, blob, at, flag, wanted=0xFF, tries=3, timeout=25.0):
+        """Put a build in memory, start it, and say whether it got going.
+
+        Writing straight into a running machine is how the Amstrads and the
+        PCW are driven, and on the PCW it is now and then too early: with no
+        disk in it that machine is still busy with the loader its keyboard
+        gave it, and once in a while that treads on what has just been
+        written.  So this looks at whether the build reached the mark it was
+        going to reach, and puts it back if it did not.
+        """
+        for attempt in range(tries):
+            for offset in range(0, len(blob), 512):
+                piece = blob[offset:offset + 512]
+                self.command(
+                    f"write-memory-raw {at + offset} " + piece.hex().upper()
+                )
+            self.command(f"set-register PC={at:04X}H")
+            if self.wait_for(flag, wanted, timeout=timeout, every=0.2):
+                return True
+        return False
+
     def wait_for(self, address, wanted, timeout=20.0, every=0.4):
         """Run until a byte in memory takes a value, and say whether it did.
         Look often when what happens after the wait is being measured, because

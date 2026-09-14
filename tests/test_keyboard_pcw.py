@@ -81,13 +81,9 @@ def watching():
         blob = f.read()
     session = emulator.Session(machine="PCW8256")
     time.sleep(4.0)
-    for at in range(0, len(blob), 512):
-        session.command(
-            f"write-memory-raw {LOADS_AT + at} " + blob[at:at + 512].hex().upper()
-        )
-    session.command(f"set-register PC={LOADS_AT:04X}H")
-    time.sleep(1.0)
-    assert session.read(where["ready_flag"], 1)[0] == 1, "the build never started"
+    started = session.start_code(blob, LOADS_AT, where["ready_flag"], wanted=1,
+                                 timeout=5.0)
+    assert started, "the build never started"
     return session, where
 
 
@@ -140,11 +136,16 @@ def test_a_bit_is_high_while_its_key_is_held():
     try:
         # The last three bytes are not keys: one bit of them is always on and
         # another comes and goes with nothing held at all, which is the
-        # controller's own business.  Every row that carries a character is
-        # clear until something is pressed.
-        assert session.read(KEYS_AT, 13) == bytes(13), (
-            "something is held with nothing pressed"
-        )
+        # controller's own business.  Every row that carries a character does
+        # come to rest with nothing pressed -- looked at more than once,
+        # because a machine that has just been switched on takes a moment to
+        # settle and one look can catch it still doing so.
+        for _ in range(5):
+            rest = session.read(KEYS_AT, 13)
+            if rest == bytes(13):
+                break
+            time.sleep(0.2)
+        assert rest == bytes(13), f"something is held with nothing pressed: {rest.hex()}"
         session.command("send-keys-event 97 1")  # the letter A
         time.sleep(0.1)
         assert session.read(where["raw_row"], 1)[0] == 0b00100000

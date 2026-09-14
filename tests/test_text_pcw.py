@@ -140,11 +140,7 @@ def test_the_pcw_prints_what_the_database_holds():
     session = emulator.Session(machine="PCW8256")
     try:
         time.sleep(4.0)  # let the machine ask for a disk
-        for at in range(0, len(blob), 512):
-            piece = blob[at:at + 512]
-            session.command(f"write-memory-raw {LOADS_AT + at} " + piece.hex().upper())
-        session.command(f"set-register PC={LOADS_AT:04X}H")
-        finished = session.wait_for(done, 0xFF, timeout=60.0, every=0.2)
+        finished = session.start_code(blob, LOADS_AT, done)
         memory = session.read(SCREEN, WINDOW_ROWS * ROW_BYTES)
     finally:
         session.close()
