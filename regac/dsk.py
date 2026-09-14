@@ -89,7 +89,18 @@ FORMATS = {
     "plus3-720": Format(tracks=80, sectors=9, sector_size=512, reserved=2,
                         block_size=2048, dir_blocks=4, base=0x01, heads=2,
                         kind=3, geometry=0x81, boot=True, byte_count=True),
+    # The PCW's own, which is the same shape and starts itself: see boot().
+    "pcw": Format(tracks=40, sectors=9, sector_size=512, reserved=1,
+                  block_size=1024, dir_blocks=2, base=0x01,
+                  boot=True, byte_count=True),
 }
+
+# What a PCW wants of the sector it starts from: the first sixteen bytes are
+# the specification, the code begins after them, and the whole sector has to
+# add up to this.
+BOOT_AT = 0xF000
+BOOT_CODE_AT = 0xF010
+BOOT_SUM = 0xFF
 
 
 def filename(name):
@@ -122,6 +133,8 @@ class Disk:
         self.directory = bytearray([EMPTY]) * (self.entries * DIRECTORY_ENTRY)
         self.contents = {}                      # block number -> its bytes
         self.next_block = shape.dir_blocks
+        self.boot_sector = None                 # what a PCW starts from
+        self.raw = {}                           # and anything put by position
 
     # -- putting files on it ------------------------------------------------
 
@@ -196,6 +209,33 @@ class Disk:
                 return at
         return None
 
+    def boot(self, code, machine=BOOT_SUM):
+        """Put the code a PCW starts from in the first sector.
+
+        That machine has no ROM at all: at the switch it fetches a loader from
+        the keyboard controller, reads this one sector to $F000 and, if the
+        512 bytes add up to what it wants, jumps to $F010 -- which is why the
+        specification takes the first sixteen and the code follows it.  The
+        byte before the end is bent to make the sum come out.
+        """
+        spare = self.format.sector_size - (BOOT_CODE_AT - BOOT_AT) - 1
+        if len(code) > spare:
+            raise DiskError(f"the boot code is {len(code)} bytes and {spare} fit")
+        sector = bytearray(self.format.sector_size)
+        sector[0:10] = self.format.specification()
+        sector[16:16 + len(code)] = code
+        sector[-1] = (machine - sum(sector[:-1])) & 0xFF
+        self.boot_sector = bytes(sector)
+        return self.boot_sector
+
+    def put(self, track, sector, blob):
+        """Write one sector where it lies, for what has no business being in
+        a file: the loader reads these by position."""
+        where = track * self.format.sectors + (sector - 1)
+        if not 0 <= where < self.sector_count:
+            raise DiskError(f"there is no track {track} sector {sector}")
+        self.raw[where] = bytes(blob).ljust(self.format.sector_size, bytes(1))
+
     # -- writing it out -----------------------------------------------------
 
     def sectors(self):
@@ -205,7 +245,8 @@ class Disk:
         out = [bytes([EMPTY]) * shape.sector_size
                for _ in range(self.sector_count)]
         if shape.boot:
-            out[0] = (shape.specification()
+            out[0] = (self.boot_sector or
+                      shape.specification()
                       + bytes(shape.sector_size - len(shape.specification())))
         first = shape.reserved * shape.sectors
         blocks = dict(self.contents)
@@ -217,6 +258,8 @@ class Disk:
             for n in range(self.per_block):
                 out[where + n] = blob[n * shape.sector_size:
                                       (n + 1) * shape.sector_size]
+        for where, blob in self.raw.items():
+            out[where] = blob
         return out
 
     def image(self):
