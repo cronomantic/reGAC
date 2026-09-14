@@ -52,7 +52,7 @@ done_flag:      db      0
                 include "tape.asm"
                 include "../common/conditions.asm"
                 include "draw.asm"
-                include "shapes.asm"
+                include "../common/shapes.asm"
                 include "fill.asm"
                 include "../common/opcodes.asm"
                 include "../common/picture.asm"

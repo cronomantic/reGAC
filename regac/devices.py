@@ -576,6 +576,175 @@ def cpc_stretched_device():
     )
 
 
+# The Amstrad PCW's screen is 720 by 256 and carries no colour at all: one bit
+# a pixel, lit or not.  Its lines are not stored one after another either.  The
+# video reads a row of eight lines out of 720 bytes, taking every eighth byte
+# down a column, so within a row the eight lines of a byte column are the eight
+# bytes in a row.  Which 720 bytes make which row is the roller RAM's business,
+# and that is ours to lay out.
+PCW_COLUMNS = 90                        # bytes across the screen
+PCW_ROW_BYTES = CHAR_SIDE * PCW_COLUMNS  # what one row of eight lines takes
+PCW_SCALE = 2                           # a picture pixel is two of its own
+PCW_PICTURE_ROWS = SOURCE_ROWS // CHAR_SIDE
+PCW_MARGIN = (PCW_COLUMNS - (SOURCE_WIDTH * PCW_SCALE) // CHAR_SIDE) // 2
+
+
+def pcw_address(x, y):
+    """Where a pixel lives, counting from the first byte of the first row."""
+    return (y >> 3) * PCW_ROW_BYTES + CHAR_SIDE * (x >> 3) + (y & 7)
+
+
+def luminance(colour):
+    """How light a colour is, nought to 255, in the usual weights."""
+    red, green, blue = rgb(colour)
+    return (299 * red + 587 * green + 114 * blue) // 1000
+
+
+# A two by two ordered dither, indexed by the low bit of y then of x.  With
+# four thresholds it gives five levels: none of the pixels lit, a quarter,
+# half, three quarters, all.
+DITHER = (0, 2, 3, 1)
+DITHER_LEVELS = 4
+
+
+def dithered(level, x, y):
+    return level > DITHER[((y & 1) << 1) | (x & 1)]
+
+
+class PcwDevice(Device):
+    """The Amstrad PCW: light or no light, and nothing in between.
+
+    A machine with no colour cannot be told the Spectrum's colours and left to
+    it, so two things happen here.  Areas are laid down as a dither chosen by
+    how light the colour was, which keeps a dark wall darker than a bright sky
+    and keeps two different colours apart; outlines are not dithered at all,
+    because half a line is not a line, so they come out solid, black or white
+    by that same lightness.
+
+    The colour going and the light staying means a lit pixel can no longer be
+    what stops a fill: a black outline on this screen is an unlit pixel.  So,
+    like the machines with colour per pixel, it keeps a separate one bit mask,
+    and that mask holds exactly what a Spectrum's bitmap would hold.  It has
+    to: the pictures were drawn against the Spectrum's own rule, where the lit
+    half of a half tone stops the next fill and the unlit half does not.
+
+    The picture is drawn twice as wide as it is written, because a pixel of
+    this screen is about half as wide as it is tall.  Nothing here knows about
+    that: it is a coordinate space of 256 across, as on every other machine,
+    and the doubling happens on the way to the screen, which is what the
+    runtime does too.
+    """
+
+    name = "pcw"
+    palette = [0x000000, 0xFFFFFF]
+    scale = PCW_SCALE
+
+    def __init__(self):
+        self.mask = bytearray(self.width * self.height)
+        self.ink = 0
+        self.paper = 7
+        self.border = 0
+        self.line_lit = 0
+        self.ink_level = 0
+        self.paper_level = DITHER_LEVELS
+        # The screen starts in the colour the Spectrum starts in, so an area
+        # no fill ever reaches looks the same on every machine.
+        self.lit = bytearray(
+            1 if dithered(self.paper_level, x, y) else 0
+            for y in range(self.height)
+            for x in range(self.width)
+        )
+
+    def level_of(self, colour):
+        """How many of the four thresholds a colour lights.
+
+        The lightness is measured against white rather than against the
+        brightest the Spectrum's hardware can manage, and that is why the
+        bright bit does nothing at all here: it lifts the whole picture at
+        once on a colour set, and a screen with one level of light has nowhere
+        to put it.  Measured the other way a picture which never turns bright
+        on would never reach the top of this screen, which is worse.
+        """
+        white = luminance(SPECTRUM_PALETTE[7])
+        light = luminance(SPECTRUM_PALETTE[colour & 7])
+        return (light * DITHER_LEVELS + white // 2) // white
+
+    def set_border(self, colour):
+        self.border = colour & 7
+
+    def set_colours(self, ink, paper, bright, flash):
+        """Work out what the colours in force come to on this screen.
+
+        The ink and the paper are kept as they came, not as they came out, so
+        that an ink of nine, which means pick whichever reads against the
+        paper, is worked out again when the paper changes.  That is what the
+        runtime does as well, where the colours are settled once per shape
+        rather than once per pixel.
+        """
+        if paper < TRANSPARENT:
+            self.paper = paper
+        if ink < TRANSPARENT or ink == CONTRAST:
+            self.ink = ink
+        ink = self.ink
+        if ink == CONTRAST:
+            ink = 0 if self.paper >= 4 else 7
+        self.ink_level = self.level_of(ink)
+        self.paper_level = self.level_of(self.paper)
+        self.line_lit = 1 if self.ink_level * 2 > DITHER_LEVELS else 0
+
+    def inside(self, x, y):
+        return 0 <= x < self.width and 0 <= y < self.height
+
+    def draw_point(self, x, y):
+        if not self.inside(x, y):
+            return
+        index = y * self.width + x
+        self.mask[index] = 1
+        self.lit[index] = self.line_lit
+
+    def is_boundary(self, x, y):
+        if not self.inside(x, y):
+            return True
+        return self.mask[y * self.width + x]
+
+    def fill_run(self, x, y, pattern):
+        row = self.to_device(x, y)[1]
+        left = x
+        while left > 0 and not self.is_boundary(left - 1, row):
+            left -= 1
+        right = x
+        while right < self.width - 1 and not self.is_boundary(right + 1, row):
+            right += 1
+        for place in range(left, right + 1):
+            lit = (pattern >> (7 - (place & 7))) & 1
+            index = row * self.width + place
+            self.mask[index] = lit
+            level = self.ink_level if lit else self.paper_level
+            self.lit[index] = 1 if dithered(level, place, row) else 0
+        return right - left + 1
+
+    def screen(self):
+        """The picture as the sixteen rows of screen bytes it becomes, each
+        row the 720 the video reads, with the picture put in the middle."""
+        out = bytearray(PCW_PICTURE_ROWS * PCW_ROW_BYTES)
+        for y in range(self.height):
+            for x in range(self.width):
+                if not self.lit[y * self.width + x]:
+                    continue
+                column = PCW_MARGIN * CHAR_SIDE + x * PCW_SCALE
+                for step in range(PCW_SCALE):
+                    place = column + step
+                    out[pcw_address(place, y)] |= 0x80 >> (place & 7)
+        return bytes(out)
+
+    def to_rgb(self):
+        return [
+            [rgb(self.palette[self.lit[y * self.width + x]])
+             for x in range(self.width)]
+            for y in range(self.height)
+        ]
+
+
 DEVICES = {
     "spectrum": SpectrumDevice,
     "sam": sam_device,
@@ -584,6 +753,7 @@ DEVICES = {
     "cpc-wide": cpc_stretched_device,
     "msx": MsxDevice,
     "msx2": msx2_device,
+    "pcw": PcwDevice,
     "amstrad": amstrad_device,
 }
 

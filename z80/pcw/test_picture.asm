@@ -1,16 +1,22 @@
 ; MIT License, Copyright (c) 2025 Cronomantic
 ;
-; A build that draws one picture and stops, so the tests can compare the
-; screen against what the reference renderer says it should be.
+; A build that draws one picture on a PCW and stops, so the tests can compare
+; the screen against what the reference renderer says it should be.
+;
+; It takes the machine as it comes out of its own loader: interrupts off, the
+; banks unlocked so they can be moved, and a stack of our own under the screen.
 
-                DEVICE  ZXSPECTRUM48
+                DEVICE  NOSLOT64K
 
-                ORG     $8000
+LOCK            equ $F4
+UNLOCKED        equ 0
+
+                ORG     $0100
 start:
                 di
-                ld      sp, $7FF0
-                xor     a
-                out     ($FE), a
+                ld      sp, $FD00
+                ld      a, UNLOCKED             ; the banks are ours to move
+                out     (LOCK), a
                 call    db_init
                 call    config_init
                 call    text_init
@@ -19,10 +25,9 @@ start:
                 ; fall through
 
 ; Drawing again needs none of the setting up, so the tests can poke a new
-; number in here, clear the flag and point the processor back at this label
-; instead of loading the snapshot all over again.
+; number in here, clear the flag and point the processor back at this label.
 redraw:
-                ld      sp, $7FF0
+                ld      sp, $FD00
                 ld      hl, (picture_wanted)
                 call    draw_picture
                 ld      a, $FF
@@ -46,5 +51,6 @@ picture_wanted: dw      1
                 ALIGN   256
 database:
                 INCBIN  "picture.rgac"
+last:
 
-                SAVESNA "picture.sna", start
+                SAVEBIN "picture.bin", start, last - start

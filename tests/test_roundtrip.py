@@ -167,7 +167,7 @@ def test_a_fill_covers_the_same_ground_on_every_machine():
                ["SHADE", 80, 80]]}
     spectrum = Renderer(gfx, make("spectrum"))
     spectrum.run(1)
-    for machine in ("sam", "next", "msx", "msx2", "cpc"):
+    for machine in ("sam", "next", "msx", "msx2", "cpc", "pcw"):
         target = Renderer(gfx, make(machine))
         target.run(1)
         assert spectrum.fill_coverage == target.fill_coverage, machine
@@ -177,7 +177,7 @@ def test_every_machine_draws_the_same_picture():
     """A picture drawn on each machine must come out the same size as that
     machine's screen, and never blank."""
     gfx = {1: [["RECT", 40, 160, 200, 60], ["PAPER", 4], ["BGFILL", 120, 110]]}
-    for machine in ("spectrum", "sam", "next", "msx", "msx2", "cpc"):
+    for machine in ("spectrum", "sam", "next", "msx", "msx2", "cpc", "pcw"):
         device = Renderer(gfx, make(machine)).run(1)
         rows = device.to_rgb()
         assert len(rows) == device.height, machine

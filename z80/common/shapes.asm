@@ -9,6 +9,11 @@
 ; Everything here works in sixteen bit coordinates, because the original does:
 ; a curve that leaves the picture has to stay outside rather than come round in
 ; a byte.  Bringing a point back to the edge is the line's job.
+;
+; This is shared by the machines that count in whole pixels, which is every one
+; of them but the Amstrad: its firmware works in halves of a pixel, so an
+; ellipse of its own comes out a pixel wider on one side, and it keeps its own
+; copy of this file.
 
 ELLIPSE_STEPS   equ 8                   ; steps to a quarter turn
 

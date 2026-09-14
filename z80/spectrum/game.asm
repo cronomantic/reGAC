@@ -53,7 +53,7 @@ done_flag:      db      0
                 include "keyboard.asm"
                 include "tape.asm"
                 include "draw.asm"
-                include "shapes.asm"
+                include "../common/shapes.asm"
                 include "fill.asm"
                 include "../common/conditions.asm"
                 include "../common/opcodes.asm"
