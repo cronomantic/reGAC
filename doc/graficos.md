@@ -636,6 +636,94 @@ Cuando la lámina no trae color, el intérprete lee el que hay con SCR GET INK y
 lo guarda tal cual, y de ahí salen los 1, 24, 20 y 6 que son las tintas del
 modo 1 al arrancar.
 
+## El PCW, una pantalla sin color y sin mapa de bits
+
+La tercera máquina con lámina propia, y la que de verdad pone a prueba que el
+intérprete no sepa nada de color. Está medida y funcionando: todas las
+primitivas y las treinta y tres láminas de Megacorp salen byte por byte igual
+que el renderizador de referencia.
+
+### La pantalla es una tabla, y el reparto lo elegimos nosotros
+
+El vídeo no lee un bloque de memoria: lee 256 entradas de la *roller RAM*, una
+por línea de barrido. El reparto que montamos es el más llano posible, treinta
+y dos filas de ocho líneas seguidas, las dieciséis de arriba para la lámina y
+las dieciséis de abajo para el texto, y la comprobación de que la fórmula era
+la buena está en las propias entradas que escribimos: $4000, $4001... $4007
+para las ocho líneas de la primera fila, y $4168 para la siguiente, que son
+360 entradas más allá, o sea los 720 bytes de una fila.
+
+Las dos mitades viven en bancos distintos y sólo una está en el mapa a la vez.
+Nada obliga a ello -- memoria sobra --, pero así queda una ranura entera de
+16K libre para la base de datos, y el vídeo lee un banco esté o no a la vista
+del procesador. El reparto queda así:
+
+| ranura | qué hay |
+|---|---|
+| $0000 | el intérprete |
+| $4000 | la ventana de la base de datos, que se pagina |
+| $8000 | la mitad de pantalla que toque, lámina o texto |
+| $C000 | la máscara, la pila, la roller RAM y lo demás |
+
+### El color se va y quedan las tramas
+
+Un bit de luz por píxel. Una superficie se tiende como una trama elegida por
+lo clara que era el color, con un damero ordenado de dos por dos que da cinco
+niveles; un contorno no se trama, porque media línea no es una línea, y sale
+sólido, blanco o negro según esa misma claridad. Los ocho colores caen así:
+
+| color | negro | azul | rojo | magenta | verde | cian | amarillo | blanco |
+|---|---|---|---|---|---|---|---|---|
+| nivel | 0 | 0 | 1 | 2 | 2 | 3 | 4 | 4 |
+
+**El brillo no hace nada.** La claridad se mide contra el blanco, no contra lo
+más brillante que puede dar el hardware del Spectrum, para que una lámina que
+nunca enciende el brillo llegue igualmente al blanco de esta pantalla; medido
+al revés, el brillo sí contaría pero ninguna lámina normal pasaría del gris. La
+tinta 9, la que dice «el que se lea contra el papel», sí se respeta, y se
+vuelve a resolver cada vez que cambia el papel.
+
+El fondo de la lámina es blanco, como el papel del Spectrum, y el texto va
+negro sobre blanco debajo: es lo que hace LocoScript, que es lo que esa máquina
+enseñaba al encenderse.
+
+### La máscara de un bit, cuatro kilobytes
+
+Si el contorno negro es un píxel *apagado*, un píxel encendido ya no puede ser
+lo que detiene un relleno. Así que hay una máscara aparte que guarda
+exactamente lo que guardaría el mapa de bits de un Spectrum, y no es opcional:
+las láminas se dibujaron contra esa regla, donde la mitad encendida de una
+media tinta corta el siguiente relleno y la apagada no. Es la misma solución
+que ya usan las máquinas de color por píxel, y aquí cuesta 4K de los 256 que
+tiene la máquina.
+
+### Un relleno es un byte por fila
+
+La trama de la tinta y la del papel se repiten cada dos puntos, y el patrón que
+tiende GAC es lleno, vacío o damero, así que lo que el patrón coge de una y deja
+a la otra se repite también cada dos puntos: **el byte que va a la pantalla es
+el mismo en todo el tramo**. Se calcula una vez por fila y el tramo es escribir
+un byte a lo largo, con máscara sólo en las dos puntas, igual que en el
+Spectrum.
+
+### Doblada en horizontal, doblando al poner el punto
+
+El píxel del PCW es más alto que ancho, así que los 256 puntos de la lámina
+ocupan 512 píxeles: sesenta y cuatro de las noventa columnas, centradas, con
+trece de margen a cada lado. Se dobla al poner el punto, y la pareja nunca
+cruza un byte porque empieza siempre en píxel par. No se vuelve a trazar al
+doble de tamaño, que es la lección que costó aprender con el Amstrad.
+
+### Comprobarlo sin ver la pantalla
+
+El emulador no devuelve la pantalla del PCW: sale negra con lo que sea que haya
+en memoria. Así que se comparan los bytes, que es lo mismo y además comprueba
+de paso que la tabla de líneas apunta donde debe. Y no hace falta ni disco: un
+PCW sin disquete se queda en el cargador que le da el teclado, con los cuatro
+bancos mapeados del 0 al 3, que es justo el estado en que lo dejaría su propio
+sector de arranque, así que la prueba escribe el bloque en memoria y apunta el
+procesador al principio, que es lo que habría hecho el disco.
+
 ## Lo que queda por confirmar
 
 La diferencia exacta entre `FILL` y `BGFILL` se ha deducido, no verificado

@@ -60,9 +60,10 @@ tecla de mayúsculas y se quedaba ahí.
 
 ## Las máquinas
 
-En Python están modeladas Spectrum, Sam Coupé, Next, MSX1, MSX2 y Amstrad. En
-Z80 están el Spectrum y el Amstrad CPC, los dos enteros, y el Spectrum de 128K
-con la base de datos repartida en bancos.
+En Python están modeladas Spectrum, Sam Coupé, Next, MSX1, MSX2, Amstrad y
+PCW. En Z80 están el Spectrum y el Amstrad CPC, los dos enteros, el Spectrum de
+128K con la base de datos repartida en bancos, y del PCW el arranque y la
+pantalla, que ya dibuja láminas idénticas a las de la referencia.
 
 Y los tres se entregan en el medio que les toca, con su cargador: cinta para el
 Spectrum de 48 y el de 128, disco y cinta para el Amstrad, y disco para el +3.
@@ -150,29 +151,26 @@ uno de ellos.
 Merece la pena porque es Z80 y porque no se parece a ninguna de las otras, así
 que obliga a que la separación entre intérprete y máquina sea real.
 
-**Monocromo.** 720 por 256 píxeles y ni un color. Todo el modelo de tinta,
-papel, brillo y parpadeo se queda sin sitio donde ir, y la única manera de
-mostrar tonos es la trama. Es la máquina que pone a prueba de verdad que el
-intérprete de láminas no sepa nada de color: hoy pide al dispositivo que fije
-los colores en curso, y el del PCW tendrá que traducirlos a tramas o a nada.
-
-**El ancho no obliga a escalar.** Con 720 de ancho cabe la lámina de 256
-centrada, que es la regla que ya establecimos y que evita que los rellenos se
-escapen. Si se quisiera aprovechar la pantalla, el doble exacto son 512 y sí
-sería seguro, pero **doblando los píxeles del resultado, no volviendo a trazar
-al doble de tamaño**: doblar píxeles conserva la lámina exactamente, volver a
-trazar reabre el problema que medimos con el Amstrad.
+**Monocromo, y ya resuelto.** 720 por 256 píxeles y ni un color. Todo el
+modelo de tinta, papel, brillo y parpadeo se queda sin sitio donde ir, y la
+única manera de mostrar tonos es la trama: superficies tramadas por lo clara
+que sea la tinta, contornos sólidos, y el brillo sin efecto ninguno. Era la
+máquina que ponía a prueba de verdad que el intérprete de láminas no supiera
+nada de color, y lo ha pasado: el dispositivo del PCW traduce los colores en
+curso a niveles de luz y el intérprete no se entera.
 
 **Memoria de sobra**, 256K o más en bloques de 16K, que encaja con el reparto
-por bancos que ya tiene el formato binario.
+por bancos que ya tiene el formato binario. El reparto elegido deja una ranura
+entera para la ventana de la base de datos, y las dos mitades de la pantalla se
+turnan en otra.
 
 **No hay AY.** Sólo un zumbador, así que toda la previsión de música que
 condiciona el reparto de bancos no aplica aquí. La sección de música del
 formato seguirá estando, vacía, y este destino no necesitará ni buffer
 residente ni ranura propia.
 
-**La pantalla, ya medida.** No es un mapa de bits fijo: hay una *roller RAM* de
-256 entradas, una por línea de barrido, y la máquina dibuja la línea que cada
+**La pantalla, hecha.** No es un mapa de bits fijo: hay una *roller RAM* de 256
+entradas, una por línea de barrido, y la máquina dibuja la línea que cada
 entrada diga. Los puertos, comprobados en el emulador uno a uno:
 
 | puerto | qué hace |
@@ -183,40 +181,33 @@ entrada diga. Los puertos, comprobados en el emulador uno a uno:
 | $F6 | por qué línea de la tabla empieza a pintar |
 | $F7 | bit 6 enciende la pantalla, bit 7 la invierte |
 
-Cada entrada son dos bytes con la forma `bbb xxxxxxxxxxx yyy`: tres bits de
-banco, once de bloque de dieciséis bytes y tres de línea dentro del bloque. Y
-lo que hace que todo encaje: **una línea son 720 bytes y no 90**, porque el
-vídeo lee de ocho en ocho — los ocho píxeles de la columna `c` están en
-`base + 8c`. Está en la documentación de John Elliott y en la de Zigazou, y
-además se ha leído la tabla que monta el propio CP/M del PCW: dentro de una
-fila de caracteres las entradas suben de una en una (las ocho líneas de la
-fila) y al cambiar de fila suben 360, que son 45 bloques de 16 bytes, o sea
-720 bytes: una fila de 90 celdas.
-
-Con eso la dirección de un punto sale tan barata como en el Spectrum:
+Cada entrada son dos bytes: tres bits de banco, diez de bloque de dieciséis
+bytes y tres de línea dentro del bloque. Y lo que hace que todo encaje: **una
+línea son 720 bytes y no 90**, porque el vídeo lee de ocho en ocho — los ocho
+píxeles de la columna `c` están en `base + 8c`. De ahí que la dirección de un
+punto salga tan barata como en el Spectrum:
 
     dirección = base + fila*720 + 8*(x>>3) + (y&7)
 
-**El tamaño: doblado en horizontal.** El píxel del PCW es 2,1 veces más alto
-que ancho (720 por 256 en un cristal de cuatro tercios; el propio emulador lo
-pinta 1 por 2). Una lámina de 256×128 puesta píxel a píxel sale casi cuadrada
-y ocupa un tercio del ancho: eso *rompe* la proporción. Doblando sólo en
-horizontal quedan 512×128, que es la proporción de 2:1 que tiene en el
-Spectrum, y sobran 128 líneas para el texto, dieciséis filas. Se dobla al
-poner el punto, dos píxeles por punto, no volviendo a trazar al doble, que es
-la regla que costó aprender en el Amstrad. Y va con perilla: escala por eje en
-el fichero de proyecto, que es lo que el intérprete de CPC ya traía.
-
-**El color, a tramas por luminancia.** Un bit por píxel: líneas y puntos
-sólidos, rellenos tramados según el brillo del color que pida la lámina. El
-mecanismo es el que ya usa `SHADE` en el Spectrum.
+La lámina va doblada en horizontal, 512 píxeles de los 720, centrada, y se
+dobla **al poner el punto**, que es la regla que costó aprender en el Amstrad.
+El cómo y el porqué de todo esto -- el reparto de memoria, la máscara de un
+bit, los niveles de gris, el relleno de un byte por fila -- está en
+[`graficos.md`](graficos.md); la escala por eje seguirá yendo con perilla en el
+fichero de proyecto cuando lo haya.
 
 **Una advertencia sobre el banco de pruebas**: el emulador no vuelca la
 pantalla del PCW. Sale negra siempre, incluso arrancando su propio CP/M y
-habiendo escrito a mano en la memoria que la tabla señala. Así que aquí la
-comprobación no será por imagen sino leyendo la memoria de pantalla y
-comparándola contra el renderizador de referencia, que es justo lo que ya
-hacen las pruebas de láminas del Spectrum y del Amstrad.
+habiendo escrito a mano en la memoria que la tabla señala. Por eso la
+comprobación no es por imagen sino leyendo la memoria de pantalla y
+comparándola contra el renderizador de referencia. Y para correr una prueba no
+hace falta ni disco: un PCW sin disquete se queda en el cargador que le da el
+teclado, con los cuatro bancos mapeados del 0 al 3, que es justo el estado en
+que lo dejaría su propio sector de arranque, así que se escribe el bloque en
+memoria y se apunta el procesador al principio.
+
+**Lo que queda de esta máquina**: el teclado, que es lo único que sigue sin
+medir, y con eso el intérprete entero y su `release -m pcw`.
 
 **Arranca solo, y no hace falta CP/M.** Los juegos de PCW son autoarrancables
 y el mecanismo es simple: la máquina **no tiene ROM**; al encender se trae un
