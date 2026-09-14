@@ -714,6 +714,27 @@ trece de margen a cada lado. Se dobla al poner el punto, y la pareja nunca
 cruza un byte porque empieza siempre en píxel par. No se vuelve a trazar al
 doble de tamaño, que es la lección que costó aprender con el Amstrad.
 
+### Lo que cuesta
+
+Medido en ciclos del Z80 y pasado a segundos de un PCW de 4MHz, con todas las
+láminas de las cinco aventuras que hay a mano, y todas idénticas a la
+referencia:
+
+| aventura | la más lenta |
+|---|---|
+| Megacorp | 2,6 s |
+| Bangkok (Spectrum) | 3,0 s |
+| Bangkok (CPC) | 3,6 s |
+| Don Quijote | 2,7 s |
+| Las vajillas | 4,0 s |
+
+Es la máquina más lenta de las tres, y se sabe por qué: cada punto se escribe
+dos veces, en la máscara y en la pantalla, y la pantalla va al doble de ancho.
+Aun así entra en el tope de cinco segundos que nos pusimos, y sin haber
+apretado nada todavía. Si algún día hiciera falta, el sitio por donde apretar
+es el punto del contorno, no el relleno: el relleno ya va a un byte por fila y
+cuatro puntos por byte.
+
 ### Comprobarlo sin ver la pantalla
 
 El emulador no devuelve la pantalla del PCW: sale negra con lo que sea que haya
