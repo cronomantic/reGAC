@@ -137,6 +137,30 @@ con `LOAD ""`: la de 48 y la de 128, ésta con una aventura engordada hasta
 tener dos bancos, y con la lámina de la pantalla comparada byte a byte contra
 la referencia, que sólo cuadra si cada bloque cayó en su página.
 
+## El disco
+
+Para las máquinas que cargan de disco hay una librería propia,
+[`regac/dsk.py`](../regac/dsk.py): un sistema de ficheros CP/M y la imagen que
+lo contiene. La parte del sistema de ficheros sigue a la de
+ChooseYourDestiny, que a su vez es un port de libdsk y mkp3fs, y por eso no
+está escrita de cero.
+
+Lo que cambia de una máquina a otra son diez valores —pistas, sectores, tamaño
+de sector, pistas reservadas, tamaño de bloque, bloques de directorio y los
+huecos— más desde qué número se numeran los sectores. Eso último es lo del
+Amstrad: AMSDOS no guarda ningún registro de arranque, así que el formato no se
+lee, se deduce de los números de sector, $C1 en un disco de datos y $41 en uno
+de sistema. El +3 sí lo guarda, en el primer sector, y por eso su formato lleva
+`boot`.
+
+Comprobado de dos maneras, porque cada una pilla lo que la otra no. Ida y
+vuelta contra el lector de `disk.py`, que está escrito contra discos de
+Amstrad de verdad, con ficheros de todos los tamaños incómodos: uno de un
+byte, uno de un registro, uno de justo los dieciséis kilobytes que cabe en una
+entrada de directorio y uno de cuarenta mil. Y metiendo el disco en un 6128
+emulado y haciendo que **AMSDOS mismo cargue** el fichero, que es lo único que
+demuestra que el directorio es un directorio.
+
 ## La música con AY, que es lo que condiciona el diseño
 
 El reproductor de AY corre desde la interrupción, cincuenta veces por segundo.

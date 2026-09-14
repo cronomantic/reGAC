@@ -208,17 +208,40 @@ class Session:
     # the key, but not all: these are the ones that are not.
     EVENT_KEYS = {chr(13): 129, chr(10): 129, chr(8): 132, ".": 183}
 
+    # The marks that share a key with something else need shift held down,
+    # and the emulator counts shift as a key of its own; 133 is one of the
+    # three numbers that behave as one.  The pairs are an Amstrad's, which is
+    # where this is needed: typing LOAD"NAME at its BASIC wants a quote.
+    SHIFT_KEY = 133
+    SHIFTED = {'"': "2", "!": "1", "#": "3", "$": "4", "%": "5", "&": "6",
+               "'": "7", "(": "8", ")": "9", "=": "-", "*": ":", "+": ";",
+               "<": ",", ">": ".", "?": "/"}
+
     def type_keys(self, text, hold_for=0.06):
         """Type at a keyboard the matrix cannot be reached through, which is
         every machine here but the Spectrum.  The emulator will press and
         release a key on demand, which comes to the same thing and keeps the
         timing ours: sending a whole string at it drops letters.  The codes
         are ASCII, a letter in lower case, and enter is 129."""
+        last = None
         for char in text:
-            code = self.EVENT_KEYS.get(char, ord(char.lower()))
+            with_shift = self.SHIFTED.get(char)
+            base = with_shift or char
+            code = self.EVENT_KEYS.get(base, ord(base.lower()))
+            if code == last:
+                # The same key twice running needs a gap between them or the
+                # machine takes it for one long press: "&3FFF" comes out as
+                # "&3FF" without this.
+                time.sleep(hold_for * 2)
+            if with_shift:
+                self.command(f"send-keys-event {self.SHIFT_KEY} 1")
+                time.sleep(hold_for)
             self.command(f"send-keys-event {code} 1")
             time.sleep(hold_for)
             self.command(f"send-keys-event {code} 0")
+            if with_shift:
+                self.command(f"send-keys-event {self.SHIFT_KEY} 0")
+            last = code
             time.sleep(hold_for)
 
     def keys(self, text, pause=100):
