@@ -14,6 +14,7 @@ start:
                 call    config_init
                 call    text_init
                 call    screen_init
+                call    picture_init
                 call    vm_init
                 call    vocab_init
                 call    loop_init

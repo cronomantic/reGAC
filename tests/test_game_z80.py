@@ -80,6 +80,19 @@ def screen(session, glyphs):
     return lines
 
 
+def wait_screen(session, glyphs, wanted, timeout=30.0):
+    """Let it play until those letters show up, and give back the screen.  A
+    room draws its picture before it says anything, and that takes seconds."""
+    deadline = time.time() + timeout
+    lines = screen(session, glyphs)
+    while time.time() < deadline:
+        lines = screen(session, glyphs)
+        if any(wanted in line for line in lines if line):
+            return lines
+        time.sleep(0.5)
+    return lines
+
+
 @needs_tools
 def test_it_describes_asks_and_answers():
     ddb, listing = build()
@@ -92,8 +105,7 @@ def test_it_describes_asks_and_answers():
     session = emulator.Session()
     try:
         session.load(SNAPSHOT)
-        time.sleep(2.0)
-        opening = screen(session, glyphs)
+        opening = wait_screen(session, glyphs, prompt.strip()[:3])
         assert any(where[:16] in line for line in opening), (
             f"the room was never described: {opening}"
         )
@@ -103,8 +115,7 @@ def test_it_describes_asks_and_answers():
 
         # A word the adventure does not know, so it has to say so.
         session.type("XYZZY" + ENTER)
-        time.sleep(2.0)
-        answered = screen(session, glyphs)
+        answered = wait_screen(session, glyphs, puzzled[:10], timeout=20.0)
     finally:
         session.close()
 

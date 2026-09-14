@@ -67,6 +67,19 @@ print_object_name:
 describe_location:
                 call    obj_find_location
                 ret     c
+                push    hl
+                inc     hl
+                inc     hl
+                ld      e, (hl)
+                inc     hl
+                ld      d, (hl)                 ; the picture this room shows
+                ld      a, d
+                or      e
+                jr      z, .no_picture          ; a room may have none
+                ex      de, hl
+                call    draw_picture
+.no_picture:
+                pop     hl
                 ld      de, 4
                 add     hl, de
                 ld      e, (hl)

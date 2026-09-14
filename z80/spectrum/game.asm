@@ -14,6 +14,7 @@ start:
                 call    config_init
                 call    text_init
                 call    screen_init
+                call    picture_init
                 call    vm_init
                 call    vocab_init
                 call    loop_init
@@ -41,10 +42,14 @@ done_flag:      db      0
                 include "../common/textout.asm"
                 include "keyboard.asm"
                 include "tape.asm"
+                include "draw.asm"
+                include "shapes.asm"
+                include "fill.asm"
                 include "../common/conditions.asm"
                 include "../common/opcodes.asm"
                 include "../common/parser.asm"
                 include "../common/loop.asm"
+                include "../common/picture.asm"
 
                 ALIGN   256
 database:

@@ -70,6 +70,22 @@ def screen(session, glyphs):
     return decode_screen(session.read(SCREEN, 0x4000), glyphs)
 
 
+def wait_screen(session, glyphs, wanted, timeout=60.0):
+    """Let it play until those letters show up, and give back the screen.
+
+    A room draws its picture before it says anything, and a picture is
+    seconds, so waiting a fixed while is waiting either too little or too
+    long."""
+    deadline = time.time() + timeout
+    lines = screen(session, glyphs)
+    while time.time() < deadline:
+        lines = screen(session, glyphs)
+        if any(wanted in line for line in lines if line):
+            return lines
+        time.sleep(1.0)
+    return lines
+
+
 @needs_tools
 def test_it_asks_and_answers_on_an_amstrad():
     with open(ADVENTURE, encoding="utf-8") as f:
@@ -84,16 +100,14 @@ def test_it_asks_and_answers_on_an_amstrad():
     try:
         time.sleep(3.0)
         start(session)
-        time.sleep(4.0)
-        opening = screen(session, glyphs)
+        opening = wait_screen(session, glyphs, prompt.strip()[:3])
         assert any(prompt.strip()[:3] in line for line in opening if line), (
             f"the interpreter never asked: {opening}"
         )
 
         # A word the adventure does not know, so it has to say so.
         session.type_keys("XYZZY" + ENTER)
-        time.sleep(2.0)
-        answered = screen(session, glyphs)
+        answered = wait_screen(session, glyphs, puzzled[:6], timeout=30.0)
     finally:
         session.close()
 
