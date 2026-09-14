@@ -179,12 +179,13 @@ cls_window:
 cursor_address:
                 ld      a, (cursor_y)
                 call    row_base
-                ld      a, (cursor_x)
-                add     a, a
-                add     a, a
-                add     a, a                    ; eight bytes to a column
-                ld      e, a
+                ld      a, (cursor_x)           ; sixty four columns of eight
+                ld      e, a                    ; bytes do not fit in one byte
                 ld      d, 0
+                ex      de, hl
+                add     hl, hl
+                add     hl, hl
+                add     hl, hl
                 add     hl, de
                 ret
 
@@ -197,27 +198,21 @@ scroll_window:
                 call    screen_bank
                 ld      c, TEXT_ROWS - 1
                 xor     a
+                call    row_base                ; where the first row lands
 .each_row:
-                push    af
                 push    bc
-                call    row_base
-                ex      de, hl                  ; the row it comes down to
-                pop     bc
-                pop     af
-                push    af
-                push    bc
-                inc     a
-                call    row_base                ; and the one it comes from
+                ld      d, h
+                ld      e, l
+                ld      bc, ROW_BYTES
+                add     hl, bc                  ; and the row above it, which
+                push    hl                      ; is simply 720 bytes on
                 ld      bc, SCREEN_COLS * 8
                 ldir
+                pop     hl
                 pop     bc
-                pop     af
-                inc     a
                 dec     c
                 jr      nz, .each_row
-                ; the row that came free is the last one
-                ld      a, TEXT_ROWS - 1
-                call    row_base
+                ; the row that came free is the last one, and HL is at it
                 ld      d, h
                 ld      e, l
                 inc     de
