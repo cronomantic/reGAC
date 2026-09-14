@@ -28,12 +28,14 @@ gfx_start_colours:
                 ld      (gfx_paper), a
                 ret
 
-; The border, which on a Spectrum is three bits of a port.
+; The border, which on a Spectrum is three bits of a port.  A macro and not a
+; routine because the picture interpreter runs it inside its command loop and
+; an animation sets the border tens of thousands of times: the colour is in A.
 ; Corrupts: AF
-gfx_border:
+                MACRO   GFX_BORDER
                 and     7
                 out     ($FE), a
-                ret
+                ENDM
 
 ; Turn a command's y into a screen row, keeping sixteen bits with their sign.
 ; A picture may name a y above the top or below the bottom of the picture, and

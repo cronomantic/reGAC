@@ -185,7 +185,12 @@ run_picture:
 
 ; Drawing treads on every register, so the place in the commands goes to
 ; memory for as long as that takes.  The commands that only set a colour cost
-; nothing at all, which matters: the animations are thousands of them.
+; nothing at all, which matters: the animations are thousands of them.  That
+; is why the border does not come through here either, and why the machine
+; gives it as a macro that may only touch AF: one picture of Los pájaros de
+; Bangkok sets the border forty three thousand times, and putting the place
+; away and fetching it back for each of them cost it a second and three
+; quarters, and even the call and the return cost it half a second.
 .keep_place:
                 ld      (gfx_code), hl
                 ld      (gfx_left), de
@@ -200,9 +205,8 @@ run_picture:
                 cp      CMD_BORDER
                 jr      nz, .not_border
                 ld      a, b
-                call    .keep_place
-                call    gfx_border              ; the machine knows how
-                jp      .resume
+                GFX_BORDER                      ; the machine knows how
+                jp      .next
 .not_border:
                 push    hl
                 ld      hl, gfx_ink

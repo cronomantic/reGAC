@@ -255,6 +255,18 @@ dentro de una subrutina. Ahora sólo bajan a memoria las órdenes que dibujan,
 que son las que pisan todos los registros. Ocho segundos pasan a cuatro y
 medio.
 
+Y una tercera, que costó volver a aprender. Al llevar el borde a la máquina
+—que estaba bien, porque un `OUT` a un puerto del Spectrum no pinta nada en la
+parte que no sabe de máquinas— se le puso delante el guardar el sitio y detrás
+el recuperarlo, como a las órdenes que dibujan. En esta lámina eso son 43.821
+veces, 136 ciclos cada una: los cuatro segundos y medio se fueron a 6,15 y se
+salieron del tope, y quien lo cazó fue la prueba lenta. Ahora el borde lo da la
+máquina **como macro y no como rutina**: en el Spectrum se expande a `and 7` y
+`out ($FE),a` dentro del propio bucle, y en el Amstrad, que necesita dos
+escrituras al gate array y una tabla, la macro es la llamada y la rutina
+promete no tocar más que AF. Dejándolo en rutina para los dos se quedaba en
+4,73 s; con la macro vuelve a 4,33, que es lo que costaba antes.
+
 ### Medir en ciclos, no en segundos
 
 El emulador de este ordenador no corre a la velocidad de un Spectrum. Con un
@@ -267,6 +279,13 @@ el emulador deja leer, dividido por tres millones y medio. Está en
 [`tests/test_all_pictures.py`](../tests/test_all_pictures.py), que dibuja las
 196 láminas, las compara con la referencia y comprueba que ninguna pase de
 cinco segundos. Es lenta, media hora, así que sólo corre con `REGAC_SLOW=1`.
+
+Esa prueba mira la bandera cada décima y cuenta también lo que corra entre que
+la lámina acaba y la siguiente mirada, así que da un tope y no la cifra. Para
+la cifra exacta se para el Z80 en seco con un punto de ruptura en el salto que
+aparca el programa, `set-breakpoint 1 PC=xxxxH`, porque el contador se para con
+él. Comprobado en las 28 láminas de Bangkok2: las dos maneras dan lo mismo con
+dos centésimas de diferencia, o sea que el sondeo no engañaba.
 
 ## Cómo lo hacía GAC, leído de las propias aventuras
 

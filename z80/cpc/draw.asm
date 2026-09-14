@@ -446,9 +446,17 @@ gfx_start_colours:
                 ld      (gfx_flash), a
                 ret
 
-; The border, which here is one more pen.
-; Corrupts: everything
-gfx_border:
+; The border, which here is one more pen.  Too long to put inline, so the
+; macro the picture interpreter expands is the call, and the routine keeps
+; every register but AF, which is what that promises.
+; Corrupts: AF
+                MACRO   GFX_BORDER
+                call    set_border
+                ENDM
+
+set_border:
+                push    hl
+                push    bc
                 push    af
                 ld      bc, GATE_ARRAY
                 ld      a, %01010000
@@ -458,6 +466,8 @@ gfx_border:
                 or      %01000000
                 ld      bc, GATE_ARRAY
                 out     (c), a
+                pop     bc
+                pop     hl
                 ret
 
 ; Wipe the picture area to pen nought.  It is 64 bytes of every line, 32
