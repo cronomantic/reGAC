@@ -1,0 +1,118 @@
+; MIT License, Copyright (c) 2025 Cronomantic
+;
+; The same interpreter on a 128, with the database living in memory banks.
+;
+; What changes is only where the database is.  What the interpreter touches at
+; any moment without warning stays resident, next to the code in page two;
+; the text, the pictures and the music go to pages of their own and are
+; brought into the window at $C000 when they are wanted.  Which pages those
+; are is said here, because it is the machine's business, and the table the
+; paging routine walks is built from the same names.
+;
+; regac build writes banks.inc, which says how much of the file is resident
+; and how many banks follow it:
+;
+;   python -m regac build partida.json game128.rgac -m spectrum128 -b 16k \
+;          --defs banks.inc
+
+                DEFINE  BANKED
+                DEVICE  ZXSPECTRUM128
+
+                include "banks.inc"
+
+; The machine's own pages, in the order the database numbers its banks.  Two
+; are spoken for: page two holds the interpreter and page five the screen.
+DB_PAGE_0       equ 1
+DB_PAGE_1       equ 3
+DB_PAGE_2       equ 4
+DB_PAGE_3       equ 6
+DB_PAGE_4       equ 7
+DB_PAGE_5       equ 0
+
+                SLOT    3
+                IF DB_BANK_COUNT > 0
+                PAGE    DB_PAGE_0
+                ORG     $C000
+                INCBIN  "game128.rgac", DB_RESIDENT_SIZE, DB_BANK_BYTES
+                ENDIF
+                IF DB_BANK_COUNT > 1
+                PAGE    DB_PAGE_1
+                ORG     $C000
+                INCBIN  "game128.rgac", DB_RESIDENT_SIZE + DB_BANK_BYTES, DB_BANK_BYTES
+                ENDIF
+                IF DB_BANK_COUNT > 2
+                PAGE    DB_PAGE_2
+                ORG     $C000
+                INCBIN  "game128.rgac", DB_RESIDENT_SIZE + 2 * DB_BANK_BYTES, DB_BANK_BYTES
+                ENDIF
+                IF DB_BANK_COUNT > 3
+                PAGE    DB_PAGE_3
+                ORG     $C000
+                INCBIN  "game128.rgac", DB_RESIDENT_SIZE + 3 * DB_BANK_BYTES, DB_BANK_BYTES
+                ENDIF
+                IF DB_BANK_COUNT > 4
+                PAGE    DB_PAGE_4
+                ORG     $C000
+                INCBIN  "game128.rgac", DB_RESIDENT_SIZE + 4 * DB_BANK_BYTES, DB_BANK_BYTES
+                ENDIF
+                IF DB_BANK_COUNT > 5
+                PAGE    DB_PAGE_5
+                ORG     $C000
+                INCBIN  "game128.rgac", DB_RESIDENT_SIZE + 5 * DB_BANK_BYTES, DB_BANK_BYTES
+                ENDIF
+
+                SLOT    2
+                PAGE    2
+                ORG     $8000
+start:
+                di
+                ld      sp, $7FF0
+                xor     a
+                out     ($FE), a
+                call    db_init
+                call    config_init
+                call    text_init
+                call    screen_init
+                call    picture_init
+                call    vm_init
+                call    vocab_init
+                call    loop_init
+                ; the player starts where the adventure says
+                ld      a, SECTION_CONFIG
+                call    db_section
+                ld      e, (hl)
+                inc     hl
+                ld      d, (hl)
+                ld      (vm_location), de
+                ld      a, 1
+                ld      (vm_new_room), a
+                call    play
+                ld      a, $FF
+                ld      (done_flag), a
+.stop:
+                jr      .stop
+
+done_flag:      db      0
+
+                include "paging.asm"
+                include "../common/database.asm"
+                include "../common/config.asm"
+                include "../common/unpack.asm"
+                include "screen.asm"
+                include "../common/textout.asm"
+                include "keyboard.asm"
+                include "tape.asm"
+                include "draw.asm"
+                include "shapes.asm"
+                include "fill.asm"
+                include "../common/conditions.asm"
+                include "../common/opcodes.asm"
+                include "../common/parser.asm"
+                include "../common/loop.asm"
+                include "../common/picture.asm"
+
+                ALIGN   256
+database:
+                INCBIN  "game128.rgac", 0, DB_RESIDENT_SIZE
+
+                SAVESNA "game128.sna", start

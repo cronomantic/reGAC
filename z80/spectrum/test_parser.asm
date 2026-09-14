@@ -64,8 +64,12 @@ done_flag:      db      0
                 include "keyboard.asm"
                 include "tape.asm"
                 include "../common/conditions.asm"
+                include "draw.asm"
+                include "shapes.asm"
+                include "fill.asm"
                 include "../common/opcodes.asm"
                 include "../common/parser.asm"
+                include "../common/picture.asm"
 
                 ALIGN   256
 database:

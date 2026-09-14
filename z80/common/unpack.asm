@@ -74,6 +74,8 @@ message_offset:
 ; Unpack message DE into text_buffer.  Its length comes back in BC.
 ; Corrupts: AF, DE, HL
 unpack_message:
+                ld      a, SECTION_TEXT         ; where the machine keeps it,
+                call    db_bank_in              ; which may be a bank
                 push    de
                 call    message_offset
                 push    hl                      ; where it starts

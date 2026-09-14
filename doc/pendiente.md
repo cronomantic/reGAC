@@ -61,7 +61,26 @@ tecla de mayúsculas y se quedaba ahí.
 ## Las máquinas
 
 En Python están modeladas Spectrum, Sam Coupé, Next, MSX1, MSX2 y Amstrad. En
-Z80 están el Spectrum y el Amstrad CPC, los dos enteros.
+Z80 están el Spectrum y el Amstrad CPC, los dos enteros, y el Spectrum de 128K
+con la base de datos repartida en bancos.
+
+### Los bancos, que ya se usan
+
+El formato los llevaba desde el principio y no los leía nadie. Ahora sí: el
+intérprete pide una sección, y si vive en un banco la máquina lo trae a su
+ventana. Cómo está hecho y qué cuidado hay que tener con los punteros que
+alguien se guarda está en `binario.md`; lo que importa aquí es que el 48K y el
+Amstrad no pagan nada por ello, porque una máquina sin bancos se queda con un
+`db_page` que sólo retorna.
+
+Hay una prueba que lo demuestra de verdad, no sólo que arranca: una aventura
+engordada hasta que el texto y las láminas no caben en el mismo banco, jugada
+en un 128, con la lámina de la pantalla comparada byte a byte contra el
+renderizador de referencia. Para llegar a ella hubo que tapar antes un agujero
+que llevaba tiempo ahí sin que nadie lo viera: **el juego no dibujaba**.
+`describe_location` imprimía el texto del cuarto y nadie llamaba nunca a
+`draw_picture`; el intérprete de láminas estaba entero y probado, pero suelto.
+En el Spectrum ni siquiera se ensamblaba dentro del juego.
 
 ### El Amstrad, con su cinta
 

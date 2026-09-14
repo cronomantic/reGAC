@@ -103,6 +103,8 @@ picture_find:
 ; Corrupts: everything
 draw_picture:
                 push    hl                      ; clearing treads on HL
+                ld      a, SECTION_GRAPHICS     ; printing may have taken the
+                call    db_bank_in              ; pictures' bank away
                 xor     a
                 ld      (gfx_depth), a
                 call    gfx_clear

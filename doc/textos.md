@@ -71,8 +71,9 @@ mantiene esa independencia.
 Da el tamaño empaquetado, la tabla de parejas, los glifos que hacen falta, los
 códigos que sobran y la profundidad de pila que necesitará la rutina en Z80.
 
-## Lo que queda
+## Dónde está puesto
 
-El compilador todavía guarda el texto en claro en la base de datos JSON, que es
-la que usa el intérprete de PC. Esta pieza entra cuando exista el formato
-binario para las máquinas de ocho bits, que es donde el tamaño importa.
+En la base de datos JSON, que es la que usa el intérprete de PC, el texto sigue
+en claro: allí no hay nada que ahorrar. Empaquetado va en el binario de las
+máquinas de ocho bits, que es donde el tamaño importa, y lo desempaqueta
+[`unpack.asm`](../z80/common/unpack.asm) mensaje a mensaje.

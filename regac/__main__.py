@@ -178,6 +178,18 @@ def cmd_build(args):
     image = database.build()
     with open(args.output, "wb") as f:
         f.write(image)
+    if args.defs:
+        # What an assembler needs to cut the image up: where the banks start
+        # and how many there are.  Which of the machine's own pages they go
+        # to is the machine's business and not the database's.
+        lines = [
+            "; Written by regac build.  See doc/binario.md.",
+            f"DB_RESIDENT_SIZE equ {database.resident_size}",
+            f"DB_BANK_COUNT    equ {len(database.banks)}",
+            f"DB_BANK_BYTES    equ {1 << database.page_bits if database.banks else 0}",
+        ]
+        with open(args.defs, "w", encoding="utf-8") as f:
+            f.write("\n".join(lines) + "\n")
     print(f"{args.input} -> {args.output}")
     print(f"  machine     {args.machine}")
     print(f"  image       {len(image)} bytes")
@@ -247,6 +259,10 @@ def main():
         type=int,
         default=0,
         help="bytes to reserve for the tune being played (see doc/binario.md)",
+    )
+    p.add_argument(
+        "--defs",
+        help="write an assembler include saying where the banks start",
     )
     p.set_defaults(func=cmd_build)
 

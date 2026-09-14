@@ -70,6 +70,47 @@ O sea que para estas aventuras los bancos son previsión y no necesidad: caben d
 sobra en un Spectrum de 48K sin paginar nada. Hacen falta para aventuras nuevas
 más grandes, y para la música.
 
+## Cómo se pagina, ya en la máquina
+
+El intérprete pide una sección y no sabe dónde está. Si el directorio dice que
+vive en un banco, `db_section` llama a `db_page`, que es de la máquina, y
+devuelve una dirección dentro de la ventana; si dice que es residente devuelve
+una dirección del bloque de siempre. Una máquina sin bancos no define nada y se
+queda con el `db_page` que no hace nada, en el propio
+[`database.asm`](../z80/common/database.asm), así que el Spectrum de 48K y el
+Amstrad no pagan ni un byte por todo esto.
+
+Lo que sí hay que cuidar es quien se guarda un puntero. El texto y las láminas
+lo hacen —`text_init` y `picture_init` apuntan una vez y luego leen muchas
+veces— y son justo las dos secciones que van a bancos, así que imprimir le
+quita el banco a las láminas y dibujar se lo quita al texto. Por eso
+`unpack_message` y `draw_picture` empiezan pidiendo el suyo con `db_bank_in`,
+que no hace nada si ya está puesto. Es una comprobación por mensaje y otra por
+lámina; no se nota.
+
+En el Spectrum de 128K la ventana es la de $C000 y las páginas que se usan son
+la 1, 3, 4, 6, 7 y 0, en ese orden: la 2 lleva el intérprete y la 5 la
+pantalla. El byte que elige página no se puede leer, así que se guarda el
+último escrito, que además es lo que permite no escribir nada cuando ya está la
+que se quiere. Está en [`paging.asm`](../z80/spectrum/paging.asm).
+
+Para que el ensamblador pueda repartir la imagen en páginas, la construcción le
+deja dicho dónde empieza cada banco:
+
+    python -m regac build partida.json game128.rgac -m spectrum128 -b 16k            --defs banks.inc
+
+y eso escribe `DB_RESIDENT_SIZE`, `DB_BANK_COUNT` y `DB_BANK_BYTES`. Qué página
+de la máquina le toca a cada banco lo dice el propio fuente de la máquina, en
+[`game128.asm`](../z80/spectrum/game128.asm), que es de donde sale también la
+tabla que camina `db_page`: la lista está una sola vez.
+
+Probado con Los pájaros de Bangkok engordada con mensajes de relleno hasta que
+el texto y las láminas no caben en el mismo banco. La aventura juega, describe
+el cuarto —que es leer un banco— y la lámina que sale en pantalla es byte a
+byte la que dibuja el renderizador de referencia —que es leer el otro—, con la
+máquina paginando entre las dos. Está en
+[`tests/test_banks_z80.py`](../tests/test_banks_z80.py).
+
 ## La música con AY, que es lo que condiciona el diseño
 
 El reproductor de AY corre desde la interrupción, cincuenta veces por segundo.
