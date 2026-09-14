@@ -64,6 +64,12 @@ En Python están modeladas Spectrum, Sam Coupé, Next, MSX1, MSX2 y Amstrad. En
 Z80 están el Spectrum y el Amstrad CPC, los dos enteros, y el Spectrum de 128K
 con la base de datos repartida en bancos.
 
+Y los tres se entregan en el medio que les toca, con su cargador: cinta para el
+Spectrum de 48 y el de 128, disco y cinta para el Amstrad, y disco para el +3.
+Cómo está hecho cada uno está en `binario.md`. Lo que falta por ese lado es el
++3 con bancos, que necesita un cargador en código máquina en vez del BASIC, y
+el PCW, que primero necesita intérprete.
+
 ### Los bancos, que ya se usan
 
 El formato los llevaba desde el principio y no los leía nadie. Ahora sí: el

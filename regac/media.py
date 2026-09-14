@@ -87,6 +87,82 @@ def cpc_disk(code, name=NAME, load=CODE_AT, entry=CODE_AT):
     return disk.image()
 
 
+# -- the Spectrum +3, which loads from disk and not from tape -----------------
+
+# What the Spectrum's own BASIC keeps for each of these words.
+SPECTRUM_CLEAR = 0xFD
+SPECTRUM_LOAD = 0xEF
+SPECTRUM_CODE = 0xAF
+SPECTRUM_RANDOMIZE = 0xF9
+SPECTRUM_USR = 0xC0
+SPECTRUM_VAL = 0xB0
+ENTER = 0x0D
+
+PLUS3_CODE_AT = 0x8000          # where the Spectrum interpreter is built to run
+PLUS3_LOADER = "DISK"           # the name the +3 menu runs by itself
+PLUS3_GAME = "GAME"
+FILE_BASIC = 0
+FILE_CODE = 3
+
+
+def spectrum_line(number, body):
+    """One line of Spectrum BASIC: its number the wrong way round, which is
+    how that machine writes it, then how long it is and what it says."""
+    body = bytes(body) + bytes([ENTER])
+    return struct.pack(">H", number) + struct.pack("<H", len(body)) + body
+
+
+def spectrum_number(value):
+    """A number written as VAL of a string.
+
+    Typed in as digits it would carry five bytes of hidden binary after them,
+    which is a thing to get wrong for no reason; VAL "32767" is the same
+    number to the machine and is only what it looks like.
+    """
+    return bytes([SPECTRUM_VAL, 0x22]) + str(value).encode("ascii") + bytes([0x22])
+
+
+def plus3_loader(name=PLUS3_GAME, load=PLUS3_CODE_AT):
+    """CLEAR below the interpreter, load it, and call it."""
+    return spectrum_line(10,
+                         [SPECTRUM_CLEAR] + list(spectrum_number(load - 1))
+                         + [ord(":"), SPECTRUM_LOAD, 0x22]
+                         + list(name.encode("ascii"))
+                         + [0x22, SPECTRUM_CODE, ord(":"), SPECTRUM_RANDOMIZE,
+                            SPECTRUM_USR] + list(spectrum_number(load)))
+
+
+def plus3_file(kind, data, first=0, second=0):
+    """The hundred and twenty eight bytes +3DOS puts in front of a file: its
+    own mark, how long the lot is, and then the eight bytes a Spectrum header
+    has always had -- what kind of file, how long, and two numbers whose
+    meaning is the kind's business."""
+    head = bytearray(128)
+    head[0:8] = b"PLUS3DOS"
+    head[8] = 0x1A
+    head[9] = 1                                 # the issue, and then the version
+    head[11:15] = (len(data) + 128).to_bytes(4, "little")
+    head[15] = kind
+    head[16:18] = struct.pack("<H", len(data))
+    head[18:20] = struct.pack("<H", first)
+    head[20:22] = struct.pack("<H", second)
+    head[127] = sum(head[:127]) & 0xFF
+    return bytes(head) + bytes(data)
+
+
+def plus3_disk(code, load=PLUS3_CODE_AT):
+    """A +3 disk with the loader the machine's own menu starts.
+
+    The first thing on that menu is Loader, and what Loader runs is the BASIC
+    program called DISK, so that is what it is called.
+    """
+    basic = plus3_loader(PLUS3_GAME, load)
+    disk = Disk("plus3")
+    disk.add(PLUS3_LOADER, plus3_file(FILE_BASIC, basic, 10, len(basic)))
+    disk.add(PLUS3_GAME, plus3_file(FILE_CODE, code, load, 0x8000))
+    return disk.image()
+
+
 def cpc_tape(code, name=NAME, load=CODE_AT, entry=CODE_AT):
     """A tape with the same two, which a machine starts with RUN and nothing
     else because what it runs is whatever comes first."""

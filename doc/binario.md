@@ -192,6 +192,30 @@ a la velocidad a la que el firmware los lee— así que esa prueba sólo corre c
 `REGAC_SLOW=1`. Conviene saberlo antes de darla por colgada: una cinta de
 Amstrad de verdad se comporta igual de lenta en el emulador.
 
+## El +3, que arranca él solo
+
+Un +3 con un disco dentro ofrece «Loader» como primera cosa de su menú, y lo
+que Loader ejecuta es el programa BASIC llamado `DISK`. Así que ahí va el
+nuestro: un `CLEAR` por debajo del intérprete, un `LOAD "GAME" CODE` y la
+llamada, con el intérprete en el fichero `GAME`. Los dos llevan delante la
+cabecera de ciento veintiocho bytes de +3DOS, con su marca, lo que ocupa todo
+y los ocho bytes de cabecera que un Spectrum lleva desde siempre.
+
+Los números del BASIC van escritos como `VAL "32767"`. Es el mismo número para
+la máquina y se ahorra los cinco bytes de binario escondido que arrastra un
+número tecleado, que son cinco bytes que se pueden escribir mal para nada.
+
+    python -m regac release z80/spectrum/game.bin salida/ -m plus3
+
+Lo que va a ese disco, de momento, es la versión sin bancos, la misma que carga
+la cinta de 48. La de 128 repartida en bancos pide que el cargador pagine antes
+de leer cada bloque, y eso el BASIC no lo puede hacer: hace falta un cargador
+en código máquina que use las llamadas de +3DOS, como el de la cinta usa las de
+la ROM.
+
+La prueba lo arranca como lo arrancaría su dueño: enter en el menú, y a esperar
+a que la aventura describa dónde está el jugador.
+
 ## La música con AY, que es lo que condiciona el diseño
 
 El reproductor de AY corre desde la interrupción, cincuenta veces por segundo.

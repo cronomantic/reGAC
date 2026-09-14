@@ -30,7 +30,7 @@ import sys
 from .binary import MACHINES, SECTION_NAMES, Database, Reader
 from .devices import DEVICES, device_for, make
 from .gfx import Renderer
-from .media import cpc_disk, cpc_tape
+from .media import cpc_disk, cpc_tape, plus3_disk
 from .png import save_picture
 from .srcgen import generate
 from .text import TextStore
@@ -166,6 +166,10 @@ def cmd_text(args):
 
 BANK_SIZES = {"none": 0, "8k": 13, "16k": 14}
 
+# Where each machine's interpreter is built to sit, which is where its medium
+# has to put it.
+LOADS_AT = {"cpc": 0x4000, "plus3": 0x8000}
+
 
 def cmd_build(args):
     """Write the binary database the 8 bit interpreter reads."""
@@ -215,18 +219,24 @@ def cmd_release(args):
     with open(args.input, "rb") as f:
         code = f.read()
     name = args.name.upper()
+    load = args.load if args.load is not None else LOADS_AT[args.machine]
     written = []
     if args.machine == "cpc":
         for suffix, make in ((".dsk", cpc_disk), (".cdt", cpc_tape)):
             path = os.path.join(args.output, name.lower() + suffix)
             with open(path, "wb") as f:
-                f.write(make(code, name, args.load, args.entry or args.load))
+                f.write(make(code, name, load, args.entry or load))
             written.append(path)
+        how = f'RUN"{name}" on the disk, RUN"" on the tape'
     else:
-        sys.exit(f"ERROR: {args.machine} makes its own medium when it assembles")
+        path = os.path.join(args.output, name.lower() + ".dsk")
+        with open(path, "wb") as f:
+            f.write(plus3_disk(code, load))
+        written.append(path)
+        how = "the Loader entry of the machine's own menu"
     print(f"{args.input} -> " + ", ".join(written))
-    print(f"  loads at    ${args.load:04X}, {len(code)} bytes")
-    print(f"  starts with RUN\"{name}\" on a disk, RUN\"\" on a tape")
+    print(f"  loads at    ${load:04X}, {len(code)} bytes")
+    print(f"  starts with {how}")
 
 
 def main():
@@ -297,10 +307,10 @@ def main():
     p = sub.add_parser("release", help="put an assembled interpreter on a disk and a tape")
     p.add_argument("input", help="the binary the assembler wrote")
     p.add_argument("output", help="where to write the disk and the tape")
-    p.add_argument("-m", "--machine", default="cpc", choices=["cpc"])
+    p.add_argument("-m", "--machine", default="cpc", choices=sorted(LOADS_AT))
     p.add_argument("--name", default="JUEGO", help="what the files are called")
-    p.add_argument("--load", type=lambda n: int(n, 0), default=0x4000,
-                   help="where the binary loads")
+    p.add_argument("--load", type=lambda n: int(n, 0), default=None,
+                   help="where the binary loads, if not where that machine has it")
     p.add_argument("--entry", type=lambda n: int(n, 0), default=None,
                    help="where it starts, if not where it loads")
     p.set_defaults(func=cmd_release)

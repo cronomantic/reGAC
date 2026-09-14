@@ -59,6 +59,7 @@ database:
 last:
 
                 SAVESNA "game.sna", start
+                SAVEBIN "game.bin", start, last - start
 
 ; The tape: the BASIC that carries the loader, and then the whole of the
 ; interpreter and its database in one block.
