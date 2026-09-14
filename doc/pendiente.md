@@ -251,16 +251,13 @@ Ya está hecho y probado: [`boot.asm`](../z80/pcw/boot.asm) arranca en un PCW
 emulado, lee lo que va detrás del sector y lo ejecuta. La prueba lo comprueba
 por memoria, no por pantalla, porque el emulador no devuelve la del PCW.
 
-**Y las partidas.** Como arrancamos solos, el disco no necesitaría sistema de
-ficheros, pero conviene que lo lleve: el plan es disco con formato CP/M, el
-intérprete y sus bancos en un fichero, y **las partidas en ficheros creados ya
-en la construcción**, del tamaño justo. El intérprete escribe sus sectores
-directamente, sin tocar directorio ni reserva de bloques, y aun así la partida
-es un fichero de verdad que se puede copiar con las herramientas de CP/M. El
-sistema de ficheros existe para la persona; el intérprete sólo toca sectores
-que ya le dijeron cuáles son.
-
-**Lo que queda por medir**: el teclado.
+**Y las partidas**, que son lo que era el plan y salió tal cual: disco con
+formato CP/M, el intérprete y sus bancos en un fichero, y la partida en un
+fichero creado ya en la construcción, del tamaño justo. El intérprete escribe
+sus sectores directamente, sin tocar directorio ni reserva de bloques, y aun
+así la partida es un fichero de verdad que se puede copiar con las
+herramientas de CP/M. El sistema de ficheros existe para la persona; el
+intérprete sólo toca sectores que ya le dijeron cuáles son.
 
 ### Mirar las versiones de CPC, que es la lección para el PCW
 
