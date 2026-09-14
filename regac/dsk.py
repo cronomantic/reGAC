@@ -1,3 +1,23 @@
+# ReGAC, tools for Graphic Adventure Creator adventures.
+#
+# Copyright (C) 2025 Cronomantic
+#
+# This program is free software: you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by the Free
+# Software Foundation, either version 3 of the License, or (at your option)
+# any later version.
+#
+# This program is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+# FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+# more details.
+#
+# You should have received a copy of the GNU General Public License along with
+# this program.  If not, see <https://www.gnu.org/licenses/>.
+#
+# The interpreters in z80/ are not part of this program and are given under
+# the MIT licence instead: see z80/LICENSE.
+#
 """Writing a disk image, for the machines that load off one.
 
 This is a CP/M filesystem and the container that holds it.  The Amstrad, the
@@ -7,7 +27,7 @@ numbered from; the rest of the work is the same.
 
 The filesystem part follows the one in ChooseYourDestiny, which is itself a
 port of libdsk and mkp3fs, and is the reason this was not written from
-scratch.  What is new here is the Amstrad: AMSDOS keeps no boot record, so its
+scratch; it is the same author's, given here under this project's licence.  What is new here is the Amstrad: AMSDOS keeps no boot record, so its
 format has to be told rather than read, and its sectors are numbered from $C1
 on a data disk and from $41 on a system one, which is how the machine tells
 one from the other.

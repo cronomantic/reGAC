@@ -31,6 +31,17 @@ python -m regac build     game.json game.rgac -m spectrum128 -b 16k
 python -m regac release   game.bin  release/ -m cpc
 ```
 
+## Licence
+
+Two, on purpose.
+
+The tools -- everything in Python -- are under the **GNU General Public
+License v3**, whose text is in [LICENSE](LICENSE).
+
+The interpreters in [z80/](z80), which are what ends up inside somebody's
+adventure, are under the **MIT licence**: see [z80/LICENSE](z80/LICENSE).  An
+adventure built with these tools carries no obligation from them.
+
 --
 
 MIT License
