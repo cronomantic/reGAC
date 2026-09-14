@@ -143,8 +143,10 @@ def test_the_disk_starts_the_game(tmp_path):
 @is_slow
 @needs_tools
 def test_the_tape_starts_the_game(tmp_path):
-    """The same, off a tape, which is minutes: twenty eight kilobytes at the
-    speed the firmware reads them."""
+    """The same, off a tape, which is a quarter of an hour: twenty eight
+    kilobytes at the speed the firmware reads them, on an emulator that runs
+    at about half the speed of the machine.  Measured at ten and a half
+    minutes, so the wait is fifteen."""
     with open(ADVENTURE, encoding="utf-8") as f:
         ddb = json.load(f)
     path = str(tmp_path / "juego.cdt")
@@ -158,7 +160,7 @@ def test_the_tape_starts_the_game(tmp_path):
     try:
         time.sleep(2.5)
         session.command("smartload " + path)
-        screen = wait_screen(session, glyphs, asking(ddb), timeout=600.0)
+        screen = wait_screen(session, glyphs, asking(ddb), timeout=900.0)
     finally:
         session.close()
     assert any(asking(ddb) in line for line in screen if line), (
