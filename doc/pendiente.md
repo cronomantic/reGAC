@@ -206,6 +206,13 @@ teclado, con los cuatro bancos mapeados del 0 al 3, que es justo el estado en
 que lo dejaría su propio sector de arranque, así que se escribe el bloque en
 memoria y se apunta el procesador al principio.
 
+**Un tono que falta.** Con cinco niveles, el azul y el negro caen los dos en
+cero, así que en Megacorp las ventanas azul oscuro desaparecen: quedan del
+mismo negro que el contorno que las rodea. Se ve en la lámina 1. Hay donde
+elegir -- una trama de 4x4 con más niveles, o separar a mano los colores que
+chocan en vez de fiarlo todo a la luminancia -- pero conviene decidirlo
+mirando láminas, no en abstracto.
+
 **Lo que queda de esta máquina**: el teclado, que es lo único que sigue sin
 medir, y con eso el intérprete entero y su `release -m pcw`.
 
