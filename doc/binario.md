@@ -231,13 +231,58 @@ esperar. La del disco con bancos usa una aventura engordada hasta necesitar
 dos, y compara la lámina de la pantalla byte a byte contra la referencia, que
 sólo cuadra si cada banco acabó en su página.
 
+## El PCW, que no tiene a quién pedirle nada
+
+Ni ROM, ni sistema operativo, ni cargador que valga: la máquina lee el sector
+de la pista 0, cara 0, registro 1, comprueba que sus 512 bytes suman $FF y
+salta dentro. De ahí en adelante todo es nuestro, y lo que hay es
+[`boot.asm`](../z80/pcw/boot.asm), que maneja el PD765 él mismo.
+
+Ese sector hace tres cosas, y en este orden: monta la tabla que lee el vídeo y
+enciende la pantalla —para que la de carga se vea mientras entra lo demás—,
+lee las piezas que le diga su tabla, y salta a donde ésa le diga. Las piezas
+son la pantalla, el intérprete y cada banco de la base de datos, y van todas
+dentro de un fichero CP/M normal llamado `GAME`, para que el disco siga
+teniendo un sistema de ficheros que una persona pueda leer.
+
+La tabla vive en los últimos 64 bytes del propio sector, en $F1C0:
+
+| bytes | qué |
+|---|---|
+| 0-1 | pista y registro donde empiezan las piezas |
+| 2-3 | a dónde saltar cuando estén todas |
+| 4... | por cada pieza: dónde va, cuántos sectores es, y en qué banco |
+| 60-62 | pista, registro y sectores de la partida guardada |
+
+**Y las partidas.** No hay a quién pedirle un fichero, así que lo hace el
+constructor: un fichero CP/M de verdad, `GAME.SAV`, del tamaño justo y vacío,
+y deja en la tabla dónde empieza. El intérprete —[`disc.asm`](../z80/pcw/disc.asm)—
+escribe esos sectores él mismo y no toca el directorio jamás, que es lo que
+permite que la partida siga siendo un fichero que las herramientas de CP/M
+pueden copiar. El sector de arranque sigue en $F000 cuando el juego corre,
+porque no se carga nada encima, así que la tabla se lee de ahí sin más.
+
+El reparto de memoria del intérprete es el que ya suponían la pantalla y el
+teclado: el código en los primeros 16K, la ventana de la base de datos en los
+segundos, la mitad de pantalla que toque en los terceros y la máscara, los
+buffers y la pila en los cuartos. Los bancos de la base de datos son del 5 en
+adelante, porque del 0 al 4 los usa ese mapa.
+
+    python -m regac build partida.json game.rgac -m pcw -b 16k            --defs banks.inc
+    python -m regac release z80/pcw/game_code.bin salida/ -m pcw            --boot z80/pcw/boot.bin --database z80/pcw/game.rgac
+
+La prueba lo hace como lo haría su dueño: esos dos comandos y encender un PCW
+con el disco dentro. Arranca solo, lee lo suyo, dice lo que la aventura dice y
+contesta a lo que se teclea.
+
 ## La pantalla de carga
 
 Cualquiera de los destinos puede llevar una, y lo que se le da es **un volcado
 crudo de la pantalla de esa máquina**: 6912 bytes en el Spectrum, que es un
 `.SCR` de toda la vida; dieciséis kilobytes en el Amstrad, que es su modo 1
-entero; y los veintitrés del PCW cuando le toque. No se convierte nada ni se
-dibuja nada: lo que se entrega es exactamente lo que la máquina enseña.
+entero; y 23040 en el PCW, que son las treinta y dos filas de 720 bytes tal y
+como las lee su vídeo. No se convierte nada ni se dibuja nada: lo que se
+entrega es exactamente lo que la máquina enseña.
 
 Dónde entra en cada medio:
 
@@ -251,6 +296,11 @@ Dónde entra en cada medio:
   el cargador en código máquina.
 - **Amstrad**: un `JUEGO.SCR` en el disco, o el fichero de delante en la cinta,
   que el cargador mete en $C000 antes de cargar nada más.
+- **PCW**: el primer trozo del fichero, y antes de leerlo el sector de arranque
+  enciende el vídeo, porque en esa máquina no hay nada encendido hasta que
+  alguien monta la tabla de líneas. La mitad de arriba va donde el mapa ya la
+  enseña; la de abajo vive en un banco propio y entra por la misma ventana que
+  la base de datos.
 
         python -m regac release z80/cpc/game.bin salida/ -m cpc                --screen pantalla.scr
 

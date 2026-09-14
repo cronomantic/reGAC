@@ -62,8 +62,10 @@ tecla de mayúsculas y se quedaba ahí.
 
 En Python están modeladas Spectrum, Sam Coupé, Next, MSX1, MSX2, Amstrad y
 PCW. En Z80 están el Spectrum y el Amstrad CPC, los dos enteros, el Spectrum de
-128K con la base de datos repartida en bancos, y del PCW el arranque y la
-pantalla, que ya dibuja láminas idénticas a las de la referencia.
+128K con la base de datos repartida en bancos, y **el PCW entero**: arranca
+solo de un disco que se hace con `release`, dibuja láminas idénticas a las de
+la referencia, imprime, lee el teclado y guarda la partida en un fichero de
+verdad.
 
 Y los tres se entregan en el medio que les toca, con su cargador: cinta para el
 Spectrum de 48 y el de 128, disco y cinta para el Amstrad, y disco para el +3.
@@ -230,9 +232,13 @@ Un detalle que costó un susto: la tabla que lee el vídeo estaba puesta donde e
 controlador escribe las teclas, y no lo notaba nadie porque esa tabla no se
 vuelve a leer nunca. Ahora hay un `ASSERT` en el fuente que lo dice.
 
-**Lo que queda de esta máquina**: juntarlo todo en el intérprete y su
-`release -m pcw`, con la pantalla de carga y las partidas en ficheros
-preasignados.
+**Y ya juega.** El intérprete está montado, el `release -m pcw` hace el disco
+—sector de arranque, pantalla de carga, intérprete, bancos y la partida vacía
+esperando—, y la prueba lo enciende con ese disco dentro y teclea. Cómo está
+hecho está en [`binario.md`](binario.md).
+
+**Lo que queda de esta máquina**: nada urgente. El zumbador, si alguna vez hay
+sonido; y los niveles de gris, que es lo del azul oscuro de aquí arriba.
 
 **Arranca solo, y no hace falta CP/M.** Los juegos de PCW son autoarrancables
 y el mecanismo es simple: la máquina **no tiene ROM**; al encender se trae un
