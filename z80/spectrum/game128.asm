@@ -61,6 +61,12 @@ DB_PAGE_5       equ 0
                 INCBIN  "game128.rgac", DB_RESIDENT_SIZE + 5 * DB_BANK_BYTES, DB_BANK_BYTES
                 ENDIF
 
+                ; The loader travels in the BASIC area, which is page five
+                ; and is always there.
+                SLOT    1
+                PAGE    5
+                include "loader.asm"
+
                 SLOT    2
                 PAGE    2
                 ORG     $8000
@@ -114,5 +120,41 @@ done_flag:      db      0
                 ALIGN   256
 database:
                 INCBIN  "game128.rgac", 0, DB_RESIDENT_SIZE
+last:
 
                 SAVESNA "game128.sna", start
+
+; The tape: the BASIC that carries the loader, then the interpreter with what
+; is resident of the database, then a block for each bank.  Each of those is
+; read straight into the window with its own page in, which is what the table
+; in the loader says.
+                EMPTYTAP "game128.tap"
+                SAVETAP "game128.tap", BASIC, "reGAC", basic, basic_end - basic, 10
+                SLOT    2
+                PAGE    2
+                SAVETAP "game128.tap", HEADLESS, start, last - start
+                SLOT    3
+                IF DB_BANK_COUNT > 0
+                PAGE    DB_PAGE_0
+                SAVETAP "game128.tap", HEADLESS, DB_WINDOW, DB_BANK_USED_0
+                ENDIF
+                IF DB_BANK_COUNT > 1
+                PAGE    DB_PAGE_1
+                SAVETAP "game128.tap", HEADLESS, DB_WINDOW, DB_BANK_USED_1
+                ENDIF
+                IF DB_BANK_COUNT > 2
+                PAGE    DB_PAGE_2
+                SAVETAP "game128.tap", HEADLESS, DB_WINDOW, DB_BANK_USED_2
+                ENDIF
+                IF DB_BANK_COUNT > 3
+                PAGE    DB_PAGE_3
+                SAVETAP "game128.tap", HEADLESS, DB_WINDOW, DB_BANK_USED_3
+                ENDIF
+                IF DB_BANK_COUNT > 4
+                PAGE    DB_PAGE_4
+                SAVETAP "game128.tap", HEADLESS, DB_WINDOW, DB_BANK_USED_4
+                ENDIF
+                IF DB_BANK_COUNT > 5
+                PAGE    DB_PAGE_5
+                SAVETAP "game128.tap", HEADLESS, DB_WINDOW, DB_BANK_USED_5
+                ENDIF

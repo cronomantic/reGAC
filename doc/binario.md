@@ -111,6 +111,32 @@ byte la que dibuja el renderizador de referencia —que es leer el otro—, con 
 máquina paginando entre las dos. Está en
 [`tests/test_banks_z80.py`](../tests/test_banks_z80.py).
 
+## La cinta, que es lo que se entrega
+
+Una instantánea no la carga nadie en una máquina de verdad, así que lo que
+sale de la construcción es una cinta. La técnica es la de siempre y está
+tomada de ChooseYourDestiny, que es donde Sergio ya la tenía resuelta: la
+cinta es un programa en BASIC y detrás los bloques sin cabecera. El cargador
+viaja dentro del propio BASIC, en un `REM` que es la línea 0, así que cargar
+el BASIC es cargar el cargador; la línea 10 hace `CLEAR` por debajo del
+intérprete y lo llama.
+
+El cargador no hace más que recorrer una tabla: dónde va cada bloque, cuántos
+bytes tiene y, en un 128, en qué página. Cada uno se lo pide a la ROM con
+`LD_BYTES`, y si alguno no entra entero arranca la máquina de nuevo. La tabla
+se arma en el ensamblado con lo que dice el `--defs` de la construcción, así
+que un 48 tiene un bloque y un 128 tiene ése más uno por banco. Está en
+[`loader.asm`](../z80/spectrum/loader.asm), y las cintas las escribe el propio
+sjasmplus con `SAVETAP`.
+
+De cada banco se graba sólo lo que ocupa y no la página entera, que para eso
+el `--defs` dice también cuánto usa cada uno.
+
+Probado cargando las dos cintas en el emulador como las cargaría una persona,
+con `LOAD ""`: la de 48 y la de 128, ésta con una aventura engordada hasta
+tener dos bancos, y con la lámina de la pantalla comparada byte a byte contra
+la referencia, que sólo cuadra si cada bloque cayó en su página.
+
 ## La música con AY, que es lo que condiciona el diseño
 
 El reproductor de AY corre desde la interrupción, cincuenta veces por segundo.

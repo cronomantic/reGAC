@@ -4,6 +4,8 @@
 
                 DEVICE  ZXSPECTRUM48
 
+                include "loader.asm"
+
                 ORG     $8000
 start:
                 di
@@ -54,5 +56,12 @@ done_flag:      db      0
                 ALIGN   256
 database:
                 INCBIN  "game.rgac"
+last:
 
                 SAVESNA "game.sna", start
+
+; The tape: the BASIC that carries the loader, and then the whole of the
+; interpreter and its database in one block.
+                EMPTYTAP "game.tap"
+                SAVETAP "game.tap", BASIC, "reGAC", basic, basic_end - basic, 10
+                SAVETAP "game.tap", HEADLESS, start, last - start

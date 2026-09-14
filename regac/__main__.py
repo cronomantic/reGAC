@@ -188,6 +188,10 @@ def cmd_build(args):
             f"DB_BANK_COUNT    equ {len(database.banks)}",
             f"DB_BANK_BYTES    equ {1 << database.page_bits if database.banks else 0}",
         ]
+        # And how much of each bank is really used, because a loader has no
+        # reason to read the padding that makes them all the same size.
+        for number, bank in enumerate(database.banks):
+            lines.append(f"DB_BANK_USED_{number}  equ {len(bank)}")
         with open(args.defs, "w", encoding="utf-8") as f:
             f.write("\n".join(lines) + "\n")
     print(f"{args.input} -> {args.output}")
