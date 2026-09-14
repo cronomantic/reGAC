@@ -103,6 +103,11 @@ def label_address(listing, label):
 class Session:
     """A running ZEsarUX, talked to over its remote protocol."""
 
+    # The few machines whose pretty name has nothing of their name in it, so
+    # that asking the emulator what it is can still be compared with what was
+    # asked for.  P341 comes back as "ZX Spectrum +3 (ROM v4.1)".
+    PRETTY = {"P341": "ZX Spectrum +3"}
+
     def __init__(self, machine="48k", port=PORT, extra=()):
         emulator = find_zesarux()
         if not emulator:
@@ -154,7 +159,8 @@ class Session:
         def plain(name):
             return "".join(name.lower().split())
 
-        if running and plain(machine) not in plain(running[0]):
+        wanted = plain(self.PRETTY.get(machine, machine))
+        if running and wanted not in plain(running[0]):
             self.close()
             raise RuntimeError(
                 f"asked for {machine} but the emulator on port {port} is "
