@@ -36,6 +36,14 @@ DB_PAGE_5       equ 0                   ; which is what the next line says
 
                 SLOT    2
                 PAGE    2
+                IFDEF SCREEN
+                ; A loading screen, if the build says there is one: it goes
+                ; where the screen is and travels as the first block.
+                ORG     SCREEN_AT
+loading_screen:
+                INCBIN  "screen.bin", 0, SCREEN_BYTES
+                ENDIF
+
                 ORG     $8000
 start:
                 di
@@ -89,5 +97,8 @@ database:
                 INCBIN  "game3.rgac", 0, DB_RESIDENT_SIZE
 last:
 
+                IFDEF SCREEN
+                SAVEBIN "game3_screen.bin", loading_screen, SCREEN_BYTES
+                ENDIF
                 SAVEBIN "game3_code.bin", start, last - start
                 SAVEBIN "game3_boot.bin", basic, basic_end - basic

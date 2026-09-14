@@ -69,6 +69,14 @@ DB_PAGE_5       equ 0
 
                 SLOT    2
                 PAGE    2
+                IFDEF SCREEN
+                ; A loading screen, if the build says there is one: it goes
+                ; where the screen is and travels as the first block.
+                ORG     SCREEN_AT
+loading_screen:
+                INCBIN  "screen.bin", 0, SCREEN_BYTES
+                ENDIF
+
                 ORG     $8000
 start:
                 di
@@ -130,6 +138,9 @@ last:
 ; in the loader says.
                 EMPTYTAP "game128.tap"
                 SAVETAP "game128.tap", BASIC, "reGAC", basic, basic_end - basic, 10
+                IFDEF SCREEN
+                SAVETAP "game128.tap", HEADLESS, loading_screen, SCREEN_BYTES
+                ENDIF
                 SLOT    2
                 PAGE    2
                 SAVETAP "game128.tap", HEADLESS, start, last - start

@@ -170,6 +170,10 @@ BANK_SIZES = {"none": 0, "8k": 13, "16k": 14}
 # has to put it.
 LOADS_AT = {"cpc": 0x4000, "plus3": 0x8000}
 
+# And how big a dump of each machine's screen is, which is what a loading
+# screen has to be.
+SCREEN_BYTES = {"cpc": 0x4000, "plus3": 6912}
+
 
 def cmd_build(args):
     """Write the binary database the 8 bit interpreter reads."""
@@ -220,12 +224,20 @@ def cmd_release(args):
         code = f.read()
     name = args.name.upper()
     load = args.load if args.load is not None else LOADS_AT[args.machine]
+    screen = None
+    if args.screen:
+        with open(args.screen, "rb") as f:
+            screen = f.read()
+        wanted = SCREEN_BYTES[args.machine]
+        if len(screen) != wanted:
+            sys.exit(f"ERROR: a {args.machine} screen is {wanted} bytes and "
+                     f"{args.screen} is {len(screen)}")
     written = []
     if args.machine == "cpc":
         for suffix, make in ((".dsk", cpc_disk), (".cdt", cpc_tape)):
             path = os.path.join(args.output, name.lower() + suffix)
             with open(path, "wb") as f:
-                f.write(make(code, name, load, args.entry or load))
+                f.write(make(code, name, load, args.entry or load, screen))
             written.append(path)
         how = f'RUN"{name}" on the disk, RUN"" on the tape'
     else:
@@ -239,10 +251,10 @@ def cmd_release(args):
                     starter = boot.read()
                 with open(args.database, "rb") as database:
                     banks = banks_of(database.read())
-                f.write(plus3_banked_disk(starter, code, banks))
+                f.write(plus3_banked_disk(starter, code, banks, screen))
                 how = f"the Loader entry of its menu, and {len(banks)} banks"
             else:
-                f.write(plus3_disk(code, load))
+                f.write(plus3_disk(code, load, screen))
                 how = "the Loader entry of the machine's own menu"
         written.append(path)
     print(f"{args.input} -> " + ", ".join(written))
@@ -326,6 +338,8 @@ def main():
                    help="where it starts, if not where it loads")
     p.add_argument("--boot", help="the assembled loader, for a +3 with banks")
     p.add_argument("--database", help="the built database the banks come from")
+    p.add_argument("--screen", help="a dump of the machine's screen, to show "
+                                    "while the rest loads")
     p.set_defaults(func=cmd_release)
 
     p = sub.add_parser("text", help="report what the text costs once packed")

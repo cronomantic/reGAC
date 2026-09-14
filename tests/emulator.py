@@ -39,15 +39,21 @@ def available():
     return bool(find_sjasmplus() and find_zesarux())
 
 
-def assemble(source, listing=None):
-    """Assemble one file where it sits.  Returns the listing path."""
+def assemble(source, listing=None, defines=()):
+    """Assemble one file where it sits.  Returns the listing path.
+
+    `defines` are handed to the assembler as it would be from a makefile,
+    which is how a build says things that are not the adventure's business:
+    whether there is a loading screen, for one."""
     sjasmplus = find_sjasmplus()
     if not sjasmplus:
         raise RuntimeError("sjasmplus is not in tools/")
     folder = os.path.dirname(os.path.abspath(source))
     listing = listing or os.path.join(folder, "out.lst")
     result = subprocess.run(
-        [sjasmplus, f"--lst={listing}", os.path.basename(source)],
+        [sjasmplus, f"--lst={listing}"]
+        + [f"-D{name}" for name in defines]
+        + [os.path.basename(source)],
         cwd=folder,
         capture_output=True,
         text=True,

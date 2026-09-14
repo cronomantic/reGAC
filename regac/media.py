@@ -49,14 +49,22 @@ def quoted(text):
     return bytes([QUOTE]) + text.encode("ascii") + bytes([QUOTE])
 
 
-def loader(wanted, keep=CODE_AT - 1, entry=CODE_AT):
-    """The three lines: keep out of the memory the interpreter wants, load it,
-    and go.  `wanted` is the name to load, which on tape is the shout that
-    means the next file and no fuss about it."""
-    return (basic_line(10, [MEMORY, SPACE] + list(hex_number(keep)))
-            + basic_line(20, [LOAD, SPACE] + list(quoted(wanted)))
-            + basic_line(30, [CALL, SPACE] + list(hex_number(entry)))
-            + b"\x00\x00")
+SCREEN_AT = 0xC000              # where an Amstrad keeps what it is showing
+SCREEN_BYTES = 0x4000
+
+
+def loader(wanted, keep=CODE_AT - 1, entry=CODE_AT, screen=None):
+    """The lines: keep out of the memory the interpreter wants, put up the
+    loading screen if there is one, bring the interpreter in and go.  `wanted`
+    is the name to load, which on tape is the shout that means the next file
+    and no fuss about it."""
+    out = basic_line(10, [MEMORY, SPACE] + list(hex_number(keep)))
+    if screen is not None:
+        out += basic_line(20, [LOAD, SPACE] + list(quoted(screen))
+                          + [ord(",")] + list(hex_number(SCREEN_AT)))
+    out += basic_line(30, [LOAD, SPACE] + list(quoted(wanted)))
+    out += basic_line(40, [CALL, SPACE] + list(hex_number(entry)))
+    return out + bytes(2)
 
 
 def amsdos(name, data, kind=BINARY, load=CODE_AT, entry=0):
@@ -76,14 +84,18 @@ def amsdos(name, data, kind=BINARY, load=CODE_AT, entry=0):
     return bytes(head) + bytes(data)
 
 
-def cpc_disk(code, name=NAME, load=CODE_AT, entry=CODE_AT):
+def cpc_disk(code, name=NAME, load=CODE_AT, entry=CODE_AT, screen=None):
     """A data disk with the loader and the interpreter on it, which a machine
-    starts with RUN and the name."""
+    starts with RUN and the name.  A loading screen, when there is one, is a
+    dump of that machine's own screen and travels as a file of its own."""
     binary = f"{name}.BIN"
+    picture = f"{name}.SCR" if screen else None
     disk = Disk("cpc-data")
     disk.add(f"{name}.BAS",
-             amsdos(f"{name}.BAS", loader(binary, load - 1, entry),
+             amsdos(f"{name}.BAS", loader(binary, load - 1, entry, picture),
                     kind=0, load=BASIC_AT))
+    if screen:
+        disk.add(picture, amsdos(picture, screen, load=SCREEN_AT))
     disk.add(binary, amsdos(binary, code, load=load, entry=entry))
     return disk.image()
 
@@ -123,14 +135,17 @@ def spectrum_number(value):
     return bytes([SPECTRUM_VAL, 0x22]) + str(value).encode("ascii") + bytes([0x22])
 
 
-def plus3_loader(name=PLUS3_GAME, load=PLUS3_CODE_AT):
-    """CLEAR below the interpreter, load it, and call it."""
-    return spectrum_line(10,
-                         [SPECTRUM_CLEAR] + list(spectrum_number(load - 1))
-                         + [ord(":"), SPECTRUM_LOAD, 0x22]
-                         + list(name.encode("ascii"))
-                         + [0x22, SPECTRUM_CODE, ord(":"), SPECTRUM_RANDOMIZE,
-                            SPECTRUM_USR] + list(spectrum_number(load)))
+def plus3_loader(name=PLUS3_GAME, load=PLUS3_CODE_AT, screen=False):
+    """CLEAR below the interpreter, put up the screen if there is one, load
+    the interpreter and call it."""
+    body = [SPECTRUM_CLEAR] + list(spectrum_number(load - 1))
+    if screen:
+        body += ([ord(":"), SPECTRUM_LOAD, 0x22]
+                 + list(PLUS3_SCREEN.encode("ascii")) + [0x22, SPECTRUM_CODE])
+    body += ([ord(":"), SPECTRUM_LOAD, 0x22] + list(name.encode("ascii"))
+             + [0x22, SPECTRUM_CODE, ord(":"), SPECTRUM_RANDOMIZE,
+                SPECTRUM_USR] + list(spectrum_number(load)))
+    return spectrum_line(10, body)
 
 
 def plus3_file(kind, data, first=0, second=0):
@@ -151,20 +166,30 @@ def plus3_file(kind, data, first=0, second=0):
     return bytes(head) + bytes(data)
 
 
-def plus3_disk(code, load=PLUS3_CODE_AT):
+PLUS3_SCREEN = "SCREEN"
+SPECTRUM_SCREEN_AT = 0x4000
+SPECTRUM_SCREEN_BYTES = 6912
+
+
+def plus3_disk(code, load=PLUS3_CODE_AT, screen=None):
     """A +3 disk with the loader the machine's own menu starts.
 
     The first thing on that menu is Loader, and what Loader runs is the BASIC
-    program called DISK, so that is what it is called.
+    program called DISK, so that is what it is called.  A loading screen is a
+    dump of the Spectrum's own screen and goes on as another file, put up
+    before the interpreter comes in.
     """
-    basic = plus3_loader(PLUS3_GAME, load)
+    basic = plus3_loader(PLUS3_GAME, load, bool(screen))
     disk = Disk("plus3")
     disk.add(PLUS3_LOADER, plus3_file(FILE_BASIC, basic, 10, len(basic)))
+    if screen:
+        disk.add(PLUS3_SCREEN,
+                 plus3_file(FILE_CODE, screen, SPECTRUM_SCREEN_AT, 0x8000))
     disk.add(PLUS3_GAME, plus3_file(FILE_CODE, code, load, 0x8000))
     return disk.image()
 
 
-def plus3_banked_disk(boot, code, banks):
+def plus3_banked_disk(boot, code, banks, screen=None):
     """A +3 disk for an adventure whose database lives in banks.
 
     The loader is not BASIC any more -- BASIC cannot page -- so what goes in
@@ -175,7 +200,9 @@ def plus3_banked_disk(boot, code, banks):
     """
     disk = Disk("plus3")
     disk.add(PLUS3_LOADER, plus3_file(FILE_BASIC, boot, 10, len(boot)))
-    disk.add(PLUS3_GAME, bytes(code) + b"".join(bytes(b) for b in banks))
+    pieces = ([bytes(screen)] if screen else []) + [bytes(code)]
+    pieces += [bytes(b) for b in banks]
+    disk.add(PLUS3_GAME, b"".join(pieces))
     return disk.image()
 
 
@@ -195,10 +222,14 @@ def banks_of(image):
             for n in range(reader.bank_count)]
 
 
-def cpc_tape(code, name=NAME, load=CODE_AT, entry=CODE_AT):
-    """A tape with the same two, which a machine starts with RUN and nothing
-    else because what it runs is whatever comes first."""
-    return tape([
-        File(name, loader("!", load - 1, entry), kind=BASIC, load=BASIC_AT),
-        File(name, code, kind=BINARY, load=load, entry=entry),
-    ])
+def cpc_tape(code, name=NAME, load=CODE_AT, entry=CODE_AT, screen=None):
+    """A tape with the same, which a machine starts with RUN and nothing else
+    because what it runs is whatever comes first.  A shouted name means the
+    next file along, so the pieces only have to be in the order they are
+    wanted: the loader, the screen, and the interpreter."""
+    files = [File(name, loader("!", load - 1, entry, "!" if screen else None),
+                  kind=BASIC, load=BASIC_AT)]
+    if screen:
+        files.append(File(name, screen, kind=BINARY, load=SCREEN_AT))
+    files.append(File(name, code, kind=BINARY, load=load, entry=entry))
+    return tape(files)

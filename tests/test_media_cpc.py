@@ -23,10 +23,11 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+import disk as reader  # noqa: E402
 import emulator  # noqa: E402
 from regac import cdt  # noqa: E402
 from regac.binary import Database  # noqa: E402
-from regac.media import cpc_disk, cpc_tape  # noqa: E402
+from regac.media import SCREEN_AT, cpc_disk, cpc_tape  # noqa: E402
 from test_game_cpc import glyph_table, wait_screen  # noqa: E402
 
 CPC = os.path.join(ROOT, "z80", "cpc")
@@ -138,6 +139,41 @@ def test_the_disk_starts_the_game(tmp_path):
     assert any(asking(ddb) in line for line in screen if line), (
         f"the adventure never got going: {screen}"
     )
+
+
+@needs_tools
+def test_the_disk_puts_up_a_loading_screen(tmp_path):
+    """A dump of the Amstrad's own sixteen kilobytes of screen, which the
+    loader puts where the machine shows it before pulling the rest in."""
+    import random
+
+    filler = random.Random(13)
+    screen = bytes(filler.randrange(256) for _ in range(0x4000))
+    path = str(tmp_path / "juego.dsk")
+    with open(path, "wb") as f:
+        f.write(cpc_disk(built(), screen=screen))
+
+    area = reader.data_area(open(path, "rb").read())
+    listing = reader.directory(area)
+    assert "JUEGO.SCR" in listing, f"no screen on the disk: {sorted(listing)}"
+    carried = reader.contents(area, listing["JUEGO.SCR"])[128:128 + len(screen)]
+    assert carried == screen, "what is on the disk is not the screen given"
+
+    session = emulator.Session(
+        machine="CPC6128", extra=["--enable-dsk", "--dsk-file", path]
+    )
+    try:
+        time.sleep(4.0)
+        session.type_keys('run"juego' + chr(13))
+        deadline, seen = time.time() + 60.0, False
+        while time.time() < deadline:
+            time.sleep(0.2)
+            if bytes(session.read(SCREEN_AT, 256)) == screen[:256]:
+                seen = True
+                break
+    finally:
+        session.close()
+    assert seen, "the screen never reached the machine"
 
 
 @is_slow

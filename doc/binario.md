@@ -231,6 +231,35 @@ esperar. La del disco con bancos usa una aventura engordada hasta necesitar
 dos, y compara la lámina de la pantalla byte a byte contra la referencia, que
 sólo cuadra si cada banco acabó en su página.
 
+## La pantalla de carga
+
+Cualquiera de los destinos puede llevar una, y lo que se le da es **un volcado
+crudo de la pantalla de esa máquina**: 6912 bytes en el Spectrum, que es un
+`.SCR` de toda la vida; dieciséis kilobytes en el Amstrad, que es su modo 1
+entero; y los veintitrés del PCW cuando le toque. No se convierte nada ni se
+dibuja nada: lo que se entrega es exactamente lo que la máquina enseña.
+
+Dónde entra en cada medio:
+
+- **Cinta de Spectrum**: un bloque más, y el primero de todos, delante del
+  intérprete. El cargador no se entera de que es especial: la tabla de bloques
+  lo lleva como cualquier otro. Se pide al ensamblar, con `-DSCREEN` y el
+  fichero `screen.bin` junto al fuente, porque en esta máquina el medio lo
+  escribe el ensamblador y no `release`.
+- **Disco de +3**: un fichero `SCREEN` que el BASIC pone antes de traerse el
+  intérprete; y en la versión con bancos, el primer trozo del fichero que lee
+  el cargador en código máquina.
+- **Amstrad**: un `JUEGO.SCR` en el disco, o el fichero de delante en la cinta,
+  que el cargador mete en $C000 antes de cargar nada más.
+
+        python -m regac release z80/cpc/game.bin salida/ -m cpc                --screen pantalla.scr
+
+  El tamaño se comprueba: si no es el de esa máquina, protesta y no escribe.
+
+Un aviso de andar por casa: los medios de todas las máquinas se llaman igual
+(`juego.dsk`, `juego.cdt`), así que cada una quiere su propia carpeta de
+salida. Dos `release` seguidos en la misma se pisan.
+
 ## La música con AY, que es lo que condiciona el diseño
 
 El reproductor de AY corre desde la interrupción, cincuenta veces por segundo.

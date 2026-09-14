@@ -111,12 +111,13 @@ def written(ddb):
     return path
 
 
-def build(source, database, machine, source_asm, listing, banks=None, defs=None):
+def build(source, database, machine, source_asm, listing, banks=None, defs=None,
+          defines=()):
     order = [sys.executable, "-m", "regac", "build", source, database, "-m", machine]
     if banks:
         order += ["-b", banks, "--defs", defs]
     subprocess.run(order, cwd=ROOT, check=True, capture_output=True)
-    return emulator.assemble(source_asm, listing=listing)
+    return emulator.assemble(source_asm, listing=listing, defines=defines)
 
 
 def played(tape, ddb, glyphs, machine):
@@ -181,6 +182,41 @@ def reference(ddb, number, drawn={}):
     if number not in drawn:
         drawn[number] = Renderer(ddb["gfx"], SpectrumDevice()).run(number)
     return drawn[number]
+
+
+def blocks_of(tape):
+    """Every block of a tape image: what it holds, without the flag byte and
+    the checksum that wrap it."""
+    with open(tape, "rb") as f:
+        image = f.read()
+    at, found = 0, []
+    while at < len(image):
+        length = image[at] | image[at + 1] << 8
+        found.append(image[at + 2:at + 2 + length])
+        at += 2 + length
+    return found
+
+
+@needs_tools
+def test_a_loading_screen_travels_first(tmp_path):
+    """A dump of the machine's own screen, put on the tape ahead of everything
+    so that there is something to look at while the rest comes in."""
+    screen = bytes(random.Random(11).randrange(256) for _ in range(6912))
+    with open(os.path.join(SPECTRUM, "screen.bin"), "wb") as f:
+        f.write(screen)
+    build(ADVENTURE, os.path.join(SPECTRUM, "game.rgac"), "spectrum48",
+          os.path.join(SPECTRUM, "game.asm"), os.path.join(SPECTRUM, "game.lst"))
+    plain = blocks_of(os.path.join(SPECTRUM, "game.tap"))
+    emulator.assemble(os.path.join(SPECTRUM, "game.asm"),
+                      listing=os.path.join(SPECTRUM, "game.lst"),
+                      defines=("SCREEN",))
+    with_screen = blocks_of(os.path.join(SPECTRUM, "game.tap"))
+
+    assert len(with_screen) == len(plain) + 1, "no extra block came out"
+    # header, the BASIC, then the screen, then the interpreter
+    carried = with_screen[2]
+    assert carried[1:-1] == screen, "what travelled is not the screen given"
+    assert with_screen[3] == plain[2], "the interpreter changed as well"
 
 
 @needs_tools

@@ -11,3 +11,9 @@ TOKEN_RANDOMIZE equ 249
 TOKEN_USR       equ 192
 NUMBER_MARK     equ 14                  ; what hides a number after its digits
 ENTER           equ 13
+
+; Where a loading screen goes and how much of it there is.  A build says
+; whether there is one by defining SCREEN, and then the file has to be next to
+; the source; see doc/binario.md.
+SCREEN_AT       equ $4000
+SCREEN_BYTES    equ 6912

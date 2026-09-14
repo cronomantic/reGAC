@@ -6,6 +6,14 @@
 
                 include "loader.asm"
 
+                IFDEF SCREEN
+                ; A loading screen, if the build says there is one: it goes
+                ; where the screen is and travels as the first block.
+                ORG     SCREEN_AT
+loading_screen:
+                INCBIN  "screen.bin", 0, SCREEN_BYTES
+                ENDIF
+
                 ORG     $8000
 start:
                 di
@@ -65,4 +73,7 @@ last:
 ; interpreter and its database in one block.
                 EMPTYTAP "game.tap"
                 SAVETAP "game.tap", BASIC, "reGAC", basic, basic_end - basic, 10
+                IFDEF SCREEN
+                SAVETAP "game.tap", HEADLESS, loading_screen, SCREEN_BYTES
+                ENDIF
                 SAVETAP "game.tap", HEADLESS, start, last - start

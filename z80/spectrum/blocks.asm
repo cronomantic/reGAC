@@ -6,6 +6,15 @@
 ; Both loaders read this: the tape one to ask the ROM for each block, and the
 ; +3 one to ask +3DOS, which pages the bank itself when it is told which.
 load_table:
+                IFDEF SCREEN
+                ; The loading screen goes first, so that there is something to
+                ; look at while the rest comes in.
+                dw      SCREEN_AT
+                dw      SCREEN_BYTES
+                IFDEF BANKED
+                db      5               ; the page the screen itself lives in
+                ENDIF
+                ENDIF
                 dw      start
                 dw      last - start
                 IFDEF BANKED

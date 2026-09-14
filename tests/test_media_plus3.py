@@ -86,6 +86,26 @@ def test_the_disk_starts_from_the_menu(tmp_path):
     )
 
 
+@needs_tools
+def test_a_loading_screen_goes_on_the_disk(tmp_path):
+    """The Spectrum's own screen dump, as a file of its own, put up by the
+    loader before the interpreter comes in."""
+    import random
+
+    filler = random.Random(17)
+    screen = bytes(filler.randrange(256) for _ in range(6912))
+    path = str(tmp_path / "juego.dsk")
+    with open(path, "wb") as f:
+        f.write(plus3_disk(built(), screen=screen))
+    image = open(path, "rb").read()
+    # A sector's worth is enough to look for: a disk image breaks a file up
+    # with a track header every nine of them, so the whole thing is not in
+    # there end to end.
+    assert screen[:512] in image, "the screen never made it onto the disk"
+    # and the loader says to put it up: the name is in the BASIC it runs
+    assert image.count(b"SCREEN") >= 2, "the loader does not ask for it"
+
+
 BANKED_SOURCE = os.path.join(SPECTRUM, "game3.asm")
 BANKED_DATABASE = os.path.join(SPECTRUM, "game3.rgac")
 BANKED_DEFS = os.path.join(SPECTRUM, "banks3.inc")
