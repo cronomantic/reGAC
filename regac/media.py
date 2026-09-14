@@ -242,6 +242,36 @@ def banks_of(image):
             for n in range(reader.bank_count)]
 
 
+# -- the PCW, which starts itself and has nothing to ask ----------------------
+
+PCW_TABLE_AT = 0x1C0            # where boot.asm keeps its table, in its sector
+PCW_NO_BANK = 0xFF              # a piece that goes where the map already is
+PCW_SECTOR = 512
+PCW_PAYLOAD = "GAME"
+
+
+def pcw_disk(boot, pieces):
+    """A disk a PCW starts by itself.
+
+    `pieces` are what to load, in the order they lie on the disk: where each
+    goes, what it is, and which of the machine's banks to put in the window
+    first.  They travel as one file, so that the disk still has a filesystem
+    on it that a person can read, and the loader is told where that file
+    begins and reads on from there.  The first piece is the one that is run.
+    """
+    disk = Disk("pcw")
+    payload, table = bytearray(), bytearray()
+    for where, blob, bank in pieces:
+        padded = bytes(blob) + bytes(-len(blob) % PCW_SECTOR)
+        table += struct.pack("<HBB", where, len(padded) // PCW_SECTOR, bank)
+        payload += padded
+    table += bytes(4)                           # and nowhere, to end it
+    disk.add(PCW_PAYLOAD, bytes(payload))
+    track, record = disk.where(PCW_PAYLOAD)
+    disk.boot(boot, bytes([track, record]) + bytes(table), PCW_TABLE_AT)
+    return disk.image()
+
+
 def cpc_tape(code, name=NAME, load=CODE_AT, entry=CODE_AT, screen=None):
     """A tape with the same, which a machine starts with RUN and nothing else
     because what it runs is whatever comes first.  A shouted name means the

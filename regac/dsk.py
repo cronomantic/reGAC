@@ -215,6 +215,23 @@ class Disk:
                 entry[16 + n] = block
         self.directory[at:at + DIRECTORY_ENTRY] = entry
 
+    def where(self, name, user=0):
+        """Which track and record a file starts at.
+
+        A loader that has no filesystem in it still has to be told where to
+        start reading, and this is what tells it: the blocks are handed out in
+        order, so a file is laid down in one run from here.
+        """
+        at = self.find(filename(name), user)
+        if at is None:
+            raise DiskError(f"{name} is not on the disk")
+        block = self.directory[at + 16]
+        if self.wide:
+            block |= self.directory[at + 17] << 8
+        shape = self.format
+        sector = shape.reserved * shape.sectors + block * self.per_block
+        return divmod(sector, shape.sectors)[0],             shape.base + sector % shape.sectors
+
     def free_entry(self):
         for at in range(0, len(self.directory), DIRECTORY_ENTRY):
             if self.directory[at] == EMPTY:
@@ -229,7 +246,7 @@ class Disk:
                 return at
         return None
 
-    def boot(self, code, machine=BOOT_SUM):
+    def boot(self, code, table=b"", table_at=None, machine=BOOT_SUM):
         """Put the code a PCW starts from in the first sector.
 
         That machine has no ROM at all: at the switch it fetches a loader from
@@ -237,6 +254,9 @@ class Disk:
         512 bytes add up to what it wants, jumps to $F010 -- which is why the
         specification takes the first sixteen and the code follows it.  The
         byte before the end is bent to make the sum come out.
+
+        `table` is what that code reads to know what to load and where, and it
+        goes wherever the code expects it in the same sector.
         """
         spare = self.format.sector_size - (BOOT_CODE_AT - BOOT_AT) - 1
         if len(code) > spare:
@@ -244,6 +264,10 @@ class Disk:
         sector = bytearray(self.format.sector_size)
         sector[0:10] = self.format.specification()
         sector[16:16 + len(code)] = code
+        if table:
+            if table_at is None:
+                raise DiskError("a table has to be told where it goes")
+            sector[table_at:table_at + len(table)] = table
         sector[-1] = (machine - sum(sector[:-1])) & 0xFF
         self.boot_sector = bytes(sector)
         return self.boot_sector

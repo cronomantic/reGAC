@@ -14,7 +14,13 @@
 ; Amstrad and the +3 have, at ports nought and one, and reading a sector is
 ; nine bytes of command, the data, and seven bytes of answer.
 ;
-; What it does is read the pieces that follow this sector and jump into them.
+; What to read and where to put it is a table the builder writes into the end
+; of this same sector: which track and record the pieces start at, and then,
+; for each piece, where it goes, how many sectors it is, and which of the
+; machine's banks to put in the window first.  The pieces lie one after
+; another on the disc, so reading is simply going on to the next record and,
+; when a track runs out, to the next track.  A piece that goes nowhere ends
+; the table, and then the first piece is jumped into.
 
                 DEVICE  NOSLOT64K
 
@@ -24,22 +30,32 @@ SYSTEM          equ $F8                 ; among other things, the motor
 MOTOR_ON        equ 9
 MOTOR_OFF       equ 10
 
+BANK_AT_4000    equ $F1                 ; which of the eight is seen at $4000
+LOCK            equ $F4                 ; and whether that can be changed
+UNLOCKED        equ 0
+BANK_MARK       equ $80                 ; a bank number is given with this on
+NO_BANK         equ $FF                 ; and this means leave the map alone
+
 READ_DATA       equ $46                 ; read, double density
 RECALIBRATE     equ $07                 ; wind the head back to track nought
+SEEK            equ $0F
 SENSE_INTERRUPT equ $08
+SEEK_END        equ %00100000
 SECTOR_CODE     equ 2                   ; which is five hundred and twelve
+SECTORS         equ 9                   ; of them to a track
 GAP             equ $2A
 DTL             equ $FF
 
 BOOT_CODE_AT    equ $F010
-PAYLOAD_AT      equ $0100               ; where what follows is put
-FIRST_SECTOR    equ 2                   ; this one being the first of the track
-SECTORS         equ 8                   ; and the rest of the track after it
+TABLE_AT        equ $F1C0               ; the last sixty four bytes of the
+                                        ; sector, which the builder fills in
 
                 ORG     BOOT_CODE_AT
 boot:
                 di
                 ld      sp, $F000
+                ld      a, UNLOCKED     ; the banks are ours to move
+                out     (LOCK), a
                 ld      a, MOTOR_ON
                 out     (SYSTEM), a
                 ld      de, 0
@@ -55,28 +71,49 @@ boot:
                 call    send            ; drive nought
                 call    settled
 
-                ld      hl, PAYLOAD_AT
-                ld      d, 0            ; the track
-                ld      c, FIRST_SECTOR
-.each:
+                ld      ix, TABLE_AT
+                ld      b, (ix+0)       ; the track the pieces start on
+                ld      c, (ix+1)       ; and the record
+                ld      a, b
+                or      a
+                call    nz, seek        ; which may not be where the head is
+                ld      de, 2
+                add     ix, de
+.each_piece:
+                ld      l, (ix+0)
+                ld      h, (ix+1)       ; where this piece goes
+                ld      a, h
+                or      l
+                jr      z, .run
+                ld      a, (ix+3)       ; and in which bank, if any
+                cp      NO_BANK
+                jr      z, .mapped
+                or      BANK_MARK
+                out     (BANK_AT_4000), a
+.mapped:
+                ld      e, (ix+2)       ; how many sectors of it
+.each_sector:
                 call    read_sector
-                inc     c
-                ld      a, c
-                cp      FIRST_SECTOR + SECTORS
-                jr      nz, .each
-
+                dec     e
+                jr      nz, .each_sector
+                ld      de, 4
+                add     ix, de
+                jr      .each_piece
+.run:
                 ld      a, MOTOR_OFF
                 out     (SYSTEM), a
-                jp      PAYLOAD_AT
+                ld      hl, (TABLE_AT + 2)      ; the first piece is the one to run
+                jp      (hl)
 
-; One sector, track D and record C, into HL, which is left after it.
-; Corrupts: AF, B
+; One sector into HL, from track B and record C, moving both on afterwards.
+; Corrupts: AF
 read_sector:
+                push    de
                 ld      a, READ_DATA
                 call    send
                 xor     a
                 call    send            ; drive nought, head nought
-                ld      a, d
+                ld      a, b
                 call    send            ; the cylinder
                 xor     a
                 call    send            ; the head again
@@ -101,21 +138,50 @@ read_sector:
                 inc     hl
                 jr      .data
 .answer:
+                push    bc
                 ld      b, 7            ; seven bytes of how it went, unread
 .each_answer:
                 call    take
                 djnz    .each_answer
+                pop     bc
+                ; and on to the next record, or the next track
+                inc     c
+                ld      a, c
+                cp      SECTORS + 1
+                jr      c, .done
+                ld      c, 1
+                inc     b
+                call    seek
+.done:
+                pop     de
                 ret
 
+; Put the head on track B.
+; Corrupts: AF
+seek:
+                ld      a, SEEK
+                call    send
+                xor     a
+                call    send            ; drive nought, head nought
+                ld      a, b
+                call    send
+                ; fall through, and wait for it
+
 ; Wait for the head to stop moving, which is asking until it says so.
-; Corrupts: AF, B
+; Corrupts: AF
 settled:
+                push    bc
+.again:
                 ld      a, SENSE_INTERRUPT
                 call    send
                 call    take            ; the first byte says whether it ended
-                and     %00100000       ; seek end
-                jr      z, settled
+                and     SEEK_END
+                ld      c, a
                 call    take            ; and the second is the track
+                ld      a, c
+                or      a
+                jr      z, .again
+                pop     bc
                 ret
 
 ; Give the controller the byte in A.
