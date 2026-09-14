@@ -54,6 +54,12 @@ gfx_start_colours:
 ; inside its command loop: one picture of Los pájaros de Bangkok sets the
 ; border forty three thousand times, and even a call and a return cost that
 ; picture half a second on a Spectrum.
+; The colours in force have changed.  Nothing to do here: this machine
+; settles them once per shape, which is where the picture interpreter's own
+; hook leaves it free to.
+                MACRO   GFX_COLOURS
+                ENDM
+
                 MACRO   GFX_BORDER
                 ENDM
 

@@ -260,6 +260,12 @@ class PixelDevice(Device):
             self.colours[index] = self.line_colour if lit else self.fill_colour
         return right - left + 1
 
+    def vram(self):
+        """The picture as a machine with a byte to a pixel holds it: one row
+        after another, each byte the colour of its pixel.  That is a Next's
+        layer 2 exactly, which is what the Z80 side is compared against."""
+        return bytes(self.colours)
+
     def to_rgb(self):
         return [
             [rgb(self.palette[self.colours[y * self.width + x]]) for x in range(self.width)]

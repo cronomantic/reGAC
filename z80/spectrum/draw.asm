@@ -32,6 +32,12 @@ gfx_start_colours:
 ; routine because the picture interpreter runs it inside its command loop and
 ; an animation sets the border tens of thousands of times: the colour is in A.
 ; Corrupts: AF
+; The colours in force have changed.  Nothing to do here: this machine
+; settles them once per shape, which is where the picture interpreter's own
+; hook leaves it free to.
+                MACRO   GFX_COLOURS
+                ENDM
+
                 MACRO   GFX_BORDER
                 and     7
                 out     ($FE), a

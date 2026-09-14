@@ -7,6 +7,15 @@
 ; there are.  That is all on the other side of gfx_line, gfx_fill and the
 ; rest, which is the same boundary the Python renderer draws between its
 ; devices.  See doc/graficos.md.
+;
+; Two of those commands are handed straight over as macros rather than calls,
+; because they are met inside this loop and a picture can meet them tens of
+; thousands of times: GFX_BORDER, which most machines do in three
+; instructions, and GFX_COLOURS, which is empty on every machine that settles
+; its colours once per shape.  A machine whose colours belong to a pixel
+; rather than to a cell cannot wait that long -- an ink of nine is settled
+; against the paper of the moment, and the paper may change before the shape
+; arrives -- so it settles here instead.
 
 GFX_MAX_DEPTH   equ 8                   ; a picture may call others
 
@@ -225,7 +234,8 @@ run_picture:
 .store:
                 ld      (hl), b
                 pop     hl
-                jp      .next
+                GFX_COLOURS                     ; only for a machine that has
+                jp      .next                   ; to settle them here: see below
 .two_pens:
                 ld      a, (hl)
                 inc     hl

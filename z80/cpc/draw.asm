@@ -450,6 +450,12 @@ gfx_start_colours:
 ; macro the picture interpreter expands is the call, and the routine keeps
 ; every register but AF, which is what that promises.
 ; Corrupts: AF
+; The colours in force have changed.  Nothing to do here: this machine
+; settles them once per shape, which is where the picture interpreter's own
+; hook leaves it free to.
+                MACRO   GFX_COLOURS
+                ENDM
+
                 MACRO   GFX_BORDER
                 call    set_border
                 ENDM

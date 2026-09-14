@@ -105,8 +105,9 @@ class Session:
 
     # The few machines whose pretty name has nothing of their name in it, so
     # that asking the emulator what it is can still be compared with what was
-    # asked for.  P341 comes back as "ZX Spectrum +3 (ROM v4.1)".
-    PRETTY = {"P341": "ZX Spectrum +3"}
+    # asked for.  P341 comes back as "ZX Spectrum +3 (ROM v4.1)", and the Next
+    # is asked for by the name of the board it runs on.
+    PRETTY = {"P341": "ZX Spectrum +3", "TBBlue": "ZX Spectrum Next"}
 
     def __init__(self, machine="48k", port=PORT, extra=()):
         emulator = find_zesarux()

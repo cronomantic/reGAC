@@ -1,23 +1,28 @@
 ; MIT License, Copyright (c) 2025 Cronomantic
 ;
-; Drawing on an MSX1 in screen 2: the primitives the picture interpreter asks
-; for, into the copy of the screen that screen.asm sends to the video chip.
+; Drawing on a Spectrum Next, into layer 2: a byte a pixel, sixteen colours
+; that are the Spectrum's own, and no clash anywhere.
 ;
-; One bit per pixel and a lit pixel stops a fill, exactly as on the Spectrum,
-; so there is no mask here and the fill is that machine's.  Two things are
-; this one's own: a colour belongs to eight pixels of one line rather than to
-; a cell of eight by eight, so a fill lays colour down once a row instead of
-; once every eight; and the fifteen colours are not the Spectrum's sixteen, so
-; each is matched to the nearest -- by the same table the reference renderer
-; works out, which is how the two are held to each other.
+; Two things follow from that and they are the whole of what is different
+; here.  The first is that a colour belongs to one pixel, so an outline lays
+; its colour down as it goes and a fill lays two along a row, one for the
+; pattern's lit points and one for the rest; there is no cell to share.
+;
+; The second is that the picture no longer says where a fill must stop.  On a
+; Spectrum a set pixel is both a black mark and a wall, and the artists drew
+; against that; with a colour a pixel there is nothing to read back, so a mask
+; of one bit a pixel is kept beside the picture and that is what a fill walks.
+; It holds exactly what a Spectrum's screen would hold, which is why the
+; pictures come out the same, and it is laid out row by row, thirty two bytes
+; to a row, so the fill that walks it is the Spectrum's own.
 
 GAC_TOP         equ 175                 ; y=175 is the first row of the screen
-SHADOW_STEP     equ (SHADOW_COLOURS - SHADOW) >> 8       ; rows between tables
 
-; The nearest colour this machine has to each of the Spectrum's eight, worked
-; out by plain distance in red, green and blue.  Bright and flash have nowhere
-; to go here, so they are not looked at.
-msx_colours:    db      1, 4, 6, 13, 2, 7, 10, 14
+; The mask, four kilobytes on a four kilobyte boundary: a row is the high byte
+; of the address and nothing else, which is what lets a run be walked with inc
+; l and dec l.
+MASK            equ $A000
+MASK_BYTES      equ PICTURE_ROWS * 32
 
 ; Turn the adventure's y into a screen row.  In A, out A.
 to_row:
@@ -26,45 +31,110 @@ to_row:
                 ret
 
 ; The colours a picture starts in: black on white, as the screen starts.
+;
+; The picture interpreter calls this with the number of the picture it is
+; about to draw in HL, so HL comes back untouched.  It cost the PCW an
+; afternoon once.
 ; Corrupts: AF
 gfx_start_colours:
+                push    de
+                push    hl
                 xor     a
                 ld      (gfx_ink), a
                 ld      (gfx_bright), a
                 ld      (gfx_flash), a
-                ld      a, 7
+                ld      (ink_now), a
+                ld      (bright_now), a
+                ld      a, START_PAPER
                 ld      (gfx_paper), a
+                ld      (paper_now), a
+                call    settle_colours
+                pop     hl
+                pop     de
                 ret
 
-; The border, which here is one of the video chip's registers.  A routine and
-; not a macro of its own because the colour has to go through the table above,
-; and the picture interpreter's loop wants its registers back.
-; Corrupts: AF
-; The colours in force have changed.  Nothing to do here: this machine
-; settles them once per shape, which is where the picture interpreter's own
-; hook leaves it free to.
-                MACRO   GFX_COLOURS
-                ENDM
-
+; The border is the one thing here that is still the old machine's: layer 2
+; does not cover it and the ULA still draws it, so it is written the way it
+; always was.
                 MACRO   GFX_BORDER
                 call    set_border
                 ENDM
 
 set_border:
-                push    hl
                 and     7
-                ld      hl, msx_colours
-                add     a, l
-                ld      l, a
-                jr      nc, .no_carry
-                inc     h
-.no_carry:
-                ld      a, (hl)
-                out     (VDP_ADDR), a
-                ld      a, $87                  ; register seven
-                out     (VDP_ADDR), a
-                pop     hl
+                out     ($FE), a
                 ret
+
+; The colours in force have changed, and on this machine they are settled here
+; rather than once per shape: an ink of nine means whichever of black and
+; white reads against the paper, and the reference settles that the moment the
+; command arrives -- which matters, because a picture of Megacorp changes the
+; paper afterwards and expects the ink it already had.
+                MACRO   GFX_COLOURS
+                push    hl                      ; the command interpreter is
+                push    de                      ; part way through a picture and
+                push    bc                      ; wants all three of these back
+                call    settle_colours
+                pop     bc
+                pop     de
+                pop     hl
+                ENDM
+
+; Settle the two colours in force into the two bytes a pixel is written with.
+;
+; The ink and the paper are kept as they came rather than as they came out,
+; because a colour of eight means leave the one in force alone and has to be
+; told apart from a real colour later.  Bright is a colour of its own here:
+; there is no attribute to carry it, so it is simply the top bit of the
+; sixteen.
+; Corrupts: AF, HL
+settle_colours:
+                ld      a, (gfx_bright)
+                cp      8
+                jr      nc, .bright_stands
+                ld      (bright_now), a
+.bright_stands:
+                ld      a, (gfx_paper)
+                cp      8
+                jr      nc, .paper_stands
+                ld      (paper_now), a
+.paper_stands:
+                ld      a, (gfx_ink)
+                cp      8
+                jr      c, .ink_given
+                cp      9
+                jr      nz, .ink_stands
+                ld      a, (paper_now)          ; whichever reads against it
+                cp      4
+                ld      a, 0                    ; black on a light paper
+                jr      nc, .ink_given
+                ld      a, 7                    ; white on a dark one
+.ink_given:
+                ld      (ink_now), a
+.ink_stands:
+                ; and the two bytes, which are the colour and eight more of it
+                ; when it is bright
+                ld      hl, bright_now
+                ld      a, (hl)
+                or      a
+                ld      a, 0
+                jr      z, .no_lift
+                ld      a, 8
+.no_lift:
+                ld      hl, ink_now
+                add     a, (hl)
+                ld      (line_colour), a
+                sub     (hl)
+                ld      hl, paper_now
+                add     a, (hl)
+                ld      (fill_colour), a
+                ret
+
+ink_now:        db      0                       ; the last real ones
+paper_now:      db      START_PAPER
+bright_now:     db      0
+line_colour:    db      0                       ; and what they come to
+fill_colour:    db      START_PAPER
 
 ; Turn a command's y into a screen row, keeping sixteen bits with their sign.
 ; A picture may name a y above the top or below the bottom, and those have to
@@ -109,9 +179,10 @@ clamp_row:
                 ld      l, PICTURE_ROWS - 1
                 ret
 
-; The byte holding pixel (D across, E down) in HL, its bit as a mask in B.
+; The byte of the mask holding pixel (D across, E down) in HL, its bit as a
+; mask in B.
 ;
-; The copy is kept row by row, thirty two bytes to a row, so the row is the
+; The mask is kept row by row, thirty two bytes to a row, so the row is the
 ; high byte and the whole of it fits in the low one -- which is what lets the
 ; fill walk a run with inc l and dec l, as the Spectrum's does.
 ; Corrupts: AF
@@ -121,7 +192,7 @@ pixel_address:
                 rrca
                 rrca
                 and     %00011111               ; which page of eight rows
-                add     a, SHADOW >> 8
+                add     a, MASK >> 8
                 ld      h, a
                 ld      a, e
                 and     7
@@ -154,154 +225,24 @@ pixel_address:
 bit_masks:      db      %10000000, %01000000, %00100000, %00010000
                 db      %00001000, %00000100, %00000010, %00000001
 
-; The colour of those same eight pixels lives in the other copy, the same
-; distance into it.  In HL, out HL.
-; Corrupts: AF
-to_colour:
-                ld      a, h
-                add     a, SHADOW_STEP
-                ld      h, a
-                ret
-
-; Settle the colours in force into the byte this machine wants, once per shape
-; rather than once per point.  Matching the Spectrum's sixteen colours to the
-; fifteen here is two table lookups and some shifting, and a line of any length
-; would pay for them at every pixel.
-;
-; When one of the colours is an eight, or the ink is nine, the byte depends on
-; what is already on the screen and cannot be settled: then colour_varies says
-; so and every point works it out for itself, as before.
-; Corrupts: AF, BC, HL
-settle_colours:
-                call    colour_const
-                ld      hl, colour_varies
-                jr      c, .varies
-                ld      (colour_now), a
-                ld      (hl), 0
-                ret
-.varies:
-                ld      (hl), 1
-                ret
-
-colour_now:     db      0
-colour_varies:  db      1
-
-; The colour byte the colours in force come to, when it does not depend on
-; what is already there.  Carry clear and the byte in A when it does not;
-; carry set when one of them is an eight, meaning leave what is there, or the
-; ink is nine, meaning choose against the paper.
-; Corrupts: AF, BC, HL
-colour_const:
-                ld      a, (gfx_ink)
-                cp      8
-                jr      nc, .varies
-                call    msx_colour
-                rlca
-                rlca
-                rlca
-                rlca
-                ld      c, a
-                ld      a, (gfx_paper)
-                cp      8
-                jr      nc, .varies
-                call    msx_colour
-                or      c
-                ret                             ; carry is clear after OR
-.varies:
-                scf
-                ret
-
-; The colour this machine shows for the Spectrum's colour A.
+; Where pixel (D across, E down) is in layer 2, with its half of the picture
+; mapped.  Inside a piece the row is the high byte and the column the low one.
 ; Corrupts: AF, HL
-msx_colour:
-                and     7
-                ld      hl, msx_colours
-                add     a, l
-                ld      l, a
-                jr      nc, .no_carry
-                inc     h
-.no_carry:
-                ld      a, (hl)
+colour_address:
+                ld      a, e
+                rlca
+                rlca                            ; bit six of the row: which half
+                and     1
+                call    map_piece
+                ld      a, e
+                and     PIECE_LINES - 1
+                add     a, WINDOW >> 8
+                ld      h, a
+                ld      l, d
                 ret
 
-; Give the eight pixels holding (D, E) the colours in force.  A colour of
-; eight means leave what is there, and an ink of nine means pick black or
-; white, whichever will be read against the paper.
-; Corrupts: everything but DE
-colour_cell:
-                push    de
-                call    pixel_address
-                call    to_colour
-                jr      colour_there
-
-; The same, when the address has already been worked out: HL points at the
-; colour, and DE has been put away by the caller.  Every point of an outline
-; comes through here, which is why the address is not worked out twice.
-; Corrupts: everything but DE
-colour_at:
-                push    de
-                ; fall through
-colour_there:
-                ld      a, (colour_varies)
-                or      a
-                jr      nz, .the_hard_way
-                ld      a, (colour_now)         ; settled for this whole shape
-                ld      (hl), a
-                pop     de
-                ret
-.the_hard_way:
-                ld      c, (hl)                 ; what is there now
-                push    hl
-                ld      a, (gfx_paper)
-                cp      8
-                jr      nc, .keep_paper
-                call    msx_colour
-                jr      .have_paper
-.keep_paper:
-                ld      a, c
-                and     15
-.have_paper:
-                ld      e, a                    ; the paper
-                ld      a, (gfx_ink)
-                cp      8
-                jr      c, .plain_ink
-                cp      9
-                jr      z, .contrast
-                ld      a, c                    ; leave the ink alone
-                rrca
-                rrca
-                rrca
-                rrca
-                jr      .have_ink
-.contrast:
-                ; Which way this goes is decided on the paper the picture
-                ; asked for, not on the colour it came out as: the order of
-                ; this machine's fifteen says nothing about how light they are.
-                ld      a, (gfx_paper)
-                cp      4
-                ld      a, 0                    ; black on a light paper
-                jr      nc, .dark_ink
-                ld      a, 7                    ; white on a dark one
-.dark_ink:
-                call    msx_colour
-                jr      .have_ink
-.plain_ink:
-                call    msx_colour
-.have_ink:
-                and     15
-                rlca
-                rlca
-                rlca
-                rlca
-                or      e
-                pop     hl
-                ld      (hl), a
-                pop     de
-                ret
-
-; Put down a pixel of the outline at (D, E), which also stops fills.  The
-; address is worked out once and used twice: the pattern is in one copy and
-; the colour of those eight pixels is in the other, the same distance in.
+; Put down a pixel of the outline at (D, E), which also stops fills: the
+; colour into the picture and the bit into the mask.
 ; Corrupts: everything but DE
 plot_point:
                 ld      a, e
@@ -312,9 +253,13 @@ plot_point:
                 ld      a, (hl)
                 or      b
                 ld      (hl), a
-                call    to_colour
                 pop     de
-                jp      colour_at
+                push    de
+                call    colour_address
+                ld      a, (line_colour)
+                ld      (hl), a
+                pop     de
+                ret
 
 ; Whether a fill has to stop at (D, E).  Zero flag clear if it does.  Off the
 ; picture always stops it.
