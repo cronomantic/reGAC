@@ -289,6 +289,18 @@ MSX1_PALETTE = [
 ]
 
 
+# Where screen 2 keeps a byte of eight pixels, and how much of that table the
+# picture takes: the top sixteen rows, which is two of its three blocks.
+MSX_BLOCK = 2048
+MSX_PICTURE_BYTES = 2 * MSX_BLOCK
+MSX_PATTERNS = 0x0000  # where the two tables sit in the video chip's memory
+MSX_COLOURS = 0x2000
+
+
+def msx_address(x, y):
+    return ((y & 0xF8) << 5) | (x & 0xF8) | (y & 7)
+
+
 class MsxDevice(BitmapDevice):
     """The MSX1 in screen 2.
 
@@ -332,6 +344,29 @@ class MsxDevice(BitmapDevice):
         if self.ink == CONTRAST:
             foreground = self.map[0] if self.paper >= 4 else self.map[7]
         self.colours[index] = (foreground << 4) | background
+
+    def vram(self):
+        """The picture as the two tables the video chip reads.
+
+        Screen 2 keeps the eight lines of a cell together and the cells in
+        blocks of a third of the screen, which comes out as
+
+            (y & $F8) * 32 + (x & $F8) + (y & 7)
+
+        -- cheaper than the Spectrum's own sum, and the colour table has
+        exactly the same shape one block further on, because a colour here
+        belongs to eight pixels of one line and not to a cell of eight by
+        eight.  The picture is the top sixteen rows, which is the first two
+        blocks of each table; the eight rows of text below are the third.
+        """
+        patterns = bytearray(MSX_PICTURE_BYTES)
+        colours = bytearray(MSX_PICTURE_BYTES)
+        for y in range(self.height):
+            for column in range(self.char_width):
+                at = msx_address(column * 8, y)
+                patterns[at] = self.pixels[y * self.char_width + column]
+                colours[at] = self.colours[y * self.char_width + column]
+        return bytes(patterns), bytes(colours)
 
     def to_rgb(self):
         rows = []

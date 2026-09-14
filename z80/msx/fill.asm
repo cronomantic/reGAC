@@ -1,25 +1,17 @@
 ; MIT License, Copyright (c) 2025 Cronomantic
 ;
-; Filling an area, the way GAC filled, read out of the original interpreter.
+; Filling an area on an MSX1, which is the Spectrum's fill.
 ;
-; It is not a flood fill, which is the thing that took longest to work out.
-; It walks up and down the one column the fill was started in, laying a
-; horizontal run across each row, and stops the moment the point directly
-; above or below is blocked.  It never spreads round a corner.  That is why a
-; picture carries dozens of fill commands where a flood would need one, and
-; why filling solid does not bury the drawing.  The original is at $6374.
+; The walk is the same, the pattern is the same and the rule is the same, and
+; because the copy it draws into is kept row by row -- screen.asm says why --
+; a run is walked and laid down with the same one byte steps.
 ;
-; What it lays down is two bytes: the low one on even rows and the high one
-; exclusive ored into it on odd ones, counting in the y of the commands.
-; Solid is $00FF, wiping is $0000 and the half tone is $FFAA, which comes to
-; $AA and $55 by turns.  From $6364.
-;
-; A run is laid down a byte at a time where it can be, because eight clear
-; pixels are one byte of zero, and bit by bit at the two ends.
+; The one thing that is this machine's own: the colour goes down once a row
+; rather than once every eight, because here a colour belongs to eight pixels
+; of one line and not to a cell of eight by eight.
 
 PICTURE_TOP     equ 175                 ; the y a picture reaches
 PICTURE_BOTTOM  equ 48
-
 FILL_INK        equ 0
 FILL_PAPER      equ 1
 FILL_SHADE      equ 2
@@ -29,20 +21,17 @@ FILL_SHADE      equ 2
 ; Corrupts: AF
 row_address:
                 ld      a, e
-                and     %11000000
                 rrca
                 rrca
-                rrca                    ; which third
+                rrca
+                and     %00011111               ; which page of eight rows
+                add     a, SHADOW >> 8
                 ld      h, a
                 ld      a, e
-                and     %00000111       ; which line within the character
-                or      h
-                or      $40
-                ld      h, a
-                ld      a, e
-                and     %00111000       ; which row within the third
-                rlca
-                rlca
+                and     7
+                rrca
+                rrca
+                rrca                            ; the row in it, times thirty two
                 ld      l, a
                 ret
 
@@ -122,16 +111,11 @@ fill_run:
                 jp      mark_span
 
 ; How far the clear run through (D, E) reaches, into fill_left and fill_right.
-; The address is worked out once and the mask rotated from there.
 ;
 ; Whenever the walk steps into a byte it has not looked at yet, it looks at the
 ; whole byte first: eight clear pixels are a byte of zero, and one comparison
 ; takes all eight.  Only a byte with something in it is picked apart pixel by
-; pixel, which happens twice in a run, at its two ends.  The Amstrad does the
-; same thing, comparing the byte against one holding the pen of the seed four
-; times over; here the seed is clear by definition, so the byte to match is
-; zero.  See doc/graficos.md.
-;
+; pixel, which happens twice in a run, at its two ends.
 ; Corrupts: everything
 span_extent:
                 call    row_address
@@ -150,7 +134,7 @@ span_extent:
                 ld      a, (hl)
                 or      a
                 jr      nz, .pixel_left         ; something in it: one at a time
-                ld      a, (fill_left)          ; the walk arrived at a byte
+                ld      a, (fill_left)          ; the walk arrived at a cell
                 sub     8                       ; boundary, so this byte is all
                 ld      (fill_left), a          ; of the next eight pixels
                 ld      b, %10000000            ; and we stand at its first
@@ -251,7 +235,7 @@ span_bytes:
                 ld      l, a
                 ld      a, c
                 sub     b
-                ld      c, a                    ; bytes after the first
+                ld      c, a                    ; cells after the first
                 ret
 
 ; Put the pattern down over the run, eight pixels at a stroke where it can.
@@ -295,24 +279,27 @@ blend_byte:
                 ld      (hl), a
                 ret
 
-; Give every cell the run passes through the colours in force.  A colour
-; belongs to a cell of eight by eight, so this steps by bytes.
+; Give every cell the run passes through the colours in force.  Here that is
+; once a row and not once every eight rows, because a colour belongs to eight
+; pixels of one line.
 ;
 ; Almost always the same byte goes into every cell of the run, because the
 ; colours in force do not depend on what is already there.  Then the whole run
-; is one address worked out once and a byte written along it, which is what
-; makes a fill affordable: the slow way was to work out the address and the
-; colours again for every cell of every row.
+; is one address worked out once and a byte written along it.
 ; Corrupts: everything
 colour_span:
                 ld      a, (fill_row)
                 ld      e, a
                 ld      a, (fill_left)
                 ld      d, a
-                call    attr_const
-                jr      c, .cell_by_cell
+                ld      a, (colour_varies)      ; settled once for the shape
+                or      a
+                jr      nz, .cell_by_cell
+                ld      a, (colour_now)
+                or      a                       ; and the carry off with it
                 push    af
-                call    attribute_address       ; the first cell of the run
+                call    pixel_address           ; the first cell of the run
+                call    to_colour
                 pop     af
                 ld      c, a                    ; the byte all of them get
                 ld      a, (fill_right)
@@ -336,7 +323,7 @@ colour_span:
                 srl     a
                 srl     a
                 srl     a
-                ld      c, a                    ; the last byte across
+                ld      c, a                    ; the last cell across
 .each_cell:
                 push    bc
                 push    de
@@ -380,18 +367,22 @@ gfx_to_words:
                 ret
 
 gfx_line:
+                call    settle_colours
                 call    gfx_to_words
                 jp      draw_line
 
 gfx_rect:
+                call    settle_colours
                 call    gfx_to_words
                 jp      draw_rect
 
 gfx_ellipse:
+                call    settle_colours
                 call    gfx_to_words
                 jp      draw_ellipse
 
 gfx_plot:
+                call    settle_colours
                 call    gfx_to_words
                 ld      hl, (lin_x0)
                 call    clamp_x
@@ -402,6 +393,7 @@ gfx_plot:
                 jp      plot_point
 
 gfx_fill:
+                call    settle_colours
                 ld      a, (gfx_x0)
                 ld      d, a
                 ld      a, (gfx_y0)
@@ -423,24 +415,29 @@ set_fill_pattern:
                 ld      (fill_high), a
                 ret
 
-; Wipe the picture area and give it back the colours it starts with.
+; Wipe the picture and give it back the colours it starts in.  Both copies,
+; because what the video chip is shown is what these hold.
 ; Corrupts: everything
 gfx_clear:
-                ld      hl, $4000
-                ld      de, $4001
-                ld      bc, PICTURE_ROWS * 32 - 1
+                ld      hl, SHADOW
+                ld      de, SHADOW + 1
+                ld      bc, PICTURE_BYTES - 1
                 ld      (hl), 0
                 ldir
-                ld      hl, ATTRIBUTES
-                ld      de, ATTRIBUTES + 1
-                ld      bc, (PICTURE_ROWS / 8) * 32 - 1
-                ld      (hl), $38               ; black on white, as it starts
+                ld      hl, SHADOW_COLOURS
+                ld      de, SHADOW_COLOURS + 1
+                ld      bc, PICTURE_BYTES - 1
+                ld      a, (msx_colours)        ; black on white, as it starts
+                rlca
+                rlca
+                rlca
+                rlca
+                push    hl
+                ld      hl, msx_colours + 7
+                or      (hl)
+                pop     hl
+                ld      (hl), a
                 ldir
-                ret
-
-; The picture is finished.  This machine draws straight at its screen, so
-; there is nothing to send anywhere.
-gfx_show:
                 ret
 
 ; Solid, wiped, half tone: the three pairs the original holds at $6364.

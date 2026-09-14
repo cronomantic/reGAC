@@ -500,6 +500,11 @@ gfx_clear:
                 jr      nz, .each_row
                 ret
 
+; The picture is finished.  This machine draws straight at its screen, so
+; there is nothing to send anywhere.
+gfx_show:
+                ret
+
 ; Solid, wiped, half tone: the three pairs the original holds at $6364.
 fill_patterns:  db      $FF, $00
                 db      $00, $00

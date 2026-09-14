@@ -110,7 +110,8 @@ draw_picture:
                 call    gfx_clear
                 pop     hl
                 call    gfx_start_colours       ; what a picture starts in
-                jr      run_picture
+                call    run_picture
+                jp      gfx_show                ; and let the machine show it
 
 ; Draw picture HL without clearing first, which is what CALL needs.
 ; Corrupts: everything

@@ -107,6 +107,22 @@ class Session:
         emulator = find_zesarux()
         if not emulator:
             raise RuntimeError("ZEsarUX is not in tools/")
+        # Nobody else may be on that port.  One emulator at a time is not a
+        # style rule, it is how this works: two sessions on one port both talk
+        # to whichever came first, so one run writes its build into the other's
+        # machine and both come out wrong.  Three separate hunts have started
+        # here, so it is checked before anything is launched.
+        self.process = self.socket = None
+        try:
+            already = socket.create_connection(("127.0.0.1", port), timeout=0.5)
+        except OSError:
+            pass
+        else:
+            already.close()
+            raise RuntimeError(
+                f"something is already listening on port {port}: another "
+                "emulator is running, and two of them share one machine"
+            )
         self.process = subprocess.Popen(
             [
                 emulator, "--noconfigfile", "--machine", machine,
@@ -116,7 +132,6 @@ class Session:
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
-        self.socket = None
         for _ in range(40):
             try:
                 self.socket = socket.create_connection(("127.0.0.1", port), timeout=1.0)
@@ -128,6 +143,23 @@ class Session:
             raise RuntimeError("ZEsarUX never opened its remote protocol port")
         self.socket.settimeout(8.0)
         self.__drain()
+        # And make sure it is ours.  An emulator left behind by a killed run
+        # still holds the port, and a session that connects to it looks like a
+        # machine that has gone mad: code written into a Spectrum that was
+        # asked to be an MSX, memory that reads back as somebody else's ROM.
+        # It has cost hours twice, so it is asked outright.
+        running = self.command("get-current-machine").strip().splitlines()
+        # The name it gives back is the pretty one -- "CPC 6128" for CPC6128,
+        # "Amstrad PCW 8256" for PCW8256 -- so the spaces go before comparing.
+        def plain(name):
+            return "".join(name.lower().split())
+
+        if running and plain(machine) not in plain(running[0]):
+            self.close()
+            raise RuntimeError(
+                f"asked for {machine} but the emulator on port {port} is "
+                f"{running[0]!r}: something else is still running"
+            )
 
     def __drain(self):
         data = b""
@@ -164,7 +196,13 @@ class Session:
     # is the machine's RAM, as it is laid out.
     RAM = 0
 
+    MAPPED = -1  # what the processor itself would see
+
     def read(self, address, length, zone=None):
+        # A zone is set for this read and put back afterwards.  Leaving it set
+        # is a trap: everything else, the flag a test waits on included, would
+        # then be looked for in the video chip's memory or wherever it was
+        # pointed, and a run that works looks like one that hangs.
         if zone is not None:
             self.command(f"set-memory-zone {zone}")
         out = bytearray()
@@ -175,6 +213,8 @@ class Session:
             out += bytes.fromhex(digits[: piece * 2])
             address += piece
             length -= piece
+        if zone is not None:
+            self.command(f"set-memory-zone {self.MAPPED}")
         return bytes(out)
 
     def start_code(self, blob, at, flag, wanted=0xFF, tries=3, timeout=25.0):

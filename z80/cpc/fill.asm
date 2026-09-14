@@ -227,6 +227,11 @@ gfx_fill:
 set_fill_pattern:
                 ret
 
+; The picture is finished.  This machine draws straight at its screen, so
+; there is nothing to send anywhere.
+gfx_show:
+                ret
+
 fill_x:         db      0
 fill_seed_y:    db      0
 fill_y:         db      0
