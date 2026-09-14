@@ -82,10 +82,12 @@ que llevaba tiempo ahí sin que nadie lo viera: **el juego no dibujaba**.
 `draw_picture`; el intérprete de láminas estaba entero y probado, pero suelto.
 En el Spectrum ni siquiera se ensamblaba dentro del juego.
 
-### El Amstrad, con su cinta
+### El Amstrad, con su cinta y su disco
 
 Dibuja, escribe, lee el teclado y ya graba y carga, así que juega de principio
-a fin.
+a fin. Y se entrega como se entregaba entonces: un disco que arranca con
+`RUN"JUEGO` y una cinta que arranca con `RUN"`, las dos con su cargador en
+BASIC delante. Cómo está hecho está en `binario.md`.
 
 La cinta va por el firmware, igual que en el Spectrum va por la ROM: un bloque
 de datos sin cabecera delante, escrito con CAS WRITE ($BC9E) y leído con CAS

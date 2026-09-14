@@ -161,6 +161,37 @@ entrada de directorio y uno de cuarenta mil. Y metiendo el disco en un 6128
 emulado y haciendo que **AMSDOS mismo cargue** el fichero, que es lo único que
 demuestra que el directorio es un directorio.
 
+## El Amstrad: cómo se le entrega
+
+Un Amstrad arranca la aventura como se arrancaban entonces: `RUN"JUEGO` en un
+disco y `RUN"` en una cinta. Lo que corre es un BASIC de tres líneas —apartar
+la memoria que hace falta, traer el intérprete y llamarlo— que va primero en el
+medio, con el intérprete detrás. Lo hace
+[`regac/media.py`](../regac/media.py), y se pide así:
+
+    python -m regac release z80/cpc/game.bin salida/ -m cpc
+
+El BASIC va **ya tokenizado**, que es como la máquina lo guarda en memoria. Un
+listado en texto plano vale en disco, pero en cinta no hay manera; y como sólo
+son tres sentencias, la tabla de tokens tiene tres entradas.
+
+La cinta es el formato del propio firmware, en
+[`regac/cdt.py`](../regac/cdt.py): cada fichero en bloques de dos kilobytes, y
+cada bloque escrito dos veces, un registro de cabecera que dice qué viene y
+otro con los datos. Dentro de un registro, los datos van en trozos de 256 con
+dos bytes de comprobación detrás de cada uno y cuatro bytes de cola. Esa
+comprobación es el CRC CCITT de siempre, complementado y con el byte alto
+delante, y las duraciones de pulso están copiadas de una cinta de verdad y no
+redondeadas de un manual.
+
+Contrastado contra esa cinta: el cargador de Megacorp, leído de su propia
+cinta y vuelto a escribir a partir de sus campos, sale **byte a byte igual**,
+cabecera, datos, comprobaciones y cola. Y luego en la máquina: el disco arranca
+el juego, y la cinta también. Lo de la cinta son minutos —veintiocho kilobytes
+a la velocidad a la que el firmware los lee— así que esa prueba sólo corre con
+`REGAC_SLOW=1`. Conviene saberlo antes de darla por colgada: una cinta de
+Amstrad de verdad se comporta igual de lenta en el emulador.
+
 ## La música con AY, que es lo que condiciona el diseño
 
 El reproductor de AY corre desde la interrupción, cincuenta veces por segundo.
