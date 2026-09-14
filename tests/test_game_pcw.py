@@ -45,7 +45,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import emulator  # noqa: E402
 from regac.binary import Database  # noqa: E402
-from regac.media import banks_of, pcw_release  # noqa: E402
+from regac.devices import PcwDevice  # noqa: E402
+from regac.gfx import Renderer  # noqa: E402
+from regac.media import PCW_HALF, banks_of, pcw_release  # noqa: E402
 from test_keyboard_pcw import type_them  # noqa: E402
 from test_text_pcw import ROW_BYTES, WINDOW_ROWS, decode_screen, glyph_table  # noqa: E402
 
@@ -59,6 +61,9 @@ DEFS = os.path.join(PCW, "banks.inc")
 ADVENTURE = os.path.join(ROOT, "snapshots", "megacorp2.json")
 
 SCREEN = 0x8000
+SCREEN_SLOT = 0xF2  # the port that says which half of it the map shows
+BANK_MARK = 0x80
+PICTURE_BANK = 2
 ENTER = chr(13)
 NOT_UNDERSTOOD = "242"  # the message GAC prints when a word means nothing
 
@@ -136,8 +141,21 @@ def test_it_asks_and_answers_on_a_pcw(tmp_path):
         # A word the adventure does not know, so it has to say so.
         type_them(session, "XYZZY" + ENTER)
         answered = wait_screen(session, glyphs, puzzled[:6], timeout=30.0)
+
+        # And what the room drew, which is in the half of the screen the map
+        # does not show while there is text to print, so it has to be brought
+        # into the window to be looked at.
+        session.command("enter-cpu-step")
+        session.command(f"write-port {SCREEN_SLOT} {BANK_MARK | PICTURE_BANK}")
+        drawn = session.read(SCREEN, PCW_HALF)
+        session.command("exit-cpu-step")
     finally:
         session.close()
+
+    room = ddb["locations"][str(ddb["init_loc"])]["graphic_id"]
+    assert drawn == Renderer(ddb["gfx"], PcwDevice()).run(int(room)).screen(), (
+        f"the picture of room {ddb['init_loc']} is not the one the reference draws"
+    )
 
     assert answered != opening, "typing changed nothing on screen"
     assert any("XYZZY" in line for line in answered), (
