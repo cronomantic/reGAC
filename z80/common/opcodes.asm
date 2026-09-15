@@ -138,11 +138,7 @@ print_powers:   dw      10000, 1000, 100, 10, 1
 ; Print the digit in A, zero to nine, through the adventure's character set.
 ; Corrupts: everything
 print_digit:
-                ld      hl, digit_codes
-                ld      e, a
-                ld      d, 0
-                add     hl, de
-                ld      a, (hl)
+                add     a, DIGIT_ZERO           ; a code is its own ASCII here
                 ld      (digit_char), a
                 ld      hl, digit_char
                 ld      bc, 1

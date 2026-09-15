@@ -23,8 +23,7 @@ print_text:
                 jr      z, .measured
                 ld      a, (hl)
                 push    hl
-                ld      hl, space_code
-                cp      (hl)
+                cp      SPACE_CODE
                 pop     hl
                 jr      z, .measured
                 inc     hl

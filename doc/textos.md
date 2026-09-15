@@ -24,26 +24,43 @@ Se puede estirar con un apaño para el castellano. No da para lo que queremos.
 
 ## El juego de caracteres
 
-Cada carácter que la aventura usa recibe un código, que es también su posición
-en la fuente. Los códigos se reparten por frecuencia, de modo que una máquina
-apurada de memoria puede quedarse con los glifos útiles y soltar la cola.
+**Fijo, y el mismo en todas las aventuras.** El sitio que un carácter ocupa en
+la tabla es su código:
 
-Lo importante es que no se reserva nada para alfabetos que la aventura no usa.
-Un acento cuesta exactamente lo que cuesta una letra, y castellano, catalán o
-portugués no necesitan ningún caso especial. Medido sobre MegaCorp, acentuar el
-texto como el autor habría querido añade cinco glifos y un 1,4% de tamaño.
+| códigos | qué |
+|---|---|
+| 0 | el nulo, que no es ningún carácter y nunca lo será |
+| 1 | reservado para un cambio de color, para cuando una palabra quiera otra tinta |
+| 2-15 | `áéíóúüñ` y sus mayúsculas |
+| 16-17 | `¿` `¡` |
+| 18-19 | `ç` `Ç` |
+| 20-28 | `àèòïãõâêô`, lo que ponen encima catalán, portugués e italiano |
+| 29-31 | `ª` `º` `—` |
+| 32-127 | ASCII tal cual, hasta el símbolo de copyright que estas máquinas ponen al final |
+| 128-255 | del compresor: 128 parejas, siempre |
 
-Las ocho aventuras necesitan entre 42 y 71 glifos, con lo que sobran entre 185 y
-214 códigos para el compresor.
+Antes se numeraban por frecuencia de uso, y eso tenía una consecuencia que no
+se ve hasta que se mide: **al compresor le quedaban los códigos que el alfabeto
+no se llevara**. Una aventura en castellano con acentos tenía menos parejas que
+una en inglés, y una en catalán menos todavía. El idioma no debe ser un
+handicap. Con la tabla fija todos tienen las mismas 128 parejas.
 
-El techo son 256 códigos contando los del compresor, y una aventura que se pase
-lo oye al construir, con la lista de los caracteres de los que mejor podría
-prescindir.
+Y una fuente pasa a ser **una hoja de las mismas letras en los mismos sitios**,
+que es algo que un artista puede dibujar una vez y reusar, en vez de una tabla
+que depende de qué palabras salgan en la aventura.
 
-Conviene saber que **el compresor se los gasta todos**: en las ocho aventuras
-usa exactamente tantas parejas como códigos le sobran, 185 a 214. O sea que no
-está limitado por el texto sino por el byte, y cada glifo de más es una pareja
-de menos. Acentuar una aventura entera cuesta cinco glifos.
+Lo que cuesta, medido sobre las ocho aventuras: el texto empaquetado sube un 8%
+—entre 280 y 575 bytes— y la base de datos entera **un 2,1%**, de 305 a 565
+bytes por aventura. Parte de eso vuelve: como un código desde el espacio es su
+propio ASCII, desaparecen del binario la tabla de 96 bytes que traducía tecla a
+código y la de los diez dígitos, y con ellas una búsqueda por cada tecla
+pulsada. Un dígito es ahora `add a, 48` y el espacio es 32.
+
+Lo que no está en la tabla no se puede usar, y la construcción lo dice con el
+carácter en la mano en lugar de imprimir un hueco. Caben el castellano entero,
+las minúsculas acentuadas de catalán, portugués e italiano, y los signos; el
+francés no, y ahí es donde la directiva `charset` tendría por fin trabajo:
+elegir el perfil de los treinta que van debajo del espacio.
 
 ## De dónde salen los glifos que la aventura no trae
 
@@ -107,6 +124,10 @@ Sobre los 71577 caracteres de texto de las ocho aventuras, comparando esquemas:
 | Huffman por bytes | 57% |
 | Parejas más Huffman | 52% |
 | **Parejas** | **49%** |
+
+Ese 49% era con todos los códigos que sobraran; con las 128 parejas fijas sale
+un 8% más, entre el 50% y el 55% según la aventura. Es lo que cuesta que el
+idioma no cuente, y sigue ganando a todo lo demás de la tabla.
 
 Que las parejas ganen a Huffman llama la atención, pero con corpus de siete a
 catorce kilobytes la tabla de Huffman se come la ventaja, y además Huffman sólo

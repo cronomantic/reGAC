@@ -156,11 +156,14 @@ El fuente es UTF-8 y se puede escribir en él lo que se escribe en español: «L
 señora Muñoz te miró con desdén», «¿Qué año es?». No hace falta declarar nada.
 
 Cómo funciona, que es lo que hace que no haga falta declarar nada: **el juego
-de caracteres se saca del texto**. Cada carácter que la aventura usa recibe un
-código y un glifo, ordenados por uso, y nada reserva códigos para un alfabeto
-que la aventura no escribe. Una ñ cuesta exactamente lo que cuesta una n. Aquí
-es donde se rompe con el original, que empaquetaba los caracteres en siete bits
-y usaba el octavo para marcar fin de palabra: ahí no cabía ni un acento.
+de caracteres es fijo y el mismo en todas las aventuras**. Debajo del espacio
+van las letras que el ASCII no tiene —las acentuadas, la ñ, la ç, los signos de
+apertura— y del 32 al 127 va el ASCII tal cual, con lo que el código de una
+letra corriente es su propio ASCII. Del 128 para arriba es del compresor,
+siempre. Una ñ cuesta lo que cuesta una n y no le quita nada a nadie: el reparto
+está en [`textos.md`](textos.md). Aquí es donde se rompe con el original, que
+empaquetaba los caracteres en siete bits y usaba el octavo para marcar fin de
+palabra: ahí no cabía ni un acento.
 
 **Los glifos no están dibujados a mano.** Una letra acentuada es la letra de la
 propia aventura con una marca encima, para que se parezca a la tipografía en la
@@ -179,12 +182,14 @@ porque el texto se imprime y no se teclea. Si dos palabras se quedan en la
 misma —PEÑA y PENA—, la construcción lo dice en vez de dejar que la segunda no
 se alcance nunca.
 
-El techo son **256 códigos** contando los que la compresión necesita, y una
-aventura que se pase lo oye al construir, con la lista de los caracteres de los
-que mejor podría prescindir.
+Lo que no está en la tabla no se puede usar, y la construcción lo dice con el
+carácter en la mano en lugar de imprimir un hueco. Caben el castellano entero,
+las minúsculas acentuadas de catalán, portugués e italiano, y los signos.
 
 La directiva `charset` se sigue aceptando para que los fuentes escritos antes
-compilen, y no elige nada.
+compilen, y hoy no elige nada; el día que haga falta un alfabeto que no cabe
+—el francés, por ejemplo— será ella la que elija cuáles son los treinta que van
+debajo del espacio.
 
 ## Compresión de textos, que también
 

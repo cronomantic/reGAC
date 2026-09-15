@@ -69,7 +69,7 @@ next_statement:
                 ld      a, c
                 call    ends_statement
                 jr      z, .a_mark
-                ld      a, (space_code)
+                ld      a, SPACE_CODE
                 cp      c
                 jr      z, .a_space
                 ld      hl, word_len            ; it belongs to the word
@@ -255,7 +255,7 @@ parse_sentence:
                 ld      a, b
                 or      c
                 jr      z, .finished
-                ld      a, (space_code)
+                ld      a, SPACE_CODE
                 cp      (hl)
                 jr      nz, .word_start
                 inc     hl
@@ -269,7 +269,7 @@ parse_sentence:
                 ld      a, b
                 or      c
                 jr      z, .measured
-                ld      a, (space_code)
+                ld      a, SPACE_CODE
                 cp      (hl)
                 jr      z, .measured
                 inc     hl

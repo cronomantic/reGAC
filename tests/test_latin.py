@@ -142,7 +142,9 @@ def test_every_letter_of_an_accented_adventure_has_a_shape():
     font = Reader(built.build()).section(S_FONT)
     blank = []
     for index, char in enumerate(built.store.charset.order):
-        if not any(font[2 + index * 8 : 10 + index * 8]) and char != " ":
+        if char is None or char == " ":         # a hole, and the space
+            continue
+        if not any(font[2 + index * 8 : 10 + index * 8]):
             blank.append(char)
     assert not blank, f"nothing to draw {blank} with"
 

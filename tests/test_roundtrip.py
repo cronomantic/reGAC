@@ -220,9 +220,15 @@ def test_text_survives_packing(path):
 @needs_databases
 @parametrized
 def test_text_packs_to_about_half(path):
-    """The scheme is meant to halve the text.  Guard against drifting back."""
+    """The scheme is meant to halve the text.  Guard against drifting back.
+
+    It is a little over half now, not a little under: the compressor has a
+    fixed 128 pairs rather than whatever codes the alphabet left it, which
+    costs about eight per cent and buys an adventure in Catalan the same deal
+    as one in English.
+    """
     store = TextStore(adventure_text(load(path)))
-    assert store.ratio < 0.55, f"{store.ratio:.0%} of the original"
+    assert store.ratio < 0.58, f"{store.ratio:.0%} of the original"
     # the 8 bit routine needs room for the unpacking stack, and not much
     assert store.packer.depth() < 32
 
@@ -290,13 +296,19 @@ def test_banking_changes_nothing_but_the_layout(path):
 
 def test_accents_cost_no_more_than_letters():
     """The reason for giving up the original format: an accented character is
-    just another character, with no special case anywhere."""
+    just another character, with no special case anywhere.
+
+    And since the character set is fixed, it costs the compressor nothing at
+    all: the same 128 pairs whatever the adventure is written in, which is
+    what stops one language being a handicap against another.
+    """
     plain = ["El senor esta aqui", "La cabina esta rota", "Un senor mas"]
     accented = ["El señor está aquí", "La cabina está rota", "Un señor más"]
     store = TextStore(accented)
     for index, original in enumerate(accented):
         assert store.read(index) == original
-    assert len(TextStore(accented).charset) - len(TextStore(plain).charset) <= 4
+    assert store.charset.spare == TextStore(plain).charset.spare
+    assert len(store.messages) == len(TextStore(plain).messages)
 
 
 if __name__ == "__main__":

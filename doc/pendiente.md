@@ -546,12 +546,27 @@ cualquier editor de fuentes— o letra a letra en el propio fuente, nombrando el
 carácter por su número o por sí mismo. Lo que el autor dibuja se usa tal cual;
 sólo se compone lo que no trae.
 
-La compresión ya estaba entera y sigue igual: siempre, generada, nunca escrita
-a mano, y el texto de las ocho aventuras entre el 46% y el 51% de lo que
-ocupaba. Es el esquema que ganó la comparación del principio —parejas
+**Y el juego de caracteres pasó a ser fijo**, que es lo que arregla el fallo de
+diseño que asomó al medirlo: numerando los códigos por frecuencia, al compresor
+le quedaban los que el alfabeto no se llevara, así que una aventura en
+castellano con acentos tenía menos parejas que una en inglés y una en catalán
+menos todavía. El idioma no debe ser un handicap. Ahora hay treinta sitios
+debajo del espacio para las letras que el ASCII no tiene, el ASCII tal cual del
+32 al 127, y del 128 para arriba 128 parejas para todo el mundo; el 0 es el
+nulo y el 1 está reservado para un cambio de color. El reparto está en
+[`textos.md`](textos.md).
+
+Cuesta un 2,1% de la base de datos —de 305 a 565 bytes por aventura— y devuelve
+dos tablas: como un código desde el espacio es su propio ASCII, se van del
+binario la de 96 bytes que traducía tecla a código y la de los diez dígitos, y
+con ellas una búsqueda por cada tecla. De paso la fuente deja de depender de qué
+palabras salgan en la aventura: es una hoja de letras en sitios fijos, que es lo
+que un artista puede dibujar una vez y reusar.
+
+La compresión sigue siendo la misma y la mejor de las que se midieron —parejas
 recursivas, contra el 57% de Huffman y el 84% de las abreviaturas al estilo
-PAW— y está saturado: gasta todos los códigos que le sobran, así que lo que lo
-limita no es el texto sino el byte.
+PAW—, ahora entre el 50% y el 55%, y gasta las 128 parejas siempre: lo que la
+limita es el byte y no el texto.
 
 ## Cosas menores
 

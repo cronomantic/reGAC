@@ -233,16 +233,11 @@ class Database:
         out = bytearray()
         out += u16(self.ddb.get("init_loc", 1))
         out += u8(self.ddb.get("width", 32))
-        # The codes of the ten digits, at a fixed place so the runtime can
-        # print a number without hunting for them.
-        for digit in "0123456789":
-            out += u8(self.code_of(digit))
-        # What the player types arrives as ASCII and has to become a code of
-        # this adventure's character set before it can be matched against the
-        # vocabulary.  Ninety six bytes covers everything typeable.
-        codes = self.store.charset.codes
-        for point in range(32, 128):
-            out += u8(codes.get(chr(point), NO_CHARACTER))
+        # Nothing here turns a typed character into a code, and nothing says
+        # where the digits are: with the character set fixed, a code from the
+        # space up is the character's own ASCII, so a runtime that wants the
+        # digit seven adds seven to the code of a nought and a keyboard hands
+        # over what it read.  See regac/text.py.
         punct = self.ddb.get("punctuation", [])
         # The first entry is the end of string marker and has no glyph.
         printable = [c for c in punct if c != "\0"]
@@ -369,7 +364,8 @@ class Database:
         out += u8(self.store.charset.first)
         out += u8(len(self.store.charset))
         for char in self.store.charset.order:
-            out += glyph_for(char, source) or bytes(8)
+            # A hole in the run is a code nothing uses: eight noughts.
+            out += (glyph_for(char, source) if char else None) or bytes(8)
         return bytes(out)
 
     def graphics(self):

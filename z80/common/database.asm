@@ -33,9 +33,7 @@ NO_MESSAGE          equ $FF   ; no message carries that number
 NOT_BANKED          equ $FF   ; the bank of a section that is resident
 
 ; Inside the config section
-CONFIG_DIGITS       equ 3     ; the codes of "0" to "9"
-CONFIG_ASCII        equ 13    ; ASCII 32 to 127 -> this adventure's codes
-CONFIG_PUNCTUATION  equ 109   ; how many, then the codes; the space comes first
+CONFIG_PUNCTUATION  equ 3     ; how many, then the codes; the space comes first
 
 NO_CHARACTER        equ $FF   ; the adventure has no such character
 

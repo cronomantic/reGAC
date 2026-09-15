@@ -44,6 +44,53 @@ import unicodedata
 
 MAX_CODES = 256
 
+# Where every character stands.  The place a character has in this list is its
+# code, and that is the same in every adventure, whatever it is written in.
+#
+# It is fixed on purpose.  Numbering the characters by use, which is what this
+# did before, left the compressor whatever codes the alphabet had not taken --
+# so an adventure written in Spanish had fewer pairs than one written without
+# accents, and one in Catalan fewer still.  A language should not be a
+# handicap.  Fixed, everybody gets the same 128 pairs, and a font is a sheet
+# of the same letters in the same places, which is a thing an artist can draw
+# once and use again.
+#
+# The first two codes are not characters and never will be.  Nought is the
+# null, so that a zero byte in a stream of text can only ever mean nothing at
+# all; one is kept for a change of colour, for when a message wants to say a
+# word in another ink.
+#
+# The capitals of the accented vowels are here even though the Academy lets
+# them go unaccented, because a title looks wrong without them.  What is not
+# here cannot be used, and the build says so rather than printing a blank.
+NULL_CODE = 0
+INK_CODE = 1                            # not used yet, and not to be taken
+SPECIALS_FIRST = 2
+SPECIALS = (
+    "áéíóúüñ"           #  2-8   Spanish, in small letters
+    "ÁÉÍÓÚÜÑ"           #  9-15  and in capitals
+    "¿¡"                # 16-17  the two it opens with
+    "çÇ"                # 18-19  the one its neighbours add to the alphabet
+    "àèòïãõâêô"         # 20-28  and the accents they put on the rest
+    "ªº—"               # 29-31  the ordinals, and the dash a dialogue opens
+)
+ASCII_FIRST = 32                        # and from the space up it is ASCII
+ASCII_LAST = 127                        # to the copyright sign these machines
+                                        # keep at the end of it
+FIRST_PAIR = 128                        # everything above is the compressor's
+PAIRS = MAX_CODES - FIRST_PAIR
+
+assert SPECIALS_FIRST + len(SPECIALS) <= ASCII_FIRST, "too many to fit below the space"
+
+
+def code_of(char):
+    """The code a character takes, or None if it has no place at all."""
+    at = SPECIALS.find(char)
+    if at >= 0:
+        return SPECIALS_FIRST + at
+    point = ord(char)
+    return point if ASCII_FIRST <= point <= ASCII_LAST else None
+
 
 def typed(word):
     """A word as a player can actually type it, which is without its marks.
@@ -58,45 +105,47 @@ def typed(word):
 
 
 class Charset:
-    """The codes an adventure's characters take in the font.
+    """Which of the fixed codes an adventure actually uses.
 
-    Characters are numbered by how much they are used, so the commonest come
-    first.  That is not for the compressor, which does not care, but so that a
-    machine short of font memory can hold the useful glyphs and drop the tail.
+    The codes themselves are not this class's to decide -- they are the same
+    in every adventure, and `code_of` says what they are.  What is worked out
+    here is the stretch of them the font has to carry: from the lowest the
+    adventure uses to the highest, holes and all, because the font travels as
+    a run of glyphs with a code to start it.
     """
 
-    def __init__(self, texts, first=0, extra=()):
-        counts = collections.Counter()
+    def __init__(self, texts, extra=()):
+        used = set()
         for text in texts:
-            counts.update(text)
+            used.update(text)
         # Characters that need a code and a glyph but are never packed: the
         # vocabulary is matched against what the player types, not printed.
         for text in extra:
-            for char in text:
-                counts.setdefault(char, 0)
-        self.order = [c for c, _ in counts.most_common()]
-        # A code is a byte, and the ones the character set does not take are
-        # what the compressor has to work with.  Saying so here is better than
-        # letting it come out as a byte that will not fit, which is what the
-        # first adventure written in a second alphabet would have got.
-        if first + len(self.order) > MAX_CODES:
-            rarest = "".join(self.order[MAX_CODES - first:])
+            used.update(text)
+        stranger = sorted(c for c in used if code_of(c) is None)
+        if stranger:
             raise ValueError(
-                f"an adventure can use {MAX_CODES - first} different "
-                f"characters and this one uses {len(self.order)}; the ones it "
-                f"could most do without are {rarest[:40]!r}"
+                "there is no place in the character set for "
+                + ", ".join(f"{c!r}" for c in stranger[:8])
+                + f" ({len(stranger)} in all); what fits is ASCII and "
+                + f"{SPECIALS!r}"
             )
-        self.first = first
-        self.codes = {c: first + i for i, c in enumerate(self.order)}
+        self.codes = {c: code_of(c) for c in sorted(used, key=code_of)}
         self.chars = {code: c for c, code in self.codes.items()}
+        self.first = min(self.chars, default=0)
+        last = max(self.chars, default=0)
+        # The run, holes and all: a hole is a code nothing uses, and what the
+        # font carries for it is eight noughts.
+        self.order = [self.chars.get(code) for code in range(self.first, last + 1)]
 
     def __len__(self):
         return len(self.order)
 
     @property
     def spare(self):
-        """How many codes are left for the compressor."""
-        return MAX_CODES - self.first - len(self.order)
+        """How many codes are left for the compressor, which is always the
+        same number: that is the whole point of a fixed set."""
+        return PAIRS
 
     def encode(self, text):
         try:
@@ -194,12 +243,10 @@ def pack(sequences, first_pair, spare, min_uses=3):
 class TextStore:
     """An adventure's text, ready to be written out for a machine."""
 
-    def __init__(self, texts, first=0, extra=()):
-        self.charset = Charset(texts, first, extra)
+    def __init__(self, texts, extra=()):
+        self.charset = Charset(texts, extra)
         encoded = [self.charset.encode(t) for t in texts]
-        self.packer, self.messages = pack(
-            encoded, first + len(self.charset), self.charset.spare
-        )
+        self.packer, self.messages = pack(encoded, FIRST_PAIR, PAIRS)
         self.raw_size = sum(len(t) for t in encoded)
 
     @property

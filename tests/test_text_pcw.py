@@ -93,7 +93,9 @@ def glyph_table(database):
     table = {}
     for index in range(count):
         glyph = bytes(font[2 + index * 8 : 10 + index * 8])
-        table.setdefault(glyph, database.store.charset.chars[first + index])
+        char = database.store.charset.chars.get(first + index)
+        if char is not None:            # a hole in the run draws nothing
+            table.setdefault(glyph, char)
     return table
 
 
