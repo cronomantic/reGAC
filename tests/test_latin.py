@@ -20,6 +20,11 @@
 #
 """An adventure written in Spanish, with the letters Spanish is written in.
 
+And where the shapes of those letters come from, which is either the
+adventure's own typeface or nothing at all: an author writing one of these
+rather than decompiling one hands over a font of their own, whole as a file or
+a letter at a time, and whatever they drew is used as they drew it.
+
 The character set never needed a special case for them -- a code is a code --
 but two things did.  The shapes had to come from somewhere, because the font
 an adventure inherits from 1986 has no accented letter in it; and the words
@@ -37,6 +42,7 @@ import json
 import os
 import subprocess
 import sys
+import textwrap
 
 try:
     import pytest
@@ -50,6 +56,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import emulator  # noqa: E402
 from regac.binary import BuildError, Database, Reader, S_FONT  # noqa: E402
 from regac.glyphs import glyph_for  # noqa: E402
+from regac.srcparse import SourceError, parse  # noqa: E402
 from regac.text import typed  # noqa: E402
 from test_spectrum import decode_screen, glyph_table, wrapped  # noqa: E402
 
@@ -163,6 +170,87 @@ def test_the_marks_come_off_the_words_and_off_nothing_else():
     assert typed("ARAÑA") == "ARANA"
     assert typed("cigüeña") == "cigueña".replace("ñ", "n")
     assert typed("¿Qué?") == "¿Que?", "only the marks come off, not the letters"
+
+
+SOURCE_WITH_A_FONT = """/CTL
+model    SPECTRUM
+start    1
+width    32
+punct    "\0" " " "." "," "-" "!" "?" ":"
+nothing  "nada"
+
+/VOC
+MIRAR 1 verb
+
+/MSG
+#1
+Añoranza
+
+/FONT chars=128 file="letras.bin" first=32
+{entries}
+"""
+
+
+def a_source(tmp_path, entries="", font=None):
+    """A source with a font of its own beside it, as an author would have.
+
+    The file is a plain dump from the space upwards, 768 bytes of it, which is
+    the shape every font editor for these machines writes and the shape the
+    ROM of one is in.
+    """
+    dump = bytes(a_font()[32 * 8:])
+    (tmp_path / "letras.bin").write_bytes(font if font is not None else dump)
+    text = SOURCE_WITH_A_FONT.format(entries=entries)
+    (tmp_path / "juego.gac").write_text(text, encoding="utf-8")
+    return text
+
+
+def test_a_font_of_the_authors_own_comes_out_of_a_file(tmp_path):
+    """Eight bytes a character from `first` upwards, which is what a font
+    editor for one of these machines writes."""
+    text = a_source(tmp_path)
+    ddb = parse(text, "juego.gac", str(tmp_path))
+    theirs = bytes(a_font()[65 * 8:66 * 8])
+    assert bytes(ddb["font"][65 * 8:66 * 8]) == theirs, (
+        "the A is not the one in the file"
+    )
+    assert glyph_for("Á", ddb["font"])[1:] == theirs[:7], (
+        "the accented one was not built out of it"
+    )
+    assert glyph_for("Á", ddb["font"])[0], "and nothing was put above it"
+
+
+def test_a_letter_the_author_drew_is_used_as_they_drew_it(tmp_path):
+    """Nothing is composed on top of a glyph somebody drew, and the table
+    reaches it without having to be declared twice."""
+    drawn = "18 00 7E 63 63 63 63 00"
+    text = a_source(tmp_path, entries=f'#"Ñ"  {drawn}')
+    ddb = parse(text, "juego.gac", str(tmp_path))
+    assert glyph_for("Ñ", ddb["font"]) == bytes(int(b, 16) for b in drawn.split())
+    assert len(ddb["font"]) >= 0xD2 * 8, "the table did not reach it"
+    # and the one they did not draw is still built for them
+    assert glyph_for("ñ", ddb["font"]) is not None
+
+
+def test_a_font_by_number_and_a_font_by_letter_are_the_same(tmp_path):
+    drawn = "18 00 7E 63 63 63 63 00"
+    by_letter = parse(a_source(tmp_path, f'#"Ñ"  {drawn}'), "x", str(tmp_path))
+    by_number = parse(a_source(tmp_path, f"#209  {drawn}"), "x", str(tmp_path))
+    assert by_letter["font"] == by_number["font"]
+
+
+def test_a_font_that_is_not_whole_characters_is_refused(tmp_path):
+    text = a_source(tmp_path, font=bytes(100))
+    with pytest.raises(SourceError) as complaint:
+        parse(text, "juego.gac", str(tmp_path))
+    assert "eight bytes a character" in str(complaint.value)
+
+
+def test_a_font_that_is_not_there_says_so(tmp_path):
+    text = SOURCE_WITH_A_FONT.format(entries="")
+    with pytest.raises(SourceError) as complaint:
+        parse(text, "juego.gac", str(tmp_path))
+    assert "letras.bin" in str(complaint.value)
 
 
 @needs_tools

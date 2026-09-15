@@ -44,7 +44,6 @@ the exclamation mark turned upside down, which is exactly what they are.
 import unicodedata
 
 GLYPH_ROWS = 8
-ASCII_GLYPHS = 128
 
 
 # Each mark as two rows, drawn so that the second is the essential one.
@@ -134,29 +133,40 @@ def with_tail(glyph, mark):
     return body[1:] + [mark]
 
 
-def ascii_glyph(char, source):
-    """The eight bytes the original font holds for a character, or nothing."""
+def drawn(char, source):
+    """The eight bytes the adventure's own font holds for a character.
+
+    The table is indexed by the character itself, so an author who draws an ñ
+    of their own puts it at 241 and it is used as it stands; nothing here is
+    composed on top of a letter somebody drew.  A glyph of all noughts is not
+    a glyph -- that is what an undrawn letter looks like in a table that
+    covers it -- so those fall through to be built instead.
+    """
     point = ord(char)
     at = point * GLYPH_ROWS
-    if point < ASCII_GLYPHS and at + GLYPH_ROWS <= len(source):
-        return list(source[at:at + GLYPH_ROWS])
+    if at + GLYPH_ROWS <= len(source):
+        rows = list(source[at:at + GLYPH_ROWS])
+        if any(rows):
+            return rows
     return None
 
 
 def glyph_for(char, source):
-    """The eight bytes to draw `char` with, out of the adventure's own font.
+    """The eight bytes to draw `char` with.
 
-    Comes back as None when there is nothing to build it from, which is what
-    leaves a character blank rather than guessing at it.
+    What the adventure's own font has is used as it is; what it has not is
+    built out of what it has.  Comes back as None when there is nothing to
+    build it from either, which is what leaves a character blank rather than
+    guessing at it.
     """
-    plain = ascii_glyph(char, source)
-    if plain is not None:
-        return bytes(plain)
+    own = drawn(char, source)
+    if own is not None:
+        return bytes(own)
     if char in TURNED:
-        upright = ascii_glyph(TURNED[char], source)
+        upright = drawn(TURNED[char], source)
         return bytes(turn_over(upright)) if upright else None
     pieces = unicodedata.normalize("NFD", char)
-    body = ascii_glyph(pieces[0], source) if pieces else None
+    body = drawn(pieces[0], source) if pieces else None
     if body is None:
         return None
     for mark in pieces[1:]:

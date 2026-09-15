@@ -66,7 +66,9 @@ def cmd_compile(args):
     with open(args.input, encoding="utf-8") as f:
         source = f.read()
     try:
-        ddb = parse(source, name)
+        # A source may point at a font of its own, and where it points is
+        # from where it stands.
+        ddb = parse(source, name, os.path.dirname(os.path.abspath(args.input)))
     except SourceError as e:
         sys.exit(f"ERROR: {e}")
     write_json(args.output, ddb)

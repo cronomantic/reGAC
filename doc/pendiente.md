@@ -540,8 +540,18 @@ un Spectrum y leída de vuelta de la pantalla con su propia fuente, que es la
 única manera de saber que los códigos, los glifos, el empaquetado y la
 impresión están de acuerdo.
 
+Y para quien escriba una aventura en vez de decompilarla, **una fuente suya**:
+entera en un fichero —el volcado de ocho bytes por carácter que escribe
+cualquier editor de fuentes— o letra a letra en el propio fuente, nombrando el
+carácter por su número o por sí mismo. Lo que el autor dibuja se usa tal cual;
+sólo se compone lo que no trae.
+
 La compresión ya estaba entera y sigue igual: siempre, generada, nunca escrita
-a mano, y el texto de Megacorp en el 46% de lo que ocupaba.
+a mano, y el texto de las ocho aventuras entre el 46% y el 51% de lo que
+ocupaba. Es el esquema que ganó la comparación del principio —parejas
+recursivas, contra el 57% de Huffman y el 84% de las abreviaturas al estilo
+PAW— y está saturado: gasta todos los códigos que le sobran, así que lo que lo
+limita no es el texto sino el byte.
 
 ## Cosas menores
 

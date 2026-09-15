@@ -129,12 +129,26 @@ para no alterar el código al recompilar.
 
 ### `/FONT`
 
-La cabecera declara cuántos caracteres cubre la tabla. Luego, ocho bytes por
-carácter en hexadecimal, con el glifo como comentario. Los caracteres en blanco
-se omiten.
+La tipografía de la aventura, entera o letra a letra.
+
+**Entera**: un volcado normal, ocho bytes por carácter desde `first` hacia
+arriba, que es lo que escribe cualquier editor de fuentes de estas máquinas y
+la forma que tiene la ROM de una. `file` dice dónde está, relativo al fuente.
+
+    /FONT chars=128 file="letras.bin" first=32
+
+**Letra a letra**: ocho bytes en hexadecimal por carácter, con el glifo como
+comentario. Ganan sobre el fichero, así que se puede cambiar una letra sin
+volver a dibujar el resto, y los caracteres en blanco se omiten. Un carácter se
+nombra por su número o por sí mismo:
 
     /FONT chars=128
-    #65   00 3C 42 42 7E 42 42 00   ; A
+    #65    00 3C 42 42 7E 42 42 00   ; A
+    #"Ñ"   18 00 7E 63 63 63 63 00
+
+La tabla crece sola hasta donde llegue el carácter más alto que se dibuje, así
+que para poner una Ñ propia no hay que declarar nada aparte. Y lo que el autor
+dibuja se usa tal cual: encima de un glifo dibujado no se compone nada.
 
 ## Caracteres latinos, que ya están
 

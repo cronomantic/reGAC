@@ -20,6 +20,8 @@
 #
 """Reader for the ReGAC source format: source text -> database dictionary."""
 
+import os
+
 from .conds import CompileError, compile_line
 from .opcodes import GFX_CMDS
 
@@ -91,10 +93,11 @@ def text_of(line):
 
 
 class Parser:
-    def __init__(self, text, name="adventure"):
+    def __init__(self, text, name="adventure", folder=None):
         self.lines = text.splitlines()
         self.i = 0
         self.name = name
+        self.folder = folder or "."     # what a file= is relative to
         self.pending_exits = {}  # location id -> [(word or number, dest)]
         self.font_chars = 0
         self.ddb = {
@@ -368,10 +371,34 @@ class Parser:
             self.ddb["gfx"][gid] = insts
 
     def font(self):
+        """A typeface of the author's own, given whole or a letter at a time.
+
+        A whole one is a plain dump, eight bytes a character from `first`
+        upwards, which is what every font editor for these machines writes and
+        what the ROM of one looks like; `file` says where it is, relative to
+        this source.  A letter at a time is the entries below it, which win
+        over the file so that one glyph can be changed without redrawing the
+        rest.  A letter is named by its number or by itself: #241 and #"Ñ" are
+        the same character.
+        """
         head = self.lines[self.i - 1]
         a = self.attrs(" ".join(strip_comment(head).split()[1:]))
         self.font_chars = int(a.get("chars", 128))
         data = [0] * (self.font_chars * 8)
+        whole = a.get("file")
+        if whole:
+            first = int(a.get("first", 32))
+            path = os.path.join(self.folder, whole.strip('"'))
+            try:
+                with open(path, "rb") as f:
+                    blob = f.read()
+            except OSError as trouble:
+                self.fail(f"cannot read the font {whole}: {trouble}")
+            if len(blob) % 8:
+                self.fail(f"a font is eight bytes a character and {whole} is "
+                          f"{len(blob)}, which is not a whole number of them")
+            data = self.room_for(data, first * 8 + len(blob))
+            data[first * 8 : first * 8 + len(blob)] = blob
         while not self.at_section():
             st = strip_comment(self.cur()).strip()
             self.i += 1
@@ -380,13 +407,33 @@ class Parser:
             if not st.startswith("#"):
                 self.fail("a font entry is: #code followed by 8 hex bytes")
             parts = st[1:].split()
-            code = int(parts[0])
+            code = self.char_code(parts[0])
             row = [int(b, 16) for b in parts[1:]]
             if len(row) != 8:
                 self.fail(f"character {code} needs 8 bytes, found {len(row)}")
+            data = self.room_for(data, code * 8 + 8)
             data[code * 8 : code * 8 + 8] = row
+        self.font_chars = len(data) // 8
         self.ddb["font"] = data
 
+    def room_for(self, data, size):
+        """Let the table reach a character beyond the ones declared: an
+        accented letter drawn by hand lives past the first hundred and
+        twenty eight, and saying so twice would be a way of getting it wrong.
+        """
+        if size > len(data):
+            data = data + [0] * (size - len(data))
+        return data
 
-def parse(text, name="adventure"):
-    return Parser(text, name).parse()
+    def char_code(self, word):
+        """A character named by its number, or by itself in quotes."""
+        if word.startswith('"') or word.startswith("'"):
+            letter = word.strip("\"'")
+            if len(letter) != 1:
+                self.fail(f"{word} is not one character")
+            return ord(letter)
+        return int(word)
+
+
+def parse(text, name="adventure", folder=None):
+    return Parser(text, name, folder).parse()

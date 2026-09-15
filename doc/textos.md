@@ -40,6 +40,11 @@ El techo son 256 códigos contando los del compresor, y una aventura que se pase
 lo oye al construir, con la lista de los caracteres de los que mejor podría
 prescindir.
 
+Conviene saber que **el compresor se los gasta todos**: en las ocho aventuras
+usa exactamente tantas parejas como códigos le sobran, 185 a 214. O sea que no
+está limitado por el texto sino por el byte, y cada glifo de más es una pareja
+de menos. Acentuar una aventura entera cuesta cinco glifos.
+
 ## De dónde salen los glifos que la aventura no trae
 
 Un código no dibuja nada. La fuente que una aventura hereda de 1986 no tiene ni
@@ -68,6 +73,12 @@ a su sitio.
 Lo que no se puede construir —una letra que no está debajo, una marca que no
 conocemos— sale en blanco antes que salir mal. Está en
 [`glyphs.py`](../regac/glyphs.py).
+
+Y esto es sólo para lo que la aventura no trae. **Lo que el autor dibuja se usa
+tal cual**: la tabla de la fuente va indexada por el carácter, así que quien
+quiera su propia Ñ la pone en el 241 y se respeta; encima de un glifo dibujado
+no se compone nada. Cómo se le da una fuente propia —entera en un fichero o
+letra a letra— está en [`formato-fuente.md`](formato-fuente.md).
 
 ## Al vocabulario se le caen las marcas
 

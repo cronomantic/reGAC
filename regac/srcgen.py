@@ -177,7 +177,7 @@ class SourceWriter:
             row = font[code * 8 : code * 8 + 8]
             if not any(row):
                 continue
-            glyph = chr(code) if 32 <= code < 127 else "?"
+            glyph = chr(code) if code >= 32 and chr(code).isprintable() else "?"
             hexes = " ".join(f"{b:02X}" for b in row)
             self.w(f"#{code:<4} {hexes}   ; {glyph}")
         self.w()
