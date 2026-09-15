@@ -92,3 +92,49 @@ music_tick:
 music_playing:  db      0
 music_rate:     dw      MUSIC_RATE
 music_clock:    dw      0
+
+; Sound effects, in a build that asks for them.  They are the tracker's as
+; well: an effect is a little instrument of its own, exported from a song of
+; nothing but effects, and what playing one does is tell the player to lay it
+; over one of the three channels the next time it runs.  So an effect costs
+; nothing until the interrupt comes round, and the tune goes on underneath
+; with a channel missing for as long as the effect lasts.
+;
+; Which channel is the last one, because the tunes these machines carry put
+; the melody on the first and the bass on the second more often than not.  A
+; build may say otherwise.
+                IFDEF PLY_AKM_MANAGE_SOUND_EFFECTS
+
+                IFNDEF SOUND_CHANNEL
+                DEFINE SOUND_CHANNEL 2  ; counting from nought
+                ENDIF
+
+; The bank of effects at HL, which has to be said before any of them is asked
+; for and may be said whether a tune is playing or not.
+; Corrupts: AF, HL
+sound_init:
+                jp      PLY_AKM_InitSoundEffects
+
+; Play effect A, counting from one, at its own volume.  The interrupts go off
+; while it is asked for: it is five bytes of the player's state, and one
+; arriving half way through would find half an address.
+; Corrupts: everything
+sound_play:
+                di
+                ld      c, SOUND_CHANNEL
+                ld      b, 0                    ; as loud as it was made
+                call    PLY_AKM_PlaySoundEffect
+                ei
+                ret
+
+; And quiet again before it has finished, which nothing needs yet but the
+; player offers.
+; Corrupts: everything
+sound_quiet:
+                di
+                ld      a, SOUND_CHANNEL
+                call    PLY_AKM_StopSoundEffectFromChannel
+                ei
+                ret
+
+                ENDIF
