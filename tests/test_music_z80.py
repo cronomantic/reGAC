@@ -59,6 +59,31 @@ SNAPSHOT = os.path.join(SPECTRUM, "music.sna")
 LISTING = os.path.join(SPECTRUM, "music.lst")
 TUNE = os.path.join(ROOT, "music", "test.asm")
 
+
+def name_the_tunes(*tunes):
+    """Write music/tunes.asm so that it names these tunes and no others.
+
+    That file is shared: every build with music includes it, and `regac make`
+    writes it beside the interpreter from the adventure's own /MUSIC.  A test
+    that assembles music and trusts whatever the last one left there passes
+    or fails by the order it was run in -- the project test points it at a
+    tune in a folder pytest sweeps away, and three runs later the Amstrad's
+    disk failed to assemble with nothing to connect the two.  So it is
+    written here, on the way in, and every test that assembles music gets the
+    same one tune.  The two that want something else write it themselves and
+    put it back.
+    """
+    from regac.__main__ import music_source
+
+    music_source([{"file": os.path.basename(tune), "subsong": subsong}
+                  for tune, subsong in tunes],
+                 os.path.dirname(TUNE), os.path.join(os.path.dirname(TUNE),
+                                                     "tunes.asm"))
+
+
+if os.path.exists(TUNE):
+    name_the_tunes((TUNE, 0))
+
 # The tune's own working variables, which the player moves as it goes: where
 # in the first channel's track it has got to, and what the three volumes are.
 WATCHED = ("playing_flag", "spins",

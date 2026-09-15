@@ -230,11 +230,11 @@ def test_a_machine_without_music_reads_them_and_carries_on():
     """The same conditions on a build with no sound chip and no player: the
     three opcodes must take their argument and get out of the way."""
     state = run_without_music([
-        "MUSIC 0 SET 3 END",
-        "SOUND 2 SET 4 END",
+        "MUSIC 0 SET 13 END",
+        "SOUND 2 SET 14 END",
         "QUIET 7 CSET 5 END",
     ])
-    assert state["flags"] == {3, 4}, (
+    assert state["flags"] == {13, 14}, (
         f"a line with a noise in it stopped where it should not: {state}"
     )
     assert state["counters"][5] == 7, "and the numbers after it went astray"

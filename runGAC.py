@@ -416,10 +416,15 @@ class GAC_Interpreter:
         return res
 
     def __display_room(self, loc):
-        # Check whether there's light
+        # Check whether there's light.  In the dark the picture goes off the
+        # screen with everything else, and the marker that says a room has
+        # just been described is left alone, because none has: measured on
+        # the original, see doc/pendiente.md.
         if not self.flags[self.LIGHTING_FLAG] and not self.flags[self.LAMP_FLAG]:
+            self.clear_picture()
             self.print(self.messages[self.ITSDARK])
         else:
+            self.flags[self.FLAG_ROOM_DESC] = True
             if self.graphics:
                 self.draw_picture(self.locations[loc]["graphic_id"])
             self.print(self.locations[loc]["desc"])
@@ -786,14 +791,12 @@ class GAC_Interpreter:
                 elif cmd == "VBNO":
                     self.stack.append(self.verb)
                 elif cmd == "LIST":
+                    # One line, commas between, nothing after: what the
+                    # original writes for LLEVAS UN LIBRO,UNA CAMISA.
                     r = self.stack.pop()
-                    nothing = True
-                    for o in self.objects.values():
-                        if o["loc"] == r:
-                            self.print(o["name"] + "\n")
-                            nothing = False
-                    if nothing:
-                        self.print(self.no_objs_msg + "\n")
+                    named = [o["name"] for o in self.objects.values()
+                             if o["loc"] == r]
+                    self.print(",".join(named) if named else self.no_objs_msg)
                 elif cmd == "CONN":
                     d = self.stack.pop()
                     res = 0
@@ -856,15 +859,19 @@ class GAC_Interpreter:
             self.__display_room(self.current_loc)
             self.new_room = False
 
-        # Increment turn
+        # High priority conditions
+        self.finished, done, if_true = self.__perfom_conditions(self.hpcs, False)
+
+        # And only now the turn is counted.  Which side of the table this
+        # falls on matters: MegaCorp sets its whole game up in a condition
+        # guarded by the count still being zero, and counting first leaves
+        # that condition unreachable and the player dead on the opening move.
         if self.counters[self.TURN_CNT_L] < 255:
             self.counters[self.TURN_CNT_L] += 1
         elif self.counters[self.TURN_CNT_H] < 255:
             self.counters[self.TURN_CNT_L] = 0
             self.counters[self.TURN_CNT_H] += 1
 
-        # High priority conditions
-        self.finished, done, if_true = self.__perfom_conditions(self.hpcs, False)
         if self.finished:
             return self.finished
 
@@ -877,10 +884,7 @@ class GAC_Interpreter:
                     self.finished = True
                     return self.finished
             # Separate statements
-            separators = filter(lambda x: x != " ", self.separators + self.punctuation)
-            for sep in separators:
-                input_str = input_str.replace(sep, ".")
-            self.statements = input_str.split(".")
+            self.statements = self.__cut_into_orders(input_str)
             self.old_noun = 0  # Delete after new text input
 
         # Process player input
@@ -925,12 +929,52 @@ class GAC_Interpreter:
 
         return self.finished
 
+    def __cut_into_orders(self, line):
+        """One typed line into the orders it holds.
+
+        The original cuts at a mark of punctuation and at two words, THEN and
+        AND: XYZZY THEN SUR makes MegaCorp complain about the first word and
+        then walk south, where XYZZY SUR simply walks south.  Those two live
+        in the original's interpreter; here they live in the database, put
+        there by the decompiler, so that the words belong to the adventure and
+        its author rather than to us.  They are matched whole, so ANDAR is not
+        a joining word with a tail.
+        """
+        for mark in self.punctuation:
+            if mark not in (" ", ""):
+                line = line.replace(mark, ".")
+        parting = {w.upper() for w in self.separators}
+        orders = []
+        for piece in line.split("."):
+            taken = []
+            for word in piece.split(" "):
+                if word.upper() in parting:
+                    orders.append(" ".join(taken))
+                    taken = []
+                else:
+                    taken.append(word)
+            orders.append(" ".join(taken))
+        return orders
+
     def run(self):
         if not self.ready:
             return
         self.finished = False
         while not self.finished:
             self.main_loop()
+        self.tell_the_score()
+
+    def tell_the_score(self):
+        """What the game was worth and how long it took, unless the adventure
+        would rather not say: that is what the fourth marker is for."""
+        if self.flags[self.SCORE_DIS_FLAG]:
+            return
+        turns = (self.counters[self.TURN_CNT_H] * 256
+                 + self.counters[self.TURN_CNT_L])
+        self.print("\n" + self.messages[self.YOURSCORE]
+                   + str(self.counters[self.SCORE_CNT])
+                   + self.messages[self.YOUTOOK] + str(turns)
+                   + self.messages[self.TURNS] + "\n")
 
     def print(self, string):
         # A change of ink is written inside the text of a message and is not

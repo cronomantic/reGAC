@@ -204,7 +204,8 @@ class Database:
         # The words the parser compares, as the player will type them: see
         # typed() for why the marks come off these and off nothing else.
         extra = [typed(word) for word in self.words()]
-        extra += list(self.ddb.get("separators", []))
+        extra += [typed(word).upper()
+                  for word in self.ddb.get("separators", [])]
         extra += [c for c in self.ddb.get("punctuation", []) if c != chr(0)]
         # The digits always get a code and a glyph, whether the adventure's
         # text happens to use one or not, because scores get printed.
@@ -244,7 +245,10 @@ class Database:
         out += u8(len(printable))
         for c in printable:
             out += u8(self.code_of(c))
-        separators = self.ddb.get("separators", [])
+        # As the player can type them, which is without their marks and in
+        # the case the keyboards of these machines give: see typed().
+        separators = [typed(word).upper()
+                      for word in self.ddb.get("separators", [])]
         out += u8(len(separators))
         for word in separators:
             out += u8(len(word))

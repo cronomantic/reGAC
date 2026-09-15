@@ -22,8 +22,13 @@
 
 The original parts them at a mark of punctuation: typing "XYZY.SUR" at
 MegaCorp makes it say it does not know the first word and then walk south.
-Each piece is a turn of its own, and the line is only asked for again when it
-runs out.
+It parts them at two words as well, THEN and AND, measured the same way.
+Those two live in the original's interpreter; here they live in the
+database, which is what the decompiler puts there, so the tests below name
+them the way a decompiled adventure does.  Ours knows no word by itself: a
+Spanish Y parts nothing unless the adventure says it does, and neither does
+THEN.  Each piece is a turn of its own, and the line is only asked for
+again when it runs out.
 
 The way to see that both orders ran, without reading the screen, is to make
 the first one take time and the second one end the game.  Then the game ends
@@ -152,10 +157,48 @@ def test_a_word_parts_them_when_the_adventure_names_one():
     )
 
 
+ORIGINALS = ["THEN", "AND"]                     # what the decompiler writes
+
+
+@needs_tools
+def test_then_parts_them_as_it_did_in_the_original():
+    took = how_long("ESPERA THEN SALIR", separators=ORIGINALS)
+    wanted = FRAMES / 50
+    assert took is not None, "THEN did not part the two orders"
+    assert wanted * 0.8 < took < wanted * 1.4, (
+        f"both orders should have run, taking about {wanted}s, and it took {took:.2f}s"
+    )
+
+
+@needs_tools
+def test_and_parts_them_too():
+    took = how_long("ESPERA AND SALIR", separators=ORIGINALS)
+    wanted = FRAMES / 50
+    assert took is not None, "AND did not part the two orders"
+    assert wanted * 0.8 < took < wanted * 1.4, (
+        f"both orders should have run, taking about {wanted}s, and it took {took:.2f}s"
+    )
+
+
+@needs_tools
+def test_a_word_that_only_starts_one_parts_nothing():
+    """ANDAR is not AND with a tail: the words are matched whole."""
+    assert how_long("ESPERA ANDAR SALIR", separators=ORIGINALS) is None
+
+
+@needs_tools
+def test_the_interpreter_names_none_by_itself():
+    """THEN is the original interpreter's word, not ours.  An adventure that
+    does not ask for it does not get it, which is the whole point of the words
+    living in the database."""
+    assert how_long("ESPERA THEN SALIR") is None
+
+
 @needs_tools
 def test_a_word_no_adventure_names_parts_nothing():
     """With no separator named, the same line is one order and means nothing,
-    so the game carries on waiting for another."""
+    so the game carries on waiting for another.  The original does the same:
+    XYZZY Y SUR walks south without complaining, exactly as XYZZY SUR does."""
     assert how_long("ESPERA Y SALIR") is None
 
 

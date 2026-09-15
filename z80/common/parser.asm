@@ -3,7 +3,7 @@
 ; Making sense of what the player typed.
 ;
 ; A line is cut into sentences wherever a separator or a mark of punctuation
-; appears, so "COGE LA LLAVE Y ABRE LA PUERTA" is two orders and they are
+; appears, so "COGE LA LLAVE THEN ABRE LA PUERTA" is two orders and they are
 ; obeyed one after the other.  Each sentence is then cut into words and each
 ; word is looked for in the vocabulary.
 ;
@@ -45,12 +45,12 @@ vocab_init:
 
 ; The next order on the line, in HL with its length in BC.
 ;
-; A line may hold more than one order.  The original parted them at a mark of
+; A line may hold more than one order.  The original parts them at a mark of
 ; punctuation: typing "XYZY.SUR" at it makes it answer that it does not know
-; the first word and then walk south.  An adventure may also name words that
-; part two orders, which the original never did; those are honoured here, for
-; adventures written from now on, and an adventure that names none behaves
-; exactly as the original.
+; the first word and then walk south.  It parts them at two words as well,
+; THEN and AND, which live in its interpreter and in no original's database;
+; here they live in the database, put there by the decompiler, so that what
+; parts an order is the adventure's to say and not ours.
 ; Corrupts: everything
 next_statement:
                 ld      hl, (line_at)
@@ -134,6 +134,12 @@ next_statement:
 
 ; Whether the word of B codes at HL is one the adventure names as parting two
 ; orders.  Carry set when it is.
+;
+; The interpreter knows none by itself.  The original knew two, THEN and AND,
+; and they are not lost: the decompiler writes them into the database of every
+; adventure it reads, so a recompiled original parts orders where it always
+; did and an adventure written from now on says for itself which words those
+; are.  See doc/pendiente.md.
 ; Corrupts: everything
 separator_find:
                 ld      (sep_word), hl

@@ -40,18 +40,44 @@ Amstrad y en el MSX sí la hay, y la mitad que se puede probar aquí también se
 podría: darle una cinta de Spectrum de verdad y leer un bloque de ella, como
 se hace allí.
 
-Partir la línea en varias órdenes ya está, y de paso se aclaró de dónde salen
-los separadores: de ningún sitio. GAC parte al llegar a un signo de
-puntuación, y en su base de datos no hay ninguna lista de palabras que hagan lo
-mismo; los ocho caracteres son fijos e iguales en las ocho aventuras, hasta el
-punto de que el decompilador de referencia los usa como firma para reconocer un
-GAC. Las palabras `then` y `and` que traía todo lo decompilado se las inventaba
-`deGAC`, y ya no las pone.
+Partir la línea en varias órdenes ya está, y de dónde salen los separadores
+costó dos vueltas. La primera fue mirar la base de datos: los ocho signos de
+puntuación están ahí —fijos e iguales en las ocho aventuras, hasta el punto de
+que el decompilador de referencia los usa como firma para reconocer un GAC— y
+**ninguna lista de palabras**. De ahí se concluyó que las palabras `then` y
+`and` que traía todo lo decompilado se las inventaba `deGAC`, y se quitaron.
 
-La lista de separadores se queda en el formato como extensión, y el intérprete
-la respeta: una aventura escrita de ahora en adelante puede decir que "y"
-separa dos órdenes. Sin ninguna declarada, se comporta exactamente como el
-original.
+La conclusión estaba mal, y el fallo fue de método: que no estén en la base de
+datos no quiere decir que no estén en el intérprete. Medido en la máquina, en
+MegaCorp, que es española y no tiene declarado nada:
+
+| lo tecleado | lo que hace el original |
+|---|---|
+| `XYZY SUR` | se va al sur, sin quejarse |
+| `XYZZY Y SUR` | se va al sur, sin quejarse |
+| `XYZZY THEN SUR` | **«Repita la orden.»** y se va al sur |
+| `XYZZY AND SUR` | **«Repita la orden.»** y se va al sur |
+
+O sea que **THEN y AND son del intérprete** del original, están en las ocho
+aventuras aunque ninguna las guarde, y la Y castellana no separa nada.
+
+Y ahí hubo una decisión, que es de Sergio: **no repetir el a capón**. Tenemos
+intérprete propio, así que las palabras que parten una orden las dice la
+aventura y no el intérprete. El nuestro **no sabe ninguna**; el que las pone
+es `deGAC`, que escribe `THEN` y `AND` en la base de datos de toda aventura
+que lee. Con eso se tienen las dos cosas: un original recompilado parte las
+órdenes donde siempre, y una aventura escrita de ahora en adelante dice las
+suyas —`sep "y" "luego"`— sin cargar con dos palabras inglesas que no quiere.
+
+Se comparan como palabra entera, así que `ANDAR` no es `AND` con cola, y se
+guardan sin marcas y en mayúsculas, que es como llegan de estos teclados. Hay
+prueba de cada cosa en [`test_statements_z80.py`](../tests/test_statements_z80.py)
+y en [`test_interpreter.py`](../tests/test_interpreter.py), incluida una que
+mira que las aventuras decompiladas las traigan: una que las perdiera dejaría
+de partir órdenes y no se enteraría nadie.
+
+**Las que ya estuvieran decompiladas hay que volver a pasarlas por `deGAC`**,
+porque el campo se escribía vacío.
 
 Para que eso sirva de algo hubo que enseñar al teclado a dar los signos, que
 en el Spectrum piden símbolo y otra tecla a la vez. De paso se arregló que
@@ -417,6 +443,40 @@ para las 196 y lleva esa única lámina apuntada con nombre y con su número en
 `KNOWN_SLOW`, de modo que si crece se entera, y si crece otra distinta,
 también.
 
+### Lo que le queda libre al Amstrad, que es poco
+
+Su mapa es fijo: el intérprete desde `$4000`, la base de datos detrás alineada
+a 256, y el firmware empezando en `$B100`, que es donde salta el `ASSERT` de su
+[`game.asm`](../z80/cpc/game.asm). Medido con las ocho aventuras:
+
+| aventura | base de datos | acaba en | le sobran |
+|---|---:|---:|---:|
+| vajillas2 | 17387 | `$A3EB` | 3349 |
+| vajillas1 | 17538 | `$A482` | 3198 |
+| Bangkok1 | 18328 | `$A798` | 2408 |
+| megacorp1 | 19204 | `$AB04` | 1532 |
+| Bangkok2 | 19208 | `$AB08` | 1528 |
+| megacorp2 | 20574 | `$B05E` | **162** |
+| quijote2 | 20984 | — | **le faltan 248** |
+| quijote1 | 21115 | — | **le faltan 379** |
+
+**Las dos partes del Quijote no caben en un Amstrad**, y no es de ahora: sale
+igual en el árbol de antes de todo esto. Es un agujero que estaba y que nadie
+había nombrado. Lo que se puede hacer cuando toque es lo mismo que hace el +3
+—repartir la base de datos en bancos, que el formato ya sabe y el 6128 tiene
+memoria de sobra— o dibujar sus láminas más baratas, que en el Quijote son casi
+la mitad del total.
+
+Y hay un **escalón** que conviene saber, porque muerde sin avisar: como la base
+de datos va alineada a 256, lo que importa no es cuánto crece el intérprete
+sino cuándo cruza una página. Antes de los marcadores acababa en `$5F21` y
+ahora acaba en `$5FDA` —185 bytes más— y **ninguna aventura ha perdido un solo
+byte**, porque la base de datos sigue cayendo en `$6000`. Pero quedan **38
+bytes** hasta el escalón, y el día que se crucen, las ocho pierden 256 de golpe
+y megacorp2 se sale. Eso es justo lo que pasó a mitad de esta tanda: con una
+tabla de separadores metida a capón el intérprete pasó de `$6000`, la base de
+datos se fue a `$6100` y `regac make` dejó de construir esta máquina.
+
 ### Mirar las versiones de CPC, que es la lección para el PCW
 
 Sergio puede conseguir las mismas aventuras en su versión de Amstrad CPC. Es la
@@ -537,6 +597,76 @@ mismas escenas.
 De paso, `deGAC` avisa cuando las tablas de una máquina no parecen punteros. Sin
 ese aviso, una imagen de memoria puesta donde la máquina no la pondría se lee
 como una aventura con un solo nombre y nadie se entera.
+
+## Los cuatro marcadores que son del intérprete
+
+Los marcadores 0 a 3 y los contadores 0, 126 y 127 **no son de la aventura**,
+son del intérprete, y de eso no hacíamos nada. No es un detalle: *Los pájaros
+de Bangkok* pregunta `SET? 0` quince veces para escribir por dónde se sale, y
+ninguna de esas líneas podía ejecutarse nunca.
+
+Lo que hace cada uno está escrito en el manual del decompilador de referencia,
+pero lo que está aquí está **medido en la máquina**, sobre las aventuras de
+verdad: la tabla de marcadores de MegaCorp está en `$A483` y la de contadores
+en `$A403`, y se encontraron buscando el dibujo de bits que su propia tabla de
+alta prioridad pone al empezar.
+
+| | qué es | cómo se comprobó |
+|---|---|---|
+| marcador 0 | una localidad acaba de describirse | en `$A483` vale 1 nada más arrancar, y la aventura sólo hace `RESE 0` |
+| marcador 1 | este sitio tiene luz | vale 1 también, y ninguna de las ocho lo pone |
+| marcador 2 | el jugador lleva algo que alumbra | `12 SWAP 9 RESE 2` al apagar la linterna en Bangkok2 |
+| marcador 3 | no decir la puntuación al acabar | cinco aventuras lo ponen; las dos de *vajillas* no, y tienen los tres mensajes de puntuación |
+| contador 0 | la puntuación | |
+| contadores 126 y 127 | los turnos, bajo y alto **en ese orden** | 126 sube de uno en uno con cada orden; el de referencia los tiene al revés |
+
+**A oscuras** —los marcadores 1 y 2 a cero— el original no describe: borra la
+ventana de la lámina, dice el mensaje 251 y **no pone el marcador 0**, porque
+no ha descrito nada. Las tres cosas están medidas apagando la luz a mano en la
+memoria de MegaCorp.
+
+**Lo que hay en el suelo** lo nombra el intérprete detrás de la descripción:
+el mensaje 253 y luego los nombres con una coma entre ellos, todo en la misma
+línea. `Tambien puedo ver:un disco metalico,una pistola`. Y `LIST` escribe
+igual —`Llevas un libro,una camisa`—, y cuando no hay nada que nombrar escribe
+la palabra que la aventura da para eso.
+
+De ahí salió otra: **`MESS` no termina la línea**. Si la terminara, el 253 y
+los nombres no podrían salir juntos. Por eso las aventuras dicen `LF` cuando
+quieren un salto, y por eso MegaCorp rellena sus descripciones con treinta y
+dos asteriscos. El nuestro saltaba de línea en cada mensaje y en cada
+descripción.
+
+Y la peor de todas: **el turno se cuenta después de la tabla de alta
+prioridad**, no antes. MegaCorp monta la partida entera dentro de
+`IF ( 0 EQU? 126 )`; contando antes, ese `IF` no se cumple jamás, no se ponen
+sus banderas ni sus contadores, y la línea siguiente de la misma tabla ve
+`0 EQU? 1` y mata al jugador. **Nuestra compilación de MegaCorp I era
+injugable**: decía «Tomandome por uno de sus enemigos... No tengo ninguna
+oportunidad!» en la primera jugada. Ahora dice «La cabina de la nave.»
+
+Todo esto está en el Z80 y en `runGAC.py`, que iba por su lado en tres de las
+siete, y probado en [`test_markers_z80.py`](../tests/test_markers_z80.py): once
+pruebas que no leen la pantalla donde no hace falta, porque una condición que
+acaba la partida dice lo que el intérprete creía mucho mejor que una pantalla
+de letras.
+
+**Lo que queda de aquí**, apuntado y medido y no hecho:
+
+- **`TEXT` y `PICT` se escriben y no se leen.** En el original, `TEXT` le da al
+  texto la pantalla entera: así sale la presentación de MegaCorp, sin marco de
+  lámina. Cambiar eso es tocar la capa de pantalla de cada máquina —la altura
+  de la ventana de texto—, no una línea en el intérprete.
+- **El corte de línea no es el mismo.** El original parte también en los signos
+  de puntuación, porque su texto son palabras con un terminador de tres bits;
+  el nuestro sólo parte en el espacio. Se ve en `Salidas:Sur.****`, que allí
+  cae en dos renglones y aquí en otros dos distintos.
+- **`deGAC` no lee la palabra de «nada»**: escribe `Nothing` a pelo, y el
+  original dice `nada`. No es del intérprete, que ya la saca de la base de
+  datos; es de la extracción.
+- **El Amstrad va justo, y hay un escalón.** Está medido, adventura por
+  aventura, antes y después de meter los marcadores, con un árbol aparte en el
+  commit anterior para poder comparar.
 
 ## Los caracteres latinos, que ya se ven
 

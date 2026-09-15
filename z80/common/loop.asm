@@ -148,11 +148,16 @@ play_turn:
                 xor     a
                 ld      (vm_new_room), a
 .no_description:
-                call    bump_turn
-
                 xor     a                       ; the high priority conditions
                 call    cond_table
                 call    run_table
+                ; And only now the turn is counted.  It matters which side of
+                ; the table this falls: MegaCorp sets its whole game up in a
+                ; condition guarded by the count still being zero, and with
+                ; the turn counted first that condition never runs and the
+                ; adventure kills the player on the opening move.  Measured
+                ; on the original -- see doc/pendiente.md.
+                call    bump_turn
                 ld      a, (vm_over)
                 or      a
                 ret     nz
@@ -237,13 +242,39 @@ play_turn:
 .say:
                 jp      print_message
 
+; What the game was worth and how long it took, unless the adventure has
+; said it would rather not: that is what the fourth marker is for.  The two
+; counters the turns are kept in are the interpreter's as well.
+; Corrupts: everything
+tell_the_score:
+                ld      a, (vm_flags)
+                and     MARK_NO_SCORE
+                ret     nz
+                call    new_line
+                ld      a, MSG_SCORE
+                call    print_message
+                ld      a, (vm_counters)        ; counter zero is the score
+                ld      l, a
+                ld      h, 0
+                call    print_number
+                ld      a, MSG_TOOK
+                call    print_message
+                ld      a, (vm_counters + TURN_COUNTER_HI)
+                ld      h, a
+                ld      a, (vm_counters + TURN_COUNTER_LO)
+                ld      l, a
+                call    print_number
+                ld      a, MSG_TURNS
+                call    print_message
+                jp      new_line
+
 ; Play until the adventure says to stop.
 play:
                 call    play_turn
                 ld      a, (vm_over)
                 or      a
                 jr      z, play
-                ret
+                jp      tell_the_score
 
 cond_section:   dw      0
 vm_understood:  db      0

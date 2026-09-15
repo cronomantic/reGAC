@@ -899,11 +899,16 @@ def get_database(sysram):
         database["gfx_inks"] = inks
     database["model"] = MACHINE["model"]
     database["punctuation"] = list("\0 .,-!?:")
-    # GAC parts one order from the next at a mark of punctuation, and
-    # nowhere in its database is there a list of words that do the same.
-    # The field is left empty rather than filled with words the original
-    # never knew; an adventure written from now on may name its own.
-    database["separators"] = []
+    # GAC parts one order from the next at a mark of punctuation and at two
+    # words, THEN and AND.  The marks are in its database; the words are not,
+    # they are in its interpreter -- measured on the machine, because typing
+    # XYZZY THEN SUR at MegaCorp makes it complain about the first word and
+    # then walk south, where XYZZY SUR simply walks south and so does XYZZY Y
+    # SUR.  They are written out here so that a recompiled original parts
+    # orders where it always did, and so that the words belong to the
+    # adventure: ours has none of its own, and an adventure written from now
+    # on names the ones it wants.
+    database["separators"] = ["THEN", "AND"]
     database["init_loc"] = peek2(sysram, STARTROOM_ADDR)
     database["no_objs_msg"] = "Nothing"
 

@@ -18,18 +18,33 @@ CARRIED         equ 255                 ; the location an object carried is in
 NOWHERE         equ 0
 
 ; The messages the interpreter itself prints
+MSG_SCORE       equ 249
+MSG_TOOK        equ 250
 MSG_PRESSKEY    equ 243
 MSG_YOUSURE     equ 244
 MSG_DONTHAVE    equ 246
 MSG_CANTSEE     equ 247
 MSG_TOOMUCH     equ 248
+MSG_ITSDARK     equ 251
+MSG_OBJHERE     equ 253
 MSG_OKAY        equ 254
+MSG_TURNS       equ 255
+
+; The first four markers belong to the interpreter and not to the adventure,
+; which is why they are masks and not numbers: they all live in the first
+; byte of the table.  What each one is for is the original's, written down in
+; the manual of the reference decompiler and measured on a real machine
+; against the real games -- see doc/pendiente.md.
+MARK_DESCRIBED  equ %00000001           ; a room has just been described
+MARK_LIT        equ %00000010           ; this place has light of its own
+MARK_LAMP       equ %00000100           ; the player carries something alight
+MARK_NO_SCORE   equ %00001000           ; do not tell the score at the end
 
 TURN_COUNTER_LO equ 126
 TURN_COUNTER_HI equ 127
 
-; Set the machine up for a new game: no flags, no counters, objects where the
-; adventure says they start.
+; Set the machine up for a new game: no counters, no markers but the one that
+; says there is light, and every object where the adventure says it starts.
 ; Corrupts: AF, BC, DE, HL
 vm_init:
                 ld      hl, vm_flags
@@ -47,6 +62,8 @@ vm_init:
                 ld      (vm_done), a
                 ld      (vm_over), a
                 ld      (vm_new_room), a
+                ld      a, MARK_LIT             ; a game starts in the light
+                ld      (vm_flags), a
                 ld      a, 1
                 ld      (vm_graphics), a
                 ; walk the object table, noting where each one lives
@@ -256,15 +273,17 @@ obj_record:
                 or      a
                 ret
 
-; Print message number A, then a new line.
+; Print message number A.  Nothing follows it: the original does not end a
+; line here, which is what makes MESS 253 and the names of what is lying
+; about come out on one line, and why the adventures say LF when they want a
+; line ended.
 ; Corrupts: everything
 print_message:
                 call    message_index           ; DE = where it is in the store
                 ret     c
                 call    unpack_message          ; BC = how long
                 ld      hl, text_buffer
-                call    print_text
-                jp      new_line
+                jp      print_text
 
 ; Find location HL in the table; its record comes back in HL.
 ; Carry set if there is no such location.

@@ -86,11 +86,23 @@ lámina. El cambio dura hasta el siguiente, no hasta el final del mensaje.
     start    5000
     width    32
     punct    "\0" " " "." "," "-" "!" "?" ":"
-    sep      "then" "and"
+    sep      "THEN" "AND"
     nothing  "Nada"
 
 `punct` es la tabla de ocho terminadores de frase que GAC codifica en tres bits
 dentro de cada palabra de texto. El primero, el nulo, marca fin de cadena.
+
+`sep` son las palabras que parten una línea en dos órdenes, y son **todas**
+las que hay: el intérprete no sabe ninguna por su cuenta. El original sí sabía
+dos, `THEN` y `AND`, metidas en su intérprete; `deGAC` las escribe aquí al
+decompilar, de modo que un original recompilado parte las órdenes donde
+siempre y una aventura nueva dice las suyas y nada más:
+
+    sep      "y" "luego"
+
+Se comparan como palabra entera —`ANDAR` no es `AND` con cola— y se guardan
+sin marcas y en mayúsculas, que es como llegan de los teclados de estas
+máquinas. Sin `sep`, sólo parten los signos de `punct`.
 
 ### `/VOC`
 

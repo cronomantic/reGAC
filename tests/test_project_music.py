@@ -85,6 +85,33 @@ else:
         return func
 
 
+def tunes_put_back():
+    """music/tunes.asm is shared, and this is the test that poisons it.
+
+    Every build that has music includes that one file, and `regac make`
+    writes it beside the interpreter from the adventure's own /MUSIC.  The
+    project this test makes lives in a folder pytest sweeps away, so what is
+    left behind names a tune that will not be there for long -- and three
+    runs later the Amstrad's disk test fails to assemble, with nothing to
+    connect it to this.  So whatever was there is put back.
+    """
+    was = None
+    if os.path.exists(WRITTEN):
+        with open(WRITTEN, "rb") as f:
+            was = f.read()
+    yield
+    if was is None:
+        if os.path.exists(WRITTEN):
+            os.remove(WRITTEN)
+    else:
+        with open(WRITTEN, "wb") as f:
+            f.write(was)
+
+
+if pytest is not None:                  # it is a fixture only under pytest
+    tunes_put_back = pytest.fixture(autouse=True)(tunes_put_back)
+
+
 def a_project(where):
     """A folder with an adventure that has music, the music itself, and a
     project file: what an author's own folder looks like."""

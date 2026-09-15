@@ -107,11 +107,74 @@ def test_the_second_noun_needs_a_first():
     assert (noun1, noun2) == (3, 4)
 
 
+def cut(line, named=()):
+    """One typed line into the orders it holds."""
+    game = interpreter()
+    it = object.__new__(game)
+    it.separators = list(named)
+    it.punctuation = list("\0 .,-!?:")
+    return game.__dict__["_GAC_Interpreter__cut_into_orders"](it, line)
+
+
+def test_a_mark_of_punctuation_parts_two_orders():
+    assert cut("XYZY.SUR") == ["XYZY", "SUR"]
+
+
+ORIGINALS = ["THEN", "AND"]                     # what the decompiler writes
+
+
+def test_then_and_and_part_them_as_in_the_original():
+    """Typing XYZZY THEN SUR at MegaCorp makes it complain about the first
+    word and then walk south.  The two words are the original interpreter's;
+    the decompiler writes them into the database so that a recompiled original
+    parts orders where it always did."""
+    assert cut("COGE LLAVE THEN SUR", ORIGINALS) == ["COGE LLAVE", "SUR"]
+    assert cut("COGE LLAVE AND SUR", ORIGINALS) == ["COGE LLAVE", "SUR"]
+
+
+def test_the_interpreter_names_none_by_itself():
+    assert cut("COGE LLAVE THEN SUR") == ["COGE LLAVE THEN SUR"]
+
+
+def test_a_spanish_y_parts_nothing():
+    """Measured on the original, which walks south without complaining."""
+    assert cut("XYZZY Y SUR", ORIGINALS) == ["XYZZY Y SUR"]
+
+
+def test_the_words_are_matched_whole():
+    assert cut("ESPERA ANDAR SUR", ORIGINALS) == ["ESPERA ANDAR SUR"]
+
+
+def test_an_adventure_names_its_own():
+    assert cut("COGE LLAVE Y SUR", named=["Y"]) == ["COGE LLAVE", "SUR"]
+
+
+def test_the_decompiler_writes_the_two_the_original_knew():
+    """A decompiled adventure that lost them would stop parting orders where
+    it used to, and nothing else would notice."""
+    import glob
+    import json
+
+    where = os.path.join(ROOT, "snapshots", "*.json")
+    for path in sorted(glob.glob(where)):
+        with open(path, encoding="utf-8") as f:
+            named = json.load(f).get("separators", [])
+        assert [w.upper() for w in named] == ORIGINALS, (
+            f"{os.path.basename(path)} names {named}: decompile it again"
+        )
+
+
 if __name__ == "__main__":
     for check in (
         test_the_start_of_a_word_is_enough,
         test_more_than_the_word_holds_matches_nothing,
         test_the_shortest_of_the_words_a_letter_starts,
+        test_a_mark_of_punctuation_parts_two_orders,
+        test_then_and_and_part_them_as_in_the_original,
+        test_the_interpreter_names_none_by_itself,
+        test_a_spanish_y_parts_nothing,
+        test_the_words_are_matched_whole,
+        test_an_adventure_names_its_own,
         test_a_sentence_fills_the_four_slots,
         test_the_second_noun_needs_a_first,
     ):

@@ -47,7 +47,8 @@ counter_address:
                 or      a
                 ret
 
-; Print the name of object L.
+; Print the name of object L.  No line is ended: whoever lists several of
+; them puts the commas in between.
 ; Corrupts: everything
 print_object_name:
                 call    obj_record
@@ -59,12 +60,65 @@ print_object_name:
                 ld      d, (hl)                 ; where its name is in the store
                 call    unpack_message
                 ld      hl, text_buffer
-                call    print_text
-                jp      new_line
+                jp      print_text
 
-; Describe location HL.
+; The names of the objects that are in room (list_room), with a comma between
+; them, the way the original writes both an inventory and what is lying about.
+; With (list_quiet) set nothing is printed and the walk only answers whether
+; there was anything, which is what a room description has to know before it
+; can say there is.
+; Comes back with the zero flag set when there was nothing to name.
+; Corrupts: everything
+list_objects:
+                xor     a
+                ld      (list_found), a
+                ld      b, 255
+                ld      c, 1                    ; object numbers start at one
+.each:
+                push    bc
+                ld      l, c
+                ld      h, 0
+                ld      (vm_arg), hl            ; obj_location reads it again
+                call    obj_location            ; DE = where it is
+                jr      c, .next
+                ld      hl, (list_room)
+                or      a
+                sbc     hl, de
+                jr      nz, .next
+                ld      a, (list_quiet)
+                or      a
+                jr      nz, .counted
+                ld      a, (list_found)
+                or      a
+                jr      z, .first               ; the first one needs no comma
+                ld      a, ','
+                call    print_char
+.first:
+                ld      hl, (vm_arg)
+                call    print_object_name
+.counted:
+                ld      a, 1
+                ld      (list_found), a
+.next:
+                pop     bc
+                inc     c
+                djnz    .each
+                xor     a
+                ld      (list_quiet), a         ; quiet lasts for one walk only
+                ld      a, (list_found)
+                or      a
+                ret
+
+; Describe location HL: its picture, its description, and what is lying in
+; it.  In the dark none of that happens -- the picture window is wiped and
+; the interpreter says so -- and the marker that tells the adventure a room
+; has just been described is left alone, because none has.
 ; Corrupts: everything
 describe_location:
+                ld      a, (vm_flags)
+                and     MARK_LIT | MARK_LAMP
+                jr      z, .in_the_dark
+                ld      (list_room), hl         ; which room, to name its things
                 call    obj_find_location
                 ret     c
                 push    hl
@@ -88,7 +142,26 @@ describe_location:
                 call    unpack_message
                 ld      hl, text_buffer
                 call    print_text
-                jp      new_line
+                ld      a, 1
+                ld      (list_quiet), a
+                call    list_objects            ; is there anything here at all
+                jr      z, .nothing_here
+                ld      a, MSG_OBJHERE
+                call    print_message           ; which has to be said first
+                call    list_objects
+.nothing_here:
+                ld      hl, vm_flags
+                ld      a, (hl)
+                or      MARK_DESCRIBED
+                ld      (hl), a
+                ret
+.in_the_dark:
+                ld      a, SECTION_GRAPHICS
+                call    db_bank_in
+                call    gfx_clear
+                call    gfx_show
+                ld      a, MSG_ITSDARK
+                jp      print_message
 
 ; Print HL as a decimal number, without leading zeros.
 ; Corrupts: everything
@@ -789,27 +862,22 @@ op_vbno:
                 call    vm_push
                 jp      vm_loop
 
+; The word an adventure gives for having nothing at all.  It is what the
+; original writes when LIST finds none -- LLEVO CONMIGO:NADA -- and it is the
+; only text of an adventure that is not a message, an object or a room.
+; Corrupts: everything
+print_nothing_word:
+                ld      de, (nothing_at)
+                call    unpack_message
+                ld      hl, text_buffer
+                jp      print_text
+
 op_list:
                 call    vm_pop
-                ld      (vm_arg2), hl           ; the room to list
-                ld      b, 255
-                ld      c, 1                    ; object numbers start at one
-.each:
-                push    bc
-                ld      l, c
-                ld      (vm_arg), hl
-                call    obj_location
-                jr      c, .next
-                ld      hl, (vm_arg2)
-                or      a
-                sbc     hl, de
-                jr      nz, .next
-                ld      hl, (vm_arg)
-                call    print_object_name
-.next:
-                pop     bc
-                inc     c
-                djnz    .each
+                ld      (list_room), hl         ; the room to list
+                call    list_objects
+                jp      nz, vm_loop
+                call    print_nothing_word      ; LIST always writes something
                 jp      vm_loop
 
 op_pict:
@@ -957,6 +1025,9 @@ next_random:
                 ret
 
 vm_arg2:        dw      0
+list_room:      dw      0                       ; whose objects are being named
+list_quiet:     db      0                       ; count them, do not name them
+list_found:     db      0                       ; whether there was any
 
 ; -- where each opcode lives -------------------------------------------------
 

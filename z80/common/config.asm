@@ -27,6 +27,26 @@ config_init:
                 ld      de, punct_codes
                 ldir
                 ld      (seps_at), hl           ; the words come after them
+                ; and after those, where the word for having nothing is kept
+                ld      a, (hl)                 ; how many separator words
+                inc     hl
+.skip:
+                or      a
+                jr      z, .counted
+                dec     a
+                ld      c, a
+                ld      a, (hl)                 ; how long this one is
+                inc     hl
+                ld      e, a
+                ld      d, 0
+                add     hl, de
+                ld      a, c
+                jr      .skip
+.counted:
+                ld      e, (hl)
+                inc     hl
+                ld      d, (hl)
+                ld      (nothing_at), de
                 ret
 
 ; Whether the code in A is a mark that ends one order and starts the next.
@@ -67,3 +87,4 @@ ascii_to_code:
 punct_count:    db      0
 punct_codes:    ds      8
 seps_at:        dw      0                       ; the separator words, if any
+nothing_at:     dw      0                       ; the word for having none

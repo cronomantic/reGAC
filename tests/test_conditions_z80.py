@@ -113,8 +113,13 @@ def run(conditions):
         ],
     )
     assert finished, "the condition machine never reached the end"
+    # Markers 0 to 3 are the interpreter's own -- a room described, light,
+    # a lamp, and whether to tell the score -- so the first byte is masked
+    # off here and the tests below say what the conditions did with the rest.
+    # A new game starts with the light on, which is why this matters.
     return {
-        "flags": {n for n in range(256) if flags[n >> 3] & (1 << (n & 7))},
+        "flags": {n for n in range(4, 256) if flags[n >> 3] & (1 << (n & 7))},
+        "markers": {n for n in range(4) if flags[0] & (1 << n)},
         "counters": {n: value for n, value in enumerate(counters) if value},
         "location": location[0] | (location[1] << 8),
         "objects": {
@@ -126,7 +131,7 @@ def run(conditions):
 @needs_tools
 def test_flags_counters_and_arithmetic():
     state = run([
-        "SET 1 SET 5 SET 200 RESE 5 END",
+        "SET 5 SET 6 SET 200 RESE 6 END",
         "42 CSET 3 INCR 3 DECR 3 DECR 3 END",
         "CTR 3 CSET 7 END",
         "1 + 2 CSET 8 END",
@@ -134,7 +139,8 @@ def test_flags_counters_and_arithmetic():
         "255 CSET 20 INCR 20 END",
         "0 CSET 21 DECR 21 END",
     ])
-    assert state["flags"] == {1, 200}, "a flag past the first byte must work too"
+    assert state["flags"] == {5, 200}, "a flag past the first byte must work too"
+    assert state["markers"] == {1}, "a game starts with the light on and nothing else"
     assert state["counters"][3] == 41
     assert state["counters"][7] == 41
     assert state["counters"][8] == 3
