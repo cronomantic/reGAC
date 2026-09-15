@@ -8,15 +8,20 @@
 ; as well with -DWITH_EFFECTS.  What it then takes in is the author's own
 ; music/tunes.asm, which says what tunes there are.
 ;
-; This is the tightest of the four machines that can play anything.  The code,
-; the database and now the music are one stretch from $4000, and what stops
-; them is the firmware's own variables at $B100 -- the firmware is asleep, but
-; the tape is saved through its jumpblock, so what it keeps down there has to
-; stay.  Sixteen kilobytes are going begging under $4000, where both ROMs are
-; out of the way, but nothing can be loaded there: the BASIC line that loads
-; this is itself at $0170 and would be loaded over while it ran.  So for now
-; an adventure with music has to end before $A200 or so, and the ASSERT below
-; says which ones do not.  doc/pendiente.md has what the way out looks like.
+; The music does not go where the interpreter is.  Above $4000 there is
+; nothing to spare -- the code and the database are one stretch and the
+; firmware's own variables stop them at $B100, because the tape is saved
+; through its jumpblock -- and the sixteen kilobytes under $4000 are empty
+; and ours, with both ROMs out of the way.  What stopped them being used was
+; the loading and not the memory: the BASIC line that loads the game is itself
+; at $0170, and a file loaded down there would land on the loader while it
+; ran.
+;
+; So the music travels as a second file with a mover in front of it: the
+; loader brings it in at $4000, where nothing is yet, calls it, and twenty
+; instructions carry the music down to $0300 -- clear of the BASIC line, which
+; is the whole of the trick -- and come back.  Then the interpreter is loaded
+; over the top of where it was and started, and finds the music waiting.
                 IFDEF WITH_MUSIC
                 DEFINE  PLY_AKM_HARDWARE_CPC 1
                 DEFINE  MUSIC_RATE 300          ; this one interrupts that often
@@ -26,6 +31,8 @@
                 ENDIF
 
 FIRMWARE_AT     equ $B100               ; what the firmware keeps for itself
+MUSIC_AT        equ $0300               ; above the BASIC line that loads us
+MUSIC_LOADS_AT  equ $4000               ; where its file comes in, to be moved
 
                 ; above the lower ROM, which covers anything under $4000
                 ORG     $4000
@@ -82,7 +89,33 @@ done_flag:      db      0
                 include "../common/loop.asm"
                 include "../common/picture.asm"
 
+                ALIGN   256
+database:
+                INCBIN  "game.rgac"
+last:
+                ASSERT  last <= FIRMWARE_AT     ; or the tape would stop working
+
+                SAVEBIN "game.bin", start, last - start
+
+; And the music, as a file of its own.  It is assembled here, after the
+; interpreter has been written out, because the mover in front of it is put
+; where the interpreter will be loaded: by the time that matters, game.bin is
+; already a file.
+;
+; The music itself is assembled for $0300 and stored behind the mover, which
+; is what DISP is for -- the same way the interrupt's routine travels.
                 IFDEF WITH_MUSIC
+                ORG     MUSIC_LOADS_AT
+music_mover:
+                ld      hl, music_image
+                ld      de, MUSIC_AT
+                ld      bc, MUSIC_BYTES
+                ldir
+                ret
+
+music_image:
+                DISP    MUSIC_AT
+music_at:
                 include "../common/music.asm"
                 include "../arkos/PlayerAkm.asm"
                 include "interrupt.asm"
@@ -92,17 +125,15 @@ done_flag:      db      0
 effects:
                 include "../../music/effects.asm"
                 ENDIF
-                DEFINE  MUSIC_LIST 1    ; no banks here, so the list and
-                DEFINE  MUSIC_STORE 1   ; the tunes live side by side
+                DEFINE  MUSIC_LIST 1    ; no banks to page here, so the list
+                DEFINE  MUSIC_STORE 1   ; and the tunes live side by side
                 include "../../music/tunes.asm"
                 UNDEFINE MUSIC_LIST
                 UNDEFINE MUSIC_STORE
+music_end:
+                ASSERT  music_end <= MUSIC_LOADS_AT     ; or it would reach the
+                ENT                                     ; interpreter
+MUSIC_BYTES     equ music_end - music_at
+
+                SAVEBIN "music.bin", music_mover, $ - music_mover
                 ENDIF
-
-                ALIGN   256
-database:
-                INCBIN  "game.rgac"
-last:
-                ASSERT  last <= FIRMWARE_AT     ; or the tape would stop working
-
-                SAVEBIN "game.bin", start, last - start

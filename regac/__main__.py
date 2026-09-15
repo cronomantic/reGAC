@@ -222,7 +222,7 @@ def cmd_build(args):
 
 
 def write_media(machine, code, where, name, load, entry, screen=None,
-                boot=None, banks=None, database=None):
+                boot=None, banks=None, database=None, music=None):
     """Put an assembled interpreter on the medium its machine loads from, and
     say what was written and how a person starts it."""
     written = []
@@ -250,9 +250,11 @@ def write_media(machine, code, where, name, load, entry, screen=None,
         for suffix, make in ((".dsk", cpc_disk), (".cdt", cpc_tape)):
             path = os.path.join(where, name.lower() + suffix)
             with open(path, "wb") as f:
-                f.write(make(code, name, load, entry, screen))
+                f.write(make(code, name, load, entry, screen, music))
             written.append(path)
         how = f'RUN"{name}" on the disk, RUN"" on the tape'
+        if music:
+            how += f", with {len(music)} bytes of music in front of it"
     else:
         path = os.path.join(where, name.lower() + ".dsk")
         with open(path, "wb") as f:
@@ -289,6 +291,10 @@ def cmd_release(args):
         if len(screen) != wanted:
             sys.exit(f"ERROR: a {args.machine} screen is {wanted} bytes and "
                      f"{args.screen} is {len(screen)}")
+    music = None
+    if args.music:
+        with open(args.music, "rb") as f:
+            music = f.read()
     boot = banks = database = None
     if args.boot:
         with open(args.boot, "rb") as f:
@@ -299,7 +305,7 @@ def cmd_release(args):
         banks = banks_of(database)
     written, how = write_media(args.machine, code, args.output, name, load,
                                args.entry or load, screen, boot, banks,
-                               database)
+                               database, music)
     print(f"{args.input} -> " + ", ".join(written))
     print(f"  loads at    ${load:04X}, {len(code)} bytes")
     print(f"  starts with {how}")
@@ -502,6 +508,8 @@ def main():
     p.add_argument("--database", help="the built database the banks come from")
     p.add_argument("--screen", help="a dump of the machine's screen, to show "
                                     "while the rest loads")
+    p.add_argument("--music", help="the assembled music, for a machine that "
+                                   "loads it as a file of its own")
     p.set_defaults(func=cmd_release)
 
     p = sub.add_parser("make", help="build an adventure for every machine a "

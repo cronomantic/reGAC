@@ -71,17 +71,28 @@ def quoted(text):
 
 SCREEN_AT = 0xC000              # where an Amstrad keeps what it is showing
 SCREEN_BYTES = 0x4000
+MUSIC_LOADS_AT = 0x4000         # where the music comes in to be moved down
 
 
-def loader(wanted, keep=CODE_AT - 1, entry=CODE_AT, screen=None):
+def loader(wanted, keep=CODE_AT - 1, entry=CODE_AT, screen=None, music=None):
     """The lines: keep out of the memory the interpreter wants, put up the
-    loading screen if there is one, bring the interpreter in and go.  `wanted`
-    is the name to load, which on tape is the shout that means the next file
-    and no fuss about it."""
+    loading screen if there is one, bring the music down under $4000 if there
+    is any, bring the interpreter in and go.  `wanted` is the name to load,
+    which on tape is the shout that means the next file and no fuss about it.
+
+    The music is the odd one.  It cannot be loaded where it is going to live,
+    because where it lives is under $4000 and this very program is down there
+    at $0170; so it comes in at $4000, where nothing is yet, and is called.
+    What answers is twenty instructions in front of it that carry it down and
+    come back, and then $4000 is free again for the interpreter.
+    """
     out = basic_line(10, [MEMORY, SPACE] + list(hex_number(keep)))
     if screen is not None:
         out += basic_line(20, [LOAD, SPACE] + list(quoted(screen))
                           + [ord(",")] + list(hex_number(SCREEN_AT)))
+    if music is not None:
+        out += basic_line(25, [LOAD, SPACE] + list(quoted(music)))
+        out += basic_line(26, [CALL, SPACE] + list(hex_number(MUSIC_LOADS_AT)))
     out += basic_line(30, [LOAD, SPACE] + list(quoted(wanted)))
     out += basic_line(40, [CALL, SPACE] + list(hex_number(entry)))
     return out + bytes(2)
@@ -104,18 +115,23 @@ def amsdos(name, data, kind=BINARY, load=CODE_AT, entry=0):
     return bytes(head) + bytes(data)
 
 
-def cpc_disk(code, name=NAME, load=CODE_AT, entry=CODE_AT, screen=None):
+def cpc_disk(code, name=NAME, load=CODE_AT, entry=CODE_AT, screen=None,
+             music=None):
     """A data disk with the loader and the interpreter on it, which a machine
     starts with RUN and the name.  A loading screen, when there is one, is a
-    dump of that machine's own screen and travels as a file of its own."""
+    dump of that machine's own screen and travels as a file of its own, and so
+    does the music."""
     binary = f"{name}.BIN"
     picture = f"{name}.SCR" if screen else None
+    tunes = f"{name}.MUS" if music else None
     disk = Disk("cpc-data")
     disk.add(f"{name}.BAS",
-             amsdos(f"{name}.BAS", loader(binary, load - 1, entry, picture),
+             amsdos(f"{name}.BAS", loader(binary, load - 1, entry, picture, tunes),
                     kind=0, load=BASIC_AT))
     if screen:
         disk.add(picture, amsdos(picture, screen, load=SCREEN_AT))
+    if music:
+        disk.add(tunes, amsdos(tunes, music, load=MUSIC_LOADS_AT))
     disk.add(binary, amsdos(binary, code, load=load, entry=entry))
     return disk.image()
 
@@ -319,15 +335,19 @@ def pcw_release(boot, code, banks, screen=None):
     return pcw_disk(boot, pieces)
 
 
-def cpc_tape(code, name=NAME, load=CODE_AT, entry=CODE_AT, screen=None):
+def cpc_tape(code, name=NAME, load=CODE_AT, entry=CODE_AT, screen=None,
+             music=None):
     """A tape with the same, which a machine starts with RUN and nothing else
     because what it runs is whatever comes first.  A shouted name means the
     next file along, so the pieces only have to be in the order they are
-    wanted: the loader, the screen, and the interpreter."""
-    files = [File(name, loader("!", load - 1, entry, "!" if screen else None),
+    wanted: the loader, the screen, the music and the interpreter."""
+    files = [File(name, loader("!", load - 1, entry,
+                               "!" if screen else None, "!" if music else None),
                   kind=BASIC, load=BASIC_AT)]
     if screen:
         files.append(File(name, screen, kind=BINARY, load=SCREEN_AT))
+    if music:
+        files.append(File(name, music, kind=BINARY, load=MUSIC_LOADS_AT))
     files.append(File(name, code, kind=BINARY, load=load, entry=entry))
     return tape(files)
 
