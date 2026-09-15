@@ -546,8 +546,19 @@ de carga delante, con o sin la cabecera de AMSDOS, una fuente de consola PSF, o
 **un PNG con las letras en una rejilla**, que es lo que un artista prefiere
 dibujar, o **la fuente escrita como fuente**: una cabecera de C o un listado de
 Z80, 6502, x86 o 68000, que es como se publican para que las use un programa.
-Se mira el fichero y se averigua qué es. Con eso, una fuente de ZX Origins
-entra tal cual, en cualquiera de las formas en que viene su ZIP.
+un BDF, la ristra de VDU 23 de un BBC, el BASIC con `SYMBOL` de un Amstrad o
+una fuente de consola PSF. Se mira el fichero y se averigua qué es.
+
+Comprobado con una fuente de verdad, bajada de ZX Origins: de su ZIP entran
+—dando todos la misma letra— el `.ch8`, el `.fnt` de Atari, el `.64c`, el
+`.psf`, los cinco listados de `Source`, el `.bbc`, el `.bas`, el `.bdf`, la
+hoja del GameBoy y hasta la imagen de muestra. Y de eso salieron tres fallos
+que los ficheros inventados por mí no habrían encontrado nunca: el `&00` con
+que escribe el hexadecimal un ensamblador de Z80, el signo de copyright en un
+comentario —que hacía que el fichero no pareciera texto— y, el mejor, que
+estos listados ponen en un comentario la letra que dibuja cada fila, así que
+la línea de la llave abierta tiene una llave abierta y buscar las llaves de un
+array de C sin quitar antes los comentarios encontraba ésa.
 
 Cada letra se identifica por su casilla, y `layout` dice de una vez por dónde
 empieza la hoja y cuántas casillas tiene. La que hay que dibujar es **Latin-1**:

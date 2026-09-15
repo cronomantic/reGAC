@@ -87,57 +87,71 @@ ORDERS = {"ascii": None, "c64": C64_ORDER, "atascii": ATASCII_ORDER}
 # same fonts are published for, and the numbers they are written in.
 DATA_LINE = re.compile(r"\b(?:db|defb|defm|dc\.b|\.byte|byte)\b", re.I)
 NUMBER = re.compile(
-    r"(?<![\w.$%])(?:"
+    r"(?<![\w.$%&])(?:"
     r"0[xX]([0-9a-fA-F]+)"          # C and some assemblers
     r"|\$([0-9a-fA-F]+)"            # 6502 and 68000
+    r"|&([0-9a-fA-F]+)"             # the Amstrad way, which z88dk uses too
     r"|([0-9a-fA-F]+)[hH]\b"        # x86
     r"|%([01]+)"                    # binary, the way a Z80 assembler writes it
     r"|0[bB]([01]+)"
     r"|([0-9]+)"
     r")(?![\w.])"
 )
-BASES = (16, 16, 16, 2, 2, 10)
+BASES = (16, 16, 16, 16, 2, 2, 10)
 
 
 class FontError(Exception):
     pass
 
 
-def numbers_in(text):
+def without_comments(written):
+    """A listing with what is said about it taken out.
+
+    It matters more than it sounds: these listings put the letter each row
+    draws in a comment at the end of it, so the line for the open brace has an
+    open brace in it, and looking for the braces of a C array without doing
+    this first finds that one.
+    """
+    written = re.sub(r"/\*.*?\*/", " ", written, flags=re.S)
+    out = []
+    for line in written.splitlines():
+        line = line.split("//")[0]
+        if "{" not in line and "}" not in line:
+            line = line.split(";")[0].split("*")[0] if line.lstrip()[:1] == "*" \
+                else line.split(";")[0]
+        out.append(line)
+    return "\n".join(out)
+
+
+def numbers_in(written):
     """Every byte a listing of bytes holds, in order.
 
     The same font is published as a C header, as Z80, 6502, x86 and 68000
     assembly, and as a line of BASIC: all of them a heap of numbers with
-    something different around them.  What is taken is what is inside the
-    braces, if there are braces, and otherwise what stands on the lines that
-    carry a byte directive -- which is what keeps the length out of
+    something different around them.  What is taken is what stands on the
+    lines carrying a byte directive, and failing that what is inside the
+    braces -- which between them keep the length out of
     `unsigned char font[768]` and the address out of an `org`.
     """
-    opened, closed = text.find("{"), text.rfind("}")
-    if 0 <= opened < closed:
-        wanted = [text[opened + 1:closed]]
-    else:
-        wanted = [line[found.end():]
-                  for line in text.splitlines()
-                  for found in [DATA_LINE.search(line)] if found]
-        if not wanted:
-            wanted = [text]
+    written = without_comments(written)
+    wanted = [line[found.end():]
+              for line in written.splitlines()
+              for found in [DATA_LINE.search(line)] if found]
+    if not wanted:
+        opened, closed = written.find("{"), written.rfind("}")
+        wanted = [written[opened + 1:closed] if 0 <= opened < closed else written]
     out = []
     for piece in wanted:
-        for match in NUMBER.finditer(piece.split(";")[0].split("//")[0]):
+        for match in NUMBER.finditer(piece):
             digits = next(g for g in match.groups() if g is not None)
             base = BASES[match.groups().index(digits)]
             out.append(int(digits, base))
     return out
 
 
-def from_listing(blob):
-    """The glyphs of a listing, which is a font written out as source."""
-    try:
-        text = blob.decode("utf-8")
-    except UnicodeDecodeError:
-        text = blob.decode("latin-1")
-    values = numbers_in(text)
+def from_listing(written):
+    """The bytes of a listing, which is a font written out as source."""
+    values = numbers_in(written)
     if not values:
         raise FontError("there are no bytes in this at all")
     big = [v for v in values if v > 255]
@@ -154,17 +168,30 @@ def from_listing(blob):
     return bytes(values)
 
 
-def looks_like_text(blob):
-    """Whether this is a font written out as source rather than as bytes.
+def as_text(blob):
+    """The file as writing, if that is what it is, and None if it is bytes.
 
     A font of bytes is eight bits a row and full of them; a listing is
-    letters, digits and punctuation.  So: nothing above ASCII, and a good half
-    of it letters or spaces.
+    letters, digits and punctuation -- and a comment in it may well be in
+    Spanish, or hold a pound sign or a copyright sign, so what is looked at is
+    the characters and not the bytes.
     """
-    if not blob or max(blob) > 126:
-        return False
-    letters = sum(1 for b in blob if b in (9, 10, 13, 32) or 48 <= b <= 122)
-    return letters * 2 > len(blob)
+    for how in ("utf-8", "latin-1"):
+        try:
+            written = blob.decode(how)
+        except UnicodeDecodeError:
+            continue
+        if not written:
+            return None
+        written = written.lstrip("\ufeff")
+        plain = sum(1 for c in written
+                    if c.isprintable() or c in "\r\n\t")
+        # Nearly all of it, rather than all: one of these listings names the
+        # letter each row draws in a comment, and among those letters is
+        # whatever the machine keeps at 127.  A font of bytes is nowhere near
+        # this, being full of the noughts a blank row is.
+        return written if plain * 50 >= len(written) * 49 else None
+    return None
 
 
 def strip_header(blob):
@@ -174,22 +201,92 @@ def strip_header(blob):
     some of these formats say that and some only imply it.
     """
     if blob[:len(PSF2_MAGIC)] == PSF2_MAGIC:
-        length = int.from_bytes(blob[8:12], "little")
+        head = int.from_bytes(blob[8:12], "little")
+        glyphs = int.from_bytes(blob[16:20], "little")
+        each = int.from_bytes(blob[20:24], "little")
         height = int.from_bytes(blob[24:28], "little")
-        if height != GLYPH_ROWS:
+        if height != GLYPH_ROWS or each != GLYPH_ROWS:
             raise FontError(f"this console font is {height} rows tall, not eight")
-        return blob[length:], 0
+        # What follows the glyphs is a table of what each one means, and it is
+        # not glyphs: it is left where it is.
+        return blob[head:head + glyphs * each], 0
     if blob[:len(PSF1_MAGIC)] == PSF1_MAGIC:
         if blob[3] != GLYPH_ROWS:
             raise FontError(f"this console font is {blob[3]} rows tall, not eight")
-        return blob[4:], 0
+        glyphs = 512 if blob[2] & 1 else 256
+        return blob[4:4 + glyphs * GLYPH_ROWS], 0
     if len(blob) > DOS_HEADER and (len(blob) - DOS_HEADER) in PLAIN:
         # AMSDOS and +3DOS: the header is a hundred and twenty eight bytes and
         # the length in it is the rest of the file.
         return blob[DOS_HEADER:], None
     if len(blob) % GLYPH_ROWS == 2 and (len(blob) - 2) in PLAIN:
         return blob[2:], None                   # a load address, as on a C64
+    if (len(blob) > 10 and blob[0] == 0
+            and int.from_bytes(blob[1:3], "big") == len(blob) - 10):
+        # RS-DOS, which a CoCo reads: five bytes of header and five of tail.
+        return blob[5:-5], None
     return blob, None
+
+
+def from_bdf(written):
+    """The glyphs of a BDF, which is the format that says what each one is.
+
+    Every glyph carries its own number -- ENCODING -- so nothing has to be
+    worked out from where it sits, and a font of two hundred and ninety eight
+    letters in no particular order reads as easily as one of ninety six.
+    """
+    slots = {}
+    code = None
+    rows = None
+    for line in written.splitlines():
+        word = line.split()
+        if not word:
+            continue
+        if word[0] == "ENCODING":
+            code = int(word[1])
+        elif word[0] == "BITMAP":
+            rows = []
+        elif word[0] == "ENDCHAR":
+            if code is not None and code >= 0 and rows:
+                slots[code] = bytes(rows[:GLYPH_ROWS]).ljust(GLYPH_ROWS, b"\0")
+            code, rows = None, None
+        elif rows is not None:
+            rows.append(int(word[0][:2], 16))        # eight pixels wide
+    if not slots:
+        raise FontError("this says it is a BDF but there are no glyphs in it")
+    return slots
+
+
+def from_vdu(blob):
+    """The glyphs of a stream of VDU 23 commands, which is how a BBC Micro is
+    told to redefine a character: the twenty three, the character, its eight
+    rows, and again."""
+    slots = {}
+    for at in range(0, len(blob), 10):
+        piece = blob[at:at + 10]
+        if len(piece) < 10 or piece[0] != 23:
+            raise FontError("this stops looking like VDU 23 commands part way in")
+        slots[piece[1]] = bytes(piece[2:])
+    return slots
+
+
+SYMBOL = re.compile(r"\bSYMBOL\s+(?!AFTER)(.+)", re.I)
+
+
+def from_symbols(written):
+    """The glyphs of an Amstrad BASIC listing, which redefines a character at
+    a time with SYMBOL: the character and then its eight rows."""
+    slots = {}
+    for line in written.splitlines():
+        found = SYMBOL.search(line)
+        if not found:
+            continue
+        values = numbers_in(found.group(1))
+        if len(values) == 1 + GLYPH_ROWS:
+            slots[values[0]] = bytes(values[1:])
+    if not slots:
+        raise FontError("this has SYMBOL in it but no character it redefines")
+    return slots
 
 
 def glyphs_of(blob, first):
@@ -285,13 +382,20 @@ def read(path, first=None, order="ascii", layout=None):
     starts, holds = LAYOUTS.get(layout, (None, None))
     with open(path, "rb") as f:
         blob = f.read()
+    written = as_text(blob)
     if blob[:len(PNG_MAGIC)] == PNG_MAGIC:
         slots = from_image(blob, holds)
         start = first if first is not None else (0 if starts is None else starts)
         slots = {slot + start: glyph for slot, glyph in slots.items()}
+    elif written is not None and written.lstrip().startswith("STARTFONT"):
+        return from_bdf(written)                # it says what each glyph is
+    elif written is not None and SYMBOL.search(written):
+        return from_symbols(written)            # and so does this
+    elif blob[:1] == b"\x17" and len(blob) % 10 == 0:
+        return from_vdu(blob)                   # and this
     else:
-        if looks_like_text(blob):
-            blob = from_listing(blob)
+        if written is not None:
+            blob = from_listing(written)
         body, said = strip_header(blob)
         start = first if first is not None else said
         if start is None:

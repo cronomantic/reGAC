@@ -318,6 +318,88 @@ def test_a_font_written_out_as_source(tmp_path, kind):
     assert glyphs[65] == bytes(a_font()[65 * 8:66 * 8]), "the A came out wrong"
 
 
+def test_a_listing_whose_comments_hold_braces(tmp_path):
+    """The one the real files caught.  These listings put the letter each row
+    draws in a comment at the end of it, so the line for the open brace has an
+    open brace in it -- and looking for the braces of a C array without taking
+    the comments out first finds that one and reads eight bytes."""
+    dump = bytes(a_font()[32 * 8:])
+    lines = []
+    for n in range(0, len(dump), 8):
+        letter = chr(32 + n // 8)
+        row = ", ".join(f"&{b:02X}" for b in dump[n:n + 8])
+        lines.append(f"\tdefb {row} ; {letter}")
+    body = "\t; Envious font, \u00a9 somebody\n" + "\n".join(lines) + "\n"
+    (tmp_path / "font.z80.asm").write_text(body, encoding="utf-8")
+    glyphs = fontfile.read(str(tmp_path / "font.z80.asm"))
+    assert len(glyphs) == 96, "the braces in the comments were taken for the font's"
+    assert glyphs[65] == bytes(a_font()[65 * 8:66 * 8])
+
+
+def test_a_bdf_says_what_each_glyph_is(tmp_path):
+    """The format that needs no layout at all: every glyph carries its own
+    number, so a font of letters in no order reads as easily as a run."""
+    font = a_font()
+    wanted = {0x41: font[0x41 * 8:0x42 * 8], 0xD1: glyph_for("Ñ", font)}
+    body = ["STARTFONT 2.1", "FONT Prueba", "SIZE 8 75 75",
+            "FONTBOUNDINGBOX 8 8 0 -1", f"CHARS {len(wanted)}"]
+    for code, glyph in wanted.items():
+        body += [f"STARTCHAR C{code:04X}", f"ENCODING {code}",
+                 "DWIDTH 8 0", "BBX 8 8 0 -1", "BITMAP"]
+        body += [f"{row:02X}" for row in glyph]
+        body.append("ENDCHAR")
+    body.append("ENDFONT")
+    (tmp_path / "font.bdf").write_text("\n".join(body) + "\n", encoding="utf-8")
+    glyphs = fontfile.read(str(tmp_path / "font.bdf"))
+    assert glyphs == {code: bytes(glyph) for code, glyph in wanted.items()}
+
+
+def test_a_stream_of_vdu_commands(tmp_path):
+    """How a BBC Micro is told to redefine a character, and how that machine's
+    file in these collections is written: the twenty three, the character, its
+    eight rows, and again."""
+    font = a_font()
+    blob = bytearray()
+    for code in (65, 66):
+        blob += bytes([23, code]) + bytes(font[code * 8:code * 8 + 8])
+    (tmp_path / "font.bbc").write_bytes(bytes(blob))
+    glyphs = fontfile.read(str(tmp_path / "font.bbc"))
+    assert glyphs[65] == bytes(font[65 * 8:66 * 8])
+    assert set(glyphs) == {65, 66}
+
+
+def test_a_basic_listing_that_redefines_characters(tmp_path):
+    """The Amstrad's, which is what its file in these collections is: a line
+    number, SYMBOL, the character and its eight rows."""
+    font = a_font()
+    lines = ["9000 REM Prueba", "9020 SYMBOL AFTER 33"]
+    drawn = {65: bytes(font[65 * 8:66 * 8]), 193: glyph_for("Á", font)}
+    for n, (code, glyph) in enumerate(drawn.items()):
+        rows = ",".join(str(b) for b in glyph)
+        lines.append(f"{9030 + n * 10} SYMBOL {code},{rows}")
+    (tmp_path / "font.bas").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    glyphs = fontfile.read(str(tmp_path / "font.bas"))
+    assert glyphs[65] == drawn[65], "the line numbers got in"
+    assert glyphs[193] == drawn[193]
+
+
+def test_a_console_font_with_a_table_of_meanings_behind_it(tmp_path):
+    """A PSF carries a table saying what each glyph means, after the glyphs.
+    It is not glyphs, and taking it for some was what made a real one come out
+    as not a whole number of letters."""
+    dump = bytes(a_font()[32 * 8:])
+    glyphs = len(dump) // 8
+    header = (bytes([0x72, 0xb5, 0x4a, 0x86]) + (0).to_bytes(4, "little")
+              + (32).to_bytes(4, "little") + (1).to_bytes(4, "little")
+              + glyphs.to_bytes(4, "little") + (8).to_bytes(4, "little")
+              + (8).to_bytes(4, "little") + (8).to_bytes(4, "little"))
+    table = b"".join(bytes([32 + n]) + b"\xff" for n in range(glyphs))
+    (tmp_path / "font.psf").write_bytes(header + dump + table)
+    read = fontfile.read(str(tmp_path / "font.psf"))
+    assert len(read) == glyphs
+    assert read[65 - 32] == bytes(a_font()[65 * 8:66 * 8])
+
+
 def test_something_that_is_not_a_font_at_all(tmp_path):
     (tmp_path / "notes.txt").write_text(
         "Este fichero no tiene nada dentro que sea una fuente.\n", encoding="utf-8")

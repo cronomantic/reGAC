@@ -148,13 +148,27 @@ Lo que sabe reconocer:
 | fuente de consola | las dos cabeceras de PSF |
 | PNG | las letras en una rejilla de celdas de ocho por ocho, leídas como se lee una página; es tinta todo lo que sea más oscuro que la mitad, así que da igual en qué dos colores esté dibujada |
 | escrita como fuente | una cabecera de C o un listado de ensamblador —Z80, 6502, x86, 68000—, que es como se publican las mismas fuentes para que las use un programa |
+| BDF | el formato estándar de fuentes de mapa de bits, y el único que dice por sí mismo qué carácter es cada glifo |
+| VDU 23 | la ristra de órdenes con que se redefine un carácter en un BBC Micro: el 23, el carácter y sus ocho filas |
+| BASIC con `SYMBOL` | lo mismo en un Amstrad CPC, que es como viene su fichero en estas colecciones |
+| fuente de consola | las dos cabeceras de PSF, tomando los glifos y no la tabla de significados que va detrás |
+| RS-DOS | el envoltorio de cinco bytes delante y cinco detrás de un CoCo |
 
-Eso último quiere decir que una fuente de [ZX Origins](https://damieng.com/typography/zx-origins/)
-entra tal cual: el `.ch8` de 768 bytes que trae cada una es un volcado normal, y
-si prefieres el `.h` o el `.asm` del mismo ZIP, también. De un listado se coge
-lo que hay entre llaves, si las hay, y si no lo que va en las líneas con una
-directiva de bytes —`db`, `defb`, `.byte`, `dc.b`—, que es lo que deja fuera el
-tamaño de `font[768]` y la dirección de un `org`.
+De un listado se coge lo que va en las líneas con una directiva de bytes —`db`,
+`defb`, `.byte`, `dc.b`— y, si no hay ninguna, lo que está entre llaves; entre
+las dos cosas queda fuera el tamaño de `font[768]` y la dirección de un `org`.
+Los comentarios se quitan **antes** de buscar las llaves, y no es un detalle:
+estos listados ponen en un comentario la letra que dibuja cada fila, así que la
+línea de la llave abierta tiene una llave abierta.
+
+**Probado con una fuente de verdad.** De un ZIP de
+[ZX Origins](https://damieng.com/typography/zx-origins/) entran, dando todos la
+misma letra: el `.ch8` de Spectrum, el `.fnt` de Atari con `order=atascii`, el
+`.64c` de C64, el `.psf`, los cinco listados de `Source`, el `.bbc`, el `.bas`
+del Amstrad, el `.bdf`, la hoja del GameBoy con `first=32` y hasta la imagen de
+muestra con `layout=ascii`. Quedan fuera el `.bin` de C64 —que son dos fuentes
+en un fichero, y hay que decir con `first=` cuál— el `.CHR` del CoCo, cuyo
+orden no conozco, y el `.fzx`, que es proporcional.
 
 **Cada letra se identifica por su casilla**, y para eso está `layout`, que dice
 de una vez por dónde empieza la hoja y cuántas casillas tiene:
