@@ -22,7 +22,12 @@
 
 import os
 
+from . import fontfile
 from .conds import CompileError, compile_line
+from .fontfile import FontError
+from .png import ImageError
+
+QUOTES = "'\""
 from .opcodes import GFX_CMDS
 
 NOWHERE = 0
@@ -373,13 +378,15 @@ class Parser:
     def font(self):
         """A typeface of the author's own, given whole or a letter at a time.
 
-        A whole one is a plain dump, eight bytes a character from `first`
-        upwards, which is what every font editor for these machines writes and
-        what the ROM of one looks like; `file` says where it is, relative to
-        this source.  A letter at a time is the entries below it, which win
-        over the file so that one glyph can be changed without redrawing the
-        rest.  A letter is named by its number or by itself: #241 and #"Ñ" are
-        the same character.
+        A whole one is a file: a dump of eight bytes a character, a console
+        font, a C64 charset with its load address, or a PNG of the letters in
+        a grid -- fontfile.py works out which and where its first letter
+        stands, and `first` and `order` are there for when it cannot.  `file`
+        is relative to this source.
+
+        A letter at a time is the entries below it, which win over the file so
+        that one glyph can be changed without redrawing the rest.  A letter is
+        named by its number or by itself: #241 and #"Ñ" are the same.
         """
         head = self.lines[self.i - 1]
         a = self.attrs(" ".join(strip_comment(head).split()[1:]))
@@ -387,18 +394,16 @@ class Parser:
         data = [0] * (self.font_chars * 8)
         whole = a.get("file")
         if whole:
-            first = int(a.get("first", 32))
             path = os.path.join(self.folder, whole.strip('"'))
+            first = int(a["first"]) if "first" in a else None
             try:
-                with open(path, "rb") as f:
-                    blob = f.read()
-            except OSError as trouble:
-                self.fail(f"cannot read the font {whole}: {trouble}")
-            if len(blob) % 8:
-                self.fail(f"a font is eight bytes a character and {whole} is "
-                          f"{len(blob)}, which is not a whole number of them")
-            data = self.room_for(data, first * 8 + len(blob))
-            data[first * 8 : first * 8 + len(blob)] = blob
+                glyphs = fontfile.read(path, first,
+                                       a.get("order", "ascii").strip(QUOTES))
+            except (OSError, FontError, ImageError) as trouble:
+                self.fail(f"the font {whole}: {trouble}")
+            for code, glyph in glyphs.items():
+                data = self.room_for(data, code * 8 + 8)
+                data[code * 8 : code * 8 + 8] = glyph
         while not self.at_section():
             st = strip_comment(self.cur()).strip()
             self.i += 1

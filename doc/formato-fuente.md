@@ -131,11 +131,27 @@ para no alterar el código al recompilar.
 
 La tipografía de la aventura, entera o letra a letra.
 
-**Entera**: un volcado normal, ocho bytes por carácter desde `first` hacia
-arriba, que es lo que escribe cualquier editor de fuentes de estas máquinas y
-la forma que tiene la ROM de una. `file` dice dónde está, relativo al fuente.
+**Entera**: `file` dice dónde está, relativo al fuente, y qué es se averigua
+mirándola.
 
-    /FONT chars=128 file="letras.bin" first=32
+    /FONT file="letras.bin"
+    /FONT file="hoja.png" first=32
+    /FONT file="charset.64c" order=c64
+
+Lo que sabe reconocer:
+
+| | |
+|---|---|
+| volcado normal | ocho bytes por carácter; 768 son los noventa y seis desde el espacio —la forma en que viene la fuente de un Spectrum—, 1024 y 2048 son ciento veintiocho y doscientos cincuenta y seis desde el cero |
+| con dirección de carga | dos bytes delante, que es como viaja un charset de C64 |
+| con cabecera de AMSDOS o +3DOS | los 128 bytes que esos sistemas ponen a todo |
+| fuente de consola | las dos cabeceras de PSF |
+| PNG | las letras en una rejilla de celdas de ocho por ocho, leídas como se lee una página; es tinta todo lo que sea más oscuro que la mitad, así que da igual en qué dos colores esté dibujada |
+
+`first` dice qué carácter es el primer glifo cuando el fichero no lo dice —un
+PNG nunca lo dice— y `order` en qué orden están, para las máquinas que no
+usan el del ASCII: `c64` guarda `@ABC...` en el cero y `atascii` pone la
+puntuación delante. Sin `order`, tal cual.
 
 **Letra a letra**: ocho bytes en hexadecimal por carácter, con el glifo como
 comentario. Ganan sobre el fichero, así que se puede cambiar una letra sin

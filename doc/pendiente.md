@@ -540,11 +540,15 @@ un Spectrum y leída de vuelta de la pantalla con su propia fuente, que es la
 única manera de saber que los códigos, los glifos, el empaquetado y la
 impresión están de acuerdo.
 
-Y para quien escriba una aventura en vez de decompilarla, **una fuente suya**:
-entera en un fichero —el volcado de ocho bytes por carácter que escribe
-cualquier editor de fuentes— o letra a letra en el propio fuente, nombrando el
-carácter por su número o por sí mismo. Lo que el autor dibuja se usa tal cual;
-sólo se compone lo que no trae.
+Y para quien escriba una aventura en vez de decompilarla, **una fuente suya**,
+en lo que la tenga: un volcado de ocho bytes por carácter, con o sin dirección
+de carga delante, con o sin la cabecera de AMSDOS, una fuente de consola PSF, o
+**un PNG con las letras en una rejilla**, que es lo que un artista prefiere
+dibujar. Se mira el fichero y se averigua qué es; `first` y `order` están para
+lo que no se pueda averiguar —un PNG no dice qué carácter es su primera celda,
+y un C64 no guarda las letras en el orden del ASCII. O letra a letra en el
+propio fuente, nombrando el carácter por su número o por sí mismo. Lo que el
+autor dibuja se usa tal cual; sólo se compone lo que no trae.
 
 **Y el juego de caracteres pasó a ser fijo**, que es lo que arregla el fallo de
 diseño que asomó al medirlo: numerando los códigos por frecuencia, al compresor

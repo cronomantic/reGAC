@@ -56,6 +56,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import emulator  # noqa: E402
 from regac.binary import BuildError, Database, Reader, S_FONT  # noqa: E402
 from regac.glyphs import glyph_for  # noqa: E402
+from regac import fontfile, png  # noqa: E402
 from regac.srcparse import SourceError, parse  # noqa: E402
 from regac.text import typed  # noqa: E402
 from test_spectrum import decode_screen, glyph_table, wrapped  # noqa: E402
@@ -245,7 +246,62 @@ def test_a_font_that_is_not_whole_characters_is_refused(tmp_path):
     text = a_source(tmp_path, font=bytes(100))
     with pytest.raises(SourceError) as complaint:
         parse(text, "juego.gac", str(tmp_path))
-    assert "eight bytes a character" in str(complaint.value)
+    assert "eight bytes a letter" in str(complaint.value)
+
+
+def test_a_font_of_a_size_nobody_uses_asks_where_it_starts(tmp_path):
+    """Sizes this knows say where their first letter is; anything else has to
+    be told, and is told so."""
+    text = a_source(tmp_path, font=bytes(8 * 40)).replace(" first=32", "")
+    with pytest.raises(SourceError) as complaint:
+        parse(text, "juego.gac", str(tmp_path))
+    assert "first=" in str(complaint.value)
+
+
+def test_the_shapes_a_font_file_can_come_in(tmp_path):
+    """A dump of the ninety six from the space up, the same with a load
+    address in front of it, the same behind an AMSDOS header, and a console
+    font: all of them the same letters in the end."""
+    plain = bytes(a_font()[32 * 8:])
+    wanted = fontfile.read(str(tmp_path / "plain.bin")) if False else None
+    for name, blob, first in (
+        ("plain.bin", plain, None),
+        ("charset.64c", bytes([0x00, 0x20]) + plain, None),
+        ("font.bin", bytes(128) + plain, None),            # AMSDOS and +3DOS
+        ("console.psf", bytes([0x36, 0x04, 0x00, 0x08]) + plain, 32),
+    ):
+        (tmp_path / name).write_bytes(blob)
+        glyphs = fontfile.read(str(tmp_path / name), first)
+        assert glyphs[65] == bytes(a_font()[65 * 8:66 * 8]), f"{name} lost its A"
+
+
+def test_a_font_kept_in_another_machines_order(tmp_path):
+    """A C64 keeps @ABC... at nought, so slot one is the A and slot two the
+    B; what comes out has them where ASCII has them."""
+    glyphs = [bytes([code] * 8) for code in range(64)]
+    (tmp_path / "c64.bin").write_bytes(b"".join(glyphs))
+    read = fontfile.read(str(tmp_path / "c64.bin"), first=0, order="c64")
+    assert read[ord("A")] == glyphs[1]
+    assert read[ord("0")] == glyphs[48]
+
+
+def test_a_sheet_of_letters_drawn_as_a_picture(tmp_path):
+    """What an artist would rather hand over: the letters in a grid of eight
+    by eight cells, ink darker than half."""
+    letters = [a_font()[code * 8:code * 8 + 8] for code in range(32, 48)]
+    rows = []
+    for line in range(8):
+        row = []
+        for glyph in letters:
+            row += [(0, 0, 0) if glyph[line] & (0x80 >> bit) else (255, 255, 255)
+                    for bit in range(8)]
+        rows.append(row)
+    png.write(str(tmp_path / "hoja.png"), rows, 1)
+    glyphs = fontfile.read(str(tmp_path / "hoja.png"), first=32)
+    for code in range(32, 48):
+        assert glyphs[code] == bytes(a_font()[code * 8:code * 8 + 8]), (
+            f"the cell for {chr(code)!r} came back wrong"
+        )
 
 
 def test_a_font_that_is_not_there_says_so(tmp_path):
