@@ -1,6 +1,6 @@
 # Pendiente
 
-Estado a 13 de septiembre de 2026, para retomarlo sin tener que reconstruir el
+Estado a 15 de septiembre de 2026, para retomarlo sin tener que reconstruir el
 contexto.
 
 ## Los gráficos, cerrados
@@ -312,8 +312,8 @@ ellas manda la máquina al BASIC en lugar de devolverla. La prueba usa
 `--tbblue-fast-boot-mode`, que es como el emulador da una máquina ya arrancada.
 
 **Lo que queda de esta máquina**: nada urgente. Guardar en fichero por el API
-de NextZXOS, si alguna vez se quiere en vez de la cinta; y el sonido, cuando
-haya.
+de NextZXOS, si alguna vez se quiere en vez de la cinta. El sonido ya está, por
+el AY compatible y con la interrupción en modo 2.
 
 ### MSX1, con la máquina entera y una cinta
 
@@ -592,6 +592,85 @@ La compresión sigue siendo la misma y la mejor de las que se midieron —pareja
 recursivas, contra el 57% de Huffman y el 84% de las abreviaturas al estilo
 PAW—, ahora entre el 50% y el 55%, y gasta las 128 parejas siempre: lo que la
 limita es el byte y no el texto.
+
+## La música, que ya suena
+
+Suena en las cuatro máquinas que tienen AY —Spectrum 128, Amstrad, MSX y
+Next—, tocada desde la interrupción mientras el bucle principal no hace nada
+con ella. Lo que se toca es de **Arkos Tracker 3**, que es lo que usa hoy
+cualquiera que componga para estas máquinas, y su reproductor es MIT como todo
+lo de `z80/`.
+
+**El reproductor viene convertido, no copiado a mano.** Los fuentes de Arkos
+están escritos para RASM y tienen tres cosas que son de RASM y no del Z80:
+las marcas `(void)` de Disark, macros que fabrican etiquetas con su argumento,
+y banderas que se asignan con `=` pero se preguntan con `IFDEF`. `arkos.py`,
+en la raíz junto a `disk.py` y `grab.py`, las quita sin tocar un solo byte de
+lo que ensambla; cuando salga una versión nueva de Arkos se vuelve a pasar. El
+AKM ocupa 1602 bytes y cuesta entre el 4 % y el 5 % de un frame de Spectrum,
+con picos del 7 % en los compases más cargados.
+
+**La interrupción, máquina por máquina.** Tres van en modo 2, porque el $0038
+es la rutina de la ROM —o directamente la base de datos, en las máquinas que
+se quedan con toda la memoria—, y el Amstrad se queda en modo 1, porque con
+las dos ROM fuera el $0038 es RAM nuestra. Cada máquina dice dónde caben la
+tabla y la rutina, en la parte de su mapa que no se mueve:
+
+| máquina | tabla | rutina | notas |
+|---|---|---|---|
+| Spectrum 128 | $BE00 | $BDBD | entre el intérprete y la ventana |
+| MSX | $BE00 | $BDBD | en la mitad alta, donde la BIOS no vuelve |
+| Next | $B000 | $B1B1 | encima de la máscara y debajo de la pila |
+| Amstrad | — | modo 1 en $0038 | RAM, con las dos ROM fuera |
+
+Ni la tabla ni la rutina viajan en el fichero. Están en un rincón al que el
+intérprete no llega, y llevarlas allí obligaría a llevar también los kilobytes
+de en medio —un minuto de nada en una cinta—, así que la rutina se ensambla
+donde va a correr, se guarda con el código y se pone en su sitio al encender
+las interrupciones.
+
+**El ritmo es un reloj y no una cuenta.** Una melodía quiere sonar cincuenta
+veces por segundo; el Amstrad interrumpe trescientas, el Spectrum y el Next
+cincuenta, y el MSX las que refresque su televisión: cincuenta en Europa y
+sesenta en Japón y América, y eso no se sabe hasta que arranca. Así que cada
+interrupción suma cincuenta a un reloj y, cuando el reloj tiene tanto como
+interrupciones da la máquina en un segundo, se le resta y se toca. Cincuenta
+entre cincuenta toca siempre, cincuenta entre trescientas una de cada seis, y
+cincuenta entre sesenta cinco de cada seis, repartidas lo mejor que permiten
+las interrupciones enteras. El MSX lee de qué televisión es en el bit 7 del
+$002B **antes** de quedarse con la máquina, que es cuando todavía hay BIOS a
+la que preguntar; la prueba lo compara con lo que dice la ROM del emulador.
+
+**Los efectos de sonido, puestos.** Un efecto de Arkos es un instrumento suelto
+que el reproductor superpone a uno de los tres canales la próxima vez que la
+interrupción lo llama: pedirlo escribe cinco bytes y vuelve, la melodía sigue
+por debajo con un canal menos, y cuando el efecto se acaba el canal vuelve a la
+melodía. Va al canal tercero, porque las melodías de estas máquinas suelen
+llevar la voz en el primero y el bajo en el segundo.
+
+**Lo que falta**, que es todo lo que toca al intérprete:
+
+- **Dónde vive la melodía.** Hoy se ensambla con el intérprete, que es lo que
+  hace que la interrupción pueda tocarla con cualquier banco en la ventana. En
+  el formato binario ya hay una sección de música reservada; cuando se use,
+  tiene que quedar en la parte residente o en un banco que no se pagine nunca,
+  y hay que decidir cuántas melodías caben.
+- **Cómo se pide desde el fuente.** Un comando para empezar una melodía, otro
+  para pararla, y otro para un efecto, con la aventura eligiendo el número. Eso
+  es opcodes nuevos y sintaxis nueva.
+- **Cuándo se calla sola.** Al grabar y cargar en cinta, seguro: el temporizado
+  no admite interrupciones. En el Amstrad hay además un detalle que no se puede
+  olvidar —el AY está detrás del mismo 8255 por el que se lee el teclado, así
+  que un barrido interrumpido a la mitad lee la fila que no es. El barrido
+  tendrá que llevarlas quitadas, y sólo en las versiones con música: volver a
+  ponerlas donde no hay rutina sería saltar a lo que haya en el $0038.
+- **Cómo la trae el autor.** Lo mismo que con las fuentes: exportar de Arkos e
+  incluir. Falta decidir si la herramienta de autoría se traga el `.aks` o sólo
+  el fuente ya exportado.
+- **El PCW no entra en nada de esto**: no tiene AY, sólo un zumbador.
+
+Las melodías no están en el repositorio, que no son nuestras: las pruebas
+piden una en `music/` y se apartan si no hay.
 
 ## Un comando para cambiar el color de la letra
 

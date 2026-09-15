@@ -18,6 +18,8 @@ Implementation of a decompiler and simple interpreter for Graphic Adventure Crea
   that was laid out so that it could not be copied.
 * grab.py: Load a disk, a tape or a snapshot on the machine it belongs to and
   write out what it left in memory, for the decompiler to read.
+* arkos.py: Turn a player that comes with Arkos Tracker into a source this
+  project's assembler reads, for the music in z80/arkos/.
 * z80: The interpreters themselves, for the Spectrum, the Amstrad CPC, the
   Amstrad PCW, the MSX and the Spectrum Next. The Spectrum ones write their own
   tape as they assemble and the Next its own .nex; the Amstrad's disk and tape,
