@@ -77,6 +77,7 @@ class SourceWriter:
         self.conds("LOW", self.ddb.get("lpcs", []))
         self.gfx()
         self.font()
+        self.music()
         return self.text()
 
     def header(self):
@@ -167,6 +168,16 @@ class SourceWriter:
                 args = " ".join(str(a) for a in inst[1:])
                 self.w(f"  {inst[0]}{' ' + args if args else ''}")
             self.w()
+
+    def music(self):
+        tunes = self.ddb.get("music") or []
+        if not tunes:
+            return
+        self.w("/MUSIC")
+        self.w("; what the tracker exported          subsong")
+        for tune in tunes:
+            self.w(f"{tune['file']:<36}{tune.get('subsong', 0)}")
+        self.w()
 
     def font(self):
         font = self.ddb.get("font", [])

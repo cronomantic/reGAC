@@ -692,66 +692,58 @@ dolería perder.
 intérprete no hay sitio en ninguna parte: en el 128 el código, lo residente de
 la base de datos y el rincón de la interrupción llegan juntos a $C000, y de las
 ocho aventuras descompiladas **sólo una** dejaba hueco para reproductor y
-melodía —y por treinta y dos bytes—. Debajo sí hay:
+melodía —y por treinta y dos bytes—. Así que cada máquina la pone donde puede:
 
-| máquina | dónde va | cuánto hay |
-|---|---|---|
-| Spectrum 128 | $6000, debajo del intérprete | 7 KB, bloque propio en la cinta |
-| MSX | encima del código, bajo el rincón de la interrupción | 7,4 KB, en el mismo bloque |
-| Next | **$4000**, en la página de lo residente | 7 KB, ya va en el `.nex` |
-| Amstrad | no cabe | — |
+| máquina | reproductor y buffer | las melodías | cuánto hay |
+|---|---|---|---|
+| Spectrum 128 | $6000, debajo del intérprete | una página propia, la siguiente a las de la base de datos | 5 KB de buffer |
+| Next | **$4000**, en la página de lo residente | dos páginas propias, de los cientos que le sobran | 4,7 KB de buffer |
+| Amstrad | **$0300**, debajo de las dos ROM | ahí mismo | 15 KB |
+| MSX | encima del código | ahí mismo | 7,4 KB |
 
 Lo del Next es lo más bonito: esta máquina dibuja en layer 2, así que los
 dieciséis kilobytes donde un Spectrum tiene la pantalla están vacíos.
 
-En el 128 la música viaja en **un bloque propio**, y en la tabla del cargador va
-*después* del bloque del intérprete y no antes: el propio cargador está ahí
-abajo, dentro de la línea BASIC en la que viajó, y un bloque que fuese primero
-le caería encima de la tabla que todavía está recorriendo.
+**Las melodías en una página, y copiadas al tocarlas.** Una melodía ensamblada
+con el intérprete cuesta su tamaño para siempre, suene o no. En las máquinas
+con bancos ahora viven en una página que no usa nadie más y la que se pide se
+copia a un buffer al arrancarla: una versión paga la melodía más gorda una vez,
+lleve las que lleve, y nada hasta que suene la primera. Lo que lo hace posible
+es que la melodía se **ensambla para el buffer y se guarda donde se guarda**,
+que es para lo que está `DISP` —el mismo truco con el que viaja la rutina de
+la interrupción—. La lista es lo único que se queda residente, porque se lee en
+cualquier momento.
 
-**El Amstrad se queda fuera de momento.** Código, base de datos y música son un
-solo tramo desde $4000 y lo que los para son las variables del firmware en
-$B100 —el firmware duerme, pero la cinta se graba por su jumpblock, así que lo
-que guarda ahí abajo tiene que seguir—. Con las ocho aventuras la más pequeña
-se queda en $A379, y 3,9 KB de música no entran. Debajo de $4000 hay dieciséis
-kilobytes libres, con las dos ROM fuera, pero **no se puede cargar nada ahí**:
-la línea BASIC que carga el juego está en el $0170 y se la cargaría encima
-mientras se ejecuta. Las salidas, por orden de lo que cuestan:
+En el 128 las melodías viajan en **un bloque propio**, y en la tabla del
+cargador va *después* del bloque del intérprete y no antes: el propio cargador
+está ahí abajo, dentro de la línea BASIC en la que viajó, y un bloque que fuese
+primero le caería encima de la tabla que todavía está recorriendo. En el Next
+van en un banco nombrado en el `.nex` —un banco que nadie nombra es un banco
+que el fichero no lleva, y lo que sale de eso es un reproductor leyendo un
+buffer lleno de ceros—.
 
-1. Un cargador propio en código máquina en vez del BASIC, que se traiga la
-   música a $0100 él mismo y luego el resto. Es lo que hacían los juegos de la
-   época.
-2. Bancos en el CPC, que tiene 128K y el formato binario ya los contempla: la
-   música a un banco, como en el 128.
-3. Dejar la música para aventuras pequeñas, que es donde está ahora: el
-   `ASSERT` del fuente dice cuáles no entran.
+**El Amstrad, que era el que no cabía**, se arregló con veinte instrucciones. La
+música no se puede cargar donde va a vivir: vive debajo de $4000 y la línea
+BASIC que carga el juego está en el $0170. Así que viaja como **fichero aparte
+con un movedor delante**: el cargador la trae al $4000, donde todavía no hay
+nada, la llama, y esas veinte instrucciones la bajan al $0300 —a salvo de la
+línea BASIC— y vuelven. Después se carga el intérprete encima y arranca, y se
+la encuentra puesta. De ser la máquina más apretada pasa a ser la que más sitio
+tiene para melodías: quince kilobytes que no quiere nadie.
 
 **Lo que falta**, que es todo lo que toca al intérprete:
 
-- **Dónde viven las melodías.** Hoy se ensamblan con el intérprete, que es lo
-  que hace que la interrupción pueda tocarlas con cualquier banco en la
-  ventana, y eso pone el techo en la memoria libre: entre 2 y 6 KB según la
-  máquina y lo gorda que sea la aventura, o sea una melodía de tamaño normal en
-  el 128, el Amstrad y el Next, y tres o cuatro en el MSX. Con subcanciones de
-  un mismo export salen más por el mismo precio. En el formato binario ya hay
-  una sección de música reservada, con la forma «una cuenta, y para cada
-  melodía dónde empieza y cuánto mide», y la cabecera lleva modo de música y
-  tamaño de buffer: con `MUSIC_COPY` el buffer residente tiene que medir lo que
-  la melodía mayor, y con `MUSIC_SLOT` la melodía se queda en un banco mapeado
-  a una ranura que el código principal no toca. Cuando eso esté, el techo pasa
-  a ser una melodía por banco y tantas como quepan en los bancos, y la lista de
-  `MUSIC_TUNE` se convierte en esa tabla.
 - **Si volver a pedir la que ya suena la reinicia o no.** Hoy la reinicia.
   `music_tune` guarda cuál está sonando, así que las dos opciones están a una
-  comparación; lo decidirá el comando cuando exista, porque entrar otra vez en
-  una habitación no debería cortar la música.
-- **El Amstrad**, según la tabla de más arriba.
+  comparación; entrar otra vez en una habitación no debería cortar la música.
 - **Guardar en la partida qué melodía sonaba.** Hoy no se guarda, así que
   cargar una partida deja sonando lo que sonara.
-- **Cómo la trae el autor.** Lo mismo que con las fuentes: exportar de Arkos e
-  incluir. Falta decidir si la herramienta de autoría se traga el `.aks` o sólo
-  el fuente ya exportado.
+- **Que la herramienta de autoría se trague el `.aks`** en vez del fuente ya
+  exportado. Hoy el autor exporta de Arkos y nombra el fichero en `/MUSIC`.
 - **El PCW no entra en nada de esto**: no tiene AY, sólo un zumbador.
+- **La sección `music` del formato binario sigue vacía.** Hoy las melodías son
+  fuente de ensamblador y las coloca el ensamblador, que es quien puede; la
+  sección queda para el día en que una melodía sea dato y no fuente.
 
 **Dos cosas que la música se lleva por delante, ya resueltas.** Grabar y cargar
 la callan y la vuelven a poner alrededor de la cinta —el temporizado de un byte
@@ -761,10 +753,16 @@ dura, porque el AY está detrás del mismo 8255 y una interrupción en mitad del
 baile deja el chip apuntando al registro de otro. Son treinta microsegundos; la
 música no se entera.
 
-Las melodías no están en el repositorio, que no son nuestras: las pruebas
-piden una en `music/` y se apartan si no hay. El fichero que el autor escribe
-es `music/tunes.asm`, con la lista de `MUSIC_TUNE` y los `include` de lo que
-haya exportado del tracker; una versión con música se ensambla con
+**Y el autor no escribe ensamblador.** La aventura dice qué música tiene en su
+propio fuente, en una sección `/MUSIC`, una línea por melodía: el fichero que
+exportó del tracker y qué subcanción tocar de él. `regac build --music-defs
+music/tunes.asm` escribe el fuentecillo que el ensamblador incluye, con la
+lista por un lado y las melodías por otro, cada una en su `MODULE` y ensamblada
+para el buffer; un fichero nombrado dos veces se incluye una vez y se apunta
+dos, que es para lo que están las subcanciones.
+
+Las melodías no están en el repositorio, que no son nuestras: las pruebas piden
+una en `music/` y se apartan si no hay. Una versión con música se ensambla con
 `-DWITH_MUSIC`, y con efectos además con `-DWITH_EFFECTS`.
 
 ## El zumbador, y el clic que hacía el original

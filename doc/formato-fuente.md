@@ -75,6 +75,7 @@ lámina. El cambio dura hasta el siguiente, no hasta el final del mensaje.
 | `/LOW`   | Condiciones de baja prioridad                               |
 | `/GFX`   | Gráficos vectoriales                                        |
 | `/FONT`  | Fuente redefinida                                           |
+| `/MUSIC` | Las melodías que tiene la aventura                          |
 
 ### `/CTL`
 
@@ -123,6 +124,24 @@ identificador. El tipo es `verb`, `noun` o `adverb`.
 
 En `/CONN` la dirección es un verbo, igual que en GAC, y se escribe con la
 palabra en lugar del número.
+
+### `/MUSIC`
+
+Una melodía por línea, en el orden en que `MUSIC` las cuenta desde cero: el
+fichero que exportó el tracker y qué subcanción tocar de él, que es la cero si
+no se dice otra cosa.
+
+    /MUSIC
+    menu.akm.asm     0
+    menu.akm.asm     1
+    cueva.akm.asm
+
+El fichero es relativo al fuente y no se lee aquí: es ensamblador, y quien lo
+lee es el ensamblador. `regac build --music-defs music/tunes.asm` escribe el
+fuentecillo que los incluye a todos con la forma que cada máquina necesita —la
+lista por un lado y las melodías por otro, cada una en su `MODULE` y ensamblada
+para el buffer—, y un fichero nombrado dos veces se incluye una sola vez y se
+apunta dos: para eso son las subcanciones.
 
 ### `/HIGH`, `/LOW`, `/LOCAL`
 

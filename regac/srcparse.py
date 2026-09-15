@@ -160,6 +160,7 @@ class Parser:
             "/LOW": lambda: self.conds("lpcs"),
             "/GFX": self.gfx,
             "/FONT": self.font,
+            "/MUSIC": self.music,
         }
         while True:
             self.skip_blank()
@@ -374,6 +375,35 @@ class Parser:
                     self.fail(f"{cmd} takes {argc} arguments")
                 insts.append([cmd] + [int(p) for p in parts[1:]])
             self.ddb["gfx"][gid] = insts
+
+    def music(self):
+        """The tunes this adventure has, one to a line, in the order MUSIC
+        counts them: the file the tracker exported and which of its subsongs
+        to play, which is nought unless it says otherwise.
+
+            /MUSIC
+            menu.akm.asm     0
+            menu.akm.asm     1
+            cueva.akm.asm
+
+        The file is relative to this source, and is not read here: it is
+        assembly, and what reads it is the assembler.  `regac build` writes
+        the little source that includes them all in the right shape.
+        """
+        tunes = self.ddb.setdefault("music", [])
+        while not self.eof() and not self.cur().lstrip().startswith("/"):
+            line = strip_comment(self.cur()).strip()
+            self.i += 1
+            if not line:
+                continue
+            pieces = line.split()
+            subsong = 0
+            if len(pieces) > 1:
+                if not pieces[-1].isdigit():
+                    self.fail(f"a tune is a file and a subsong: {line!r}")
+                subsong = int(pieces[-1])
+                pieces = pieces[:-1]
+            tunes.append({"file": " ".join(pieces), "subsong": subsong})
 
     def font(self):
         """A typeface of the author's own, given whole or a letter at a time.

@@ -182,6 +182,70 @@ SCREEN_BYTES = {"cpc": 0x4000, "plus3": 6912, "pcw": PCW_SCREEN_BYTES,
                 "msx": MSX_SCREEN_BYTES}
 
 
+def music_source(tunes, folder, out):
+    """The little source that says what tunes a build has, written from the
+    adventure's own /MUSIC.
+
+    It comes in two halves because the two live in different places: the list
+    is read at any moment and stays with the player, and the tunes themselves
+    go wherever that machine has room -- a page of their own, or under $4000,
+    or beside the player on a machine with memory to spare.  The build says
+    which half it wants where.
+
+    A file named twice is included once and pointed at twice, because that is
+    what subsongs are for: two tunes out of one export share its instruments
+    and cost a few hundred bytes instead of a few thousand.
+    """
+    where = os.path.dirname(os.path.abspath(out))
+    labels, seen = [], {}
+    for tune in tunes:
+        name = tune["file"]
+        if name not in seen:
+            seen[name] = f"tune_{len(seen)}"
+        labels.append(seen[name])
+
+    lines = [
+        "; Written by regac build from the adventure's own /MUSIC.  Run it",
+        "; again rather than editing this: what it does and why is in",
+        "; doc/pendiente.md and in z80/common/music.asm.",
+        "",
+        "                IFDEF MUSIC_LIST",
+        "music_tunes:",
+    ]
+    for label, tune in zip(labels, tunes):
+        lines.append(f"                MUSIC_TUNE {label}, {label}_end,"
+                     f" {tune.get('subsong', 0)}")
+    lines += ["music_tunes_end:", "                ENDIF", "",
+              "                IFDEF MUSIC_STORE"]
+    for name, label in seen.items():
+        whole = os.path.join(folder, name)
+        try:
+            path = os.path.relpath(whole, where)
+        except ValueError:      # different drives, so nothing relative to say
+            path = whole
+        path = path.replace("\\", "/")
+        lines += [
+            f"{label}:",
+            "                IFDEF MUSIC_PAGED",
+            "                DISP    music_buffer",
+            "                ENDIF",
+            # The tracker names an export's labels after the song, and a song
+            # nobody named is exported as Untitled: two of those in one build
+            # would be the same label twice.
+            f"                MODULE  {label}_song",
+            f'                include "{path}"',
+            "                ENDMODULE",
+            "                IFDEF MUSIC_PAGED",
+            "                ENT",
+            "                ENDIF",
+            f"{label}_end:",
+        ]
+    lines += ["                ENDIF", ""]
+    with open(out, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines))
+    return seen
+
+
 def cmd_build(args):
     """Write the binary database the 8 bit interpreter reads."""
     ddb = read_json(args.input)
@@ -194,6 +258,12 @@ def cmd_build(args):
     image = database.build()
     with open(args.output, "wb") as f:
         f.write(image)
+    tunes = ddb.get("music") or []
+    if args.music_defs:
+        songs = music_source(tunes, os.path.dirname(os.path.abspath(args.input)),
+                             args.music_defs)
+        print(f"{args.input} -> {args.music_defs}")
+        print(f"  tunes       {len(tunes)}, out of {len(songs)} exported")
     if args.defs:
         # What an assembler needs to cut the image up: where the banks start
         # and how many there are.  Which of the machine's own pages they go
@@ -483,6 +553,9 @@ def main():
         choices=sorted(BANK_SIZES),
         help="size of a memory bank, or none to keep everything resident",
     )
+    p.add_argument("--music-defs",
+                   help="write the source that says what tunes there are, for "
+                        "the assembler to include")
     p.add_argument(
         "--music-buffer",
         type=int,
