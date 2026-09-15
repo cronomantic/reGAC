@@ -141,6 +141,9 @@ read_key:
                 call    scan_keyboard
                 or      a
                 jr      z, .wait_press
+                push    af                      ; the original clicked at every
+                call    beep_click              ; key, and so does this
+                pop     af
                 ret
 
 ; Wait for a key, or for HL fiftieths of a second, whichever comes first.
@@ -262,3 +265,5 @@ key_found:      db      0
 line_ptr:       dw      0
 line_length:    db      0
 input_buffer:   ds      INPUT_MAX
+
+                include "beep.asm"

@@ -129,6 +129,9 @@ read_key:
                 call    scan_keyboard
                 or      a
                 jr      z, .wait_press
+                push    af                      ; the original clicked at every
+                call    beep_click              ; key, and so does this
+                pop     af
                 ; caps shift with zero means rub out
                 cp      '0'
                 jr      nz, .done
@@ -250,3 +253,5 @@ key_table:
                 db      'P', 'O', 'I', 'U', 'Y'
                 db      KEY_ENTER, 'L', 'K', 'J', 'H'
                 db      ' ', 0, 'M', 'N', 'B'
+
+                include "beep.asm"

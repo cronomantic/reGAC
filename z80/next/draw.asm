@@ -62,6 +62,7 @@ gfx_start_colours:
 
 set_border:
                 and     7
+                ld      (gfx_border), a ; the speaker shares this port
                 out     ($FE), a
                 ret
 

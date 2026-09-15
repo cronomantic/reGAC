@@ -40,6 +40,7 @@ gfx_start_colours:
 
                 MACRO   GFX_BORDER
                 and     7
+                ld      (gfx_border), a ; the speaker shares this port
                 out     ($FE), a
                 ENDM
 

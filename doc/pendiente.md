@@ -767,6 +767,59 @@ es `music/tunes.asm`, con la lista de `MUSIC_TUNE` y los `include` de lo que
 haya exportado del tracker; una versión con música se ensambla con
 `-DWITH_MUSIC`, y con efectos además con `-DWITH_EFFECTS`.
 
+## El zumbador, y el clic que hacía el original
+
+El manual no menciona el sonido en ninguna parte, así que había que mirar el
+código. En las cuatro instantáneas de GAC que tenemos hay **exactamente una**
+llamada al zumbador de la ROM, en el $820B, y lo que la rodea es el editor de
+línea: coge la duración de PIP —la variable del sistema que usa el clic de
+teclado de la propia ROM, y que GAC pone a 75—, pide un tono de $00FF y pita.
+O sea que **GAC hacía clic con cada tecla**, y ahora esto también.
+
+**El motor son 111 bytes**, tabla incluida. Un altavoz de un bit hace una nota
+igual en todas partes —darle la vuelta al bit, esperar, y otra vez— y lo que
+cambia es qué bit de qué puerto y qué más hay en ese puerto que no se puede
+tocar, así que cada máquina dice tres cosas: `BEEP_BIT`, `BEEP_BASE` y
+`BEEP_OUT`.
+
+| máquina | dónde está el altavoz | lo que comparte |
+|---|---|---|
+| Spectrum y Next | bit 4 del $FE | el borde, que por eso se guarda en memoria |
+| MSX | bit 7 del puerto C del 8255 | el motor del casete, la salida de cinta y el led de mayúsculas |
+| Amstrad | no tiene: el sonido es el AY | — |
+| PCW | tiene zumbador, pero no sabemos aún cómo se toca | — |
+
+Como el puerto del Spectrum no se puede leer, el borde que se puso la última
+vez se guarda en `gfx_border` y sale otra vez con cada vuelta del altavoz; si
+no, un clic dejaría el borde negro.
+
+**Cinco efectos**, que es lo que una aventura de las de entonces llegaba a
+querer: algo cogido, algo rechazado, una puerta, una caída y un aviso. Cada uno
+son tres bytes —tono de salida, cuántas vueltas dura y cuánto se mueve el tono
+en cada una—, y duran entre una vigésima y una décima de segundo. Un tono más
+grande es una nota más grave, y el paso se para en los extremos en vez de dar
+la vuelta: un blip que se salía por abajo volvía convertido en el gruñido más
+grave que hay.
+
+**`SOUND n` elige solo**: si la versión lleva el reproductor con efectos, suena
+por el AY; si no, suena por el altavoz. Los números no coinciden entre los dos
+—el banco del tracker es del autor y la tabla del zumbador es nuestra—, y eso
+es inevitable: son sonidos distintos hechos con cosas distintas.
+
+**Lo que falta aquí**:
+
+- **El PCW.** Tiene zumbador y no hemos encontrado todavía por dónde se toca;
+  el puerto $F8 del sistema recibe órdenes numeradas (9 y 10 son el motor del
+  disco) y alguna será el pitido, pero no está documentado en lo que tenemos y
+  el emulador no devuelve audio para probarlo a ciegas.
+- **El Amstrad sin música.** Ahí el único altavoz es el AY, así que `SOUND` en
+  una versión sin reproductor no hace nada. Se arregla escribiendo los
+  registros del chip a mano —el mismo baile del 8255 que ya hace el teclado—,
+  que son unas decenas de bytes.
+- **El clic con música puesta.** En el Spectrum y el MSX el altavoz es otro
+  aparato y no molesta al AY, así que suenan a la vez sin más. En el Amstrad
+  no podría ser, que es el mismo chip.
+
 ## Un comando para cambiar el color de la letra
 
 Pedido, y no hecho. La idea es tener **renglones de distintos colores**: que un

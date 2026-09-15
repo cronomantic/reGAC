@@ -892,6 +892,11 @@ op_sound:
                 IFDEF PLY_AKM_MANAGE_SOUND_EFFECTS
                 ld      a, l
                 call    sound_play
+                ELSE
+                IFDEF WITH_BEEPER
+                ld      a, l                    ; no chip playing, so the
+                call    beep_sound              ; speaker makes what it can
+                ENDIF
                 ENDIF
                 jp      vm_loop
 

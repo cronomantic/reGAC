@@ -186,3 +186,8 @@ font_first:     db      0
 font_count:     db      0
 cursor_x:       db      0
 cursor_y:       db      TEXT_TOP
+
+; What the border was last set to.  It is kept because the port it goes out on
+; cannot be read back and the speaker is another bit of it: beep.asm has to
+; put the border out again with every flip.  draw.asm writes it.
+gfx_border:     db      0

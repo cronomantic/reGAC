@@ -330,3 +330,8 @@ font_first:     db      0
 font_count:     db      0
 cursor_x:       db      0
 cursor_y:       db      0
+
+; What the border was last set to, which is the Spectrum's arrangement: the
+; port cannot be read back and the speaker is another bit of it, so beep.asm
+; puts the border out again with every flip.
+gfx_border:     db      0
