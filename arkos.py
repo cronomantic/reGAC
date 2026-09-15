@@ -36,6 +36,10 @@ together they are the difference between "include it and go" and an afternoon.
     not symbols, so those become defines -- guarded, because defining one
     twice is an error here and a shrug there.
 
+  * **A comma at the end of a list.**  One row of the period table ends with
+    one, which RASM reads as the end of the list and this assembler reads as
+    the promise of another number.  It comes off.
+
 What comes out is the same player, byte for byte, in a source this project's
 assembler reads.  Run it again when Arkos Tracker is updated:
 
@@ -55,6 +59,8 @@ ASSIGNMENT = re.compile(r"^[ \t]+([A-Za-z_][\w.]*)[ \t]*=[ \t]*(.+?)[ \t]*$")
 FLAG = re.compile(r"^[ \t]*([A-Za-z_][\w.]*)[ \t]*=[ \t]*1[ \t]*(;.*)?$")
 MARKER = re.compile(r"^(\s*)[A-Za-z_]\w* \(void\):")
 MARKER_ALONE = re.compile(r"^\s*[A-Za-z_]\w*\s*\(void\)\s*$")
+DATA_COMMA = re.compile(
+    r"^(\s*(?:db|dw|defb|defw)\s+.*?),\s*(;.*)?$", re.I)
 MACRO_START = re.compile(r"^\s*MACRO\s+([A-Za-z_]\w*)", re.I)
 MACRO_END = re.compile(r"^\s*ENDM\b", re.I)
 KEYWORDS = {"if", "ifdef", "ifndef", "assert", "else", "endif", "repeat",
@@ -70,7 +76,8 @@ def maker_of_labels(body):
 def convert(text):
     """The player, as a source this assembler reads, and what was done."""
     lines = text.splitlines()
-    out, counts = [], {"markers": 0, "variables": 0, "flags": 0, "macros": 0}
+    out, counts = [], {"markers": 0, "variables": 0, "flags": 0, "macros": 0,
+                       "commas": 0}
     makers, macro, body = set(), None, []
     for line in lines:
         start = MACRO_START.match(line)
@@ -112,6 +119,12 @@ def convert(text):
                     "                ENDIF"]
             counts["flags"] += 1
             continue
+
+        dangling = DATA_COMMA.match(line)
+        if dangling:
+            line = dangling.group(1) + ("      " + dangling.group(2)
+                                        if dangling.group(2) else "")
+            counts["commas"] += 1
 
         moved = ASSIGNMENT.match(line)
         if moved and moved.group(1).lower() not in KEYWORDS:

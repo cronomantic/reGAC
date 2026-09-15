@@ -86,9 +86,11 @@ def assemble(source, listing=None, defines=()):
 def label_address(listing, label):
     """Where a label ended up, read out of the sjasmplus listing."""
     # A listing row is line number, address, the bytes assembled there, then
-    # the source; a label may sit after its own data bytes.
+    # the source; a label may sit after its own data bytes.  The pluses say
+    # how deep in includes the line is, and eat the space before the address
+    # when there are two of them, so there may be no space at all there.
     pattern = re.compile(
-        r"^\s*\d+[+~]*\s+([0-9A-Fa-f]{4})\s+(?:[0-9A-Fa-f]{2}[.\s]+)*"
+        r"^\s*\d+[+~]*\s*([0-9A-Fa-f]{4})\s+(?:[0-9A-Fa-f]{2}[.\s]+)*"
         + re.escape(label)
         + r":"
     )

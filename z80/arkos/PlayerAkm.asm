@@ -2336,7 +2336,7 @@ PLY_AKM_PeriodTable:
 
         IFDEF PLY_AKM_HARDWARE_PSG_1789773_HZ           ;PSG running to 1789773 Hz.
 PLY_AKM_PeriodTable:
-        dw 6841, 6457, 6095, 5753, 5430, 5125, 4837, 4566, 4310, 4068, 3839, 3624,      ; Octave 0
+        dw 6841, 6457, 6095, 5753, 5430, 5125, 4837, 4566, 4310, 4068, 3839, 3624      ; Octave 0
         ENDIF
 
         IFDEF PLY_AKM_HARDWARE_PSG_1750000_HZ           ;PSG running to 1750000 Hz.
