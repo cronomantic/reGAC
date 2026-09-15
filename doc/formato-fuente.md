@@ -137,7 +137,11 @@ no se dice otra cosa.
     cueva.akm.asm
 
 El fichero es relativo al fuente y no se lee aquí: es ensamblador, y quien lo
-lee es el ensamblador. `regac build --music-defs music/tunes.asm` escribe el
+lee es el ensamblador. También vale nombrar el `.aks` del propio tracker, y
+entonces la construcción lo exporta antes —con el exportador de Arkos Tracker,
+que se busca en `tools/` o se dice en el proyecto con `music-tool`—; si no está,
+la construcción lo dice y explica qué hacer en vez de pasarle al ensamblador un
+fichero que no sabe leer. `regac build --music-defs music/tunes.asm` escribe el
 fuentecillo que los incluye a todos con la forma que cada máquina necesita —la
 lista por un lado y las melodías por otro, cada una en su `MODULE` y ensamblada
 para el buffer—, y un fichero nombrado dos veces se incluye una sola vez y se

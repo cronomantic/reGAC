@@ -475,6 +475,8 @@ op_equal:
 ; of one is a byte lost.
 op_save:
                 IFDEF WITH_MUSIC
+                call    music_state             ; a game remembers its music
+                ld      (vm_music), a
                 call    music_hush
                 ENDIF
                 ld      ix, vm_state
@@ -492,7 +494,16 @@ op_load:
                 ld      de, vm_state_end - vm_state
                 call    tape_load
                 IFDEF WITH_MUSIC
+                ; What came in says what was playing when it was saved.  If
+                ; nothing came in, what was playing a moment ago goes back on:
+                ; a load that failed should leave a game as it found it.
+                jr      nc, .as_it_was
+                ld      a, (vm_music)
+                call    music_restore
+                jr      .loaded
+.as_it_was:
                 call    music_back
+.loaded:
                 ENDIF
                 ld      a, 1
                 ld      (vm_new_room), a        ; wherever we are now, say so

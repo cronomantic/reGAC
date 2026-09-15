@@ -338,6 +338,11 @@ vm_max_weight:  db      0
 vm_state:
 vm_location:    dw      0
 vm_seed:        dw      $A55A
+; What the music was doing, which is part of a game and not of the machine: a
+; nought for silence, and otherwise the tune plus one.  It is a byte of every
+; build, with music or without, so that a game saved on one machine is the
+; same shape as a game saved on another.
+vm_music:       db      0
 vm_stack:       ds      VM_STACK_DEPTH * 2
 vm_flags:       ds      FLAG_BYTES
 vm_counters:    ds      COUNTERS

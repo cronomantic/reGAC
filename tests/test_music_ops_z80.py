@@ -66,7 +66,8 @@ CHANNEL = 2                     # the one music.asm lays effects on
 CHANNEL_BYTES = 8
 
 WATCHED = ("done_flag", "music_playing", "music_tune", "tune", "effects",
-           "last", "PLY_AKM_Track1_PtTrack", "PLY_AKM_Channel1_SoundEffectData")
+           "last", "vm_music", "PLY_AKM_Track1_PtTrack",
+           "PLY_AKM_Channel1_SoundEffectData")
 
 if pytest is not None:
     needs_tools = pytest.mark.skipif(
@@ -191,6 +192,40 @@ def test_a_tune_the_build_has_not_got_is_let_alone():
 
 
 @needs_tools
+def test_a_saved_game_remembers_what_was_playing():
+    """What music was on is part of a game and not of the machine, so SAVE
+    writes it out with the flags and the counters.
+
+    Only the writing can be watched here: the emulator plays tapes and does
+    not record them, so there is no reading a game back on this machine --
+    which is why what LOAD does with the byte is three instructions and a
+    routine of four, and why they are kept that small.
+    """
+    watch = run(["MUSIC 0 SAVE END"])
+    try:
+        time.sleep(0.3)
+        assert watch.session.read(watch.where["vm_music"], 1)[0] == 1, (
+            "a game saved while the first tune played should say so: what is"
+            " written is the tune and one, so that nought can mean silence"
+        )
+        assert watch.playing() == 1, (
+            "the music was hushed for the tape and never came back"
+        )
+    finally:
+        watch.session.close()
+
+    watch = run(["MUSIC 0 QUIET SAVE END"])
+    try:
+        time.sleep(0.3)
+        assert watch.session.read(watch.where["vm_music"], 1)[0] == 0, (
+            "a game saved in silence should say that too"
+        )
+        assert watch.playing() == 0, "and should still be silent afterwards"
+    finally:
+        watch.session.close()
+
+
+@needs_tools
 def test_a_machine_without_music_reads_them_and_carries_on():
     """The same conditions on a build with no sound chip and no player: the
     three opcodes must take their argument and get out of the way."""
@@ -214,5 +249,7 @@ if __name__ == "__main__":
     print("SOUND lays an effect over the tune")
     test_a_tune_the_build_has_not_got_is_let_alone()
     print("a tune the build has not got is let alone")
+    test_a_saved_game_remembers_what_was_playing()
+    print("a saved game remembers what was playing")
     test_a_machine_without_music_reads_them_and_carries_on()
     print("a machine without music reads them and carries on")

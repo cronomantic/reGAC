@@ -21,7 +21,9 @@
 """ReGAC: convert between the JSON database and the editable source format."""
 
 import argparse
+import shlex
 import shutil
+import subprocess
 import json
 import os
 import sys
@@ -182,7 +184,56 @@ SCREEN_BYTES = {"cpc": 0x4000, "plus3": 6912, "pcw": PCW_SCREEN_BYTES,
                 "msx": MSX_SCREEN_BYTES}
 
 
-def music_source(tunes, folder, out):
+# What Arkos Tracker's own exporter is called, for an author who would rather
+# name their tracker's file than export it by hand.  It is looked for in
+# tools/, where this project keeps the things it did not write -- the
+# assembler and the emulator are there too -- and a project may name another
+# command instead.
+AKS_EXPORTER = "SongToAkm"
+
+
+def exporter(root, tree, named=None):
+    """The command that turns a tracker's own file into assembly, or None."""
+    if named:
+        return shlex.split(named)
+    for folder in (os.path.join(root, "tools"), os.path.join(tree, "tools")):
+        for suffix in (".exe", ""):
+            path = os.path.join(folder, AKS_EXPORTER + suffix)
+            if os.path.exists(path):
+                return [path]
+    return None
+
+
+def exported(name, folder, out, tool):
+    """Where the assembly for one tune is.
+
+    A file the tracker has already exported is used where it stands.  The
+    tracker's own file is converted first, which is the whole of what an
+    author has to do by hand otherwise, and needs Arkos Tracker's exporter:
+    without it the build says so and says what to do instead, rather than
+    failing somewhere further on with a file the assembler cannot read.
+    """
+    if not name.lower().endswith(".aks"):
+        return os.path.join(folder, name)
+    if tool is None:
+        raise ProjectError(
+            f"{name} is a tracker's own file, and turning one into assembly "
+            f"needs Arkos Tracker's exporter: put {AKS_EXPORTER} in tools/, or "
+            f"say music-tool in the project, or export the song from the "
+            f"tracker yourself and name the .asm in /MUSIC"
+        )
+    made = os.path.join(out, os.path.splitext(os.path.basename(name))[0] + ".asm")
+    done = subprocess.run(tool + [os.path.join(folder, name), made],
+                          capture_output=True, text=True)
+    if done.returncode or not os.path.exists(made):
+        raise ProjectError(
+            f"{' '.join(tool)} could not export {name}:\n"
+            + (done.stderr or done.stdout).strip()
+        )
+    return made
+
+
+def music_source(tunes, folder, out, tool=None):
     """The little source that says what tunes a build has, written from the
     adventure's own /MUSIC.
 
@@ -201,8 +252,9 @@ def music_source(tunes, folder, out):
     for tune in tunes:
         name = tune["file"]
         if name not in seen:
-            seen[name] = f"tune_{len(seen)}"
-        labels.append(seen[name])
+            seen[name] = (f"tune_{len(seen)}",
+                          exported(name, folder, where, tool))
+        labels.append(seen[name][0])
 
     lines = [
         "; Written by regac build from the adventure's own /MUSIC.  Run it",
@@ -217,8 +269,7 @@ def music_source(tunes, folder, out):
                      f" {tune.get('subsong', 0)}")
     lines += ["music_tunes_end:", "                ENDIF", "",
               "                IFDEF MUSIC_STORE"]
-    for name, label in seen.items():
-        whole = os.path.join(folder, name)
+    for label, whole in seen.values():
         try:
             path = os.path.relpath(whole, where)
         except ValueError:      # different drives, so nothing relative to say
@@ -260,8 +311,13 @@ def cmd_build(args):
         f.write(image)
     tunes = ddb.get("music") or []
     if args.music_defs:
-        songs = music_source(tunes, os.path.dirname(os.path.abspath(args.input)),
-                             args.music_defs)
+        root = os.path.dirname(os.path.abspath(args.input))
+        tree = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        try:
+            songs = music_source(tunes, root, args.music_defs,
+                                 exporter(root, tree, args.music_tool))
+        except ProjectError as e:
+            sys.exit(f"ERROR: {e}")
         print(f"{args.input} -> {args.music_defs}")
         print(f"  tunes       {len(tunes)}, out of {len(songs)} exported")
     if args.defs:
@@ -434,6 +490,11 @@ def cmd_make(args):
     # The adventure and its loading screens sit beside the project file; the
     # interpreters sit where reGAC itself is installed.
     tree = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    try:
+        music = make_music(ddb, root, tree, project.get("effects"),
+                           project.get("music-tool"))
+    except ProjectError as e:
+        sys.exit(f"ERROR: {e}")
     wanted = args.target or sorted(project["targets"])
     for which in wanted:
         settings = project["targets"].get(which)
@@ -441,14 +502,38 @@ def cmd_make(args):
             sys.exit(f"ERROR: the project says nothing about {which}")
         try:
             written = make_one(TARGETS[which], settings, ddb, name, root, output,
-                               tree)
+                               tree, music)
         except ProjectError as e:
             sys.exit(f"ERROR: {which}: {e}")
         print(f"{which:12} -> " + ", ".join(
             os.path.relpath(path, output) for path in written))
 
 
-def make_one(target, settings, ddb, name, root, output, where_regac_is):
+def make_music(ddb, root, where_regac_is, effects=None, tool=None):
+    """Put what the adventure says about its music where the assembler looks.
+
+    The author's part is a line a tune in the adventure's own /MUSIC and the
+    files the tracker exported; the rest is written here.  Nothing is copied
+    but the bank of effects, which is small and has a fixed name in the
+    builds: the tunes stay where the author keeps them and are named by path.
+    """
+    tunes = ddb.get("music") or []
+    if not tunes:
+        return []
+    folder = os.path.join(where_regac_is, "music")
+    os.makedirs(folder, exist_ok=True)
+    music_source(tunes, root, os.path.join(folder, "tunes.asm"),
+                 exporter(root, where_regac_is, tool))
+    defines = ["WITH_MUSIC"]
+    if effects:
+        shutil.copyfile(os.path.join(root, effects),
+                        os.path.join(folder, "effects.asm"))
+        defines.append("WITH_EFFECTS")
+    return defines
+
+
+def make_one(target, settings, ddb, name, root, output, where_regac_is,
+             music=()):
     """One machine, end to end: its database, its interpreter, its medium."""
     tree = os.path.join(where_regac_is, target.folder)
     database = write_database(
@@ -459,7 +544,9 @@ def make_one(target, settings, ddb, name, root, output, where_regac_is):
         defs=os.path.join(tree, target.defs) if target.defs else None,
     )
     screen = None
-    defines = []
+    defines = list(music) if target.music is not None else []
+    if music and target.music is None:
+        print(f"  {target.machine:12} has no sound chip: the music is left out")
     if settings.get("screen"):
         screen = screen_for(target, settings["screen"], root)
         if target.screen_when == "assembly":
@@ -495,8 +582,14 @@ def make_one(target, settings, ddb, name, root, output, where_regac_is):
         image = f.read()
     banks = banks_of(image) if target.defs else None
     load = LOADS_AT[target.release]
+    tunes = None
+    if defines and target.music:
+        # A machine whose music is a file of its own: the Amstrad, whose music
+        # lives where nothing can be loaded and travels with a mover in front.
+        with open(os.path.join(tree, target.music), "rb") as f:
+            tunes = f.read()
     written, _ = write_media(target.release, code, where, name, load, load,
-                             screen, boot, banks, image)
+                             screen, boot, banks, image, tunes)
     return written
 
 
@@ -553,6 +646,9 @@ def main():
         choices=sorted(BANK_SIZES),
         help="size of a memory bank, or none to keep everything resident",
     )
+    p.add_argument("--music-tool",
+                   help="the command that turns a tracker's own file into "
+                        "assembly, if the tunes are named as .aks")
     p.add_argument("--music-defs",
                    help="write the source that says what tunes there are, for "
                         "the assembler to include")

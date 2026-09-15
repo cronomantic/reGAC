@@ -731,19 +731,32 @@ línea BASIC— y vuelven. Después se carga el intérprete encima y arranca, y 
 la encuentra puesta. De ser la máquina más apretada pasa a ser la que más sitio
 tiene para melodías: quince kilobytes que no quiere nadie.
 
-**Lo que falta**, que es todo lo que toca al intérprete:
+**Tres decisiones tomadas**, por si se vuelven a discutir:
 
-- **Si volver a pedir la que ya suena la reinicia o no.** Hoy la reinicia.
-  `music_tune` guarda cuál está sonando, así que las dos opciones están a una
-  comparación; entrar otra vez en una habitación no debería cortar la música.
-- **Guardar en la partida qué melodía sonaba.** Hoy no se guarda, así que
-  cargar una partida deja sonando lo que sonara.
-- **Que la herramienta de autoría se trague el `.aks`** en vez del fuente ya
-  exportado. Hoy el autor exporta de Arkos y nombra el fichero en `/MUSIC`.
+- **`MUSIC n` arranca esa melodía siempre**, aunque ya esté sonando. Es lo
+  simple y lo predecible; una aventura que no quiera cortarla se guarda una
+  bandera, que es lo que ya hace para todo lo demás.
+- **La partida guarda qué sonaba**, porque la música es del juego y no de la
+  máquina: un byte junto a las banderas y los contadores —cero si silencio, y
+  si no la melodía más uno—, el mismo byte en todas las versiones, con música o
+  sin ella, para que una partida tenga la misma forma en todas partes. `LOAD`
+  lo obedece; si la carga falla, vuelve lo que sonaba antes.
+- **Lo del autor es una línea por melodía y `regac make`.** La aventura dice
+  las suyas en `/MUSIC`, el proyecto dice cuál es el banco de efectos, y de ahí
+  en adelante no hay que escribir ensamblador ni pasar opciones.
+
+**Lo que falta:**
+
+- **El +3 no lleva música todavía**, aunque su máquina es la misma que la del
+  128: su versión es la de disco (`game3.asm`) y no se le ha puesto el bloque.
 - **El PCW no entra en nada de esto**: no tiene AY, sólo un zumbador.
 - **La sección `music` del formato binario sigue vacía.** Hoy las melodías son
   fuente de ensamblador y las coloca el ensamblador, que es quien puede; la
   sección queda para el día en que una melodía sea dato y no fuente.
+- **El exportador de Arkos no lo hemos probado de verdad.** El gancho está
+  —`music-tool`, o `SongToAkm` en `tools/`— y se prueba con un doble, pero
+  nadie ha corrido aquí el binario real ni ha comprobado que sus argumentos
+  sean `entrada salida`. Si no lo son, se dice en `music-tool` y ya está.
 
 **Dos cosas que la música se lleva por delante, ya resueltas.** Grabar y cargar
 la callan y la vuelven a poner alrededor de la cinta —el temporizado de un byte

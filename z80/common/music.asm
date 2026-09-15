@@ -171,6 +171,25 @@ music_back:
                 ld      a, (music_hushed_tune)
                 jp      music_start
 
+; What is playing, as the one byte a saved game keeps: nought for silence, and
+; otherwise the tune and one.
+; Corrupts: AF
+music_state:
+                ld      a, (music_playing)
+                or      a
+                ret     z
+                ld      a, (music_tune)
+                inc     a
+                ret
+
+; And back again, from a game just loaded.
+; Corrupts: everything
+music_restore:
+                or      a
+                jr      z, music_stop
+                dec     a
+                jp      music_start
+
 ; One interrupt: fifty more on the clock, and the tune played if that is
 ; enough.  On a machine that interrupts oftener than the music wants, this is
 ; where the extra ones go.

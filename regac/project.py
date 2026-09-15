@@ -71,7 +71,8 @@ class Target:
 
     def __init__(self, machine, folder, source, database, banks="none",
                  defs=None, media=(), release=None, binary=None, boot=None,
-                 screen_bytes=0, screen_when="release", scales=(1,)):
+                 screen_bytes=0, screen_when="release", scales=(1,),
+                 music=""):
         self.machine = machine          # what regac build calls it
         self.folder = folder            # where its interpreter lives
         self.source = source            # and which file of it to assemble
@@ -85,6 +86,11 @@ class Target:
         self.screen_bytes = screen_bytes
         self.screen_when = screen_when  # "assembly" or "release"
         self.scales = scales            # the widths a picture may be drawn at
+        # Whether this machine can play a tune at all, and if its music
+        # travels as a file of its own, what the assembler calls it.  A
+        # machine with no sound chip says None and the music is left out of
+        # it; one that carries its music inside the interpreter says "".
+        self.music = music
 
     def at(self, *names):
         return os.path.join(self.folder, *names)
@@ -101,38 +107,45 @@ NEXT = os.path.join("z80", "next")
 # is put together afterwards by regac release.
 TARGETS = {
     "spectrum48": Target(
+        music=None,
         machine="spectrum48", folder=SPECTRUM, source="game.asm",
         database="game.rgac", media=("game.tap",),
         screen_bytes=6912, screen_when="assembly",
     ),
     "spectrum128": Target(
+        music="",
         machine="spectrum128", folder=SPECTRUM, source="game128.asm",
         database="game128.rgac", banks="16k", defs="banks.inc",
         media=("game128.tap",),
         screen_bytes=6912, screen_when="assembly",
     ),
     "plus3": Target(
+        music=None,
         machine="spectrum128", folder=SPECTRUM, source="game3.asm",
         database="game3.rgac", banks="16k", defs="banks3.inc",
         release="plus3", binary="game3_code.bin", boot="game3_boot.bin",
         screen_bytes=6912, screen_when="assembly",
     ),
     "cpc": Target(
+        music="music.bin",
         machine="cpc", folder=CPC, source="game.asm", database="game.rgac",
         release="cpc", binary="game.bin",
         screen_bytes=0x4000,
     ),
     "next": Target(
+        music="",
         machine="next", folder=NEXT, source="game.asm", database="game.rgac",
         banks="16k", defs="banks.inc", media=("game.nex",),
         screen_bytes=NEXT_SCREEN_BYTES, screen_when="assembly",
     ),
     "msx": Target(
+        music="",
         machine="msx", folder=MSX, source="game.asm", database="game.rgac",
         release="msx", binary="game.bin",
         screen_bytes=MSX_SCREEN_BYTES,
     ),
     "pcw": Target(
+        music=None,
         machine="pcw", folder=PCW, source="game.asm", database="game.rgac",
         banks="16k", defs="banks.inc",
         release="pcw", binary="game_code.bin", boot="boot.bin",
@@ -143,7 +156,14 @@ TARGETS = {
 # What a target may say for itself, and nothing else: a name that is not here
 # is a mistake, and saying so beats building the wrong thing quietly.
 TARGET_KEYS = {"banks", "screen", "scale", "music-buffer"}
-PROJECT_KEYS = {"name", "source", "output", "targets"}
+PROJECT_KEYS = {"name", "source", "output", "targets", "effects",
+                "music-tool"}
+
+# `effects` is the bank of sound effects the tracker exported, if there is
+# one, and `music-tool` the command that turns a tracker's own file into
+# assembly, for an author who would rather name the .aks than export it.
+# What tunes there are the adventure says in its own /MUSIC and not here,
+# because they are of the adventure and not of the build.
 
 
 def read(path):
