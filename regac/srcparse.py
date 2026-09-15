@@ -21,6 +21,7 @@
 """Reader for the ReGAC source format: source text -> database dictionary."""
 
 import os
+import re
 
 from . import fontfile
 from .conds import CompileError, compile_line, nearest
@@ -28,7 +29,7 @@ from .fontfile import FontError
 from .png import ImageError
 
 QUOTES = "'\""
-from .opcodes import GFX_CMDS
+from .opcodes import BY_NAME, GFX_CMDS
 
 NOWHERE = 0
 CARRIED = 255
@@ -160,32 +161,119 @@ EVERY_LABEL = {label for labels in MACHINE_LABELS.values() for label in labels}
 IF = ".if"
 ELSE = ".else"
 END = ".end"
+DEF = ".def"
+INCLUDE = ".include"
+DIRECTIVES = (IF, ELSE, END, DEF, INCLUDE)
+
+# What a name may look like, which is what an assembler would allow: letters,
+# digits and underscores, and not beginning with a digit.
+NAME = re.compile(r"[A-Za-z_]\w*$")
+MOST_INCLUDES = 16              # deep enough for anybody, shallow enough to
+                                # catch a file that takes itself in
 
 
 def directive(line):
     """The word a line begins with, when it is one of ours."""
     first = line.strip().split(";", 1)[0].split()
-    if first and first[0].lower() in (IF, ELSE, END):
+    if first and first[0].lower() in DIRECTIVES:
         return first[0].lower()
     return None
 
 
-def for_machine(text, machine=None, name="adventure"):
-    """The source with the lines another machine was to have taken out.
+def words_of(line):
+    """What a directive line says, without its comment."""
+    return line.strip().split(";", 1)[0].split()
 
-    The lines are not thrown away but blanked, so that everything said about
-    this file afterwards -- every error, in every section -- still counts the
-    lines the way the author wrote them.
+
+def read_source(text, name, folder, machine, defs=None, lines=None,
+                origins=None, seen=()):
+    """Everything that happens to a source before a section has seen it.
+
+    Three things, and they are done in one pass because they are the same
+    kind of thing: lines kept back for other machines, names given to numbers,
+    and files taken in.  What comes back is the lines, where each of them
+    came from, and the names.
+
+    The lines kept back are blanked rather than thrown away, and every line
+    remembers the file and the number it had there, so that a mistake in a
+    file that was included says that file and that line.
     """
     labels = set(MACHINE_LABELS.get(machine, ())) if machine else set()
-    out, keeping = [], []          # a stack of (taking, taken already)
+    lines = [] if lines is None else lines
+    origins = [] if origins is None else origins
+    defs = {} if defs is None else defs
+    keeping = []                   # a stack of (taking, taken already)
+
+    def keep(line, number):
+        lines.append(line)
+        origins.append((name, number))
+
     for number, line in enumerate(text.splitlines(), 1):
         word = directive(line)
+        taking = all(t for t, _ in keeping)
         if word is None:
-            out.append(line if all(taking for taking, _ in keeping) else "")
+            keep(line if taking else "", number)
+            continue
+        if word == DEF:
+            if taking:
+                said = words_of(line)
+                if len(said) != 3:
+                    raise SourceError(pointed(
+                        name, number, ".def gives a name to a number: "
+                        ".def PUERTA_ABIERTA 5", line))
+                _, given, value = said
+                if not NAME.match(given):
+                    raise SourceError(pointed(
+                        name, number,
+                        f"{given!r} is not a name: letters, digits and "
+                        f"underscores, and not starting with a digit",
+                        line, line.find(given) + 1))
+                if given in BY_NAME or given.upper() in GFX_CMDS:
+                    raise SourceError(pointed(
+                        name, number,
+                        f"{given!r} is a word of the language already",
+                        line, line.find(given) + 1))
+                try:
+                    defs[given] = int(value, 0)
+                except ValueError:
+                    if value not in defs:
+                        raise SourceError(pointed(
+                            name, number,
+                            f"{value!r} is neither a number nor a name given "
+                            f"to one", line, line.find(value) + 1,
+                            nearest(value, defs))) from None
+                    defs[given] = defs[value]
+            keep("", number)
+            continue
+        if word == INCLUDE:
+            if taking:
+                said = words_of(line)
+                if len(said) != 2:
+                    raise SourceError(pointed(
+                        name, number,
+                        '.include takes one file: .include "comun.gac"', line))
+                wanted = said[1].strip('"\'')
+                whole = os.path.normpath(os.path.join(folder, wanted))
+                if len(seen) >= MOST_INCLUDES or whole in seen:
+                    raise SourceError(pointed(
+                        name, number,
+                        f"{wanted} is being included from itself", line))
+                try:
+                    with open(whole, encoding="utf-8") as f:
+                        inside = f.read()
+                except OSError as e:
+                    raise SourceError(pointed(
+                        name, number, f"{wanted} cannot be read: {e.strerror}",
+                        line)) from None
+                keep("", number)
+                read_source(inside, os.path.basename(whole),
+                            os.path.dirname(whole) or ".", machine, defs,
+                            lines, origins, tuple(seen) + (whole,))
+                continue
+            keep("", number)
             continue
         if word == IF:
-            wanted = line.strip().split(";", 1)[0].split()[1:]
+            wanted = words_of(line)[1:]
             if not wanted:
                 raise SourceError(f"{name}:{number}: .if what?  Name a machine")
             strange = [w for w in wanted if w.lower() not in EVERY_LABEL]
@@ -202,26 +290,38 @@ def for_machine(text, machine=None, name="adventure"):
                     f"machines, so it has to be read for one of them: say "
                     f"which with -m"
                 )
-            taking = any(w.lower() in labels for w in wanted)
-            keeping.append([taking, taking])
+            keeping.append([any(w.lower() in labels for w in wanted)] * 2)
         elif word == ELSE:
             if not keeping:
                 raise SourceError(f"{name}:{number}: .else without .if")
-            taking, taken = keeping[-1]
+            was, taken = keeping[-1]
             keeping[-1] = [not taken, True]
         else:
             if not keeping:
                 raise SourceError(f"{name}:{number}: .end without .if")
             keeping.pop()
-        out.append("")
+        keep("", number)
     if keeping:
         raise SourceError(f"{name}: a .if was never ended")
-    return "\n".join(out)
+    return lines, origins, defs
+
+
+def for_machine(text, machine=None, name="adventure"):
+    """Just the lines, for anything that only wants to see what a machine
+    gets."""
+    lines, _, _ = read_source(text, name, ".", machine)
+    return "\n".join(lines)
 
 
 class Parser:
-    def __init__(self, text, name="adventure", folder=None):
-        self.lines = text.splitlines()
+    def __init__(self, lines, origins=None, defs=None, name="adventure",
+                 folder=None):
+        self.lines = list(lines)
+        # Where each line came from, which is not always this file: a line of
+        # an included one says so, and says its own number there.
+        self.origins = list(origins) if origins else [
+            (name, n) for n in range(1, len(self.lines) + 1)]
+        self.defs = dict(defs or {})    # the names given to numbers
         self.i = 0
         self.name = name
         self.folder = folder or "."     # what a file= is relative to
@@ -264,13 +364,40 @@ class Parser:
         """Stop, saying where and showing the line.
 
         Most of the time the line at fault is the one being read; the sections
-        that take a whole entry at once know better and say which.
+        that take a whole entry at once know better and say which.  What is
+        said is where the author wrote it, which for an included file is that
+        file and its own numbering.
         """
         if lineno is None:
             lineno = self.i + 1
         if line is None:
             line = self.lines[lineno - 1] if lineno <= len(self.lines) else None
-        raise SourceError(pointed(self.name, lineno, msg, line, column, meant))
+        where, number = self.where_from(lineno)
+        raise SourceError(pointed(where, number, msg, line, column, meant))
+
+    def where_from(self, lineno):
+        """The file and the line number a line of ours was written at."""
+        if 1 <= lineno <= len(self.origins):
+            return self.origins[lineno - 1]
+        return self.name, lineno
+
+    def number(self, word, what="a number", lineno=None, line=None):
+        """A number, written as one or as a name that was given to one.
+
+        The line is worth passing where the section has it: a loop that has
+        already stepped on knows which line it was reading and the finger goes
+        under the word rather than nowhere.
+        """
+        try:
+            return int(str(word), 0)
+        except ValueError:
+            pass
+        if word in self.defs:
+            return self.defs[word]
+        column = self.starts_at(line, str(word)) if line is not None else None
+        self.fail(f"{word!r} is not {what}, and no .def gives it one",
+                  column=column, meant=nearest(word, self.defs),
+                  lineno=lineno, line=line)
 
     @staticmethod
     def starts_at(line, word=None):
@@ -328,8 +455,8 @@ class Parser:
         for lid, exits in self.pending_exits.items():
             resolved = []
             for word, dest in exits:
-                if word.isdigit():
-                    vid = int(word)
+                if word.isdigit() or word in self.defs:
+                    vid = self.number(word, "a verb")
                 elif word in self.ddb["verbs"]:
                     vid = self.ddb["verbs"][word]
                 else:
@@ -353,7 +480,8 @@ class Parser:
 
     def ctl(self):
         while not self.at_section():
-            st = strip_comment(self.cur()).strip()
+            raw, lineno = self.cur(), self.i + 1
+            st = strip_comment(raw).strip()
             self.i += 1
             if not st:
                 continue
@@ -370,9 +498,11 @@ class Parser:
                 # the adventure's own font.  See regac/glyphs.py.
                 self.charset = value
             elif key == "start":
-                self.ddb["init_loc"] = int(value)
+                self.ddb["init_loc"] = self.number(
+                    value, "a room", lineno, raw)
             elif key == "width":
-                self.width = int(value)
+                self.width = self.number(value, "a number",
+                                         lineno, raw)
             elif key == "punct":
                 self.ddb["punctuation"] = parse_strings(value)
             elif key == "sep":
@@ -395,7 +525,8 @@ class Parser:
                 self.fail("a vocabulary entry is: word id type",
                           column=self.starts_at(raw), lineno=self.i,
                           line=raw)
-            word, wid, kind = parts[0], int(parts[1]), parts[2].lower()
+            word, kind = parts[0], parts[2].lower()
+            wid = self.number(parts[1], "a number for a word")
             if kind not in buckets:
                 self.fail(f"there is no word type called {kind!r}",
                           column=self.starts_at(raw, parts[2]),
@@ -421,7 +552,7 @@ class Parser:
             if not st.startswith("#"):
                 self.fail(f"expected an entry starting with #, found {st[:32]!r}")
             head = strip_comment(st[1:]).split(None, 1)
-            eid = int(head[0])
+            eid = self.number(head[0], "the number of an entry")
             rest = head[1] if len(head) > 1 else ""
             self.i += 1
             body = []
@@ -449,8 +580,8 @@ class Parser:
             start = a.get("start", "0")
             start = {"nowhere": NOWHERE, "carried": CARRIED}.get(start, start)
             self.ddb["objects"][oid] = {
-                "weight": int(a.get("weight", 0)),
-                "initial_loc": int(start),
+                "weight": self.number(a.get("weight", 0), "a weight"),
+                "initial_loc": self.number(start, "a room"),
                 "name": join_text(text_of(b) for b in body),
             }
 
@@ -458,7 +589,7 @@ class Parser:
         parts = strip_comment(head).split()
         if len(parts) < 2 or not parts[1].startswith("#"):
             self.fail("a location header is: /LOC #id [gfx=n]")
-        lid = int(parts[1][1:])
+        lid = self.number(parts[1][1:], "the number of a room")
         a = self.attrs(" ".join(parts[2:]))
         self.i += 1
         desc = []
@@ -466,7 +597,7 @@ class Parser:
             desc.append(text_of(self.cur()))
             self.i += 1
         self.ddb["locations"][lid] = {
-            "graphic_id": int(a.get("gfx", 0)),
+            "graphic_id": self.number(a.get("gfx", 0), "a picture"),
             "exits": [],
             "desc": join_text(desc),
         }
@@ -493,7 +624,7 @@ class Parser:
             parts = st.split()
             if len(parts) != 2:
                 self.fail("a connection is: direction destination")
-            exits.append((parts[0], int(parts[1])))
+            exits.append((parts[0], self.number(parts[1], "a room")))
         if exits:
             self.pending_exits[lid] = exits
 
@@ -507,7 +638,7 @@ class Parser:
                 continue
             raw = self.lines[lineno - 1]
             try:
-                code.extend(compile_line(st))
+                code.extend(compile_line(st, self.defs))
             except CompileError as e:
                 # The compiler counts the columns of what it was given, which
                 # is the line with its comment cut off and its indent gone, so
@@ -545,7 +676,9 @@ class Parser:
                               f"{len(parts) - 1}",
                               column=self.starts_at(raw, parts[0]),
                               lineno=lineno, line=raw)
-                insts.append([cmd] + [int(p) for p in parts[1:]])
+                insts.append([cmd] + [self.number(p, "a number for a "
+                                                  "drawing command")
+                                      for p in parts[1:]])
             self.ddb["gfx"][gid] = insts
 
     def music(self):
@@ -564,7 +697,8 @@ class Parser:
         """
         tunes = self.ddb.setdefault("music", [])
         while not self.eof() and not self.cur().lstrip().startswith("/"):
-            line = strip_comment(self.cur()).strip()
+            raw, lineno = self.cur(), self.i + 1
+            line = strip_comment(raw).strip()
             self.i += 1
             if not line:
                 continue
@@ -573,7 +707,8 @@ class Parser:
             if len(pieces) > 1:
                 if not pieces[-1].isdigit():
                     self.fail(f"a tune is a file and a subsong: {line!r}")
-                subsong = int(pieces[-1])
+                subsong = self.number(pieces[-1], "a subsong",
+                                      lineno, raw)
                 pieces = pieces[:-1]
             tunes.append({"file": " ".join(pieces), "subsong": subsong})
 
@@ -651,4 +786,6 @@ def parse(text, name="adventure", folder=None, machine=None):
     The machine matters only to a source that keeps some lines for some of
     them; one that does not is the same adventure whoever asks.
     """
-    return Parser(for_machine(text, machine, name), name, folder).parse()
+    folder = folder or "."
+    lines, origins, defs = read_source(text, name, folder, machine)
+    return Parser(lines, origins, defs, name, folder).parse()

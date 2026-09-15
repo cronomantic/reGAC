@@ -183,8 +183,9 @@ def tokenize(text):
 
 
 class _Assembler:
-    def __init__(self, tokens):
+    def __init__(self, tokens, defs=None):
         self.tokens = tokens
+        self.defs = defs or {}          # the names a .def gave to numbers
         self.pos = 0
         self.code = []
 
@@ -255,10 +256,13 @@ class _Assembler:
         if tok.lstrip("-").isdigit():
             self.emit("PUSH", int(tok))
             return
+        if tok in self.defs:
+            self.emit("PUSH", self.defs[tok])
+            return
         op = _OPS.get(tok)
         if op is None:
             raise CompileError(f"unknown word {tok!r}", at,
-                               nearest(tok, _OPS))
+                               nearest(tok, list(_OPS) + list(self.defs)))
         if op.form == "nullary":
             self.emit(op.name)
             return
@@ -270,16 +274,20 @@ class _Assembler:
             f"{op.name} goes between two things, so it cannot start one", at)
 
 
-def compile_line(text):
-    """Compile one source condition line into bytecode instructions."""
-    return _Assembler(tokenize(text)).assemble()
+def compile_line(text, defs=None):
+    """Compile one source condition line into bytecode instructions.
+
+    `defs` are the names a source gave to numbers with .def, which stand
+    wherever a number would.
+    """
+    return _Assembler(tokenize(text), defs).assemble()
 
 
-def compile_block(lines):
+def compile_block(lines, defs=None):
     code = []
     for n, line in enumerate(lines, 1):
         try:
-            code.extend(compile_line(line))
+            code.extend(compile_line(line, defs))
         except CompileError as e:
             raise CompileError(f"line {n}: {e}") from None
     return code

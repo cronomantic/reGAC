@@ -41,7 +41,8 @@ Los mensajes, los nombres de objeto y las descripciones de localidad son texto
 literal. Si ocupan varias líneas se unen con un espacio; una barra invertida al
 final de una línea las une sin separación ninguna. Una línea de texto que
 empiece por `#`, `/`, `;` o `|`, o que sea una directiva —`.if`, `.else`,
-`.end`—, se escribe precedida de `|`, que el compilador descarta.
+`.end`, `.def`, `.include`—, se escribe precedida de `|`, que el compilador
+descarta.
 
 Dentro del texto hay **comandos**, que empiezan por barra invertida:
 
@@ -370,14 +371,41 @@ Lo mismo con las secciones (`/MSGG`), los tipos del vocabulario (`verbo`), las
 línea es el del fichero aunque lo que falle se lea de una vez —una lámina se
 lee entera, y aun así el error dice la línea de la orden que está mal—.
 
-## Extensiones previstas
+## Nombres para los números
 
-Estas dos no están implementadas. Se listan aquí para que el diseño actual no
-las bloquee.
+    .def PUERTA_ABIERTA   5
+    .def BIENVENIDA      14
+    .def CALLE            7
 
-**Nombres simbólicos.** `.def PUERTA_ABIERTA 5` permitirá escribir
-`SET? PUERTA_ABIERTA`. El decompilador seguirá emitiendo números.
+Y a partir de ahí el nombre vale **donde valdría el número**: en una condición
+(`IF ( SET? PUERTA_ABIERTA ) MESS BIENVENIDA END`), en una conexión, como
+número de un mensaje o de una localidad (`#BIENVENIDA`, `/LOC #CALLE`), en
+`start`, en los atributos de un objeto y en los argumentos de una orden de
+dibujo. Un fuente escrito así dice lo que quiere decir en vez de lo que cuenta,
+y lo que llega a la máquina sigue siendo el número.
 
-**Inclusión de ficheros.** `.include "comun.gac"` para compartir vocabulario y
-condiciones de baja prioridad entre aventuras, el equivalente al fichero de
-comienzo rápido `QS.ADV` de GAC.
+El valor puede ser decimal, hexadecimal (`0x0A`) u **otro nombre ya definido**.
+El nombre son letras, dígitos y subrayados, sin empezar por dígito, y no puede
+ser una palabra del lenguaje —`.def MESS 5` es un error, y se dice—. Un `.def`
+dentro de un `.if` sólo existe para las máquinas de ese `.if`, que es la forma
+de que un mismo nombre valga tres en una máquina y seis en otra.
+
+El decompilador emite números: el JSON no guarda los nombres, que son del
+fuente y no de la aventura.
+
+## Incluir ficheros
+
+    .include "comun.gac"
+
+Para compartir entre las dos partes de una aventura —o entre dos aventuras— lo
+que no cambia: los nombres, el vocabulario, las condiciones de baja prioridad.
+Es lo que GAC hacía con su fichero de comienzo rápido `QS.ADV`.
+
+La ruta se cuenta desde el fichero que incluye. Un fichero puede incluir a
+otro, hasta dieciséis de hondo, y un fichero que se incluya a sí mismo se para
+en seco y se dice. **Un error dentro de un fichero incluido dice ese fichero y
+su propia línea**, no una del que lo trajo:
+
+    comun.gac:2: there is no word type called 'verbo' -- did you mean verb?
+        NORTE   1  verbo
+                   ^
