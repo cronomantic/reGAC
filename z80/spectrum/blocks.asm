@@ -30,6 +30,12 @@ load_table:
                 IFDEF BANKED
                 db      5               ; the page $6000 is always in
                 ENDIF
+                IFDEF MUSIC_PAGED
+                ; and the tunes, which live in a page of their own
+                dw      DB_WINDOW
+                dw      MUSIC_STORE_BYTES
+                db      MUSIC_PAGE
+                ENDIF
                 ENDIF
                 IFDEF BANKED
                 IF DB_BANK_COUNT > 0

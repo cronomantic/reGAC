@@ -57,7 +57,7 @@ effect_seen:    db      0
 ; effects: the author's music, which is not this project's to carry.  See
 ; music/.
 music_tunes:
-                MUSIC_TUNE tune, 0
+                MUSIC_TUNE tune, effects, 0
 music_tunes_end:
 tune:
                 include "../../music/test.asm"

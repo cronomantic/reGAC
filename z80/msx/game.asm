@@ -126,7 +126,17 @@ database_ready: db      1               ; a cassette has it there already
                 include "../common/music.asm"
                 include "../arkos/PlayerAkm.asm"
                 include "interrupt.asm"
+                IFDEF PLY_AKM_MANAGE_SOUND_EFFECTS
+; The effects are not paged and not copied: one is asked for in the middle of
+; a turn and has to be there, so the bank lives with the player.
+effects:
+                include "../../music/effects.asm"
+                ENDIF
+                DEFINE  MUSIC_LIST 1    ; no banks here, so the list and
+                DEFINE  MUSIC_STORE 1   ; the tunes live side by side
                 include "../../music/tunes.asm"
+                UNDEFINE MUSIC_LIST
+                UNDEFINE MUSIC_STORE
                 ENDIF
 
 last:

@@ -24,13 +24,14 @@ A real decompiled adventure is built for a 128 with the music in it, given one
 extra condition -- play the first tune, once, on the first turn -- and then
 played.  Two things are being asked at once.
 
-The first is whether it fits at all, and that is why the music lives where it
-does.  Above the interpreter there is nothing to spare: the code, what is
-resident of the database and the interrupt's corner reach $C000 between them,
-and only one of the eight decompiled adventures leaves room for a player and a
-tune there.  Below the interpreter there is a great deal of room and nothing
-in it but the BASIC line the loader travelled in, which has done its work by
-then, so the music goes at $6000 and travels as a block of its own.
+The first is whether it fits at all.  Above the interpreter there is nothing
+to spare: the code, what is resident of the database and the interrupt's
+corner reach $C000 between them.  Below it there is a great deal of room and
+nothing in it but the BASIC line the loader travelled in, which has done its
+work by then, so the player goes at $6000 and what is left over up to $7C00 is
+the buffer a tune is played out of.  The tunes themselves are in a page of
+their own, and the one being played is copied down when it starts -- which is
+what this checks by looking at where the player is reading.
 
 The second is whether an adventure still plays with the interrupts on, which
 until now it never has: it puts its title up, asks for an order and answers a
@@ -115,8 +116,8 @@ def test_an_adventure_plays_with_the_music_on():
     ddb, database, listing = build()
     glyphs = glyph_table(database)
     where = {name: emulator.label_address(listing, name)
-             for name in ("music_playing", "music_tune", "music_at", "music_end",
-                          "PLY_AKM_Track1_PtTrack")}
+             for name in ("music_playing", "music_tune", "music_buffer",
+                          "music_store", "start", "PLY_AKM_Track1_PtTrack")}
     prompt = ddb["messages"]["240"].strip()[:3]
     puzzled = ddb["messages"][NOT_UNDERSTOOD]
 
@@ -131,8 +132,9 @@ def test_an_adventure_plays_with_the_music_on():
         )
         assert session.read(where["music_tune"], 1)[0] == 0
         at = word(session, where["PLY_AKM_Track1_PtTrack"])
-        assert where["music_at"] <= at < where["music_end"], (
-            f"the player is not reading the tune below the interpreter: ${at:04X}"
+        assert where["music_buffer"] <= at < where["start"], (
+            f"the player is not reading the buffer the tune was copied into:"
+            f" ${at:04X}"
         )
         assert any(screen(session, glyphs)), "nothing was ever printed"
 

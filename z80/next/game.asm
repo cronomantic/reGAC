@@ -47,6 +47,7 @@
 ; same ports and the same clock, so the player is the Spectrum's as well.
                 IFDEF WITH_MUSIC
                 DEFINE  PLY_AKM_HARDWARE_SPECTRUM 1
+                DEFINE  MUSIC_PAGED 1           ; the tunes live in pages
                 IFDEF WITH_EFFECTS
                 DEFINE  PLY_AKM_MANAGE_SOUND_EFFECTS 1
                 ENDIF
@@ -68,6 +69,7 @@ DB_PAGE_2       equ DB_FIRST_PAGE + 4
 DB_PAGE_3       equ DB_FIRST_PAGE + 6
 DB_PAGE_4       equ DB_FIRST_PAGE + 8
 DB_PAGE_5       equ DB_FIRST_PAGE + 10
+MUSIC_PAGE      equ DB_FIRST_PAGE + 12  ; and the two after all six of those
 
 ; The banks themselves, each written across the two pages it is made of.
                 IF DB_BANK_COUNT > 0
@@ -133,18 +135,53 @@ db_resident_image:
                 INCBIN  "game.rgac", 0, DB_RESIDENT_SIZE
                 ASSERT  $ <= $8000      ; or it would run into the interpreter
 
-; And the music, in the same page, below where the database begins.  It is
-; written into the .nex with everything else in that page, so there is no
-; loading to arrange.
+; And the music, in the same page, below where the database begins: the
+; player, the bank of effects, the list of what tunes there are, and then the
+; buffer a tune is played out of, which is whatever is left up to the ROM's
+; variables.  All of it is written into the .nex with everything else in that
+; page, so there is no loading to arrange.
+;
+; The tunes themselves are not here.  They are in two pages of their own --
+; sixteen kilobytes, the size of the window they are read through -- and the
+; one being played is copied into the buffer when it starts.  This machine has
+; pages to spare, so they go after the last the database took.
                 IFDEF WITH_MUSIC
                 ORG     MUSIC_AT
 music_at:
                 include "../common/music.asm"
                 include "../arkos/PlayerAkm.asm"
                 include "interrupt.asm"
+                IFDEF PLY_AKM_MANAGE_SOUND_EFFECTS
+; The effects are not paged and not copied: one is asked for in the middle of
+; a turn and has to be there, so the bank lives with the player.
+effects:
+                include "../../music/effects.asm"
+                ENDIF
+; The list of what tunes there are, which is read at any moment and so lives
+; here and not in the pages they are in.
+                DEFINE  MUSIC_LIST 1
                 include "../../music/tunes.asm"
+                UNDEFINE MUSIC_LIST
+music_buffer:
+MUSIC_BUFFER_BYTES equ MUSIC_CEILING - music_buffer
 music_end:
                 ASSERT  music_end <= MUSIC_CEILING
+
+; And the tunes, in their own pages.  It comes after the player because the
+; list is written with a macro the player's own source declares.
+                SLOT    0
+                PAGE    MUSIC_PAGE
+                SLOT    1
+                PAGE    MUSIC_PAGE + 1
+                SLOT    0
+                ORG     $0000
+music_store:
+                DEFINE  MUSIC_STORE 1
+                include "../../music/tunes.asm"
+                UNDEFINE MUSIC_STORE
+music_store_end:
+                SLOT    4
+                PAGE    4
                 ENDIF
 
                 SLOT    4
@@ -262,5 +299,8 @@ last:
                 ENDIF
                 IF DB_BANK_COUNT > 5
                 SAVENEX BANK DB_PAGE_5 / 2
+                ENDIF
+                IFDEF MUSIC_PAGED
+                SAVENEX BANK MUSIC_PAGE / 2     ; and the tunes, in theirs
                 ENDIF
                 SAVENEX CLOSE

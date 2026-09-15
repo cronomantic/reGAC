@@ -81,7 +81,7 @@ done_flag:      db      0
 ; The list of tunes and the music itself, which is the author's and not this
 ; project's to carry.  See music/.
 music_tunes:
-                MUSIC_TUNE tune, 0
+                MUSIC_TUNE tune, effects, 0
 music_tunes_end:
 tune:
                 include "../../music/test.asm"

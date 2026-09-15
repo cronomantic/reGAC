@@ -66,3 +66,20 @@ the_window_back:
                 inc     a
                 nextreg MMU1, a
                 ret
+
+                IFDEF MUSIC_PAGED
+; The pages the tunes live in, into the window and out again.  It is the same
+; window a bank of the database uses, so whatever was in it comes back after:
+; the interpreter keeps a pointer into it and would go on reading from where
+; it thought it was.
+; Corrupts: AF
+music_store_in:
+                ld      a, MUSIC_PAGE
+                nextreg MMU0, a
+                inc     a
+                nextreg MMU1, a
+                ret
+
+music_store_out:
+                jp      the_window_back
+                ENDIF

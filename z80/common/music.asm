@@ -10,23 +10,32 @@
 ; music_tunes_end:
 ;
 ;       music_tunes:
-;               MUSIC_TUNE  menu, 0
-;               MUSIC_TUNE  menu, 1
-;               MUSIC_TUNE  cave, 0
+;               MUSIC_TUNE  menu, menu_end, 0
+;               MUSIC_TUNE  menu, menu_end, 1
+;               MUSIC_TUNE  cave, cave_end, 0
 ;       music_tunes_end:
 ;
-; -- a tune being an address and which subsong of it to play, because one
-; export of the tracker may hold several and they share their instruments,
-; which is much the cheapest way to have more than one.  Two separate exports
-; work as well; they only cost more.  From here on a tune is the number of its
-; line, counting from nought.
+; -- a tune being where its bytes are, where they end, and which subsong of it
+; to play, because one export of the tracker may hold several and they share
+; their instruments, which is much the cheapest way to have more than one.
+; Two separate exports work as well; they only cost more.  From here on a tune
+; is the number of its line, counting from nought.
 ;
 ; The when is the only part with a rule to it.  The player runs from the
 ; interrupt, and an interrupt can arrive at any moment -- including while the
-; interpreter has a bank of the database in its window.  So the tune must live
-; where the window never reaches, and it does: it is assembled with the
-; interpreter.  That is why paging does not have to turn the interrupts off,
-; and why the music does not stutter when a room changes.
+; interpreter has a bank of the database in its window.  So whatever the
+; player is reading has to be somewhere the window never reaches.
+;
+; On a machine with memory to spare that is easy: the tunes are assembled with
+; the interpreter and played where they lie.  On one where they would not fit
+; -- which is every machine with banks, once an adventure is a real size --
+; the build says MUSIC_PAGED, and then the tunes live in a page of their own
+; and the one being played is copied into a buffer first.  What that costs is
+; the biggest tune once, instead of every tune for ever; what it buys is that
+; a tune costs nothing at all of the sixty four kilobytes until it plays.
+;
+; A tune in a page is assembled for the buffer and stored where it is stored,
+; which is what DISP is for; music/tunes.asm shows the shape of it.
 ;
 ; A tune wants playing fifty times a second and no machine here interrupts
 ; fifty times a second except the Spectrum.  The Amstrad does it three hundred
@@ -47,12 +56,17 @@ MUSIC_HERTZ     equ 50                  ; how often a tune wants to be played
                 DEFINE MUSIC_RATE 50    ; and how often this machine wakes up
                 ENDIF
 
-MUSIC_ENTRY     equ 3                   ; two bytes of address, one of subsong
+MUSIC_ENTRY     equ 5                   ; where it is, where it ends, subsong
 
-; One line of that list.
-                MACRO   MUSIC_TUNE where, subsong
+; One line of that list.  A tune too big for the buffer is a build that stops
+; here rather than one that plays the beginning of a tune and then noise.
+                MACRO   MUSIC_TUNE where, ending, subsong
                 dw      where
+                dw      ending - where
                 db      subsong
+                IFDEF MUSIC_PAGED
+                ASSERT  ending - where <= MUSIC_BUFFER_BYTES
+                ENDIF
                 ENDM
 
 ; Get ready to play, with nothing playing yet.
@@ -85,16 +99,37 @@ music_start:
                 ld      d, h
                 ld      e, l
                 add     hl, hl
-                add     hl, de                  ; three bytes to the line
+                add     hl, hl
+                add     hl, de                  ; five bytes to the line
                 ld      de, music_tunes
                 add     hl, de
                 ld      e, (hl)
                 inc     hl
                 ld      d, (hl)
+                inc     hl                      ; DE = where its bytes are
+                ld      c, (hl)
                 inc     hl
-                ld      a, (hl)                 ; which subsong of it
-                ex      de, hl
+                ld      b, (hl)
+                inc     hl                      ; BC = how many of them
+                ld      a, (hl)                 ; and which subsong
                 di
+                IFDEF MUSIC_PAGED
+                ; Out of the page it lives in and into the buffer it is played
+                ; from.  The interrupts are already off, which they have to be:
+                ; what the player would read half way through this is half a
+                ; tune.
+                push    af
+                ld      l, e
+                ld      h, d
+                ld      de, music_buffer
+                call    music_store_in
+                ldir
+                call    music_store_out
+                pop     af
+                ld      hl, music_buffer
+                ELSE
+                ex      de, hl
+                ENDIF
                 call    PLY_AKM_Init
                 ld      a, 1
                 ld      (music_playing), a

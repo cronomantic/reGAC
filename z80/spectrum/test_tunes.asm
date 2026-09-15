@@ -60,8 +60,8 @@ tune_asked:     db      $FF             ; poked by the test
 ; The list of tunes, and the tunes: the author's music, which is not this
 ; project's to carry.  See music/.
 music_tunes:
-                MUSIC_TUNE first, 0
-                MUSIC_TUNE second, 0
+                MUSIC_TUNE first, first_end, 0
+                MUSIC_TUNE second, second_end, 0
 music_tunes_end:
 
 first:

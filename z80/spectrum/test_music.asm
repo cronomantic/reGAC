@@ -39,7 +39,7 @@ spins:          dw      0
 ; The list of tunes, which here is one line long, and the tune itself: the
 ; author's music, which is not this project's to carry.  See music/.
 music_tunes:
-                MUSIC_TUNE tune, 0
+                MUSIC_TUNE tune, last, 0
 music_tunes_end:
 tune:
                 include "../../music/test.asm"

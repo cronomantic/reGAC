@@ -22,9 +22,12 @@
 
 The map here looked full, and then it turned out to have seven kilobytes going
 spare in the least likely place: this machine draws on layer 2, so the sixteen
-kilobytes where a Spectrum keeps its screen hold nothing at all.  The music
-goes at $4000, in the same page as what is resident of the database and below
-it, and the .nex carries that page anyway, so there is no loading to arrange.
+kilobytes where a Spectrum keeps its screen hold nothing at all.  The player
+goes at $4000, in the same page as what is resident of the database, and what
+is left over up to the ROM's variables is the buffer a tune is played out of.
+The tunes themselves are in two pages of their own, which this machine has by
+the hundred, and the one being played is copied into the buffer when it
+starts -- so what this looks at is where the player is reading.
 
 What is checked is what the other machines are checked for: the adventure
 asked for a tune, the interrupt is playing it, and the game goes on being a
@@ -53,6 +56,8 @@ from test_game_next import (ADVENTURE, DATABASE, DEFS, IMAGE,  # noqa: E402
 from test_music_z80 import TUNE, word  # noqa: E402
 
 EFFECTS = os.path.join(ROOT, "music", "effects.asm")
+
+MUSIC_CEILING = 0x5C00          # where the music's own room ends
 
 ENTER = chr(13)
 NOT_UNDERSTOOD = "242"
@@ -101,7 +106,7 @@ def test_an_adventure_plays_with_the_music_on():
     ddb, database, listing = build()
     glyphs = glyph_table(database)
     where = {name: emulator.label_address(listing, name)
-             for name in ("music_playing", "music_tune", "music_at", "music_end",
+             for name in ("music_playing", "music_tune", "music_buffer",
                           "PLY_AKM_Track1_PtTrack")}
     prompt = ddb["messages"]["240"].strip()[:3]
     puzzled = ddb["messages"][NOT_UNDERSTOOD]
@@ -119,8 +124,9 @@ def test_an_adventure_plays_with_the_music_on():
         )
         assert session.read(where["music_tune"], 1)[0] == 0
         at = word(session, where["PLY_AKM_Track1_PtTrack"])
-        assert where["music_at"] <= at < where["music_end"], (
-            f"the player is not reading the tune where it was put: ${at:04X}"
+        assert where["music_buffer"] <= at < MUSIC_CEILING, (
+            f"the player is not reading the buffer the tune was copied into:"
+            f" ${at:04X}"
         )
 
         session.type("XYZZY" + ENTER)
