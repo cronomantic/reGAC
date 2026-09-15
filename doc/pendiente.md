@@ -834,10 +834,27 @@ es inevitable: son sonidos distintos hechos con cosas distintas.
 
 **Lo que falta aquí**:
 
-- **El PCW.** Tiene zumbador y no hemos encontrado todavía por dónde se toca;
-  el puerto $F8 del sistema recibe órdenes numeradas (9 y 10 son el motor del
-  disco) y alguna será el pitido, pero no está documentado en lo que tenemos y
-  el emulador no devuelve audio para probarlo a ciegas.
+- **El PCW, y esto ya está medido.** El emulador **no emula sonido de PCW
+  ninguno**, así que ni se puede encontrar el zumbador a base de probar ni se
+  podría comprobar nada que escribiéramos para él.
+
+  Cómo se midió, para no repetirlo: ZEsarUX sabe volcar el audio a fichero
+  (`--aofile`), y eso da un oráculo de «¿ha sonado algo?» que se validó con un
+  Spectrum pitando —85 valores distintos de byte en la grabación— y con nuestra
+  propia música de Arkos en el Amstrad —30—. Contra eso, en el PCW: las
+  dieciséis órdenes numeradas del puerto $F8, de dos en dos, **silencio**; y un
+  bit meneado en cada uno de los 71 puertos de los rangos $00-$0F, $A0-$AF,
+  $D0-$EF y $F9-$FF, **silencio también**. La lista de chips de sonido que
+  ZEsarUX dice emular tampoco menciona el PCW por ninguna parte. El build que
+  hace la prueba es [`test_beeper.asm`](../z80/pcw/test_beeper.asm) y se queda
+  ahí por si algún día hay con qué escucharlo.
+
+  Las salidas, si alguna vez se quiere: escribirlo a ciegas desde documentación
+  fiable, detrás de un define y sin prueba; o meter otro emulador en las
+  herramientas —Joyce, el de John Elliott— sólo para esto. Lo que sí se sabe es
+  que la máquina tiene interrupción de temporizador, así que el clic de tecla
+  saldría gratis el día que se sepa el puerto, y la música pediría además
+  montarle la interrupción, que hoy no la usa.
 - **El Amstrad sin música.** Ahí el único altavoz es el AY, así que `SOUND` en
   una versión sin reproductor no hace nada. Se arregla escribiendo los
   registros del chip a mano —el mismo baile del 8255 que ya hace el teclado—,
