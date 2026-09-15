@@ -20,6 +20,17 @@
 
                 include "banks.inc"
 
+; A build with music is told so with -DWITH_MUSIC, and one with sound effects
+; as well with -DWITH_EFFECTS.  What it then takes in is the author's own
+; music/tunes.asm, which says what tunes there are; doc/pendiente.md has the
+; shape of it.  Without them not a byte of any of this is in the build.
+                IFDEF WITH_MUSIC
+                DEFINE  PLY_AKM_HARDWARE_SPECTRUM 1
+                IFDEF WITH_EFFECTS
+                DEFINE  PLY_AKM_MANAGE_SOUND_EFFECTS 1
+                ENDIF
+                ENDIF
+
 ; The machine's own pages, in the order the database numbers its banks.  Two
 ; are spoken for: page two holds the interpreter and page five the screen.
 DB_PAGE_0       equ 1
@@ -77,6 +88,32 @@ loading_screen:
                 INCBIN  "screen.bin", 0, SCREEN_BYTES
                 ENDIF
 
+; The music, if there is any, goes below the interpreter and not above it.
+; Above it there is nothing to spare: the interpreter, what is resident of the
+; database and the interrupt's own corner fill the map to $C000, and a player
+; and a tune are three kilobytes.  Below it there is a great deal -- the
+; screen ends at $5B00 and the stack starts at $8000, and the only thing in
+; between is the BASIC line the loader travelled in, which has done its work
+; by the time any of this runs.  So the music has the eight kilobytes from
+; $6000, which is room for the player and three or four tunes.
+;
+; It travels as a block of its own, named in blocks.asm and written to the
+; tape further down.
+MUSIC_AT        equ $6000
+MUSIC_CEILING   equ $7C00               ; leaving the stack the rest
+
+                IFDEF WITH_MUSIC
+                ORG     MUSIC_AT
+music_at:
+                include "../common/music.asm"
+                include "../arkos/PlayerAkm.asm"
+                include "interrupt.asm"
+                include "../../music/tunes.asm"
+music_end:
+MUSIC_BYTES     equ music_end - music_at
+                ASSERT  music_end <= MUSIC_CEILING
+                ENDIF
+
                 ORG     $8000
 start:
                 di
@@ -91,6 +128,14 @@ start:
                 call    vm_init
                 call    vocab_init
                 call    loop_init
+                IFDEF WITH_MUSIC
+                call    music_init
+                IFDEF PLY_AKM_MANAGE_SOUND_EFFECTS
+                ld      hl, effects
+                call    sound_init
+                ENDIF
+                call    interrupt_init
+                ENDIF
                 ; the player starts where the adventure says
                 ld      a, SECTION_CONFIG
                 call    db_section
@@ -129,6 +174,9 @@ done_flag:      db      0
 database:
                 INCBIN  "game128.rgac", 0, DB_RESIDENT_SIZE
 last:
+                IFDEF WITH_MUSIC
+                ASSERT  last <= IM2_TABLE       ; or it would run into the
+                ENDIF                           ; interrupt's own corner
 
                 SAVESNA "game128.sna", start
 
@@ -144,6 +192,11 @@ last:
                 SLOT    2
                 PAGE    2
                 SAVETAP "game128.tap", HEADLESS, start, last - start
+                IFDEF WITH_MUSIC
+                SLOT    1
+                PAGE    5                       ; where $6000 always is
+                SAVETAP "game128.tap", HEADLESS, MUSIC_AT, MUSIC_BYTES
+                ENDIF
                 SLOT    3
                 IF DB_BANK_COUNT > 0
                 PAGE    DB_PAGE_0
