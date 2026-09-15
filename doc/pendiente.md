@@ -593,6 +593,28 @@ recursivas, contra el 57% de Huffman y el 84% de las abreviaturas al estilo
 PAW—, ahora entre el 50% y el 55%, y gasta las 128 parejas siempre: lo que la
 limita es el byte y no el texto.
 
+## Un comando para cambiar el color de la letra
+
+Pedido, y no hecho. La idea es tener **renglones de distintos colores**: que un
+mensaje pueda decir que lo que viene detrás va en otra tinta, y que el
+intérprete lo obedezca al imprimir.
+
+Media pieza está puesta ya: el **código 1 del juego de caracteres está
+reservado** para esto y no se lo lleva ninguna letra, así que puede aparecer en
+mitad de un texto empaquetado sin chocar con nada. Lo que falta es lo otro:
+
+- cómo se escribe en el fuente —lo más parecido a lo que ya hay sería una
+  secuencia en el propio texto del mensaje, del estilo de `\ink 5`, que el
+  compilador convierte en el código 1 y un byte de color;
+- que `textout.asm` lo entienda al imprimir, en lugar de mandarlo a la pantalla
+  como si fuera una letra;
+- y qué significa un color en cada máquina, que es lo mismo que ya resuelven
+  los dispositivos de las láminas: el Spectrum tiene tinta y papel por celda, el
+  Amstrad plumas, el PCW no tiene color ninguno y el Next un byte por píxel.
+
+Conviene decidir de paso si el cambio dura hasta el final del mensaje o hasta
+que otro lo cambie, y si el papel también se puede tocar o sólo la tinta.
+
 ## Cosas menores
 
 `deGAC` ya lee las tres máquinas. Reconoce por sí solo una instantánea de
