@@ -544,7 +544,10 @@ Y para quien escriba una aventura en vez de decompilarla, **una fuente suya**,
 en lo que la tenga: un volcado de ocho bytes por carácter, con o sin dirección
 de carga delante, con o sin la cabecera de AMSDOS, una fuente de consola PSF, o
 **un PNG con las letras en una rejilla**, que es lo que un artista prefiere
-dibujar. Se mira el fichero y se averigua qué es.
+dibujar, o **la fuente escrita como fuente**: una cabecera de C o un listado de
+Z80, 6502, x86 o 68000, que es como se publican para que las use un programa.
+Se mira el fichero y se averigua qué es. Con eso, una fuente de ZX Origins
+entra tal cual, en cualquiera de las formas en que viene su ZIP.
 
 Cada letra se identifica por su casilla, y `layout` dice de una vez por dónde
 empieza la hoja y cuántas casillas tiene. La que hay que dibujar es **Latin-1**:

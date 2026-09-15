@@ -42,6 +42,8 @@ What comes back is a map from the character's own number -- its codepoint,
 which is what the rest of this reads a font by -- to its eight bytes.
 """
 
+import re
+
 from .png import read_image
 
 GLYPH_ROWS = 8
@@ -81,8 +83,88 @@ ATASCII_ORDER = (" !\"#$%&'()*+,-./0123456789:;<=>?"
 ORDERS = {"ascii": None, "c64": C64_ORDER, "atascii": ATASCII_ORDER}
 
 
+# The lines of a listing that carry the bytes, in the four assemblers the
+# same fonts are published for, and the numbers they are written in.
+DATA_LINE = re.compile(r"\b(?:db|defb|defm|dc\.b|\.byte|byte)\b", re.I)
+NUMBER = re.compile(
+    r"(?<![\w.$%])(?:"
+    r"0[xX]([0-9a-fA-F]+)"          # C and some assemblers
+    r"|\$([0-9a-fA-F]+)"            # 6502 and 68000
+    r"|([0-9a-fA-F]+)[hH]\b"        # x86
+    r"|%([01]+)"                    # binary, the way a Z80 assembler writes it
+    r"|0[bB]([01]+)"
+    r"|([0-9]+)"
+    r")(?![\w.])"
+)
+BASES = (16, 16, 16, 2, 2, 10)
+
+
 class FontError(Exception):
     pass
+
+
+def numbers_in(text):
+    """Every byte a listing of bytes holds, in order.
+
+    The same font is published as a C header, as Z80, 6502, x86 and 68000
+    assembly, and as a line of BASIC: all of them a heap of numbers with
+    something different around them.  What is taken is what is inside the
+    braces, if there are braces, and otherwise what stands on the lines that
+    carry a byte directive -- which is what keeps the length out of
+    `unsigned char font[768]` and the address out of an `org`.
+    """
+    opened, closed = text.find("{"), text.rfind("}")
+    if 0 <= opened < closed:
+        wanted = [text[opened + 1:closed]]
+    else:
+        wanted = [line[found.end():]
+                  for line in text.splitlines()
+                  for found in [DATA_LINE.search(line)] if found]
+        if not wanted:
+            wanted = [text]
+    out = []
+    for piece in wanted:
+        for match in NUMBER.finditer(piece.split(";")[0].split("//")[0]):
+            digits = next(g for g in match.groups() if g is not None)
+            base = BASES[match.groups().index(digits)]
+            out.append(int(digits, base))
+    return out
+
+
+def from_listing(blob):
+    """The glyphs of a listing, which is a font written out as source."""
+    try:
+        text = blob.decode("utf-8")
+    except UnicodeDecodeError:
+        text = blob.decode("latin-1")
+    values = numbers_in(text)
+    if not values:
+        raise FontError("there are no bytes in this at all")
+    big = [v for v in values if v > 255]
+    if big:
+        raise FontError(
+            f"this has {big[0]} in it, which is not a byte: it does not look "
+            "like a font written out as source"
+        )
+    if len(values) % GLYPH_ROWS:
+        raise FontError(
+            f"a font is eight bytes a letter and this listing has "
+            f"{len(values)}, which is not a whole number of them"
+        )
+    return bytes(values)
+
+
+def looks_like_text(blob):
+    """Whether this is a font written out as source rather than as bytes.
+
+    A font of bytes is eight bits a row and full of them; a listing is
+    letters, digits and punctuation.  So: nothing above ASCII, and a good half
+    of it letters or spaces.
+    """
+    if not blob or max(blob) > 126:
+        return False
+    letters = sum(1 for b in blob if b in (9, 10, 13, 32) or 48 <= b <= 122)
+    return letters * 2 > len(blob)
 
 
 def strip_header(blob):
@@ -208,6 +290,8 @@ def read(path, first=None, order="ascii", layout=None):
         start = first if first is not None else (0 if starts is None else starts)
         slots = {slot + start: glyph for slot, glyph in slots.items()}
     else:
+        if looks_like_text(blob):
+            blob = from_listing(blob)
         body, said = strip_header(blob)
         start = first if first is not None else said
         if start is None:

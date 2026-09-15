@@ -147,6 +147,14 @@ Lo que sabe reconocer:
 | con cabecera de AMSDOS o +3DOS | los 128 bytes que esos sistemas ponen a todo |
 | fuente de consola | las dos cabeceras de PSF |
 | PNG | las letras en una rejilla de celdas de ocho por ocho, leídas como se lee una página; es tinta todo lo que sea más oscuro que la mitad, así que da igual en qué dos colores esté dibujada |
+| escrita como fuente | una cabecera de C o un listado de ensamblador —Z80, 6502, x86, 68000—, que es como se publican las mismas fuentes para que las use un programa |
+
+Eso último quiere decir que una fuente de [ZX Origins](https://damieng.com/typography/zx-origins/)
+entra tal cual: el `.ch8` de 768 bytes que trae cada una es un volcado normal, y
+si prefieres el `.h` o el `.asm` del mismo ZIP, también. De un listado se coge
+lo que hay entre llaves, si las hay, y si no lo que va en las líneas con una
+directiva de bytes —`db`, `defb`, `.byte`, `dc.b`—, que es lo que deja fuera el
+tamaño de `font[768]` y la dirección de un `org`.
 
 **Cada letra se identifica por su casilla**, y para eso está `layout`, que dice
 de una vez por dónde empieza la hoja y cuántas casillas tiene:

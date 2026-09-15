@@ -275,6 +275,56 @@ def test_the_shapes_a_font_file_can_come_in(tmp_path):
         assert glyphs[65] == bytes(a_font()[65 * 8:66 * 8]), f"{name} lost its A"
 
 
+def a_listing(dump, kind):
+    """The same font written out as source, in the dialects the collections
+    publish: a C header and four assemblers."""
+    rows = [dump[n:n + 8] for n in range(0, len(dump), 8)]
+    if kind == "c":
+        body = ",\n  ".join(", ".join(f"0x{b:02X}" for b in row) for row in rows)
+        return f"/* Aardvark */\nconst unsigned char font[{len(dump)}] = {{\n  {body}\n}};\n"
+    if kind == "z80":
+        lines = "\n".join("    defb " + ", ".join(f"${b:02X}" for b in row)
+                          for row in rows)
+        return f"; Aardvark\n    org 0x8000\nfont:\n{lines}\n"
+    if kind == "6502":
+        lines = "\n".join("    .byte " + ",".join(f"${b:02X}" for b in row)
+                          for row in rows)
+        return f"; Aardvark\n{lines}\n"
+    if kind == "x86":
+        lines = "\n".join("    db " + ", ".join(f"{b:02X}h" for b in row)
+                          for row in rows)
+        return f"; Aardvark\n{lines}\n"
+    if kind == "68000":
+        lines = "\n".join("    dc.b " + ",".join(f"${b:02X}" for b in row)
+                          for row in rows)
+        return f"* Aardvark\n{lines}\n"
+    if kind == "binary":
+        return "\n".join("    defb " + ", ".join(f"%{b:08b}" for b in row)
+                          for row in rows) + "\n"
+    raise AssertionError(kind)
+
+
+@pytest.mark.parametrize("kind", ["c", "z80", "6502", "x86", "68000", "binary"])
+def test_a_font_written_out_as_source(tmp_path, kind):
+    """The collections publish the same font half a dozen ways: a heap of
+    numbers with something different around it.  What is taken is what is
+    inside the braces, or what stands on the lines that carry a byte
+    directive, which is what keeps the length out of `font[768]` and the
+    address out of an `org`."""
+    dump = bytes(a_font()[32 * 8:])
+    (tmp_path / f"font.{kind}").write_text(a_listing(dump, kind), encoding="utf-8")
+    glyphs = fontfile.read(str(tmp_path / f"font.{kind}"))
+    assert len(glyphs) == 96, "a 768 byte font is the ninety six from the space up"
+    assert glyphs[65] == bytes(a_font()[65 * 8:66 * 8]), "the A came out wrong"
+
+
+def test_something_that_is_not_a_font_at_all(tmp_path):
+    (tmp_path / "notes.txt").write_text(
+        "Este fichero no tiene nada dentro que sea una fuente.\n", encoding="utf-8")
+    with pytest.raises(fontfile.FontError):
+        fontfile.read(str(tmp_path / "notes.txt"))
+
+
 def test_a_font_kept_in_another_machines_order(tmp_path):
     """A C64 keeps @ABC... at nought, so slot one is the A and slot two the
     B; what comes out has them where ASCII has them."""
