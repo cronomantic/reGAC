@@ -392,9 +392,30 @@ nada a la pantalla. Las rutinas de cinta de la BIOS dejan el chip de vídeo
 exactamente como estaba, encendido y con sus registros; está mirado en la
 máquina, con una pantalla puesta y un bloque escrito encima.
 
-**Lo que queda de esta máquina**: que dibujar cuesta aproximadamente vez y
-media lo que en el Spectrum —6,15 segundos contra 4,31 en la lámina más
-pesada—, repartido y sin un solo sitio donde apretar.
+**Lo que queda de esta máquina**: una lámina, una sola, que pasa del tope.
+Están medidas las 196 de las ocho aventuras, con un contador de ciclos parado
+en seco por un punto de ruptura, y **todas salen idénticas a la referencia**;
+la más lenta de cada aventura va de 2,9 a 4,2 segundos, salvo en una: la 28
+de Bangkok2, que cuesta **6,11 s**. Esa misma lámina en un Spectrum cuesta
+**4,67 s**, así que la diferencia entre máquinas es de 1,31, no la vez y media
+que decía antes este párrafo; y lo que la hace cara no es el MSX, es ella: en
+el Spectrum también es la peor con diferencia (la 21 son 1,48 s y la 26, 0,30).
+
+Dónde se van esos seis segundos no se sabe todavía, y conviene decirlo así
+porque los dos modos de mirarlo se contradicen. Mirando el contador de
+programa cada poco, 400 veces, sale `colour_span` 19%, `span_extent` 18% y
+`mark_span` 14,5%. Poniendo un `RET` encima de cada rutina y volviendo a
+dibujar, quitar `gfx_fill` entero ahorra 0,86 s, `gfx_line` 0,28 s y
+`colour_span` 0,02 s. Lo segundo miente por construcción —sin los rellenos la
+lámina ya no es la misma y el resto tiene menos que pintar— y lo primero
+tampoco es exacto, porque preguntar detiene la máquina un instante. Antes de
+decir dónde apretar haría falta un perfil de verdad, instrucción a
+instrucción.
+
+La prueba lenta `tests/test_all_pictures_msx.py` guarda el tope de 5 segundos
+para las 196 y lleva esa única lámina apuntada con nombre y con su número en
+`KNOWN_SLOW`, de modo que si crece se entera, y si crece otra distinta,
+también.
 
 ### Mirar las versiones de CPC, que es la lección para el PCW
 
