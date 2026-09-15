@@ -397,8 +397,11 @@ class Parser:
             path = os.path.join(self.folder, whole.strip('"'))
             first = int(a["first"]) if "first" in a else None
             try:
-                glyphs = fontfile.read(path, first,
-                                       a.get("order", "ascii").strip(QUOTES))
+                glyphs = fontfile.read(
+                    path, first,
+                    a.get("order", "ascii").strip(QUOTES),
+                    a["layout"].strip(QUOTES) if "layout" in a else None,
+                )
             except (OSError, FontError, ImageError) as trouble:
                 self.fail(f"the font {whole}: {trouble}")
             for code, glyph in glyphs.items():

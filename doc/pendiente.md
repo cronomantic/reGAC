@@ -544,9 +544,16 @@ Y para quien escriba una aventura en vez de decompilarla, **una fuente suya**,
 en lo que la tenga: un volcado de ocho bytes por carácter, con o sin dirección
 de carga delante, con o sin la cabecera de AMSDOS, una fuente de consola PSF, o
 **un PNG con las letras en una rejilla**, que es lo que un artista prefiere
-dibujar. Se mira el fichero y se averigua qué es; `first` y `order` están para
-lo que no se pueda averiguar —un PNG no dice qué carácter es su primera celda,
-y un C64 no guarda las letras en el orden del ASCII. O letra a letra en el
+dibujar. Se mira el fichero y se averigua qué es.
+
+Cada letra se identifica por su casilla, y `layout` dice de una vez por dónde
+empieza la hoja y cuántas casillas tiene. La que hay que dibujar es **Latin-1**:
+todas las letras que esto imprime están ahí, en el sitio donde las pone
+cualquier editor de fuentes, así que el artista no tiene que oír hablar de los
+códigos de reGAC. Y como se sabe cuántas casillas son, una hoja dibujada al
+doble o al triple se lee igual, que es lo que hace que sirva: nadie dibuja a
+ocho píxeles por letra. `first` y `order` quedan para lo demás —un C64 no
+guarda las letras en el orden del ASCII. O letra a letra en el
 propio fuente, nombrando el carácter por su número o por sí mismo. Lo que el
 autor dibuja se usa tal cual; sólo se compone lo que no trae.
 

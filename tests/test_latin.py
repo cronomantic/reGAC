@@ -285,6 +285,71 @@ def test_a_font_kept_in_another_machines_order(tmp_path):
     assert read[ord("0")] == glyphs[48]
 
 
+def draw_sheet(path, glyphs, cells, across, scale=1):
+    """A sheet of letters: cells left to right and top to bottom, ink black,
+    and `scale` pixels to a pixel because a person draws one big."""
+    down = (cells + across - 1) // across
+    rows = []
+    for line in range(down * 8):
+        cell_row, in_cell = divmod(line, 8)
+        row = []
+        for column in range(across):
+            glyph = glyphs.get(cell_row * across + column, bytes(8))
+            row += [(0, 0, 0) if glyph[in_cell] & (0x80 >> bit) else (255, 255, 255)
+                    for bit in range(8)]
+        rows.append(row)
+    png.write(str(path), rows, scale)
+
+
+def latin1_sheet(tmp_path, scale=1, name="hoja.png"):
+    """Every letter where Latin-1 keeps it, which is where an artist would
+    draw it without ever hearing about the codes reGAC uses."""
+    font = a_font()
+    glyphs = {code: glyph_for(chr(code), font) for code in range(32, 256)
+              if glyph_for(chr(code), font)}
+    draw_sheet(tmp_path / name, glyphs, 256, 16, scale)
+    return tmp_path / name
+
+
+def test_a_letter_is_known_by_where_it_sits_on_the_sheet(tmp_path):
+    """Which is why the layout is named: Latin-1 says the first cell is the
+    null and the two hundred and tenth is the Ñ, and reGAC's own codes never
+    come into it."""
+    read = fontfile.read(str(latin1_sheet(tmp_path)), layout="latin1")
+    font = a_font()
+    for char in "AzÑáé¿ç":
+        assert read[ord(char)] == glyph_for(char, font), f"{char} is not where it sat"
+
+
+def test_a_sheet_drawn_larger_is_still_a_sheet(tmp_path):
+    """Nobody draws at eight pixels to a letter.  Knowing how many cells there
+    are supposed to be is what says a sheet is at three times the size rather
+    than nine times as many letters."""
+    big = latin1_sheet(tmp_path, scale=3)
+    read = fontfile.read(str(big), layout="latin1")
+    assert read[ord("Ñ")] == glyph_for("Ñ", a_font())
+    # and without the layout it can only be read as what it looks like
+    assert len(fontfile.read(str(big))) == 256 * 9
+
+
+def test_a_sheet_that_is_not_the_shape_its_layout_says(tmp_path):
+    sheet = latin1_sheet(tmp_path)
+    with pytest.raises(fontfile.FontError) as complaint:
+        fontfile.read(str(sheet), layout="ascii")
+    assert "cells" in str(complaint.value)
+
+
+def test_a_sheet_reaches_the_adventure(tmp_path):
+    """The whole way: a sheet beside the source, and a letter of it in the
+    font the machine is given."""
+    latin1_sheet(tmp_path, name="letras.png")
+    source = SOURCE_WITH_A_FONT.format(entries="").replace(
+        'file="letras.bin" first=32', 'file="letras.png" layout=latin1')
+    ddb = parse(source, "juego.gac", str(tmp_path))
+    assert glyph_for("ñ", ddb["font"]) == glyph_for("ñ", a_font())
+    assert Database(adventure(SPANISH))  # and it still builds
+
+
 def test_a_sheet_of_letters_drawn_as_a_picture(tmp_path):
     """What an artist would rather hand over: the letters in a grid of eight
     by eight cells, ink darker than half."""

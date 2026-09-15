@@ -135,7 +135,7 @@ La tipografía de la aventura, entera o letra a letra.
 mirándola.
 
     /FONT file="letras.bin"
-    /FONT file="hoja.png" first=32
+    /FONT file="hoja.png" layout=latin1
     /FONT file="charset.64c" order=c64
 
 Lo que sabe reconocer:
@@ -148,10 +148,32 @@ Lo que sabe reconocer:
 | fuente de consola | las dos cabeceras de PSF |
 | PNG | las letras en una rejilla de celdas de ocho por ocho, leídas como se lee una página; es tinta todo lo que sea más oscuro que la mitad, así que da igual en qué dos colores esté dibujada |
 
-`first` dice qué carácter es el primer glifo cuando el fichero no lo dice —un
-PNG nunca lo dice— y `order` en qué orden están, para las máquinas que no
-usan el del ASCII: `c64` guarda `@ABC...` en el cero y `atascii` pone la
-puntuación delante. Sin `order`, tal cual.
+**Cada letra se identifica por su casilla**, y para eso está `layout`, que dice
+de una vez por dónde empieza la hoja y cuántas casillas tiene:
+
+| `layout` | casillas |
+|---|---|
+| `ascii` | 96, del espacio al símbolo de copyright |
+| `latin1` | 256, Latin-1 entero |
+| `latin1-high` | 96, sólo la mitad de arriba de Latin-1, que es donde están los acentos |
+
+**Dibuja la hoja en Latin-1.** Todas las letras que esto imprime están ahí, en
+el sitio donde las pone cualquier editor de fuentes, así que el artista no
+tiene que oír hablar jamás de los códigos de reGAC: dibuja la `á` donde Latin-1
+guarda la `á` y cae donde le toca. Una hoja de Latin-1 son 16 por 16 casillas,
+y las casillas en blanco no son ninguna letra: se componen o se quedan como
+estaban.
+
+Saber cuántas casillas hay tiene una segunda ventaja, y es la que hace que esto
+sirva de verdad: **una hoja dibujada en grande se lee igual**. Nadie dibuja a
+ocho píxeles por letra; si la hoja está al doble o al triple, el número de
+casillas dice cuál de las dos cosas es, en vez de leerla como cuatro o nueve
+veces más letras.
+
+`first` dice qué carácter es la primera casilla cuando no hay `layout`, y
+`order` en qué orden están, para las máquinas que no usan el del ASCII: `c64`
+guarda `@ABC...` en el cero y `atascii` pone la puntuación delante. Sin
+`order`, tal cual.
 
 **Letra a letra**: ocho bytes en hexadecimal por carácter, con el glifo como
 comentario. Ganan sobre el fichero, así que se puede cambiar una letra sin

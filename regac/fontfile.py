@@ -54,6 +54,21 @@ DOS_HEADER = 128                # what AMSDOS and +3DOS put in front of a file
 # The sizes a plain dump comes in, and where its first letter stands.
 PLAIN = {768: 32, 1024: 0, 2048: 0, 6144: 0}
 
+# How a sheet of letters is laid out: which character the first cell is, and
+# how many cells there are.  A name for it is worth having because an image
+# does not say either of those things -- and because with the count known, a
+# sheet drawn at twice the size is still a sheet this can read.
+#
+# Latin-1 is the one to draw.  Every letter this project can print is in it,
+# in the place every font editor puts it, so an artist never has to hear about
+# the codes reGAC uses: draw the a-acute where Latin-1 keeps it and it lands
+# where it belongs.
+LAYOUTS = {
+    "ascii": (32, 96),          # the space to the copyright sign
+    "latin1": (0, 256),         # and the whole of Latin-1, accents and all
+    "latin1-high": (160, 96),   # just its top half, which is where they are
+}
+
 # A C64 keeps @ABC... at nought and the digits at forty eight; an Atari keeps
 # the punctuation first.  Only the letters and digits are worth mapping: what
 # is not in one of these is left where it is.
@@ -123,55 +138,90 @@ def in_order(slots, order):
     return out
 
 
-def from_image(blob):
-    """The glyphs of a PNG: a grid of cells eight pixels each way, read the
-    way a page is, and a pixel is ink when it is darker than half."""
+def cell_size(width, height, wanted):
+    """How big a cell is on this sheet.
+
+    Eight pixels, unless the sheet was drawn bigger: knowing how many cells
+    there are supposed to be says which, so a sheet at twice or three times
+    the size is read as what it is instead of as four or nine times as many
+    letters.
+    """
+    if wanted is None:
+        return GLYPH_ROWS
+    for scale in range(1, 9):
+        side = GLYPH_ROWS * scale
+        if width % side == 0 and height % side == 0:
+            if (width // side) * (height // side) == wanted:
+                return side
+    raise FontError(
+        f"this sheet is {width} by {height}, which is no way to lay out "
+        f"{wanted} cells of eight by eight or a whole multiple of them"
+    )
+
+
+def from_image(blob, wanted=None):
+    """The glyphs of a PNG: a grid of cells, read the way a page is, left to
+    right and top to bottom, and a pixel is ink when it is darker than half."""
     width, height, ink = read_image(blob)
-    if width % GLYPH_ROWS or height % GLYPH_ROWS:
+    side = cell_size(width, height, wanted)
+    if width % side or height % side:
         raise FontError(
-            f"a sheet of letters is a whole number of eight by eight cells "
-            f"and this one is {width} by {height}"
+            f"a sheet of letters is a whole number of cells and this one is "
+            f"{width} by {height}"
         )
-    across = width // GLYPH_ROWS
+    step = side // GLYPH_ROWS
+    across = width // side
     slots = {}
-    for cell in range(across * (height // GLYPH_ROWS)):
-        left = (cell % across) * GLYPH_ROWS
-        top = (cell // across) * GLYPH_ROWS
+    for cell in range(across * (height // side)):
+        left = (cell % across) * side
+        top = (cell // across) * side
         glyph = bytearray()
         for row in range(GLYPH_ROWS):
             bits = 0
             for column in range(GLYPH_ROWS):
-                if ink[(top + row) * width + left + column]:
+                if ink[(top + row * step) * width + left + column * step]:
                     bits |= 0x80 >> column
             glyph.append(bits)
         slots[cell] = bytes(glyph)
     return slots
 
 
-def read(path, first=None, order="ascii"):
+def read(path, first=None, order="ascii", layout=None):
     """Read a font file, whatever kind it is, into codepoint -> eight bytes.
 
-    `first` says which character the first glyph is, for a file that does not
-    say so itself; `order` says which machine's order the glyphs are in.
+    `layout` names how the letters are laid out and is the thing to reach for
+    first: it says both where the sheet starts and how many letters it holds.
+    `first` says only the former, for a file that does not say so itself, and
+    `order` says which machine's order the glyphs are in.
     """
     if order not in ORDERS:
         raise FontError(f"no font is kept in {order!r} order; "
                         f"try one of {', '.join(sorted(ORDERS))}")
+    if layout is not None and layout not in LAYOUTS:
+        raise FontError(f"there is no {layout!r} layout; "
+                        f"try one of {', '.join(sorted(LAYOUTS))}")
+    starts, holds = LAYOUTS.get(layout, (None, None))
     with open(path, "rb") as f:
         blob = f.read()
     if blob[:len(PNG_MAGIC)] == PNG_MAGIC:
-        slots = from_image(blob)
-        start = 0 if first is None else first
+        slots = from_image(blob, holds)
+        start = first if first is not None else (0 if starts is None else starts)
         slots = {slot + start: glyph for slot, glyph in slots.items()}
     else:
         body, said = strip_header(blob)
         start = first if first is not None else said
         if start is None:
-            start = PLAIN.get(len(body))
+            start = PLAIN.get(len(body)) if starts is None else starts
         if start is None:
             raise FontError(
-                f"{len(body)} bytes is not a font this knows: say where its "
-                "first letter stands with first="
+                f"{len(body)} bytes is not a font this knows: say how it is "
+                "laid out with layout=, or where its first letter stands "
+                "with first="
+            )
+        if holds is not None and len(body) != holds * GLYPH_ROWS:
+            raise FontError(
+                f"a {layout} font is {holds * GLYPH_ROWS} bytes and this is "
+                f"{len(body)}"
             )
         slots = glyphs_of(body, start)
     return in_order(slots, ORDERS[order])
