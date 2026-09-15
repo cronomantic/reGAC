@@ -242,6 +242,17 @@ new_line:
 ; bytes of bits and what goes on the screen is sixty four bytes of colour, one
 ; a pixel, which is what a screen without clash costs.
 ; Corrupts: everything
+; The ink the text is printed in, from a change of ink in a message.  Here a
+; pixel is a byte of palette and the palette is the Spectrum's sixteen in
+; order, so the colour asked for is the colour written.
+; Corrupts: AF
+text_ink:
+                and     15
+                ld      (text_colour), a
+                ret
+
+text_colour:    db      TEXT_INK
+
 print_char:
                 push    af
                 ld      hl, font_first
@@ -267,7 +278,7 @@ print_char:
                 push    af
                 ld      a, TEXT_PAPER
                 jr      nc, .lay_it
-                ld      a, TEXT_INK
+                ld      a, (text_colour)
 .lay_it:
                 ld      (hl), a
                 inc     l

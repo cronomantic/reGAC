@@ -102,6 +102,26 @@ quiera su propia Ñ la pone en el 241 y se respeta; encima de un glifo dibujado
 no se compone nada. Cómo se le da una fuente propia —entera en un fichero o
 letra a letra— está en [`formato-fuente.md`](formato-fuente.md).
 
+## El cambio de tinta
+
+El código 1 del juego de caracteres no es una letra: dice que la tinta cambia,
+y el código que va detrás dice a cuál. En el fuente se escribe `\ink 5` dentro
+del propio texto del mensaje, porque lo que va en rojo es una palabra de una
+frase y no una propiedad del mensaje entero.
+
+El color viaja **como un carácter imprimible**: el 0 es `0`, el 15 es `?`. Es
+raro a primera vista y tiene un motivo. El compresor empareja códigos, y un
+color guardado como número crudo sería un código por debajo del espacio, que es
+donde viven las letras que el ASCII no tiene; guardado como carácter es un
+código corriente, así que un cambio de tinta se empaqueta y se desempaqueta con
+el texto que lo rodea y el compresor ni se entera de que está ahí. De paso,
+ningún color puede ser nunca el 0, que es lo que termina una cadena.
+
+El que imprime obedece los dos códigos y no dibuja ninguno. Para partir líneas,
+un comando corta la palabra igual que lo haría un espacio pero no ocupa sitio,
+así que el ancho de lo que se imprime no cambia porque haya colores.
+
+
 ## Al vocabulario se le caen las marcas
 
 Ningún teclado de estas máquinas tiene tecla de acento, así que un vocabulario

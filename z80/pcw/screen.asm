@@ -269,6 +269,12 @@ new_line:
 ; a column are eight bytes in a row, so a glyph goes down in one loop; it goes
 ; down inside out, because the text is black on white paper.
 ; Corrupts: AF, BC, DE, HL
+; A change of ink, which this machine cannot do: there is one colour and it
+; is on or off.  The command is read and let go, so that an adventure written
+; for the others plays here unchanged.
+text_ink:
+                ret
+
 print_char:
                 push    af
                 ld      a, TEXT_BANK

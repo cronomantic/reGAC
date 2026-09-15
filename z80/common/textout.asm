@@ -6,14 +6,21 @@
 ; cursor sits, both of which the machine's own screen layer names, so every
 ; machine shares it.
 
+; A code that is not a letter but a command to whoever is printing: the one
+; there is says the ink changes, and the code after it says to what.  See
+; doc/textos.md.
+INK_CODE        equ 1
+INK_ZERO        equ 48                  ; the colour rides as a character
+
 ; Print BC characters from HL, breaking between words so none is split.
 ; Corrupts: AF, BC, DE, HL
 print_text:
 .word:
-                ld      a, b
+                call    obey_commands           ; a change of ink, if there is
+                ld      a, b                    ; one waiting
                 or      c
                 ret     z
-                ; how long is the run up to the next space
+                ; how long is the run up to the next space or command
                 push    hl
                 push    bc
                 ld      de, 0                   ; E counts it
@@ -25,6 +32,8 @@ print_text:
                 push    hl
                 cp      SPACE_CODE
                 pop     hl
+                jr      z, .measured
+                cp      INK_CODE
                 jr      z, .measured
                 inc     hl
                 dec     bc
@@ -70,7 +79,9 @@ print_text:
                 ld      a, b
                 or      c
                 ret     z
-                ld      a, (hl)                 ; the space itself
+                ld      a, (hl)                 ; the space itself, unless what
+                cp      INK_CODE                ; stopped the run was a command
+                jr      z, .word
                 inc     hl
                 dec     bc
                 push    bc
@@ -79,4 +90,29 @@ print_text:
                 pop     hl
                 pop     bc
                 jr      .word
+
+; Obey whatever commands are at HL, of which there is one: a change of ink.
+; HL and BC come back past them, so a run of commands costs one call.
+; Corrupts: AF, DE
+obey_commands:
+                ld      a, b
+                or      c
+                ret     z
+                ld      a, (hl)
+                cp      INK_CODE
+                ret     nz
+                inc     hl
+                dec     bc
+                ld      a, (hl)                 ; the colour follows it
+                inc     hl
+                dec     bc
+                sub     INK_ZERO
+                push    bc
+                push    hl
+                push    de
+                call    text_ink
+                pop     de
+                pop     hl
+                pop     bc
+                jr      obey_commands
 

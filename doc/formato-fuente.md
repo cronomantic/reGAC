@@ -43,6 +43,27 @@ final de una línea las une sin separación ninguna. Una línea de texto que
 empiece por `#`, `/`, `;` o `|` se escribe precedida de `|`, que el compilador
 descarta.
 
+Dentro del texto hay **comandos**, que empiezan por barra invertida:
+
+| Comando | Qué hace |
+|---|---|
+| `\ink n` | lo que sigue se imprime en el color n |
+| `\\` | una barra invertida de verdad |
+
+    #14
+    El dragón es \ink 2 rojo \ink 7 y está dormido.
+
+El comando **se come los espacios que lo siguen**, como en cualquier otro
+lenguaje con comandos dentro del texto, para que `rojo \ink 2 y negro` salga
+con un espacio entre las palabras y no con dos.
+
+Los colores son los dieciséis del Spectrum, los mismos que en las láminas: del
+8 en adelante es el mismo color brillante. Cada máquina los entiende a su
+manera —el MSX se queda con el más parecido de los suyos, el Amstrad toma el
+número como una de sus cuatro plumas, y el PCW, que no tiene color, lee el
+comando y sigue—, que es exactamente lo que ya hacen con los colores de una
+lámina. El cambio dura hasta el siguiente, no hasta el final del mensaje.
+
 | Sección  | Contenido                                                   |
 |----------|-------------------------------------------------------------|
 | `/CTL`   | Configuración de la aventura                                |

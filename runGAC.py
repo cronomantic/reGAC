@@ -26,7 +26,7 @@ import json
 import random
 import platform
 
-from regac.text import typed
+from regac.text import expand, plain, typed
 
 
 if platform.system() == "Windows":
@@ -925,6 +925,10 @@ class GAC_Interpreter:
             self.main_loop()
 
     def print(self, string):
+        # A change of ink is written inside the text of a message and is not
+        # text: this screen has one colour, so it comes out here the way it is
+        # ignored on a machine that cannot colour anything either.
+        string = plain(expand(string))
         # This method replicates the 8bit mechanism. No much python-correctness is expected
         separators = self.punctuation + ["\n"]
         pos = 0

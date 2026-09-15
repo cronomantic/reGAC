@@ -17,7 +17,6 @@ SHADOW_STEP     equ (SHADOW_COLOURS - SHADOW) >> 8       ; rows between tables
 ; The nearest colour this machine has to each of the Spectrum's eight, worked
 ; out by plain distance in red, green and blue.  Bright and flash have nowhere
 ; to go here, so they are not looked at.
-msx_colours:    db      1, 4, 6, 13, 2, 7, 10, 14
 
 ; Turn the adventure's y into a screen row.  In A, out A.
 to_row:

@@ -820,27 +820,58 @@ es inevitable: son sonidos distintos hechos con cosas distintas.
   aparato y no molesta al AY, así que suenan a la vez sin más. En el Amstrad
   no podría ser, que es el mismo chip.
 
-## Un comando para cambiar el color de la letra
+## El color de la letra, que ya se cambia
 
-Pedido, y no hecho. La idea es tener **renglones de distintos colores**: que un
-mensaje pueda decir que lo que viene detrás va en otra tinta, y que el
-intérprete lo obedezca al imprimir.
+Pedido hace tiempo y hecho. Se escribe **dentro del texto del mensaje**, que es
+donde va: lo que sale en rojo es una palabra de una frase y no una propiedad
+del mensaje entero.
 
-Media pieza está puesta ya: el **código 1 del juego de caracteres está
-reservado** para esto y no se lo lleva ninguna letra, así que puede aparecer en
-mitad de un texto empaquetado sin chocar con nada. Lo que falta es lo otro:
+    #14
+    El dragón es \ink 2 rojo \ink 7 y está dormido.
 
-- cómo se escribe en el fuente —lo más parecido a lo que ya hay sería una
-  secuencia en el propio texto del mensaje, del estilo de `\ink 5`, que el
-  compilador convierte en el código 1 y un byte de color;
-- que `textout.asm` lo entienda al imprimir, en lugar de mandarlo a la pantalla
-  como si fuera una letra;
-- y qué significa un color en cada máquina, que es lo mismo que ya resuelven
-  los dispositivos de las láminas: el Spectrum tiene tinta y papel por celda, el
-  Amstrad plumas, el PCW no tiene color ninguno y el Next un byte por píxel.
+El comando se come los espacios que lo siguen, como en cualquier otro lenguaje
+con comandos dentro del texto, para que no salgan dos espacios donde el autor
+escribió uno; `\\` es una barra invertida de verdad. Los colores son los
+dieciséis del Spectrum, los mismos que en las láminas: del 8 en adelante es el
+mismo color brillante. El cambio dura hasta el siguiente y no hasta el final
+del mensaje.
 
-Conviene decidir de paso si el cambio dura hasta el final del mensaje o hasta
-que otro lo cambie, y si el papel también se puede tocar o sólo la tinta.
+**Cómo viaja.** El código 1 del juego de caracteres, que estaba reservado desde
+que el juego pasó a ser fijo, dice que la tinta cambia, y el código siguiente
+dice a cuál —y ese va como **carácter imprimible**: el 0 es `0` y el 15 es `?`.
+Es raro a primera vista y tiene motivo: el compresor empareja códigos, y un
+color guardado como número crudo sería un código por debajo del espacio, que es
+donde viven las letras que el ASCII no tiene. Como carácter es un código
+corriente, así que un cambio de tinta se empaqueta y se desempaqueta con el
+texto que lo rodea y el compresor no sabe que está ahí. De paso, ningún color
+puede ser nunca el 0, que es lo que termina una cadena.
+
+**Qué significa un color en cada máquina**, que es lo mismo que ya resolvían las
+láminas:
+
+| máquina | qué hace con el número |
+|---|---|
+| Spectrum y Next | el color tal cual, con el brillo del bit de arriba |
+| MSX | el más parecido de los suyos, por la misma tabla que las láminas |
+| Amstrad | la pluma, de cero a tres, que es lo que un color significaba en las aventuras de esa máquina |
+| PCW | nada: lee el comando y sigue, que es como una máquina de un solo color tiene que comportarse |
+
+En el Spectrum eso obligó a **guardar el borde en memoria** —el puerto no se
+puede leer y el altavoz es otro bit del mismo— y a poner el atributo de cada
+celda al imprimir, que es una escritura más por carácter. En el Amstrad hubo
+que darle plumas al impresor: en modo 1 los dos bits de un píxel viven en
+mitades distintas del byte, así que una pluma son dos máscaras y una Y con cada
+una.
+
+**El intérprete de PC también lo hace**: el de texto se lo quita, porque no
+tiene colores, y el de pygame, que tiene atributos como la máquina que copia,
+lo obedece.
+
+**Lo que queda de esto**: decidir si un mensaje debería empezar siempre con la
+tinta por defecto en vez de heredar la del anterior. Hoy hereda, que es lo que
+hace que se pueda pintar un renglón entero sin repetir el comando, pero también
+lo que hace que un mensaje que cambia la tinta y no la devuelve tiña todo lo que
+venga después.
 
 ## Cosas menores
 

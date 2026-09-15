@@ -40,6 +40,7 @@ nothing else.
 """
 
 import collections
+import re
 import unicodedata
 
 MAX_CODES = 256
@@ -57,14 +58,15 @@ MAX_CODES = 256
 #
 # The first two codes are not characters and never will be.  Nought is the
 # null, so that a zero byte in a stream of text can only ever mean nothing at
-# all; one is kept for a change of colour, for when a message wants to say a
+# all; one is a change of colour, for when a message wants to say a
 # word in another ink.
 #
 # The capitals of the accented vowels are here even though the Academy lets
 # them go unaccented, because a title looks wrong without them.  What is not
 # here cannot be used, and the build says so rather than printing a blank.
 NULL_CODE = 0
-INK_CODE = 1                            # not used yet, and not to be taken
+INK_CODE = 1                            # a change of ink; the code after it
+                                        # says which, and see below
 SPECIALS_FIRST = 2
 SPECIALS = (
     "áéíóúüñ"           #  2-8   Spanish, in small letters
@@ -83,8 +85,84 @@ PAIRS = MAX_CODES - FIRST_PAIR
 assert SPECIALS_FIRST + len(SPECIALS) <= ASCII_FIRST, "too many to fit below the space"
 
 
+# A change of ink, as it is written in a source and as it travels.
+#
+# In the source it is a command inside the text itself, `\ink 5`, because that
+# is where it belongs: what is red is a word of a sentence and not a property
+# of the whole message.  The spaces after it are eaten, as they are after a
+# command in any other language of this kind, so that `rojo \ink 2 y negro`
+# has one space between its words and not two.  A backslash of one's own is
+# written `\\`.
+#
+# What it turns into is two codes: INK_CODE, and then the colour -- and the
+# colour rides as a printable character, nought being `0` and fifteen `?`,
+# for a reason worth the oddity.  The compressor pairs codes, and a colour
+# carried as a raw number would be a code below the space, which is where the
+# letters ASCII has not got live; carried as a character it is an ordinary
+# code like any other, so a change of ink packs and unpacks along with the
+# text around it and nothing in the compressor knows it is there.
+#
+# The colours are the Spectrum's sixteen, as they are in the pictures: eight
+# and above is the same colour bright.  Every machine reads them its own way.
+INK_CHAR = "\x01"
+INK_ARG_FIRST = ord("0")
+INK_COLOURS = 16
+
+COMMAND = re.compile(r"\\(?:(\\)|ink[ \t]*(\d{1,2})[ \t]*|(.))", re.S)
+
+
+def expand(text):
+    """Text as it is written, with its commands turned into what they travel
+    as."""
+    def one(found):
+        if found.group(1):
+            return "\\"
+        if found.group(2) is not None:
+            colour = int(found.group(2))
+            if colour >= INK_COLOURS:
+                raise ValueError(
+                    rf"\ink {colour} asks for a colour there is not: they run"
+                    f" from 0 to {INK_COLOURS - 1}"
+                )
+            return INK_CHAR + chr(INK_ARG_FIRST + colour)
+        raise ValueError(rf"\{found.group(3)} is not a text command")
+    return COMMAND.sub(one, text)
+
+
+def written(text):
+    """The other way about: expanded text, as it would be written in a
+    source."""
+    out = []
+    at = 0
+    while at < len(text):
+        char = text[at]
+        if char == INK_CHAR:
+            out.append(rf"\ink {ord(text[at + 1]) - INK_ARG_FIRST} ")
+            at += 2
+            continue
+        out.append("\\\\" if char == "\\" else char)
+        at += 1
+    return "".join(out)
+
+
+def plain(text):
+    """And what is left when the commands come out, which is what anything
+    that only wants the letters should look at."""
+    out = []
+    at = 0
+    while at < len(text):
+        if text[at] == INK_CHAR:
+            at += 2
+            continue
+        out.append(text[at])
+        at += 1
+    return "".join(out)
+
+
 def code_of(char):
     """The code a character takes, or None if it has no place at all."""
+    if char == INK_CHAR:
+        return INK_CODE
     at = SPECIALS.find(char)
     if at >= 0:
         return SPECIALS_FIRST + at
@@ -132,11 +210,18 @@ class Charset:
             )
         self.codes = {c: code_of(c) for c in sorted(used, key=code_of)}
         self.chars = {code: c for c, code in self.codes.items()}
-        self.first = min(self.chars, default=0)
-        last = max(self.chars, default=0)
+        # The font carries letters and nothing else.  A change of ink has a
+        # code like a letter, so that the compressor can pair it, but it is
+        # never drawn -- and if it counted here it would drag the run of
+        # glyphs down to code one and make the font carry the thirty blanks in
+        # between for nothing.
+        glyphs = {code: c for code, c in self.chars.items()
+                  if code >= SPECIALS_FIRST}
+        self.first = min(glyphs, default=0)
+        last = max(glyphs, default=0)
         # The run, holes and all: a hole is a code nothing uses, and what the
         # font carries for it is eight noughts.
-        self.order = [self.chars.get(code) for code in range(self.first, last + 1)]
+        self.order = [glyphs.get(code) for code in range(self.first, last + 1)]
 
     def __len__(self):
         return len(self.order)
@@ -244,6 +329,10 @@ class TextStore:
     """An adventure's text, ready to be written out for a machine."""
 
     def __init__(self, texts, extra=()):
+        # The commands an author writes inside the text become codes here, at
+        # the one door every text comes through, so that nothing further in
+        # has to know they were ever written differently.
+        texts = [expand(text) for text in texts]
         self.charset = Charset(texts, extra)
         encoded = [self.charset.encode(t) for t in texts]
         self.packer, self.messages = pack(encoded, FIRST_PAIR, PAIRS)

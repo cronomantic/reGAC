@@ -233,6 +233,54 @@ new_line:
 ; font byte becomes the first and the bottom half the second, every pixel one
 ; bit of pen one.
 ; Corrupts: everything
+; Four pixels, one to a bit in the top half of A, given the pen the text is
+; in.  A pen is two bits of a pixel and the two live in different halves of
+; the byte -- the high one where these pixels already are, the low one four
+; places down -- so a pen is two masks and this is an AND with each.
+; Corrupts: AF, C
+in_pen:
+                ld      c, a
+                ld      a, (pen_high)
+                and     c
+                push    af
+                ld      a, c
+                rrca
+                rrca
+                rrca
+                rrca
+                ld      c, a
+                ld      a, (pen_low)
+                and     c
+                ld      c, a
+                pop     af
+                or      c
+                ret
+
+; The ink the text is printed in, from a change of ink in a message.  This
+; machine has four pens and a picture chooses their colours, so what a number
+; means here is the pen itself, which is what the adventures written for this
+; machine meant by a colour in the first place.
+; Corrupts: AF
+text_ink:
+                and     3
+                ld      c, a
+                ld      a, 0
+                bit     1, c
+                jr      z, .no_high
+                ld      a, $F0
+.no_high:
+                ld      (pen_high), a
+                ld      a, 0
+                bit     0, c
+                jr      z, .no_low
+                ld      a, $0F
+.no_low:
+                ld      (pen_low), a
+                ret
+
+pen_high:       db      $F0             ; pen two, which is what it printed in
+pen_low:        db      0               ; before there was any choice
+
 print_char:
                 push    af
                 ld      hl, font_first
@@ -252,6 +300,7 @@ print_char:
 .row:
                 ld      a, (hl)
                 and     $F0                     ; the left four pixels
+                call    in_pen
                 ld      (de), a
                 inc     de
                 ld      a, (hl)
@@ -259,6 +308,7 @@ print_char:
                 add     a, a
                 add     a, a
                 add     a, a                    ; and the right four
+                call    in_pen
                 ld      (de), a
                 dec     de
                 inc     hl

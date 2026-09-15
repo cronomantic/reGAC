@@ -62,6 +62,11 @@ MSX_BLACK       equ 1
 MSX_WHITE       equ 14
 TEXT_COLOUR     equ (MSX_WHITE << 4) | MSX_BLACK
 
+; The eight the pictures ask for, in this machine's own numbers.  It lives
+; here rather than with the drawing because the text wants it too, and every
+; build that prints has this file.
+msx_colours:    db      1, 4, 6, 13, 2, 7, 10, 14
+
 ; The eight registers screen 2 wants.
 screen_setup:   db      $02             ; graphics two
                 db      $C0             ; sixteen K, display on, no interrupt
@@ -318,6 +323,29 @@ new_line:
 ; Draw the glyph for code A at the cursor and step right: eight bytes of
 ; pattern and eight of colour, which is what a line of colour costs here.
 ; Corrupts: everything
+; The ink the text is printed in, from a change of ink in a message: one of
+; the Spectrum's sixteen, taken to the nearest of this machine's the same way
+; a picture's colours are.  Bright is nothing here, so it comes off.
+; Corrupts: AF, HL
+text_ink:
+                and     7
+                ld      hl, msx_colours
+                add     a, l
+                ld      l, a
+                jr      nc, .found
+                inc     h
+.found:
+                ld      a, (hl)
+                rlca
+                rlca
+                rlca
+                rlca                            ; the ink is the top half
+                or      MSX_BLACK               ; on the paper the text has
+                ld      (text_colour), a
+                ret
+
+text_colour:    db      TEXT_COLOUR
+
 print_char:
                 push    af
                 ld      hl, font_first
@@ -345,8 +373,8 @@ print_char:
                 ld      h, a
                 call    vram_write
                 ld      b, 8
+                ld      a, (text_colour)
 .colour:
-                ld      a, TEXT_COLOUR
                 out     (VDP_DATA), a
                 djnz    .colour
                 pop     af

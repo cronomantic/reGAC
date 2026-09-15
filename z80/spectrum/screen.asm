@@ -121,6 +121,48 @@ new_line:
                 ld      (cursor_y), a
                 ret
 
+; The attribute of the cursor's cell, in HL.
+; Corrupts: AF, DE
+attr_address:
+                ld      a, (cursor_y)
+                ld      l, a
+                ld      h, 0
+                add     hl, hl
+                add     hl, hl
+                add     hl, hl
+                add     hl, hl
+                add     hl, hl                  ; thirty two to a row
+                ld      a, (cursor_x)
+                add     a, l
+                ld      l, a
+                jr      nc, .no_carry
+                inc     h
+.no_carry:
+                ld      de, $5800
+                add     hl, de
+                ret
+
+; The ink the text is printed in, from a change of ink in a message: A is one
+; of the Spectrum's sixteen, eight and above being the same colour bright, and
+; what is kept is the whole attribute byte -- the paper stays black, which is
+; what the text window is cleared to.
+; Corrupts: AF, BC
+text_ink:
+                and     15
+                ld      c, a
+                and     7
+                ld      b, a
+                ld      a, c
+                and     8
+                jr      z, .plain
+                ld      a, %01000000            ; bright, in an attribute
+.plain:
+                or      b
+                ld      (text_attr), a
+                ret
+
+text_attr:      db      TEXT_ATTR
+
 ; Draw the glyph for code A at the cursor and step right.
 ; Corrupts: AF, BC, DE, HL
 print_char:
@@ -145,6 +187,9 @@ print_char:
                 inc     hl
                 inc     d                       ; next pixel line
                 djnz    .row
+                call    attr_address            ; and the colour of the cell
+                ld      a, (text_attr)
+                ld      (hl), a
                 pop     af
                 ; step right, wrapping to the next line at the edge
                 ld      a, (cursor_x)

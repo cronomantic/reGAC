@@ -34,9 +34,30 @@ import json
 from regac.devices import SpectrumDevice
 from regac.gfx import SOURCE_ROWS as PICTURE_ROWS
 from regac.gfx import Renderer
+from regac.text import INK_ARG_FIRST, INK_CHAR, expand
 
 GFX_CHAR_WIDTH = SpectrumDevice.char_width
 from runGAC import GAC_Interpreter
+
+
+
+def split_inks(text):
+    """A message cut into its pieces of text and its changes of ink, which
+    come back as the number of the colour asked for."""
+    out = []
+    expanded = expand(text)
+    at = 0
+    while at < len(expanded):
+        if expanded[at] == INK_CHAR:
+            out.append(ord(expanded[at + 1]) - INK_ARG_FIRST)
+            at += 2
+            continue
+        to = expanded.find(INK_CHAR, at)
+        if to < 0:
+            to = len(expanded)
+        out.append(expanded[at:to])
+        at = to
+    return out
 
 
 class GAC_Interpreter_Pygame(GAC_Interpreter):
@@ -335,6 +356,8 @@ class GAC_Interpreter_Pygame(GAC_Interpreter):
                 elif cmd == 0x08:  # drop the picture, text takes the screen
                     self.text_top = 0
                     self.cls()
+                elif cmd == 0x09:  # the ink the text is printed in
+                    self.print_att = (self.print_att & 0x38) | rx_data[1]
 
     def __interpreter_task(self):
         if not self.ready:
@@ -344,6 +367,17 @@ class GAC_Interpreter_Pygame(GAC_Interpreter):
             self.main_loop()
 
     def print(self, txt):
+        # A change of ink is a command written inside the text of a message.
+        # This screen has attributes, like the machine it copies, so it obeys
+        # it: the text is cut where the commands are, and each piece goes out
+        # behind the colour it asked for.
+        for piece in split_inks(txt):
+            if isinstance(piece, int):
+                self.cmd_queue.put((0x09, piece))
+            else:
+                self.print_plain(piece)
+
+    def print_plain(self, txt):
         # This method replicates the 8bit mechanism. No much python-correctness is expected
         separators = self.punctuation + ["\n"]
         pos = 0
