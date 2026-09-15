@@ -6,6 +6,9 @@
 ;
 ;   $0000  the window a bank of the database appears in -- or the 48K ROM,
 ;          for as long as a save takes
+;   $4000  the music, in a build that has any: seven kilobytes nothing else
+;          wants, because this machine's screen is layer 2 and the sixteen
+;          kilobytes a Spectrum keeps its screen in are free here
 ;   $5C00  left free, because that is where the ROM keeps its variables and
 ;          the ROM is borrowed to save a game
 ;   $5D00  what is resident of the database
@@ -39,6 +42,18 @@
                 UNDEFINE SCREEN
                 ENDIF
 
+; A build with music is told so with -DWITH_MUSIC, and one with sound effects
+; as well with -DWITH_EFFECTS.  The sound chip here is the Spectrum's, at the
+; same ports and the same clock, so the player is the Spectrum's as well.
+                IFDEF WITH_MUSIC
+                DEFINE  PLY_AKM_HARDWARE_SPECTRUM 1
+                IFDEF WITH_EFFECTS
+                DEFINE  PLY_AKM_MANAGE_SOUND_EFFECTS 1
+                ENDIF
+                ENDIF
+
+MUSIC_AT        equ $4000
+MUSIC_CEILING   equ $5C00               ; where the ROM's variables begin
 STACK_AT        equ $BF00
 DB_FIRST_PAGE   equ 32                  ; the 8K pages the banks are put in,
                                         ; clear of the ones a Spectrum has and
@@ -118,6 +133,20 @@ db_resident_image:
                 INCBIN  "game.rgac", 0, DB_RESIDENT_SIZE
                 ASSERT  $ <= $8000      ; or it would run into the interpreter
 
+; And the music, in the same page, below where the database begins.  It is
+; written into the .nex with everything else in that page, so there is no
+; loading to arrange.
+                IFDEF WITH_MUSIC
+                ORG     MUSIC_AT
+music_at:
+                include "../common/music.asm"
+                include "../arkos/PlayerAkm.asm"
+                include "interrupt.asm"
+                include "../../music/tunes.asm"
+music_end:
+                ASSERT  music_end <= MUSIC_CEILING
+                ENDIF
+
                 SLOT    4
                 PAGE    4
                 ORG     $8000
@@ -135,6 +164,14 @@ start:
                 call    vm_init
                 call    vocab_init
                 call    loop_init
+                IFDEF WITH_MUSIC
+                call    music_init
+                IFDEF PLY_AKM_MANAGE_SOUND_EFFECTS
+                ld      hl, effects
+                call    sound_init
+                ENDIF
+                call    interrupt_init
+                ENDIF
                 ; the player starts where the adventure says
                 ld      a, SECTION_CONFIG
                 call    db_section

@@ -1,0 +1,141 @@
+# ReGAC, tools for Graphic Adventure Creator adventures.
+#
+# Copyright (C) 2025 Cronomantic
+#
+# This program is free software: you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by the Free
+# Software Foundation, either version 3 of the License, or (at your option)
+# any later version.
+#
+# This program is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+# FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+# more details.
+#
+# You should have received a copy of the GNU General Public License along with
+# this program.  If not, see <https://www.gnu.org/licenses/>.
+#
+# The interpreters in z80/ are not part of this program and are given under
+# the MIT licence instead: see z80/LICENSE.
+#
+"""A whole adventure played with the music on, on a Spectrum Next.
+
+The map here looked full, and then it turned out to have seven kilobytes going
+spare in the least likely place: this machine draws on layer 2, so the sixteen
+kilobytes where a Spectrum keeps its screen hold nothing at all.  The music
+goes at $4000, in the same page as what is resident of the database and below
+it, and the .nex carries that page anyway, so there is no loading to arrange.
+
+What is checked is what the other machines are checked for: the adventure
+asked for a tune, the interrupt is playing it, and the game goes on being a
+game while it does -- here at twenty eight megahertz, where a frame is eight
+times the work and the player is the same fifty calls a second.
+"""
+
+import json
+import os
+import sys
+
+try:
+    import pytest
+except ImportError:
+    pytest = None
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, ROOT)
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+import emulator  # noqa: E402
+from regac.binary import Database  # noqa: E402
+from regac.conds import compile_block  # noqa: E402
+from test_game_next import (ADVENTURE, DATABASE, DEFS, IMAGE,  # noqa: E402
+                            LISTING, SOURCE, glyph_table, wait_screen)
+from test_music_z80 import TUNE, word  # noqa: E402
+
+EFFECTS = os.path.join(ROOT, "music", "effects.asm")
+
+ENTER = chr(13)
+NOT_UNDERSTOOD = "242"
+A_FLAG = 250                    # one this adventure does not use
+
+if pytest is not None:
+    needs_tools = pytest.mark.skipif(
+        not emulator.available()
+        or not os.path.exists(ADVENTURE)
+        or not os.path.exists(TUNE)
+        or not os.path.exists(EFFECTS),
+        reason="sjasmplus and ZEsarUX must be in tools/, with a decompiled"
+               " adventure, a tune and a bank of effects",
+    )
+else:
+
+    def needs_tools(func):
+        return func
+
+
+def build():
+    """The adventure with one condition of our own in front of its own: play
+    the first tune on the first turn and never again."""
+    with open(ADVENTURE, encoding="utf-8") as f:
+        ddb = json.load(f)
+    ddb["hpcs"] = compile_block(
+        [f"IF ( RES? {A_FLAG} ) SET {A_FLAG} MUSIC 0 END"]
+    ) + ddb["hpcs"]
+    database = Database(ddb, machine="next", page_bits=14)
+    with open(DATABASE, "wb") as f:
+        f.write(database.build())
+    with open(DEFS, "w", encoding="utf-8") as f:
+        f.write("; Written by the test.\n")
+        f.write(f"DB_RESIDENT_SIZE equ {database.resident_size}\n")
+        f.write(f"DB_BANK_COUNT    equ {len(database.banks)}\n")
+        f.write(f"DB_BANK_BYTES    equ {1 << database.page_bits if database.banks else 0}\n")
+        for n, bank in enumerate(database.banks):
+            f.write(f"DB_BANK_USED_{n}   equ {len(bank)}\n")
+    listing = emulator.assemble(SOURCE, listing=LISTING,
+                                defines=("WITH_MUSIC", "WITH_EFFECTS"))
+    return ddb, database, listing
+
+
+@needs_tools
+def test_an_adventure_plays_with_the_music_on():
+    ddb, database, listing = build()
+    glyphs = glyph_table(database)
+    where = {name: emulator.label_address(listing, name)
+             for name in ("music_playing", "music_tune", "music_at", "music_end",
+                          "PLY_AKM_Track1_PtTrack")}
+    prompt = ddb["messages"]["240"].strip()[:3]
+    puzzled = ddb["messages"][NOT_UNDERSTOOD]
+
+    session = emulator.Session(machine="TBBlue")
+    try:
+        session.load(IMAGE)
+        opening = wait_screen(session, glyphs, prompt)
+        assert any(prompt in line for line in opening if line), (
+            f"the interpreter never asked: {opening}"
+        )
+
+        assert session.read(where["music_playing"], 1)[0] == 1, (
+            "the adventure asked for a tune and nothing is playing"
+        )
+        assert session.read(where["music_tune"], 1)[0] == 0
+        at = word(session, where["PLY_AKM_Track1_PtTrack"])
+        assert where["music_at"] <= at < where["music_end"], (
+            f"the player is not reading the tune where it was put: ${at:04X}"
+        )
+
+        session.type("XYZZY" + ENTER)
+        answered = wait_screen(session, glyphs, puzzled[:6], timeout=30.0)
+        assert any(puzzled[:6] in line for line in answered), (
+            f"the parser stopped answering with the music on: {answered}"
+        )
+        assert word(session, where["PLY_AKM_Track1_PtTrack"]) != at, (
+            "the tune stopped while the adventure was played"
+        )
+        assert session.read(where["music_playing"], 1)[0] == 1
+    finally:
+        session.close()
+
+
+if __name__ == "__main__":
+    test_an_adventure_plays_with_the_music_on()
+    print("an adventure plays with the music on")

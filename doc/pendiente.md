@@ -672,6 +672,60 @@ por debajo con un canal menos, y cuando el efecto se acaba el canal vuelve a la
 melodía. Va al canal tercero, porque las melodías de estas máquinas suelen
 llevar la voz en el primero y el bajo en el segundo.
 
+**Ya se pide desde la aventura.** Tres opcodes nuevos, los primeros que no son
+del GAC original —había sitio de sobra: un byte con el bit 7 puesto es un
+número, así que del $40 al $7F estaba libre—:
+
+| opcode | qué hace |
+|---|---|
+| `MUSIC n` | toca la melodía n de la lista, contando desde cero |
+| `SOUND n` | hace el efecto n del banco, contando desde uno |
+| `QUIET` | calla la música |
+
+Una versión **sin música** —el PCW, que no tiene chip; un Spectrum de 48K;
+cualquier máquina antes de que el autor componga nada— lee los tres igual, se
+come el argumento y sigue. Eso es lo que permite que una misma aventura se
+compile para cinco máquinas sin escribirla cinco veces, y es la prueba que más
+dolería perder.
+
+**Dónde cabe la música, máquina por máquina.** Esta fue la sorpresa. Encima del
+intérprete no hay sitio en ninguna parte: en el 128 el código, lo residente de
+la base de datos y el rincón de la interrupción llegan juntos a $C000, y de las
+ocho aventuras descompiladas **sólo una** dejaba hueco para reproductor y
+melodía —y por treinta y dos bytes—. Debajo sí hay:
+
+| máquina | dónde va | cuánto hay |
+|---|---|---|
+| Spectrum 128 | $6000, debajo del intérprete | 7 KB, bloque propio en la cinta |
+| MSX | encima del código, bajo el rincón de la interrupción | 7,4 KB, en el mismo bloque |
+| Next | **$4000**, en la página de lo residente | 7 KB, ya va en el `.nex` |
+| Amstrad | no cabe | — |
+
+Lo del Next es lo más bonito: esta máquina dibuja en layer 2, así que los
+dieciséis kilobytes donde un Spectrum tiene la pantalla están vacíos.
+
+En el 128 la música viaja en **un bloque propio**, y en la tabla del cargador va
+*después* del bloque del intérprete y no antes: el propio cargador está ahí
+abajo, dentro de la línea BASIC en la que viajó, y un bloque que fuese primero
+le caería encima de la tabla que todavía está recorriendo.
+
+**El Amstrad se queda fuera de momento.** Código, base de datos y música son un
+solo tramo desde $4000 y lo que los para son las variables del firmware en
+$B100 —el firmware duerme, pero la cinta se graba por su jumpblock, así que lo
+que guarda ahí abajo tiene que seguir—. Con las ocho aventuras la más pequeña
+se queda en $A379, y 3,9 KB de música no entran. Debajo de $4000 hay dieciséis
+kilobytes libres, con las dos ROM fuera, pero **no se puede cargar nada ahí**:
+la línea BASIC que carga el juego está en el $0170 y se la cargaría encima
+mientras se ejecuta. Las salidas, por orden de lo que cuestan:
+
+1. Un cargador propio en código máquina en vez del BASIC, que se traiga la
+   música a $0100 él mismo y luego el resto. Es lo que hacían los juegos de la
+   época.
+2. Bancos en el CPC, que tiene 128K y el formato binario ya los contempla: la
+   música a un banco, como en el 128.
+3. Dejar la música para aventuras pequeñas, que es donde está ahora: el
+   `ASSERT` del fuente dice cuáles no entran.
+
 **Lo que falta**, que es todo lo que toca al intérprete:
 
 - **Dónde viven las melodías.** Hoy se ensamblan con el intérprete, que es lo
@@ -691,22 +745,27 @@ llevar la voz en el primero y el bajo en el segundo.
   `music_tune` guarda cuál está sonando, así que las dos opciones están a una
   comparación; lo decidirá el comando cuando exista, porque entrar otra vez en
   una habitación no debería cortar la música.
-- **Cómo se pide desde el fuente.** Un comando para empezar una melodía, otro
-  para pararla, y otro para un efecto, con la aventura eligiendo el número. Eso
-  es opcodes nuevos y sintaxis nueva.
-- **Cuándo se calla sola.** Al grabar y cargar en cinta, seguro: el temporizado
-  no admite interrupciones. En el Amstrad hay además un detalle que no se puede
-  olvidar —el AY está detrás del mismo 8255 por el que se lee el teclado, así
-  que un barrido interrumpido a la mitad lee la fila que no es. El barrido
-  tendrá que llevarlas quitadas, y sólo en las versiones con música: volver a
-  ponerlas donde no hay rutina sería saltar a lo que haya en el $0038.
+- **El Amstrad**, según la tabla de más arriba.
+- **Guardar en la partida qué melodía sonaba.** Hoy no se guarda, así que
+  cargar una partida deja sonando lo que sonara.
 - **Cómo la trae el autor.** Lo mismo que con las fuentes: exportar de Arkos e
   incluir. Falta decidir si la herramienta de autoría se traga el `.aks` o sólo
   el fuente ya exportado.
 - **El PCW no entra en nada de esto**: no tiene AY, sólo un zumbador.
 
+**Dos cosas que la música se lleva por delante, ya resueltas.** Grabar y cargar
+la callan y la vuelven a poner alrededor de la cinta —el temporizado de un byte
+se cuenta en ciclos y una interrupción en mitad de uno es un byte perdido—, y
+en el Amstrad el barrido del teclado lleva las interrupciones quitadas mientras
+dura, porque el AY está detrás del mismo 8255 y una interrupción en mitad del
+baile deja el chip apuntando al registro de otro. Son treinta microsegundos; la
+música no se entera.
+
 Las melodías no están en el repositorio, que no son nuestras: las pruebas
-piden una en `music/` y se apartan si no hay.
+piden una en `music/` y se apartan si no hay. El fichero que el autor escribe
+es `music/tunes.asm`, con la lista de `MUSIC_TUNE` y los `include` de lo que
+haya exportado del tracker; una versión con música se ensambla con
+`-DWITH_MUSIC`, y con efectos además con `-DWITH_EFFECTS`.
 
 ## Un comando para cambiar el color de la letra
 
