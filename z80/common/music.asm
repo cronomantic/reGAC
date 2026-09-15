@@ -5,6 +5,22 @@
 ; expects to be played by; this is the little that is ours: which tune, and
 ; when.
 ;
+; Which tune is the other part, and it is a list.  A build says what tunes it
+; has with MUSIC_TUNE, one line each, between the labels music_tunes and
+; music_tunes_end:
+;
+;       music_tunes:
+;               MUSIC_TUNE  menu, 0
+;               MUSIC_TUNE  menu, 1
+;               MUSIC_TUNE  cave, 0
+;       music_tunes_end:
+;
+; -- a tune being an address and which subsong of it to play, because one
+; export of the tracker may hold several and they share their instruments,
+; which is much the cheapest way to have more than one.  Two separate exports
+; work as well; they only cost more.  From here on a tune is the number of its
+; line, counting from nought.
+;
 ; The when is the only part with a rule to it.  The player runs from the
 ; interrupt, and an interrupt can arrive at any moment -- including while the
 ; interpreter has a bank of the database in its window.  So the tune must live
@@ -31,26 +47,54 @@ MUSIC_HERTZ     equ 50                  ; how often a tune wants to be played
                 DEFINE MUSIC_RATE 50    ; and how often this machine wakes up
                 ENDIF
 
+MUSIC_ENTRY     equ 3                   ; two bytes of address, one of subsong
+
+; One line of that list.
+                MACRO   MUSIC_TUNE where, subsong
+                dw      where
+                db      subsong
+                ENDM
+
 ; Get ready to play, with nothing playing yet.
 ; Corrupts: AF, HL
 music_init:
                 xor     a
                 ld      (music_playing), a
+                dec     a
+                ld      (music_tune), a         ; none of them
                 ld      hl, MUSIC_RATE
                 ld      (music_rate), hl
                 ld      hl, 0
                 ld      (music_clock), hl
                 ret
 
-; Start the tune at HL, from its first subsong.
+; Start tune A, counting from nought.  Asking for one the build has not got
+; does nothing at all, rather than playing whatever is at the address that is
+; not there: an adventure may well name a tune it has lost.
 ;
 ; The interrupts go off while it is set up, or one could arrive half way
 ; through and play a tune that is not there yet, and come back on after: in a
 ; build with music they are on from the start and stay on.
 ; Corrupts: everything
 music_start:
+                cp      music_count
+                ret     nc
+                ld      (music_tune), a
+                ld      l, a
+                ld      h, 0
+                ld      d, h
+                ld      e, l
+                add     hl, hl
+                add     hl, de                  ; three bytes to the line
+                ld      de, music_tunes
+                add     hl, de
+                ld      e, (hl)
+                inc     hl
+                ld      d, (hl)
+                inc     hl
+                ld      a, (hl)                 ; which subsong of it
+                ex      de, hl
                 di
-                xor     a                       ; subsong nought
                 call    PLY_AKM_Init
                 ld      a, 1
                 ld      (music_playing), a
@@ -63,6 +107,8 @@ music_stop:
                 di
                 xor     a
                 ld      (music_playing), a
+                dec     a
+                ld      (music_tune), a
                 call    PLY_AKM_Stop
                 ei
                 ret
@@ -90,8 +136,13 @@ music_tick:
                 jp      PLY_AKM_Play
 
 music_playing:  db      0
+music_tune:     db      $FF             ; which one, or none
 music_rate:     dw      MUSIC_RATE
 music_clock:    dw      0
+
+; How many the build has, which is the length of its list.  It is worked out
+; here and not said by the build, so that there is one place to add a tune.
+music_count     equ (music_tunes_end - music_tunes) / MUSIC_ENTRY
 
 ; Sound effects, in a build that asks for them.  They are the tracker's as
 ; well: an effect is a little instrument of its own, exported from a song of

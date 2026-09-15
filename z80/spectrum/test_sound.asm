@@ -25,7 +25,7 @@ start:
                 call    interrupt_init
                 ld      hl, effects
                 call    sound_init
-                ld      hl, tune
+                xor     a                       ; the one tune this has
                 call    music_start
                 ei
                 ld      a, $FF
@@ -53,8 +53,12 @@ effect_seen:    db      0
                 include "../arkos/PlayerAkm.asm"
                 include "interrupt.asm"
 
-; A tune and a handful of effects the author made, which are not this
-; project's to carry: see music/.
+; The list of tunes, one line long here, and then the tune and a handful of
+; effects: the author's music, which is not this project's to carry.  See
+; music/.
+music_tunes:
+                MUSIC_TUNE tune, 0
+music_tunes_end:
 tune:
                 include "../../music/test.asm"
 effects:

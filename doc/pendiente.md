@@ -641,6 +641,30 @@ las interrupciones enteras. El MSX lee de qué televisión es en el bit 7 del
 $002B **antes** de quedarse con la máquina, que es cuando todavía hay BIOS a
 la que preguntar; la prueba lo compara con lo que dice la ROM del emulador.
 
+**Varias melodías.** El build dice las que tiene en una lista, una línea por
+melodía, y arrancar una es un número y nada más:
+
+    music_tunes:
+            MUSIC_TUNE  menu, 0
+            MUSIC_TUNE  menu, 1
+            MUSIC_TUNE  cueva, 0
+    music_tunes_end:
+
+Una melodía es una dirección y qué subcanción tocar de ella, porque **un export
+de Arkos puede llevar varias subcanciones** y comparten instrumentos y tablas:
+es con mucho la forma más barata de tener más de una. Dos exports distintos
+también valen, sólo que cuestan lo que ocupan. `music_start` recibe el número
+contando desde cero y, si el build no tiene esa melodía, no hace nada —una
+aventura puede nombrar una que se perdió, y leer la dirección que no está sería
+tocar basura—. La cuenta sale sola de la longitud de la lista, así que añadir
+una melodía se hace en un sitio.
+
+Un detalle que costó descubrir: el tracker **nombra las etiquetas de un export
+con el título de la canción**, y una canción sin título se exporta como
+`Untitled`. Dos de esas en un mismo build son la misma etiqueta dos veces y el
+ensamblador para en seco, así que cada melodía va envuelta en su `MODULE`, que
+le pone prefijo a todas, con la etiqueta de la dirección fuera.
+
 **Los efectos de sonido, puestos.** Un efecto de Arkos es un instrumento suelto
 que el reproductor superpone a uno de los tres canales la próxima vez que la
 interrupción lo llama: pedirlo escribe cinco bytes y vuelve, la melodía sigue
@@ -650,11 +674,23 @@ llevar la voz en el primero y el bajo en el segundo.
 
 **Lo que falta**, que es todo lo que toca al intérprete:
 
-- **Dónde vive la melodía.** Hoy se ensambla con el intérprete, que es lo que
-  hace que la interrupción pueda tocarla con cualquier banco en la ventana. En
-  el formato binario ya hay una sección de música reservada; cuando se use,
-  tiene que quedar en la parte residente o en un banco que no se pagine nunca,
-  y hay que decidir cuántas melodías caben.
+- **Dónde viven las melodías.** Hoy se ensamblan con el intérprete, que es lo
+  que hace que la interrupción pueda tocarlas con cualquier banco en la
+  ventana, y eso pone el techo en la memoria libre: entre 2 y 6 KB según la
+  máquina y lo gorda que sea la aventura, o sea una melodía de tamaño normal en
+  el 128, el Amstrad y el Next, y tres o cuatro en el MSX. Con subcanciones de
+  un mismo export salen más por el mismo precio. En el formato binario ya hay
+  una sección de música reservada, con la forma «una cuenta, y para cada
+  melodía dónde empieza y cuánto mide», y la cabecera lleva modo de música y
+  tamaño de buffer: con `MUSIC_COPY` el buffer residente tiene que medir lo que
+  la melodía mayor, y con `MUSIC_SLOT` la melodía se queda en un banco mapeado
+  a una ranura que el código principal no toca. Cuando eso esté, el techo pasa
+  a ser una melodía por banco y tantas como quepan en los bancos, y la lista de
+  `MUSIC_TUNE` se convierte en esa tabla.
+- **Si volver a pedir la que ya suena la reinicia o no.** Hoy la reinicia.
+  `music_tune` guarda cuál está sonando, así que las dos opciones están a una
+  comparación; lo decidirá el comando cuando exista, porque entrar otra vez en
+  una habitación no debería cortar la música.
 - **Cómo se pide desde el fuente.** Un comando para empezar una melodía, otro
   para pararla, y otro para un efecto, con la aventura eligiendo el número. Eso
   es opcodes nuevos y sintaxis nueva.

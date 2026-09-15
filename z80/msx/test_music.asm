@@ -24,7 +24,7 @@ start:
                 call    take_the_machine
                 call    music_init
                 call    interrupt_init
-                ld      hl, tune
+                xor     a                       ; the one tune this has
                 call    music_start
                 ei
                 ld      a, $FF
@@ -44,7 +44,11 @@ spins:          dw      0
 
                 include "interrupt.asm"
 
-; A tune the author made, which is not this project's to carry: see music/.
+; The list of tunes, which here is one line long, and the tune itself: the
+; author's music, which is not this project's to carry.  See music/.
+music_tunes:
+                MUSIC_TUNE tune, 0
+music_tunes_end:
 tune:
                 include "../../music/test.asm"
 last:
