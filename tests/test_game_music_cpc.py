@@ -59,7 +59,7 @@ from test_game_cpc import (ADVENTURE, BINARY, DATABASE, LISTING,  # noqa: E402
                            LOADS_AT, SOURCE, glyph_table, wait_screen)
 from test_music_z80 import TUNE, word  # noqa: E402
 
-MUSIC_BINARY = os.path.join(ROOT, "z80", "cpc", "music.bin")
+MUSIC_BINARY = os.path.join(ROOT, "z80", "cpc", "game_music.bin")
 EFFECTS = os.path.join(ROOT, "music", "effects.asm")
 
 ENTER = chr(13)

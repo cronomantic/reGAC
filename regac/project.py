@@ -127,7 +127,7 @@ TARGETS = {
         screen_bytes=6912, screen_when="assembly",
     ),
     "cpc": Target(
-        music="music.bin",
+        music="game_music.bin",
         machine="cpc", folder=CPC, source="game.asm", database="game.rgac",
         release="cpc", binary="game.bin",
         screen_bytes=0x4000,

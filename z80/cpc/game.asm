@@ -135,5 +135,5 @@ music_end:
                 ENT                                     ; interpreter
 MUSIC_BYTES     equ music_end - music_at
 
-                SAVEBIN "music.bin", music_mover, $ - music_mover
+                SAVEBIN "game_music.bin", music_mover, $ - music_mover
                 ENDIF
