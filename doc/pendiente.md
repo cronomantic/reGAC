@@ -651,20 +651,70 @@ pruebas que no leen la pantalla donde no hace falta, porque una condición que
 acaba la partida dice lo que el intérprete creía mucho mejor que una pantalla
 de letras.
 
+### Dónde se parten las líneas, que es del autor y no nuestro
+
+El texto del original son palabras con un terminador de tres bits cada una, y
+las imprime de una en una, así que **un signo de puntuación acaba una palabra
+igual que un espacio**. El nuestro sólo partía en el espacio, y eso no es una
+sutileza: MegaCorp escribe sus localidades como `La cabina de la nave.
+Salidas:Sur.` y detrás una regla de treinta y dos asteriscos, contados para
+llenar un renglón exacto. Partiendo sólo por espacios eso es una palabra de
+cuarenta y cuatro letras, y salían dos renglones desiguales en vez de los tres
+que su autor dibujó.
+
+De ahí salió una segunda, más pequeña y de la misma familia: **un renglón que
+se llena solo no se acaba otra vez**. La regla de asteriscos termina justo en
+el borde, y el original pone el `>>>` en el renglón siguiente sin dejar uno en
+blanco; el nuestro dejaba uno.
+
+Con las dos, la pantalla de MegaCorp sale letra por letra como la suya:
+
+    La cabina de la nave. Salidas:
+    Sur.
+    ********************************
+    >>>
+
+Queda **una diferencia de un carácter**, y queda apuntada porque no la he
+sabido explicar: cuando una palabra no cabe y salta de renglón, el original
+deja a veces el espacio que la separaba al principio del renglón nuevo —`La
+bodega de carga de la nave.` y debajo ` Salidas:Norte.`— y el nuestro lo deja
+al final del anterior, donde no se ve. Es una sangría de un espacio en un
+punto de corte.
+
+La prueba es [`test_wrapping_z80.py`](../tests/test_wrapping_z80.py), con la
+forma de MegaCorp escrita como MegaCorp la escribe.
+
+### La palabra de «nada», que no está en la base de datos
+
+Es el único texto de una aventura que **no vive en su base de datos**: el
+intérprete se guarda unas pocas palabras suyas en letras normales, cada una
+acabada en `$FF` y un retorno de carro —una queja de memoria llena, la palabra
+que escribe cuando no llevas nada, y lo que pregunta el nombre—. Se demostró
+cambiándola en la máquina: MegaCorp pasó a contestar `Llevo conmigo:XXXX`.
+
+Y por eso las ocho no dicen lo mismo, que es lo bonito del hallazgo:
+
+| aventura | dice |
+|---|---|
+| megacorp1, megacorp2 | `nada` |
+| vajillas1, vajillas2 | `NADA` |
+| Bangkok1, Bangkok2, quijote1, quijote2 | `nothing` |
+
+Cuatro adaptaciones al castellano y **dos no llegaron a traducir la palabra**.
+`deGAC` la lee ahora buscando la queja de memoria llena como mojón y tomando
+lo que hay veinte bytes más allá, de modo que no depende de una dirección
+fija. De las versiones de Amstrad y de Commodore no se sabe dónde está; si no
+aparece, se queda en `Nothing` y se dice.
+
 **Lo que queda de aquí**, apuntado y medido y no hecho:
 
 - **`TEXT` y `PICT` se escriben y no se leen.** En el original, `TEXT` le da al
   texto la pantalla entera: así sale la presentación de MegaCorp, sin marco de
   lámina. Cambiar eso es tocar la capa de pantalla de cada máquina —la altura
-  de la ventana de texto—, no una línea en el intérprete.
-- **El corte de línea no es el mismo.** El original parte también en los signos
-  de puntuación, porque su texto son palabras con un terminador de tres bits;
-  el nuestro sólo parte en el espacio. Se ve en `Salidas:Sur.****`, que allí
-  cae en dos renglones y aquí en otros dos distintos.
-- **`deGAC` no lee la palabra de «nada»**: escribe `Nothing` a pelo, y el
-  original dice `nada`. No es del intérprete, que ya la saca de la base de
-  datos; es de la extracción.
-- **El Amstrad va justo, y hay un escalón.** Está medido, adventura por
+  de la ventana de texto es hoy una constante y tendría que ser un byte—, y
+  antes hay que medir tres cosas más en la máquina: si `TEXT` borra la
+  pantalla, dónde deja el cursor, y qué hace `PICT` al volver.
+- **El Amstrad va justo, y hay un escalón.** Está medido, aventura por
   aventura, antes y después de meter los marcadores, con un árbol aparte en el
   commit anterior para poder comparar.
 

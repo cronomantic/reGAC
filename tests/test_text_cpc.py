@@ -116,20 +116,6 @@ def decode_screen(memory, glyphs):
     return lines
 
 
-def wrapped(texts, width=COLUMNS):
-    """What the printing should come to, breaking between words."""
-    out = []
-    for text in texts:
-        line = ""
-        for word in text.split(" "):
-            if line and len(line) + len(word) > width:
-                out.append(line.rstrip())
-                line = ""
-            line += word + " "
-        out.append(line.rstrip())
-    return out
-
-
 @needs_tools
 def test_the_amstrad_prints_what_the_database_holds():
     with open(ADVENTURE, encoding="utf-8") as f:
@@ -154,7 +140,7 @@ def test_the_amstrad_prints_what_the_database_holds():
 
     database = Database(ddb)
     lines = decode_screen(memory, glyph_table(database))
-    expected = wrapped(database.texts[:MESSAGES_PRINTED])
+    expected = emulator.wrapped(database.texts[:MESSAGES_PRINTED], COLUMNS)
     visible = [line for line in lines if line]
     assert visible == expected[-len(visible):]
     assert len(visible) >= 5, "hardly anything was printed"

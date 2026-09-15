@@ -102,6 +102,55 @@ def label_address(listing, label):
     raise KeyError(f"no label {label!r} in {listing}")
 
 
+# The eight marks GAC ends a word with, less the space and the end of string
+# marker.  Every one of the adventures we have uses the same table.
+WORD_MARKS = ".,-!?:"
+
+
+def wrapped(texts, width, marks=WORD_MARKS):
+    """What print_text should come to, line by line.
+
+    A word ends at a space or at a mark of punctuation -- the original's text
+    is words with a terminator of three bits each, and it prints them one at
+    a time -- a word that does not fit goes whole onto the next line, and the
+    mark or space that ended it follows it wherever it went.  A line that
+    fills itself exactly ends there and is not ended again.
+
+    Each text is a message of its own and the build that prints them ends a
+    line after each one.
+    """
+    lines, line = [], ""
+
+    def put(char):
+        nonlocal line
+        line += char
+        if len(line) >= width:
+            lines.append(line)
+            line = ""
+
+    def word(run):
+        nonlocal line
+        if run and line and len(line) + len(run) > width:
+            lines.append(line)
+            line = ""
+        for char in run:
+            put(char)
+
+    for text in texts:
+        run = ""
+        for char in text:
+            if char != " " and char not in marks:
+                run += char
+                continue
+            word(run)
+            run = ""
+            put(char)
+        word(run)
+        lines.append(line)              # the new line after each message
+        line = ""
+    return [one.rstrip() for one in lines if one.strip()]
+
+
 class Session:
     """A running ZEsarUX, talked to over its remote protocol."""
 

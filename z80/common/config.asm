@@ -73,6 +73,17 @@ ends_statement:
                 or      $FF
                 ret
 
+; The same question, asked from the middle of a loop that is using the
+; registers: whether the code in A ends a word.  Zero flag set when it does.
+; Keeps BC, DE and HL.
+word_ends_at:
+                push    bc
+                push    hl
+                call    ends_statement
+                pop     hl
+                pop     bc
+                ret
+
 ; The code for the ASCII character in A, or NO_CHARACTER.  They are the same
 ; thing from the space up, so all this does is say what is not a character at
 ; all; it stays a routine because every keyboard calls it and none of them

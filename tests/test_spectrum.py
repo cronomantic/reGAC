@@ -107,20 +107,6 @@ def decode_screen(memory, glyphs):
     return lines
 
 
-def wrapped(texts, width=COLUMNS):
-    """What the printing should come to, breaking between words."""
-    out = []
-    for text in texts:
-        line = ""
-        for word in text.split(" "):
-            if line and len(line) + len(word) > width:
-                out.append(line.rstrip())
-                line = ""
-            line += word + " "
-        out.append(line.rstrip())
-    return out
-
-
 @needs_tools
 def test_the_spectrum_prints_what_the_database_holds():
     ddb = load_adventure()
@@ -132,7 +118,7 @@ def test_the_spectrum_prints_what_the_database_holds():
 
     database = Database(ddb)
     lines = decode_screen(memory, glyph_table(database))
-    expected = wrapped(database.texts[:MESSAGES_PRINTED])
+    expected = emulator.wrapped(database.texts[:MESSAGES_PRINTED], COLUMNS)
     # The window holds the last few lines; the final one is blank because the
     # cursor moved on after the last message.
     visible = [line for line in lines if line]

@@ -297,6 +297,34 @@ def peek2(sysram, addr):
     return sysram[addr] + 256 * peek1(sysram, addr + 1)
 
 
+# The interpreter keeps a few words of its own as plain letters, each one
+# ended by $FF and a carriage return: a memory full complaint, the word it
+# writes when the player is carrying nothing, and the prompt that asks for a
+# name.  The word is not in the database anywhere -- proved by changing it in
+# the machine and watching MegaCorp answer "Llevo conmigo:XXXX" -- and it is
+# the only text of an adventure that lives in the interpreter instead.  Which
+# is why the eight we have do not all say the same: MegaCorp says "nada", La
+# guerra de las vajillas says "NADA", and Bangkok and the Quijote never
+# translated it and still say "nothing".
+NOTHING_AFTER = b"Memory full"      # the landmark just before it
+NOTHING_AT = 20                     # how far past the start of it the word is
+NOTHING_ENDS = 0xFF
+
+
+def word_for_nothing(sysram, otherwise="Nothing"):
+    """What this adventure's interpreter writes for having none."""
+    blob = bytes(byte & 0xFF for byte in sysram)
+    at = blob.find(NOTHING_AFTER)
+    if at < 0:
+        return otherwise            # another machine's interpreter, or none
+    at += NOTHING_AT
+    end = blob.find(bytes((NOTHING_ENDS,)), at)
+    if end < 0 or end - at > 32:
+        return otherwise
+    word = blob[at:end].decode("latin-1").rstrip()
+    return word or otherwise
+
+
 def find_token(sysram, token):
     addr = peek2(sysram, TOKENS_ADDR)
     while token > 0:
@@ -910,7 +938,7 @@ def get_database(sysram):
     # on names the ones it wants.
     database["separators"] = ["THEN", "AND"]
     database["init_loc"] = peek2(sysram, STARTROOM_ADDR)
-    database["no_objs_msg"] = "Nothing"
+    database["no_objs_msg"] = word_for_nothing(sysram)
 
     print(f"font {len(font)}")
     print(f"verbs {len(verbs)}")

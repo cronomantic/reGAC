@@ -172,7 +172,7 @@ play_turn:
                 ld      a, h
                 or      l
                 jr      nz, .take_one
-                call    new_line
+                call    start_a_line
                 ld      a, MSG_ASK
                 call    print_message
                 call    read_line               ; HL = the codes, BC = how many

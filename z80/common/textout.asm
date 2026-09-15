@@ -12,15 +12,27 @@
 INK_CODE        equ 1
 INK_ZERO        equ 48                  ; the colour rides as a character
 
-; Print BC characters from HL, breaking between words so none is split.
+; Print BC characters from HL, breaking between words so none is split.  A
+; word ends at a space, at a mark of punctuation, or at a command.
 ; Corrupts: AF, BC, DE, HL
+; Move to the beginning of the next line, unless nothing has been written on
+; this one yet.  The original leaves no blank line where a line has just
+; filled itself: MegaCorp's rule of thirty two asterisks ends exactly at the
+; edge, and its prompt comes on the line straight after it.
+; Corrupts: everything
+start_a_line:
+                ld      a, (cursor_x)
+                or      a
+                ret     z
+                jp      new_line
+
 print_text:
 .word:
                 call    obey_commands           ; a change of ink, if there is
                 ld      a, b                    ; one waiting
                 or      c
                 ret     z
-                ; how long is the run up to the next space or command
+                ; how long is the run up to the next space, mark or command
                 push    hl
                 push    bc
                 ld      de, 0                   ; E counts it
@@ -34,6 +46,15 @@ print_text:
                 pop     hl
                 jr      z, .measured
                 cp      INK_CODE
+                jr      z, .measured
+                ; A mark of punctuation ends a word as surely as a space
+                ; does, which is what the original's text is made of: words
+                ; with a terminator of three bits each.  Without this, a
+                ; description that runs "Salidas:Sur." followed by a rule of
+                ; asterisks is one word of forty four letters and gets broken
+                ; wherever the line happens to end, instead of falling into
+                ; the three lines its author laid out.
+                call    word_ends_at
                 jr      z, .measured
                 inc     hl
                 dec     bc

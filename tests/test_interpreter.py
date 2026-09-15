@@ -149,6 +149,56 @@ def test_an_adventure_names_its_own():
     assert cut("COGE LLAVE Y SUR", named=["Y"]) == ["COGE LLAVE", "SUR"]
 
 
+def a_memory_holding(word):
+    """A stand-in for the interpreter's own little table of words."""
+    blob = bytearray(b"\x00" * 64)
+    blob += b"Memory full ... " + bytes((0xFF, 13, 10, 0xFF))
+    blob += word + bytes((0xFF, 13, 10))
+    blob += b"Enter name of"
+    return list(blob)
+
+
+def test_the_word_for_having_nothing_is_read_from_the_interpreter():
+    """It is the one text of an adventure that is not in its database: the
+    interpreter keeps it as plain letters, and MegaCorp answering
+    `Llevo conmigo:XXXX` once it was changed in the machine is what proved
+    it.  Seven bytes, padded with spaces, ended by $FF."""
+    from deGAC import word_for_nothing
+
+    assert word_for_nothing(a_memory_holding(b"nada   ")) == "nada"
+    assert word_for_nothing(a_memory_holding(b"NADA   ")) == "NADA"
+    assert word_for_nothing(a_memory_holding(b"nothing")) == "nothing"
+    assert word_for_nothing(a_memory_holding(b"       ")) == "Nothing"
+    assert word_for_nothing([0] * 256) == "Nothing"
+
+
+#: What each of the eight really says, which is not the same in all of them:
+#: two of the four Spanish adaptations never translated the word.
+WORD_FOR_NOTHING = {
+    "Bangkok1": "nothing", "Bangkok2": "nothing",
+    "quijote1": "nothing", "quijote2": "nothing",
+    "megacorp1": "nada", "megacorp2": "nada",
+    "vajillas1": "NADA", "vajillas2": "NADA",
+}
+
+
+def test_the_decompiler_reads_the_word_each_adventure_really_has():
+    import glob
+    import json
+
+    where = os.path.join(ROOT, "snapshots", "*.json")
+    for path in sorted(glob.glob(where)):
+        name = os.path.basename(path)[:-5]
+        if name not in WORD_FOR_NOTHING:
+            continue
+        with open(path, encoding="utf-8") as f:
+            said = json.load(f).get("no_objs_msg")
+        assert said == WORD_FOR_NOTHING[name], (
+            f"{name} says {said!r} and its interpreter says "
+            f"{WORD_FOR_NOTHING[name]!r}: decompile it again"
+        )
+
+
 def test_the_decompiler_writes_the_two_the_original_knew():
     """A decompiled adventure that lost them would stop parting orders where
     it used to, and nothing else would notice."""
@@ -175,6 +225,7 @@ if __name__ == "__main__":
         test_a_spanish_y_parts_nothing,
         test_the_words_are_matched_whole,
         test_an_adventure_names_its_own,
+        test_the_word_for_having_nothing_is_read_from_the_interpreter,
         test_a_sentence_fills_the_four_slots,
         test_the_second_noun_needs_a_first,
     ):

@@ -59,7 +59,7 @@ from regac.glyphs import glyph_for  # noqa: E402
 from regac import fontfile, png  # noqa: E402
 from regac.srcparse import SourceError, parse  # noqa: E402
 from regac.text import SPECIALS, typed  # noqa: E402
-from test_spectrum import decode_screen, glyph_table, wrapped  # noqa: E402
+from test_spectrum import COLUMNS, decode_screen, glyph_table  # noqa: E402
 
 SPECTRUM = os.path.join(ROOT, "z80", "spectrum")
 SOURCE = os.path.join(SPECTRUM, "main.asm")
@@ -537,7 +537,7 @@ def test_a_spectrum_prints_the_letters_spanish_is_written_in():
 
     database = Database(ddb)
     lines = decode_screen(memory, glyph_table(database))
-    expected = wrapped(SPANISH[:MESSAGES_PRINTED])
+    expected = emulator.wrapped(SPANISH[:MESSAGES_PRINTED], COLUMNS)
     visible = [line for line in lines if line]
     assert visible == expected[-len(visible):]
     assert any("ñ" in line or "é" in line or "¿" in line for line in visible), (
