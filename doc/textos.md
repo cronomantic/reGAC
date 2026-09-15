@@ -87,8 +87,13 @@ exactamente lo que son. Al girarlas se corren una columna a la izquierda,
 porque una fuente así deja libre la columna cero y usa la siete, y se devuelven
 a su sitio.
 
-Lo que no se puede construir —una letra que no está debajo, una marca que no
-conocemos— sale en blanco antes que salir mal. Está en
+Tres de las treinta no se construyen con nada de eso, así que están dibujadas
+a mano: la `ª` y la `º`, y la raya de diálogo, que es el guión de la propia
+tipografía estirado hasta los dos bordes de la casilla para que dos seguidas se
+junten. Las treinta salen, sea cual sea el alfabeto de partida.
+
+Lo demás que no se puede construir —una letra que no está debajo, una marca
+que no conocemos— sale en blanco antes que salir mal. Está en
 [`glyphs.py`](../regac/glyphs.py).
 
 Y esto es sólo para lo que la aventura no trae. **Lo que el autor dibuja se usa

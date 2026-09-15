@@ -58,7 +58,7 @@ from regac.binary import BuildError, Database, Reader, S_FONT  # noqa: E402
 from regac.glyphs import glyph_for  # noqa: E402
 from regac import fontfile, png  # noqa: E402
 from regac.srcparse import SourceError, parse  # noqa: E402
-from regac.text import typed  # noqa: E402
+from regac.text import SPECIALS, typed  # noqa: E402
 from test_spectrum import decode_screen, glyph_table, wrapped  # noqa: E402
 
 SPECTRUM = os.path.join(ROOT, "z80", "spectrum")
@@ -129,6 +129,24 @@ def test_an_accent_is_the_letter_with_a_mark_on_it():
     assert glyph_for("¿", font) != glyph_for("?", font)
     assert glyph_for("¡", font) != glyph_for("!", font)
     assert any(glyph_for("¿", font)), "the inverted question mark is blank"
+
+
+def test_every_letter_of_the_set_can_be_drawn():
+    """The set promises thirty letters below the space, so all thirty have to
+    come out of an ordinary alphabet one way or another: with a mark on them,
+    turned over, stretched, or drawn here because nothing else would do."""
+    font = a_font()
+    blank = [c for c in SPECIALS if glyph_for(c, font) is None]
+    assert not blank, f"nothing to draw {blank} with"
+
+
+def test_a_dash_is_the_hyphen_of_the_typeface_it_stands_in():
+    """As wide as the cell, so that two of them join up, and at the height
+    that typeface puts its hyphen."""
+    font = a_font()
+    hyphen, dash = glyph_for("-", font), glyph_for("—", font)
+    assert [bool(row) for row in dash] == [bool(row) for row in hyphen]
+    assert all(row in (0, 0xFF) for row in dash), "it does not reach both edges"
 
 
 def test_a_letter_nothing_can_be_built_from_is_left_alone():

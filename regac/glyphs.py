@@ -38,7 +38,9 @@ above.  That is why every mark below is two rows with the second one the one
 that matters: the second row is what a capital gets.
 
 The two Spanish marks that are not accents, ¿ and ¡, are the question mark and
-the exclamation mark turned upside down, which is exactly what they are.
+the exclamation mark turned upside down, which is exactly what they are; and
+an em dash is the hyphen of the same typeface drawn as wide as its cell, so
+that two of them join.
 """
 
 import unicodedata
@@ -66,6 +68,21 @@ DOTTED = "ij"
 
 # What is not a letter and a mark but a letter turned over.
 TURNED = {"¿": "?", "¡": "!"}
+
+# And a letter drawn as wide as the cell, so that two of them join up: an em
+# dash is the hyphen of the typeface it stands in, stretched.
+WIDENED = {"—": "-"}
+
+# The last three the character set carries that an alphabet has nothing to
+# build them from at all.  They are drawn here rather than left blank, because
+# a set that promises a character and prints a hole is worse than either; the
+# adventure's own font wins over these whenever it has anything to say.
+DRAWN = {
+    "ª": (0b00111000, 0b00001000, 0b00111000, 0b00111000,
+          0b00000000, 0b01111100, 0b00000000, 0b00000000),
+    "º": (0b00111000, 0b00101000, 0b00111000, 0b00000000,
+          0b00000000, 0b01111100, 0b00000000, 0b00000000),
+}
 
 
 def turn_over(glyph):
@@ -165,6 +182,11 @@ def glyph_for(char, source):
     if char in TURNED:
         upright = drawn(TURNED[char], source)
         return bytes(turn_over(upright)) if upright else None
+    if char in WIDENED:
+        narrow = drawn(WIDENED[char], source)
+        return bytes(0xFF if row else 0 for row in narrow) if narrow else None
+    if char in DRAWN:
+        return bytes(DRAWN[char])
     pieces = unicodedata.normalize("NFD", char)
     body = drawn(pieces[0], source) if pieces else None
     if body is None:
