@@ -59,7 +59,6 @@ descarta.
 
     /CTL
     model    SPECTRUM
-    charset  ascii
     start    5000
     width    32
     punct    "\0" " " "." "," "-" "!" "?" ":"
@@ -137,21 +136,56 @@ se omiten.
     /FONT chars=128
     #65   00 3C 42 42 7E 42 42 00   ; A
 
+## Caracteres latinos, que ya están
+
+El fuente es UTF-8 y se puede escribir en él lo que se escribe en español: «La
+señora Muñoz te miró con desdén», «¿Qué año es?». No hace falta declarar nada.
+
+Cómo funciona, que es lo que hace que no haga falta declarar nada: **el juego
+de caracteres se saca del texto**. Cada carácter que la aventura usa recibe un
+código y un glifo, ordenados por uso, y nada reserva códigos para un alfabeto
+que la aventura no escribe. Una ñ cuesta exactamente lo que cuesta una n. Aquí
+es donde se rompe con el original, que empaquetaba los caracteres en siete bits
+y usaba el octavo para marcar fin de palabra: ahí no cabía ni un acento.
+
+**Los glifos no están dibujados a mano.** Una letra acentuada es la letra de la
+propia aventura con una marca encima, para que se parezca a la tipografía en la
+que está; lo único que hay guardado son las cinco marcas. Unicode dice qué
+letra y qué marca —NFD parte la á en a y acento, la ñ en n y tilde—, y dónde
+cabe la marca sale de la letra: una minúscula ocupa las filas dos a seis y le
+sobran dos arriba, una mayúscula ocupa de la cero a la seis y se baja una fila,
+que la de abajo siempre está libre. La ¿ y la ¡ son la ? y la ! del revés, que
+es exactamente lo que son. Está en [`regac/glyphs.py`](../regac/glyphs.py).
+
+**Al vocabulario se le caen las marcas.** Ningún teclado de estas máquinas
+tiene tecla de acento, así que un vocabulario que dijera ARAÑA no lo podría
+escribir nadie: en el binario se guarda ARANA, y el jugador escribe ARANA. Sólo
+a las palabras que el parser compara; el texto conserva todas sus marcas,
+porque el texto se imprime y no se teclea. Si dos palabras se quedan en la
+misma —PEÑA y PENA—, la construcción lo dice en vez de dejar que la segunda no
+se alcance nunca.
+
+El techo son **256 códigos** contando los que la compresión necesita, y una
+aventura que se pase lo oye al construir, con la lista de los caracteres de los
+que mejor podría prescindir.
+
+La directiva `charset` se sigue aceptando para que los fuentes escritos antes
+compilen, y no elige nada.
+
+## Compresión de textos, que también
+
+Siempre. No es decisión de nadie: el texto se comprime por pares —el par de
+códigos más frecuente se sustituye por un código libre, una y otra vez— y la
+tabla se genera, nunca se escribe a mano. En Megacorp el texto queda en el 46%
+de lo que ocupaba. Desempaquetar es una búsqueda en tabla y una pila pequeña, y
+cada mensaje se desempaqueta solo, sin tocar los de antes, que es lo que el
+intérprete necesita para imprimir el 137 y nada más. Está contado en
+[`regac/text.py`](../regac/text.py).
+
 ## Extensiones previstas
 
-Ninguna está implementada todavía. Se listan aquí para que el diseño actual no
+Estas dos no están implementadas. Se listan aquí para que el diseño actual no
 las bloquee.
-
-**Caracteres latinos.** El fuente ya es UTF-8. La directiva `charset` elegirá
-la tabla de caracteres del destino (`ascii`, `latin1`, `spectrum`, `msx`...) y
-el compilador traducirá cada carácter al índice de glifo correspondiente. El
-formato de texto original de GAC no lo permite: usa el bit 7 como marca de fin
-de token y los dos bits altos de cada palabra para mayúsculas y minúsculas, así
-que no queda espacio para acentos. Esto obliga a una codificación de texto
-nueva en el intérprete, que es también donde entra la compresión.
-
-**Compresión de textos.** Decisión del fichero de proyecto, no del fuente. La
-sección `/TOK` (tabla de tokens) será siempre generada, nunca escrita a mano.
 
 **Nombres simbólicos.** `.def PUERTA_ABIERTA 5` permitirá escribir
 `SET? PUERTA_ABIERTA`. El decompilador seguirá emitiendo números.

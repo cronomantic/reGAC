@@ -517,6 +517,32 @@ De paso, `deGAC` avisa cuando las tablas de una máquina no parecen punteros. Si
 ese aviso, una imagen de memoria puesta donde la máquina no la pondría se lee
 como una aventura con un solo nombre y nadie se entera.
 
+## Los caracteres latinos, que ya se ven
+
+El diseño estaba desde el principio —un código y un glifo por carácter usado,
+sin reservar nada para alfabetos que la aventura no escribe— y faltaba la mitad
+que se ve: la fuente que una aventura hereda de 1986 no tiene ni una letra
+acentuada, así que la á recibía su código y salía **en blanco**.
+
+Ahora se construyen, y no a mano: una letra acentuada es la letra de la propia
+aventura con una marca encima, de modo que se parece a la tipografía en la que
+está; lo guardado son las cinco marcas y la cedilla, y Unicode dice qué letra y
+qué marca lleva cada carácter. La ¿ y la ¡ son la ? y la ! dadas media vuelta.
+El cómo y el porqué están en [`textos.md`](textos.md).
+
+Y la otra mitad, la de entrada: **al vocabulario se le caen las marcas**, porque
+ningún teclado de estas máquinas tiene tecla de acento y un vocabulario que
+dijera ARAÑA no lo podría escribir nadie. Se guarda ARANA; el fuente sigue
+diciendo ARAÑA. Dos palabras que se queden en la misma se cazan al construir.
+
+Comprobado con una aventura escrita en español de verdad, impresa por el Z80 en
+un Spectrum y leída de vuelta de la pantalla con su propia fuente, que es la
+única manera de saber que los códigos, los glifos, el empaquetado y la
+impresión están de acuerdo.
+
+La compresión ya estaba entera y sigue igual: siempre, generada, nunca escrita
+a mano, y el texto de Megacorp en el 46% de lo que ocupaba.
+
 ## Cosas menores
 
 `deGAC` ya lee las tres máquinas. Reconoce por sí solo una instantánea de

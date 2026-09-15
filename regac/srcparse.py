@@ -211,6 +211,11 @@ class Parser:
             if key == "model":
                 self.ddb["model"] = value
             elif key == "charset":
+                # Still accepted, so that sources written before this compile,
+                # and it chooses nothing: the character set is worked out from
+                # the text itself, one code and one glyph for every character
+                # the adventure uses, and an accented letter is built out of
+                # the adventure's own font.  See regac/glyphs.py.
                 self.charset = value
             elif key == "start":
                 self.ddb["init_loc"] = int(value)

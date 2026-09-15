@@ -88,7 +88,8 @@ class SourceWriter:
         d = self.ddb
         self.w("/CTL")
         self.w(f"model    {d.get('model', 'SPECTRUM')}")
-        self.w(f"charset  {d.get('charset', 'ascii')}")
+        if "charset" in d:
+            self.w(f"charset  {d['charset']}")
         self.w(f"start    {d.get('init_loc', 1)}")
         self.w(f"width    {d.get('width', 32)}")
         punct = " ".join(quote_char(c) for c in d.get("punctuation", []))

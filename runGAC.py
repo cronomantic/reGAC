@@ -26,6 +26,8 @@ import json
 import random
 import platform
 
+from regac.text import typed
+
 
 if platform.system() == "Windows":
     import time
@@ -395,8 +397,14 @@ class GAC_Interpreter:
         # word matches an entry it is the start of, never one shorter than
         # itself.  Taking them in order means the shortest of the entries a
         # word starts wins, which is what the 8 bit side does too.
+        #
+        # The marks come off both sides before they are compared, because
+        # that is what the 8 bit side holds: no keyboard there has a key for
+        # an accent, so a vocabulary that says ARAÑA is stored as ARANA and
+        # answers to it.  See regac/text.py.
+        word = typed(word)
         for k in sorted(word_dictionary):
-            if k.upper().startswith(word):
+            if typed(k.upper()).startswith(word):
                 return word_dictionary[k]
         return 0
 

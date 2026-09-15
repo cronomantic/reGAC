@@ -48,7 +48,8 @@ to hand need: none of them reaches 21K.
 import struct
 
 from .opcodes import BY_NAME, GFX_CMDS
-from .text import TextStore
+from .glyphs import glyph_for
+from .text import TextStore, typed
 
 MAGIC = b"RGAC"
 VERSION = 1
@@ -200,10 +201,9 @@ class Database:
         self.no_objs_index = len(texts)
         texts.append(self.ddb.get("no_objs_msg", "Nothing"))
         self.texts = texts
-        extra = list(self.ddb.get("verbs", {}))
-        extra += list(self.ddb.get("nouns", {}))
-        extra += list(self.ddb.get("adverbs", {}))
-        extra += list(self.ddb.get("pronouns", []))
+        # The words the parser compares, as the player will type them: see
+        # typed() for why the marks come off these and off nothing else.
+        extra = [typed(word) for word in self.words()]
         extra += list(self.ddb.get("separators", []))
         extra += [c for c in self.ddb.get("punctuation", []) if c != chr(0)]
         # The digits always get a code and a glyph, whether the adventure's
@@ -218,6 +218,14 @@ class Database:
 
     def code_of(self, char):
         return self.store.charset.codes[char]
+
+    def words(self):
+        """Everything the parser will be asked to match, in one list."""
+        out = []
+        for key in ("verbs", "nouns", "adverbs"):
+            out += list(self.ddb.get(key, {}))
+        out += list(self.ddb.get("pronouns", []))
+        return out
 
     # -- sections -----------------------------------------------------------
 
@@ -257,10 +265,22 @@ class Database:
                 entries.append((kind, wid, word))
         for word in self.ddb.get("pronouns", []):
             entries.append((PRONOUN, 255, word))
+        # Stored as they can be typed, which is without their marks.  Two
+        # words that come to the same thing that way are the same word to the
+        # parser, and the second would never be reached, so it is said here
+        # rather than found in play.
+        seen = {}
         out = bytearray(u16(len(entries)))
         for kind, wid, word in entries:
-            out += u8(kind) + u8(wid) + u8(len(word))
-            for c in word:
+            plain = typed(word)
+            clash = seen.setdefault((kind, plain), word)
+            if clash != word:
+                raise BuildError(
+                    f"{word!r} and {clash!r} are the same word once the marks "
+                    "come off, and a player types them the same way"
+                )
+            out += u8(kind) + u8(wid) + u8(len(plain))
+            for c in plain:
                 out += u8(self.code_of(c))
         return bytes(out)
 
@@ -339,20 +359,17 @@ class Database:
     def font(self):
         """The glyphs, in the order the character set numbers them.
 
-        A character the original font has no glyph for comes out blank; that
-        is where the accented letters will go once they are drawn.
+        A letter the original alphabet has not got -- an accented one, or an
+        inverted mark -- is built out of the adventure's own letters, so that
+        it looks like the typeface it is standing in: see glyphs.py.  What
+        cannot be built at all comes out blank rather than wrong.
         """
         source = self.ddb.get("font") or []
         out = bytearray()
         out += u8(self.store.charset.first)
         out += u8(len(self.store.charset))
         for char in self.store.charset.order:
-            point = ord(char)
-            start = point * 8
-            if point < 128 and start + 8 <= len(source):
-                out += bytes(source[start : start + 8])
-            else:
-                out += bytes(8)
+            out += glyph_for(char, source) or bytes(8)
         return bytes(out)
 
     def graphics(self):

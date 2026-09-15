@@ -40,8 +40,21 @@ nothing else.
 """
 
 import collections
+import unicodedata
 
 MAX_CODES = 256
+
+
+def typed(word):
+    """A word as a player can actually type it, which is without its marks.
+
+    No keyboard here has a key for an accent, so a vocabulary that says ARAÑA
+    could never be matched against anything.  The marks come off the words the
+    parser compares -- and only off those: the text keeps every one of them,
+    because the text is printed and not typed.
+    """
+    return "".join(c for c in unicodedata.normalize("NFD", word)
+                   if not unicodedata.combining(c))
 
 
 class Charset:
@@ -62,6 +75,17 @@ class Charset:
             for char in text:
                 counts.setdefault(char, 0)
         self.order = [c for c, _ in counts.most_common()]
+        # A code is a byte, and the ones the character set does not take are
+        # what the compressor has to work with.  Saying so here is better than
+        # letting it come out as a byte that will not fit, which is what the
+        # first adventure written in a second alphabet would have got.
+        if first + len(self.order) > MAX_CODES:
+            rarest = "".join(self.order[MAX_CODES - first:])
+            raise ValueError(
+                f"an adventure can use {MAX_CODES - first} different "
+                f"characters and this one uses {len(self.order)}; the ones it "
+                f"could most do without are {rarest[:40]!r}"
+            )
         self.first = first
         self.codes = {c: first + i for i, c in enumerate(self.order)}
         self.chars = {code: c for c, code in self.codes.items()}

@@ -36,6 +36,52 @@ texto como el autor habría querido añade cinco glifos y un 1,4% de tamaño.
 Las ocho aventuras necesitan entre 42 y 71 glifos, con lo que sobran entre 185 y
 214 códigos para el compresor.
 
+El techo son 256 códigos contando los del compresor, y una aventura que se pase
+lo oye al construir, con la lista de los caracteres de los que mejor podría
+prescindir.
+
+## De dónde salen los glifos que la aventura no trae
+
+Un código no dibuja nada. La fuente que una aventura hereda de 1986 no tiene ni
+una letra acentuada, así que hasta ahora la á recibía código y salía en blanco.
+
+No están dibujados a mano. **Una letra acentuada es la letra de la propia
+aventura con una marca encima**, para que se parezca a la tipografía en la que
+está sea cual sea; lo único guardado son las cinco marcas —agudo, grave,
+circunflejo, tilde, diéresis— y la cedilla. Unicode dice qué letra y qué marca:
+NFD parte la á en a y acento y la ñ en n y tilde, y cualquier idioma que
+quisiéramos son esas mismas marcas otra vez.
+
+Dónde cabe la marca sale de la letra. En una fuente de este tipo una minúscula
+se apoya en las filas dos a seis, así que le sobran dos arriba y cabe la marca
+entera; una mayúscula ocupa de la cero a la seis, así que se baja una fila —la
+de abajo siempre está libre— y arriba va sólo el cuerpo de la marca. Por eso
+cada marca son dos filas con la segunda como la que importa: la segunda es la
+que le toca a una mayúscula. La cedilla es al revés y no baja nada: cuelga de la
+fila siete, que está libre en los dos casos.
+
+La ¿ y la ¡ no son letra y marca, son la ? y la ! dadas media vuelta, que es
+exactamente lo que son. Al girarlas se corren una columna a la izquierda,
+porque una fuente así deja libre la columna cero y usa la siete, y se devuelven
+a su sitio.
+
+Lo que no se puede construir —una letra que no está debajo, una marca que no
+conocemos— sale en blanco antes que salir mal. Está en
+[`glyphs.py`](../regac/glyphs.py).
+
+## Al vocabulario se le caen las marcas
+
+Ningún teclado de estas máquinas tiene tecla de acento, así que un vocabulario
+que dijera ARAÑA no lo podría escribir nadie. En el binario se guarda ARANA y el
+jugador escribe ARANA; el fuente puede seguir diciendo ARAÑA, que es como se
+escribe. Sólo se le caen a las palabras que el parser compara: el texto conserva
+todas sus marcas, porque el texto se imprime y no se teclea.
+
+Si dos palabras se quedan en la misma —PEÑA y PENA—, son la misma palabra para
+el jugador y la segunda no se alcanzaría nunca, así que la construcción lo dice
+en lugar de dejarlo pasar. El intérprete de PC hace la misma cuenta al buscar
+una palabra, para que las dos máquinas entiendan lo mismo.
+
 ## La compresión
 
 Se sustituye la pareja de códigos más repetida por un código libre, una y otra
