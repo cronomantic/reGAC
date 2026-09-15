@@ -113,6 +113,29 @@ music_stop:
                 ei
                 ret
 
+; Quiet for a moment, and back again.  The tape is the reason: its timing is
+; counted in clock cycles and an interrupt in the middle of a byte is a byte
+; lost, so saving and loading turn the music off and on again around
+; themselves.  What comes back starts the tune over -- the player has no way
+; to say where it was -- which is a small thing to hear after a save and a
+; great deal simpler than keeping its state.
+; Corrupts: everything
+music_hush:
+                ld      a, (music_playing)
+                ld      (music_hushed), a
+                or      a
+                ret     z
+                ld      a, (music_tune)
+                ld      (music_hushed_tune), a
+                jp      music_stop
+
+music_back:
+                ld      a, (music_hushed)
+                or      a
+                ret     z
+                ld      a, (music_hushed_tune)
+                jp      music_start
+
 ; One interrupt: fifty more on the clock, and the tune played if that is
 ; enough.  On a machine that interrupts oftener than the music wants, this is
 ; where the extra ones go.
@@ -137,6 +160,8 @@ music_tick:
 
 music_playing:  db      0
 music_tune:     db      $FF             ; which one, or none
+music_hushed:   db      0               ; whether it was playing when hushed
+music_hushed_tune: db   0
 music_rate:     dw      MUSIC_RATE
 music_clock:    dw      0
 

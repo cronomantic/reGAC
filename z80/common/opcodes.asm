@@ -469,15 +469,31 @@ op_equal:
 ; SAVE and LOAD: the game, not the adventure, on one block of tape.  A load
 ; that goes wrong leaves what was there alone, because the ROM only writes
 ; what it reads and the player can try again.
+;
+; A build with music turns it off while the tape lasts and on again after: the
+; timing of a byte is counted in clock cycles, and an interrupt in the middle
+; of one is a byte lost.
 op_save:
+                IFDEF WITH_MUSIC
+                call    music_hush
+                ENDIF
                 ld      ix, vm_state
                 ld      de, vm_state_end - vm_state
                 call    tape_save
+                IFDEF WITH_MUSIC
+                call    music_back
+                ENDIF
                 jp      vm_loop
 op_load:
+                IFDEF WITH_MUSIC
+                call    music_hush
+                ENDIF
                 ld      ix, vm_state
                 ld      de, vm_state_end - vm_state
                 call    tape_load
+                IFDEF WITH_MUSIC
+                call    music_back
+                ENDIF
                 ld      a, 1
                 ld      (vm_new_room), a        ; wherever we are now, say so
                 jp      vm_loop
@@ -858,6 +874,33 @@ op_lf:
                 call    new_line
                 jp      vm_loop
 
+; MUSIC, SOUND and QUIET: which tune of the build to play, which effect of its
+; bank to make, and silence.  A build without music reads them, takes their
+; argument off the stack and does nothing else, so that one adventure has the
+; same shape on every machine -- the PCW has no sound chip at all, and a
+; Spectrum of 48K none either.
+op_music:
+                call    vm_pop
+                IFDEF WITH_MUSIC
+                ld      a, l
+                call    music_start
+                ENDIF
+                jp      vm_loop
+
+op_sound:
+                call    vm_pop
+                IFDEF PLY_AKM_MANAGE_SOUND_EFFECTS
+                ld      a, l
+                call    sound_play
+                ENDIF
+                jp      vm_loop
+
+op_quiet:
+                IFDEF WITH_MUSIC
+                call    music_stop
+                ENDIF
+                jp      vm_loop
+
 op_if:
                 call    vm_pop
                 ld      a, h
@@ -965,3 +1008,8 @@ vm_table:
                 dw      op_lf           ; $3D
                 dw      op_if           ; $3E
                 dw      op_end          ; $3F
+                ; and the ones that are not the original's: a byte with bit
+                ; seven set is a number, so there is room up to $7F.
+                dw      op_music        ; $40
+                dw      op_sound        ; $41
+                dw      op_quiet        ; $42

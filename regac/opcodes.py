@@ -133,6 +133,11 @@ OPS = [
     Op("LF",       0x3D, NULLARY),
     Op("IF",       0x3E, CTRL),
     Op("END",      0x3F, CTRL),
+    # Not the original's.  A byte with bit seven set is a number, so the
+    # language has room from here up to $7F.
+    Op("MUSIC",    0x40, PREFIX,  (NUM,)),
+    Op("SOUND",    0x41, PREFIX,  (NUM,)),
+    Op("QUIET",    0x42, NULLARY),
 ]
 # fmt: on
 
