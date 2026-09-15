@@ -697,6 +697,7 @@ melodía —y por treinta y dos bytes—. Así que cada máquina la pone donde p
 | máquina | reproductor y buffer | las melodías | cuánto hay |
 |---|---|---|---|
 | Spectrum 128 | $6000, debajo del intérprete | una página propia, la siguiente a las de la base de datos | 5 KB de buffer |
+| Spectrum +3 | lo mismo | la última de las cuatro que tiene libres | 5 KB de buffer |
 | Next | **$4000**, en la página de lo residente | dos páginas propias, de los cientos que le sobran | 4,7 KB de buffer |
 | Amstrad | **$0300**, debajo de las dos ROM | ahí mismo | 15 KB |
 | MSX | encima del código | ahí mismo | 7,4 KB |
@@ -713,6 +714,16 @@ es que la melodía se **ensambla para el buffer y se guarda donde se guarda**,
 que es para lo que está `DISP` —el mismo truco con el que viaja la rutina de
 la interrupción—. La lista es lo único que se queda residente, porque se lee en
 cualquier momento.
+
+**El +3 es el 128 con otro reparto de páginas y otro medio.** +3DOS se queda
+dos de las ocho, así que la página de las melodías sale de las cuatro que la
+base de datos podía usar: una aventura de tres bancos tiene música ahí y una de
+cuatro no, y lo dice el `ASSERT` al construir. Y nada viaja en bloques de cinta:
+el cargador es código máquina —BASIC no sabe paginar— y lo que lee es un solo
+fichero con las piezas seguidas, así que la música son dos piezas más de ese
+fichero **en el orden exacto en que la tabla las pide**. Una pieza fuera de
+orden no es una melodía que suene mal: es un banco de la base de datos cargado
+encima del reproductor.
 
 En el 128 las melodías viajan en **un bloque propio**, y en la tabla del
 cargador va *después* del bloque del intérprete y no antes: el propio cargador
@@ -747,9 +758,13 @@ tiene para melodías: quince kilobytes que no quiere nadie.
 
 **Lo que falta:**
 
-- **El +3 no lleva música todavía**, aunque su máquina es la misma que la del
-  128: su versión es la de disco (`game3.asm`) y no se le ha puesto el bloque.
-- **El PCW no entra en nada de esto**: no tiene AY, sólo un zumbador.
+- **El PCW no entra en nada de esto**: no tiene AY, sólo un zumbador. Sí
+  existió periférico —el de DK'tronics, que era mando y sonido, y del que
+  nuestro emulador emula el mando y no el sonido—, así que hoy no hay manera
+  de probar aquí nada que se escribiera para él. Si algún día se quiere: el
+  reproductor ya sabe hablarle a un AY, o sea que sería decirle los dos
+  puertos, montarle la interrupción a esta máquina —que no la tiene— y buscar
+  sitio en su mapa.
 - **La sección `music` del formato binario sigue vacía.** Hoy las melodías son
   fuente de ensamblador y las coloca el ensamblador, que es quien puede; la
   sección queda para el día en que una melodía sea dato y no fuente.

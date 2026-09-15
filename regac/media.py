@@ -225,18 +225,20 @@ def plus3_disk(code, load=PLUS3_CODE_AT, screen=None):
     return disk.image()
 
 
-def plus3_banked_disk(boot, code, banks, screen=None):
+def plus3_banked_disk(boot, code, banks, screen=None, music=()):
     """A +3 disk for an adventure whose database lives in banks.
 
     The loader is not BASIC any more -- BASIC cannot page -- so what goes in
     the file the menu runs is the one in loader3.asm, already assembled, with
     its BASIC around it.  The rest is one file with no header: the
-    interpreter, and then each bank end to end in the order the loader asks
-    for them.
+    interpreter, the music if there is any, and then each bank end to end --
+    in the order the loader asks for them, which is the order of the table it
+    walks and not any order of ours.
     """
     disk = Disk("plus3")
     disk.add(PLUS3_LOADER, plus3_file(FILE_BASIC, boot, 10, len(boot)))
     pieces = ([bytes(screen)] if screen else []) + [bytes(code)]
+    pieces += [bytes(piece) for piece in music]
     pieces += [bytes(b) for b in banks]
     disk.add(PLUS3_GAME, b"".join(pieces))
     return disk.image()

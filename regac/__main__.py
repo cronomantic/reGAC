@@ -387,8 +387,10 @@ def write_media(machine, code, where, name, load, entry, screen=None,
             if boot is not None:
                 # A banked one: the loader is machine code, because paging is
                 # not something BASIC can do, and the database follows the
-                # interpreter in one file.
-                f.write(plus3_banked_disk(boot, code, banks or [], screen))
+                # interpreter in one file -- with the music between them, when
+                # there is any, because that is where its table asks for it.
+                f.write(plus3_banked_disk(boot, code, banks or [], screen,
+                                          music or ()))
                 how = f"the Loader entry of its menu, and {len(banks or [])} banks"
             else:
                 f.write(plus3_disk(code, load, screen))
@@ -584,10 +586,17 @@ def make_one(target, settings, ddb, name, root, output, where_regac_is,
     load = LOADS_AT[target.release]
     tunes = None
     if defines and target.music:
-        # A machine whose music is a file of its own: the Amstrad, whose music
-        # lives where nothing can be loaded and travels with a mover in front.
-        with open(os.path.join(tree, target.music), "rb") as f:
-            tunes = f.read()
+        # A machine whose music does not travel inside the interpreter: the
+        # Amstrad, where it is a file of its own with a mover in front, and
+        # the +3, where it is two more pieces of the one file the loader
+        # reads.  One name or several, in the order they are wanted.
+        names = ([target.music] if isinstance(target.music, str)
+                 else list(target.music))
+        pieces = []
+        for named in names:
+            with open(os.path.join(tree, named), "rb") as f:
+                pieces.append(f.read())
+        tunes = pieces[0] if len(pieces) == 1 else pieces
     written, _ = write_media(target.release, code, where, name, load, load,
                              screen, boot, banks, image, tunes)
     return written

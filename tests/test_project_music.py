@@ -63,6 +63,8 @@ effects = "efectos.asm"
 
 [targets.spectrum128]
 
+[targets.plus3]
+
 [targets.cpc]
 
 [targets.spectrum48]
@@ -159,6 +161,11 @@ def test_one_command_puts_the_music_in(tmp_path):
     assert b"MEGACORPMUS" in disk, "the Amstrad's disk has no music file on it"
     with open(os.path.join(out, "cpc", "megacorp.cdt"), "rb") as f:
         assert b"megacorp" in f.read().lower(), "the Amstrad's tape is empty"
+
+    # The +3 carries its music inside the one file its loader reads, so what
+    # says it is there is that the file grew by the two pieces.
+    with open(os.path.join(out, "plus3", "megacorp.dsk"), "rb") as f:
+        assert len(f.read()) > 64 * 1024, "the +3 disk is too small"
 
     # And the machine with no sound chip built anyway, and said why.
     assert os.path.exists(os.path.join(out, "spectrum48", "megacorp.tap"))

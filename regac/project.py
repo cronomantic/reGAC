@@ -120,7 +120,7 @@ TARGETS = {
         screen_bytes=6912, screen_when="assembly",
     ),
     "plus3": Target(
-        music=None,
+        music=("game3_music.bin", "game3_tunes.bin"),
         machine="spectrum128", folder=SPECTRUM, source="game3.asm",
         database="game3.rgac", banks="16k", defs="banks3.inc",
         release="plus3", binary="game3_code.bin", boot="game3_boot.bin",
