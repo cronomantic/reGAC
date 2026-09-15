@@ -40,7 +40,7 @@ from .project import read as read_project
 from .png import save_picture
 from .srcgen import generate
 from .text import TextStore
-from .srcparse import SourceError, parse
+from .srcparse import MACHINE_LABELS, SourceError, parse
 
 VERSION = "0.1.0"
 
@@ -70,7 +70,8 @@ def cmd_compile(args):
     try:
         # A source may point at a font of its own, and where it points is
         # from where it stands.
-        ddb = parse(source, name, os.path.dirname(os.path.abspath(args.input)))
+        ddb = parse(source, name, os.path.dirname(os.path.abspath(args.input)),
+                    machine=args.machine)
     except SourceError as e:
         sys.exit(f"ERROR: {e}")
     write_json(args.output, ddb)
@@ -478,12 +479,10 @@ def cmd_make(args):
         sys.exit(f"ERROR: {e}")
     root = os.path.dirname(os.path.abspath(args.input)) or "."
     source = os.path.join(root, project["source"])
+    written_source = None
     if source.endswith(".gac"):
         with open(source, encoding="utf-8") as f:
-            try:
-                ddb = parse(f.read(), os.path.basename(source))
-            except SourceError as e:
-                sys.exit(f"ERROR: {e}")
+            written_source = f.read()
     else:
         ddb = read_json(source)
     name = project["name"]
@@ -492,17 +491,23 @@ def cmd_make(args):
     # The adventure and its loading screens sit beside the project file; the
     # interpreters sit where reGAC itself is installed.
     tree = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    try:
-        music = make_music(ddb, root, tree, project.get("effects"),
-                           project.get("music-tool"))
-    except ProjectError as e:
-        sys.exit(f"ERROR: {e}")
     wanted = args.target or sorted(project["targets"])
     for which in wanted:
         settings = project["targets"].get(which)
         if settings is None:
             sys.exit(f"ERROR: the project says nothing about {which}")
+        # A source is read again for every machine, because it may keep some
+        # of itself back for some of them; a JSON has no such thing in it and
+        # is read once.
+        if written_source is not None:
+            try:
+                ddb = parse(written_source, os.path.basename(source),
+                            machine=which)
+            except SourceError as e:
+                sys.exit(f"ERROR: {e}")
         try:
+            music = make_music(ddb, root, tree, project.get("effects"),
+                               project.get("music-tool"))
             written = make_one(TARGETS[which], settings, ddb, name, root, output,
                                tree, music)
         except ProjectError as e:
@@ -614,6 +619,9 @@ def main():
     p = sub.add_parser("compile", help=".gac source -> JSON database")
     p.add_argument("input", help="source file")
     p.add_argument("output", help="JSON database to write")
+    p.add_argument("-m", "--machine", choices=sorted(MACHINE_LABELS),
+                   help="which machine to read it for, for a source that "
+                        "keeps some lines for some of them")
     p.set_defaults(func=cmd_compile)
 
     p = sub.add_parser("render", help="draw the pictures of an adventure as PNG")

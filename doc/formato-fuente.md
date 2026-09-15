@@ -40,8 +40,8 @@ bloques de texto.
 Los mensajes, los nombres de objeto y las descripciones de localidad son texto
 literal. Si ocupan varias líneas se unen con un espacio; una barra invertida al
 final de una línea las une sin separación ninguna. Una línea de texto que
-empiece por `#`, `/`, `;` o `|` se escribe precedida de `|`, que el compilador
-descarta.
+empiece por `#`, `/`, `;` o `|`, o que sea una directiva —`.if`, `.else`,
+`.end`—, se escribe precedida de `|`, que el compilador descarta.
 
 Dentro del texto hay **comandos**, que empiezan por barra invertida:
 
@@ -304,6 +304,51 @@ de lo que ocupaba. Desempaquetar es una búsqueda en tabla y una pila pequeña, 
 cada mensaje se desempaqueta solo, sin tocar los de antes, que es lo que el
 intérprete necesita para imprimir el 137 y nada más. Está contado en
 [`regac/text.py`](../regac/text.py).
+
+## Lo que es sólo para algunas máquinas
+
+Una aventura es un fuente y cinco máquinas, y de vez en cuando las cinco no
+quieren lo mismo. Un Spectrum de 48K puede tener que quedarse sin lo que en las
+demás cabe, las plumas del Amstrad no son los colores del Spectrum, y a una
+máquina sin chip de sonido no le hace falta la línea que arranca una melodía.
+Para eso el fuente puede **guardarse líneas**:
+
+    #14
+    El mando hace un ruido seco    .if cpc msx
+     y ya esta.
+    .else
+     y la pantalla parpadea.
+    .end
+
+Se resuelve **al leer el fuente**, no al jugar: lo que una máquina no va a
+tener no llega nunca a su base de datos, que es justo la gracia en las máquinas
+donde lo que se acaba es el sitio. Vale en cualquier sitio —una sección entera,
+una entrada, una línea de la tabla de condiciones, una palabra del
+vocabulario—, porque trabaja sobre líneas antes de que nada más las mire, y se
+puede anidar.
+
+Se puede nombrar la máquina y la familia a la que pertenece:
+
+| familia | máquinas |
+|---|---|
+| `spectrum` | `spectrum48`, `spectrum128`, `plus3` |
+| `amstrad` | `cpc`, `pcw` |
+| `msx` | `msx`, `msx2` |
+
+y sueltas quedan `next` y `sam`. Un nombre que no exista es un error y se dice:
+una errata que se lleve por delante media aventura en silencio es lo peor que
+podría pasar aquí. Lo mismo un `.if` sin cerrar, un `.else` suelto o un `.if`
+sin máquinas.
+
+Un fuente con condicionales **hay que leerlo para una máquina**: `regac compile
+partida.gac partida.json -m cpc`. `regac make` lo hace solo, una vez por cada
+máquina que construye. Un fuente sin condicionales es el mismo para todos y no
+hace falta decir nada.
+
+Las líneas que se quedan fuera no se borran: se vacían, para que cualquier
+error que venga después siga contando las líneas como las escribió el autor.
+Y una línea vacía dentro de un bloque de texto no es un espacio —sí lo es una
+línea con un espacio, que alguna aventura de las ocho tiene—.
 
 ## Extensiones previstas
 

@@ -21,6 +21,7 @@
 """Writer for the ReGAC source format: database dictionary -> source text."""
 
 from .conds import render_block
+from .srcparse import directive
 
 NOWHERE = 0
 CARRIED = 255
@@ -60,8 +61,9 @@ class SourceWriter:
 
     def wtext(self, line):
         """Write a line of adventure text, escaping it if it would otherwise
-        be read back as a marker."""
-        self.out.append("|" + line if line[:1] in ("#", "/", ";", "|") else line)
+        be read back as a marker or as a directive."""
+        marked = line[:1] in ("#", "/", ";", "|") or directive(line) is not None
+        self.out.append("|" + line if marked else line)
 
     def text(self):
         return "\n".join(self.out) + "\n"

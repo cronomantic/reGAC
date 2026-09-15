@@ -77,10 +77,15 @@ def parse_strings(text):
 
 def join_text(lines):
     """Join the lines of a text block.  Lines are separated by a single space
-    unless the previous one ends in a backslash, which joins with nothing."""
-    lines = list(lines)
-    while lines and not lines[-1]:
-        lines.pop()
+    unless the previous one ends in a backslash, which joins with nothing.
+
+    An empty line is nothing at all: an author puts one there to see the text
+    better, and a line kept back for another machine leaves one behind.
+    Neither is a space in what gets printed -- but a line with a space on it
+    is that space, because an adventure of the eight really does have a
+    description that is one.
+    """
+    lines = [line for line in lines if line != ""]
     if not lines:
         return ""
     out = lines[0]
@@ -95,6 +100,103 @@ def join_text(lines):
 def text_of(line):
     """A line of adventure text, with the marker escape removed."""
     return line[1:] if line.startswith("|") else line
+
+
+# ---------------------------------------------------------------------------
+# What is only for some machines
+# ---------------------------------------------------------------------------
+
+# An adventure is one source and five machines, and now and then the five do
+# not want the same thing: a Spectrum of 48K may have to do without the
+# pictures that fit everywhere else, an Amstrad's colours are four pens rather
+# than sixteen colours, and a machine with no sound chip has no use for the
+# line that starts a tune.  So a source may keep lines back:
+#
+#       .if cpc msx
+#       El mando hace un ruido seco.
+#       .else
+#       El mando hace un ruido seco y la pantalla parpadea.
+#       .end
+#
+# It is the plainest kind of conditional and it is resolved when the source is
+# read, not when the adventure is played: what a machine is not to have never
+# reaches its database, which is the whole point on the machines where room is
+# what runs out first.
+#
+# What may be named is the machine, and the family it belongs to for the ones
+# that have a family.  A name that is not here is a mistake and is said,
+# because a typo that quietly drops half an adventure is the worst kind.
+MACHINE_LABELS = {
+    "spectrum48": ("spectrum48", "spectrum"),
+    "spectrum128": ("spectrum128", "spectrum"),
+    "plus3": ("plus3", "spectrum128", "spectrum"),
+    "cpc": ("cpc", "amstrad"),
+    "pcw": ("pcw", "amstrad"),
+    "msx": ("msx",),
+    "msx2": ("msx2", "msx"),
+    "next": ("next",),
+    "sam": ("sam",),
+}
+EVERY_LABEL = {label for labels in MACHINE_LABELS.values() for label in labels}
+
+IF = ".if"
+ELSE = ".else"
+END = ".end"
+
+
+def directive(line):
+    """The word a line begins with, when it is one of ours."""
+    first = line.strip().split(";", 1)[0].split()
+    if first and first[0].lower() in (IF, ELSE, END):
+        return first[0].lower()
+    return None
+
+
+def for_machine(text, machine=None, name="adventure"):
+    """The source with the lines another machine was to have taken out.
+
+    The lines are not thrown away but blanked, so that everything said about
+    this file afterwards -- every error, in every section -- still counts the
+    lines the way the author wrote them.
+    """
+    labels = set(MACHINE_LABELS.get(machine, ())) if machine else set()
+    out, keeping = [], []          # a stack of (taking, taken already)
+    for number, line in enumerate(text.splitlines(), 1):
+        word = directive(line)
+        if word is None:
+            out.append(line if all(taking for taking, _ in keeping) else "")
+            continue
+        if word == IF:
+            wanted = line.strip().split(";", 1)[0].split()[1:]
+            if not wanted:
+                raise SourceError(f"{name}:{number}: .if what?  Name a machine")
+            strange = [w for w in wanted if w.lower() not in EVERY_LABEL]
+            if strange:
+                raise SourceError(
+                    f"{name}:{number}: no machine is called {strange[0]!r}; "
+                    f"what there is: " + ", ".join(sorted(EVERY_LABEL))
+                )
+            if machine is None:
+                raise SourceError(
+                    f"{name}:{number}: this source keeps some lines for some "
+                    f"machines, so it has to be read for one of them: say "
+                    f"which with -m"
+                )
+            taking = any(w.lower() in labels for w in wanted)
+            keeping.append([taking, taking])
+        elif word == ELSE:
+            if not keeping:
+                raise SourceError(f"{name}:{number}: .else without .if")
+            taking, taken = keeping[-1]
+            keeping[-1] = [not taken, True]
+        else:
+            if not keeping:
+                raise SourceError(f"{name}:{number}: .end without .if")
+            keeping.pop()
+        out.append("")
+    if keeping:
+        raise SourceError(f"{name}: a .if was never ended")
+    return "\n".join(out)
 
 
 class Parser:
@@ -473,5 +575,10 @@ class Parser:
         return int(word)
 
 
-def parse(text, name="adventure", folder=None):
-    return Parser(text, name, folder).parse()
+def parse(text, name="adventure", folder=None, machine=None):
+    """An adventure, read for one machine.
+
+    The machine matters only to a source that keeps some lines for some of
+    them; one that does not is the same adventure whoever asks.
+    """
+    return Parser(for_machine(text, machine, name), name, folder).parse()

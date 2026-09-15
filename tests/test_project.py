@@ -47,6 +47,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import emulator  # noqa: E402
 from regac.project import ProjectError, TARGETS  # noqa: E402
+from regac.srcgen import generate  # noqa: E402
 from regac.project import read as read_project  # noqa: E402
 
 ADVENTURE = os.path.join(ROOT, "snapshots", "megacorp2.json")
@@ -229,6 +230,53 @@ def test_what_it_built_actually_runs(tmp_path):
         session.close()
     assert any(prompt in line for line in lines if line), (
         f"what regac make built never got going: {lines}"
+    )
+
+
+KEPT_BACK = """
+name   = "megacorp"
+source = "megacorp.gac"
+output = "salida"
+
+[targets.spectrum48]
+
+[targets.cpc]
+"""
+
+
+@needs_tools
+def test_a_source_is_read_again_for_every_machine(tmp_path):
+    """A source may keep some of itself back for some machines, so the one
+    command has to read it once for each of them rather than once for all.
+
+    What is looked at is the databases: the same adventure built twice, with
+    one message longer on one machine than on the other, cannot come out the
+    same size unless the reading happened once and was handed round.
+    """
+    where = str(tmp_path)
+    with open(ADVENTURE, encoding="utf-8") as f:
+        ddb = json.load(f)
+    source = generate(ddb)
+    # A message that is not the same on the two machines, by a good margin.
+    mark = "#1\n"
+    at = source.index(mark) + len(mark)
+    source = (source[:at] + ".if cpc\nCorto.\n.else\n"
+              + "Largo, y mucho mas largo, para que se note en el tamano. " * 8
+              + "\n.end\n" + source[at:])
+    with open(os.path.join(where, "megacorp.gac"), "w", encoding="utf-8") as f:
+        f.write(source)
+    path = os.path.join(where, "megacorp.toml")
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(KEPT_BACK)
+
+    done = make(path)
+    assert done.returncode == 0, f"regac make failed:\n{done.stdout}\n{done.stderr}"
+    sizes = {}
+    for which, folder, built in (("spectrum48", "spectrum", "game.rgac"),
+                                 ("cpc", "cpc", "game.rgac")):
+        sizes[which] = os.path.getsize(os.path.join(ROOT, "z80", folder, built))
+    assert sizes["spectrum48"] > sizes["cpc"], (
+        f"both machines got the same adventure: {sizes}"
     )
 
 
