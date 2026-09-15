@@ -350,6 +350,26 @@ error que venga después siga contando las líneas como las escribió el autor.
 Y una línea vacía dentro de un bloque de texto no es un espacio —sí lo es una
 línea con un espacio, que alguna aventura de las ocho tiene—.
 
+## Cuando algo está mal
+
+Una aventura son miles de líneas y quien la escribe no es quien escribió el
+compilador, así que un error dice cuatro cosas: qué fichero, qué línea, la
+línea tal como está en el fichero, y un dedo debajo de la palabra. Y cuando la
+palabra está *casi* bien —que es lo que pasa siempre—, qué se quiso decir:
+
+    partida.gac:147: unknown word 'MESSS' -- did you mean MESS?
+        IF ( VERB 7 ) MESSS 14 END
+                      ^
+
+El lenguaje son sesenta y siete palabras, así que adivinar la que era sale casi
+gratis y ahorra la búsqueda. Si la palabra no se parece a ninguna no se adivina
+nada, que una sugerencia mala manda a mirar donde no es.
+
+Lo mismo con las secciones (`/MSGG`), los tipos del vocabulario (`verbo`), las
+órdenes de dibujo (`LINEA`) y las máquinas de un `.if` (`cpcc`). Y el número de
+línea es el del fichero aunque lo que falle se lea de una vez —una lámina se
+lee entera, y aun así el error dice la línea de la orden que está mal—.
+
 ## Extensiones previstas
 
 Estas dos no están implementadas. Se listan aquí para que el diseño actual no

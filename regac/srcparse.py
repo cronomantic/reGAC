@@ -23,7 +23,7 @@
 import os
 
 from . import fontfile
-from .conds import CompileError, compile_line
+from .conds import CompileError, compile_line, nearest
 from .fontfile import FontError
 from .png import ImageError
 
@@ -95,6 +95,24 @@ def join_text(lines):
         else:
             out = out + " " + line
     return out
+
+
+def pointed(name, lineno, message, line=None, column=None, meant=None):
+    """A mistake, where it happened, and the line with a finger on it.
+
+    The line and the finger are worth the three lines they take: an adventure
+    is thousands of lines long and a message that only gives a number makes
+    the author count.  What is said is the same shape every time, so that
+    whatever reads it -- a person, an editor -- can find its way.
+    """
+    if meant:
+        message = f"{message} -- did you mean {meant}?"
+    out = [f"{name}:{lineno}: {message}"]
+    if line is not None and line.strip():
+        out.append("    " + line.rstrip())
+        if column:
+            out.append("    " + " " * (column - 1) + "^")
+    return "\n".join(out)
 
 
 def text_of(line):
@@ -172,10 +190,12 @@ def for_machine(text, machine=None, name="adventure"):
                 raise SourceError(f"{name}:{number}: .if what?  Name a machine")
             strange = [w for w in wanted if w.lower() not in EVERY_LABEL]
             if strange:
-                raise SourceError(
-                    f"{name}:{number}: no machine is called {strange[0]!r}; "
-                    f"what there is: " + ", ".join(sorted(EVERY_LABEL))
-                )
+                meant = nearest(strange[0], EVERY_LABEL)
+                said = f"there is no machine called {strange[0]!r}"
+                if not meant:       # no guess, so say what there is instead
+                    said += "; what there is: " + ", ".join(sorted(EVERY_LABEL))
+                raise SourceError(pointed(name, number, said, line,
+                                          line.find(strange[0]) + 1, meant))
             if machine is None:
                 raise SourceError(
                     f"{name}:{number}: this source keeps some lines for some "
@@ -240,8 +260,26 @@ class Parser:
     def at_section(self):
         return self.eof() or self.cur().lstrip().startswith("/")
 
-    def fail(self, msg):
-        raise SourceError(f"{self.name}:{self.i + 1}: {msg}")
+    def fail(self, msg, column=None, meant=None, lineno=None, line=None):
+        """Stop, saying where and showing the line.
+
+        Most of the time the line at fault is the one being read; the sections
+        that take a whole entry at once know better and say which.
+        """
+        if lineno is None:
+            lineno = self.i + 1
+        if line is None:
+            line = self.lines[lineno - 1] if lineno <= len(self.lines) else None
+        raise SourceError(pointed(self.name, lineno, msg, line, column, meant))
+
+    @staticmethod
+    def starts_at(line, word=None):
+        """The column a word begins at, or the first thing on the line."""
+        if word:
+            at = line.find(word)
+            if at >= 0:
+                return at + 1
+        return len(line) - len(line.lstrip()) + 1
 
     def skip_blank(self):
         """Skip blank and comment lines outside text blocks."""
@@ -277,7 +315,10 @@ class Parser:
                 continue
             handler = handlers.get(tag)
             if handler is None:
-                self.fail(f"unknown section {tag}")
+                known = list(handlers) + ["/LOC"]
+                self.fail(f"there is no section called {tag}",
+                          column=self.starts_at(self.cur()),
+                          meant=nearest(tag, known))
             self.i += 1
             handler()
         self.finish()
@@ -348,19 +389,30 @@ class Parser:
             self.i += 1
             if not st:
                 continue
+            raw = self.lines[self.i - 1]
             parts = st.split()
             if len(parts) != 3:
-                self.fail("a vocabulary entry is: word id type")
+                self.fail("a vocabulary entry is: word id type",
+                          column=self.starts_at(raw), lineno=self.i,
+                          line=raw)
             word, wid, kind = parts[0], int(parts[1]), parts[2].lower()
             if kind not in buckets:
-                self.fail(f"unknown word type {kind!r}")
+                self.fail(f"there is no word type called {kind!r}",
+                          column=self.starts_at(raw, parts[2]),
+                          meant=nearest(kind, buckets), lineno=self.i,
+                          line=raw)
             if kind == "noun" and wid == 255:
                 self.ddb["pronouns"].append(word)
             else:
                 self.ddb[buckets[kind]][word] = wid
 
     def entries(self):
-        """Yield (id, header remainder, text lines) for a #-keyed section."""
+        """Yield (id, header remainder, text lines, first line number).
+
+        The line number is the body's first, because a section that takes a
+        whole entry at once has read past it by the time anything in it turns
+        out to be wrong.
+        """
         while not self.at_section():
             st = self.cur().strip()
             if not st or st.startswith(";"):
@@ -373,13 +425,14 @@ class Parser:
             rest = head[1] if len(head) > 1 else ""
             self.i += 1
             body = []
+            first = self.i + 1
             while not self.at_section() and not self.cur().strip().startswith("#"):
                 body.append(self.cur())
                 self.i += 1
-            yield eid, rest, body
+            yield eid, rest, body, first
 
     def msg(self):
-        for mid, _, body in self.entries():
+        for mid, _, body, _first in self.entries():
             self.ddb["messages"][mid] = join_text(text_of(b) for b in body)
 
     @staticmethod
@@ -391,7 +444,7 @@ class Parser:
         return out
 
     def obj(self):
-        for oid, rest, body in self.entries():
+        for oid, rest, body, _first in self.entries():
             a = self.attrs(rest)
             start = a.get("start", "0")
             start = {"nowhere": NOWHERE, "carried": CARRIED}.get(start, start)
@@ -452,29 +505,46 @@ class Parser:
             self.i += 1
             if not st:
                 continue
+            raw = self.lines[lineno - 1]
             try:
                 code.extend(compile_line(st))
             except CompileError as e:
-                raise SourceError(f"{self.name}:{lineno}: {e}") from None
+                # The compiler counts the columns of what it was given, which
+                # is the line with its comment cut off and its indent gone, so
+                # the finger is put back where the author sees it.
+                column = None
+                if e.column:
+                    column = self.starts_at(raw) + e.column - 1
+                raise SourceError(
+                    pointed(self.name, lineno, e.message, raw, column, e.meant)
+                ) from None
         return code
 
     def conds(self, key):
         self.ddb[key] = self.cond_lines()
 
     def gfx(self):
-        for gid, _, body in self.entries():
+        for gid, _, body, first in self.entries():
             insts = []
-            for raw in body:
+            for number, raw in enumerate(body):
                 st = strip_comment(raw).strip()
                 if not st:
                     continue
+                lineno = first + number
                 parts = st.split()
                 cmd = parts[0].upper()
                 if cmd not in GFX_CMDS:
-                    self.fail(f"unknown graphics command {cmd!r}")
+                    self.fail(f"there is no drawing command called {cmd!r}",
+                              column=self.starts_at(raw, parts[0]),
+                              meant=nearest(cmd, GFX_CMDS),
+                              lineno=lineno, line=raw)
                 argc = GFX_CMDS[cmd][1]
                 if len(parts) - 1 != argc:
-                    self.fail(f"{cmd} takes {argc} arguments")
+                    many = "one number" if argc == 1 else f"{argc} numbers"
+                    self.fail(f"{cmd} takes {many}, and here it has "
+                              f"{len(parts) - 1}",
+                              column=self.starts_at(raw, parts[0]),
+                              lineno=lineno, line=raw)
                 insts.append([cmd] + [int(p) for p in parts[1:]])
             self.ddb["gfx"][gid] = insts
 

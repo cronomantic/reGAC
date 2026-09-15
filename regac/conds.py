@@ -129,6 +129,7 @@ def render_block(code, strict=False):
 # Source -> bytecode
 # ---------------------------------------------------------------------------
 
+import difflib
 import re
 
 from .opcodes import BY_NAME as _OPS
@@ -137,16 +138,48 @@ _TOKEN_RE = re.compile(r"[()]|[^\s()]+")
 
 
 class CompileError(Exception):
-    pass
+    """Something the condition compiler could not read.
+
+    It carries where it happened and, when there is an obvious one, what the
+    author probably meant: whoever is printing it knows which file and which
+    line, and can point at the very word.
+    """
+
+    def __init__(self, message, column=None, meant=None):
+        super().__init__(message)
+        self.message = message
+        self.column = column            # where in the line, counting from one
+        self.meant = meant              # the word it was probably going to be
+
+    def __str__(self):
+        if self.meant:
+            return f"{self.message} -- did you mean {self.meant}?"
+        return self.message
+
+
+def nearest(word, among):
+    """The one of those a misspelling was probably meant to be, or None.
+
+    An unknown word in a condition is a typo far more often than it is
+    anything else, and the language is sixty seven words long: saying which of
+    them was meant costs a line and saves a hunt.
+    """
+    spellings = {str(one).upper(): one for one in among}
+    close = difflib.get_close_matches(str(word).upper(), list(spellings),
+                                      n=1, cutoff=0.6)
+    return spellings[close[0]] if close else None
 
 
 def tokenize(text):
-    """Split a condition line into tokens.  Parentheses are always separate,
-    which lets a source be written without the spaces GAC itself demanded."""
+    """Split a condition line into tokens, each with where it began.
+
+    Parentheses are always separate, which lets a source be written without
+    the spaces GAC itself demanded.
+    """
     comment = text.find(";")
     if comment >= 0:
         text = text[:comment]
-    return _TOKEN_RE.findall(text)
+    return [(m.group(0), m.start() + 1) for m in _TOKEN_RE.finditer(text)]
 
 
 class _Assembler:
@@ -156,19 +189,29 @@ class _Assembler:
         self.code = []
 
     def peek(self):
-        return self.tokens[self.pos] if self.pos < len(self.tokens) else None
+        return self.tokens[self.pos][0] if self.pos < len(self.tokens) else None
+
+    def where(self):
+        """The column the next token starts at, or the end of the line."""
+        if self.pos < len(self.tokens):
+            return self.tokens[self.pos][1]
+        if self.tokens:
+            last, at = self.tokens[-1]
+            return at + len(last)
+        return 1
 
     def next(self):
         tok = self.peek()
         if tok is None:
-            raise CompileError("unexpected end of condition")
+            raise CompileError("the condition stops in the middle", self.where())
         self.pos += 1
         return tok
 
     def expect(self, tok):
+        at = self.where()
         got = self.next()
         if got != tok:
-            raise CompileError(f"expected {tok!r}, found {got!r}")
+            raise CompileError(f"expected {tok!r}, found {got!r}", at)
 
     def emit(self, *ins):
         self.code.append(list(ins))
@@ -203,6 +246,7 @@ class _Assembler:
             self.emit(op.name)
 
     def operand(self):
+        at = self.where()
         tok = self.next()
         if tok == "(":
             self.expr()
@@ -213,7 +257,8 @@ class _Assembler:
             return
         op = _OPS.get(tok)
         if op is None:
-            raise CompileError(f"unknown word {tok!r}")
+            raise CompileError(f"unknown word {tok!r}", at,
+                               nearest(tok, _OPS))
         if op.form == "nullary":
             self.emit(op.name)
             return
@@ -221,7 +266,8 @@ class _Assembler:
             self.operand()
             self.emit(op.name)
             return
-        raise CompileError(f"{op.name} cannot start an operand")
+        raise CompileError(
+            f"{op.name} goes between two things, so it cannot start one", at)
 
 
 def compile_line(text):
