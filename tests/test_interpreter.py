@@ -33,6 +33,8 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
+from regac.opcodes import OPS  # noqa: E402
+
 
 def interpreter():
     """runGAC is a program rather than a module, so it is loaded by hand."""
@@ -61,6 +63,23 @@ def parse(sentence):
     it.pronouns, it.old_noun = ["LO"], 0
     game.__dict__["_GAC_Interpreter__parse_input"](it, sentence)
     return it.verb, it.noun1, it.noun2, it.adverb
+
+
+def test_the_interpreter_here_knows_every_opcode():
+    """The one that runs on this side has to keep up with the language.
+
+    It is a big chain of names, so an opcode nobody added to it falls through
+    to the end and prints INVALID OPCODE in the middle of somebody's
+    adventure -- which is what MUSIC and SOUND did until this was written.
+    The two that do nothing anywhere are the two the original left empty.
+    """
+    with open(os.path.join(ROOT, "runGAC.py"), encoding="utf-8") as f:
+        source = f.read()
+    missing = [op.name for op in OPS
+               if op.name not in ("ENDTABLE", "NOP", "NOP29")
+               and f'"{op.name}"' not in source
+               and f"'{op.name}'" not in source]
+    assert not missing, f"runGAC.py has never heard of {missing}"
 
 
 def test_the_start_of_a_word_is_enough():

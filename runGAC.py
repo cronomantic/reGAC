@@ -838,6 +838,14 @@ class GAC_Interpreter:
                 elif cmd == "LOAD":
                     # TODO
                     pass
+                elif cmd in ("MUSIC", "SOUND"):
+                    # There is no sound here, but the number they were given
+                    # has to come off the stack whether anybody plays it or
+                    # not: an adventure has the same shape on every machine,
+                    # and this is one of them.
+                    self.stack.pop()
+                elif cmd == "QUIET":
+                    pass
                 else:
                     self.print(f"INVALID OPCODE {cmd}.\n")
         return (finished, done, if_true)
