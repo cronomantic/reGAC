@@ -904,7 +904,7 @@ op_sound:
                 ld      a, l
                 call    sound_play
                 ELSE
-                IFDEF WITH_BEEPER
+                IFDEF WITH_NOISES
                 ld      a, l                    ; no chip playing, so the
                 call    beep_sound              ; speaker makes what it can
                 ENDIF

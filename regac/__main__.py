@@ -28,6 +28,7 @@ import json
 import os
 import sys
 
+from .check import problems_of
 from .binary import MACHINES, SECTION_NAMES, Database, Reader
 from .devices import DEVICES, device_for, make
 from .gfx import Renderer
@@ -79,20 +80,39 @@ def cmd_compile(args):
 
 
 def cmd_check(args):
-    """Decompile and recompile a database, reporting any loss."""
+    """Say whether an adventure survives a round trip and whether it makes
+    sense, which are two different questions.
+
+    The round trip is about this tool: decompiled and recompiled, does the
+    adventure come back the same?  The rest is about the adventure: does every
+    number that points at something point at something that is there?
+    """
     original = read_json(args.input)
     name = os.path.basename(args.input)
+    wrong = False
     try:
         rebuilt = json.loads(json.dumps(parse(generate(original, name), name)))
     except SourceError as e:
         sys.exit(f"ERROR: {e}")
     if rebuilt == original:
         print(f"{name}: round trip exact")
-        return
-    differing = sorted(
-        k for k in set(original) | set(rebuilt) if original.get(k) != rebuilt.get(k)
-    )
-    sys.exit(f"{name}: round trip differs in {', '.join(differing)}")
+    else:
+        differing = sorted(k for k in set(original) | set(rebuilt)
+                           if original.get(k) != rebuilt.get(k))
+        print(f"{name}: round trip differs in {', '.join(differing)}")
+        wrong = True
+
+    found = problems_of(original)
+    faults = [p for p in found if p.fault]
+    for problem in found:
+        print(f"{name}: {problem}")
+    if found:
+        print(f"{name}: {len(faults)} faults and {len(found) - len(faults)}"
+              f" warnings")
+    else:
+        print(f"{name}: nothing points anywhere it should not")
+    if wrong or faults:
+        sys.exit(1)
 
 
 def cmd_render(args):

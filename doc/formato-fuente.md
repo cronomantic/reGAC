@@ -371,6 +371,30 @@ Lo mismo con las secciones (`/MSGG`), los tipos del vocabulario (`verbo`), las
 línea es el del fichero aunque lo que falle se lea de una vez —una lámina se
 lee entera, y aun así el error dice la línea de la orden que está mal—.
 
+## Comprobar una aventura
+
+    python -m regac check partida.json
+
+Dice dos cosas distintas. Una es de la herramienta: descompilada y vuelta a
+compilar, ¿sale igual? La otra es de la aventura: **¿todo número que apunta a
+algo apunta a algo que está?** Un `MESS 99` compila igual de bien haya o no
+mensaje 99, y lo que ve quien juega es un hueco, una habitación cerrada o
+silencio, sin nada que diga por qué.
+
+Se mira todo lo que apunta: mensajes, localidades, objetos, contadores,
+palabras del vocabulario, láminas —incluida una lámina que llama a otra—, por
+dónde se sale de cada sitio, dónde empieza cada objeto, y las melodías que la
+aventura dice tener. Lo que no se puede saber no se dice: `MESS ( CTR 3 )`
+cambia en cada partida y ahí no hay nada que comprobar. Lo que es dudoso sale
+como aviso; lo que no puede ser otra cosa que un fallo, como fallo.
+
+También se miran los mensajes que el intérprete dice por su cuenta: sin el 240
+no tiene con qué pedir una orden, y eso no lo dice ni el compilador ni la
+máquina.
+
+Es lo que encontró un fallo de 1987: **Los pájaros de Bangkok** dice `MESS 130`
+en una habitación de su primera parte y ese mensaje no se escribió nunca.
+
 ## Nombres para los números
 
     .def PUERTA_ABIERTA   5

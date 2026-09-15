@@ -855,10 +855,13 @@ es inevitable: son sonidos distintos hechos con cosas distintas.
   que la máquina tiene interrupción de temporizador, así que el clic de tecla
   saldría gratis el día que se sepa el puerto, y la música pediría además
   montarle la interrupción, que hoy no la usa.
-- **El Amstrad sin música.** Ahí el único altavoz es el AY, así que `SOUND` en
-  una versión sin reproductor no hace nada. Se arregla escribiendo los
-  registros del chip a mano —el mismo baile del 8255 que ya hace el teclado—,
-  que son unas decenas de bytes.
+- ~~El Amstrad sin música~~, **hecho**: ahí el único altavoz es el AY, así que
+  ahora `SOUND` le pide la nota al chip en vez de menear un bit. Es el mismo
+  baile del 8255 que ya hacía el teclado, y lee **la misma tabla** que el
+  motor de un bit —las notas, las duraciones y los números son de la aventura y
+  no de la máquina—: un tono de la tabla es medio periodo del chip, así que
+  `SOUND 2` suena a lo mismo aquí. Una versión con música no lo usa, que ahí
+  los efectos son del tracker.
 - **El clic con música puesta.** En el Spectrum y el MSX el altavoz es otro
   aparato y no molesta al AY, así que suenan a la vez sin más. En el Amstrad
   no podría ser, que es el mismo chip.

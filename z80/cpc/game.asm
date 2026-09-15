@@ -79,6 +79,14 @@ done_flag:      db      0
                 include "screen.asm"
                 include "../common/textout.asm"
                 include "keyboard.asm"
+; Without music there is still SOUND, and this machine's only speaker is its
+; sound chip: ay.asm makes the same noises the others make with a bit of a
+; port.  It comes in before the opcodes, which ask whether there is anything
+; here that can make one.  With music the effects are the tracker's and this
+; stays out.
+                IFNDEF WITH_MUSIC
+                include "ay.asm"
+                ENDIF
                 include "tape.asm"
                 include "draw.asm"
                 include "shapes.asm"

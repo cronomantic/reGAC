@@ -21,22 +21,21 @@
 ;   BEEP_BASE       a macro putting the rest of that port in A, speaker clear
 ;   BEEP_OUT        a macro writing A to it
 ;
-; This file also says WITH_BEEPER, which is how the rest of the interpreter
-; knows there is a speaker to ask.
+; This file says WITH_NOISES, which is how the rest of the interpreter knows
+; there is something here that can make one -- a machine whose only speaker is
+; its sound chip says the same thing from cpc/ay.asm.
 ;
 ; The pitch is how long a half wave lasts and the length is how many of them
 ; there are, so a note of a given number of flips is shorter the higher it is,
 ; which is what an ear expects of a blip.
 
-                IFNDEF WITH_BEEPER
-                DEFINE WITH_BEEPER 1
+                IFNDEF WITH_NOISES
+                DEFINE WITH_NOISES 1
                 ENDIF
 
-; The click: about a fiftieth of a second at something near five hundred
-; hertz, which is the nearest this engine comes to the pip the original asked
-; the ROM for.
-CLICK_PITCH     equ 200
-CLICK_FLIPS     equ 20
+; What the noises are is in effects.asm, which the Amstrad's own engine
+; reads too: the numbers are the adventure's and not the machine's.
+                include "effects.asm"
 
 ; Play a note: A the pitch, B how many times the speaker moves.  A pitch of
 ; nought would be the longest wave and not the shortest, so it is not one.
@@ -128,17 +127,3 @@ beep_sound:
                 BEEP_BASE
                 BEEP_OUT
                 ret
-
-; Five of them, which is as many as an adventure of the original's kind ever
-; wanted: something taken, something refused, a door, a fall and a stab of
-; alarm.  An author with a sound chip writes their own in the tracker and gets
-; these only where there is no chip to play them.
-; A bigger pitch is a lower note, so a step that takes it down takes the note
-; up.  All five are between a twentieth and a tenth of a second.
-beep_effects:
-                db      200, 150, -1            ; 1: taken, rising
-                db      60, 150, 1              ; 2: refused, falling
-                db      250, 100, 0             ; 3: a door, flat and low
-                db      30, 110, 2              ; 4: a fall, high to low
-                db      60, 200, 0              ; 5: alarm, high and hard
-BEEP_SOUNDS     equ ($ - beep_effects) / 3
