@@ -318,6 +318,23 @@ def music_source(tunes, folder, out, tool=None):
     return seen
 
 
+def noises_source(noises, out):
+    """The three bytes a noise is, written where the interpreter reads them.
+
+    A pitch, how many steps it lasts and what to add to the pitch every step:
+    the same three the five that come with the interpreter are, because an
+    author's noises are not a different kind of thing from ours.
+    """
+    lines = ["; Written by regac build from the adventure's own /SOUND.",
+             "; A bigger pitch is a lower note; the step is what to add to it."]
+    for number, (pitch, steps, step) in enumerate(noises, 1):
+        lines.append(f"                db      {pitch}, {steps}, {step}"
+                     f"{'':<{max(1, 12 - len(str(pitch) + str(steps) + str(step)))}}"
+                     f"; {number}")
+    with open(out, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines) + "\n")
+
+
 def cmd_build(args):
     """Write the binary database the 8 bit interpreter reads."""
     ddb = read_json(args.input)
@@ -330,6 +347,15 @@ def cmd_build(args):
     image = database.build()
     with open(args.output, "wb") as f:
         f.write(image)
+    noises = ddb.get("sounds") or []
+    if noises and args.music_defs:
+        # Beside the tunes, because they are the same kind of thing: what the
+        # adventure asks for, written where the assembler looks.
+        where = os.path.join(os.path.dirname(os.path.abspath(args.music_defs)),
+                             "noises.asm")
+        noises_source(noises, where)
+        print(f"{args.input} -> {where}")
+        print(f"  noises      {len(noises)}")
     tunes = ddb.get("music") or []
     if args.music_defs:
         root = os.path.dirname(os.path.abspath(args.input))
@@ -545,13 +571,20 @@ def make_music(ddb, root, where_regac_is, effects=None, tool=None):
     builds: the tunes stay where the author keeps them and are named by path.
     """
     tunes = ddb.get("music") or []
-    if not tunes:
-        return []
+    noises = ddb.get("sounds") or []
     folder = os.path.join(where_regac_is, "music")
+    if noises:
+        os.makedirs(folder, exist_ok=True)
+        noises_source(noises, os.path.join(folder, "noises.asm"))
+    if not tunes:
+        # Noises of one's own are not music: they are played by the speaker,
+        # or by the sound chip with nothing else going on, so they go in
+        # whether or not there is a tune.
+        return ["WITH_OWN_NOISES"] if noises else []
     os.makedirs(folder, exist_ok=True)
     music_source(tunes, root, os.path.join(folder, "tunes.asm"),
                  exporter(root, where_regac_is, tool))
-    defines = ["WITH_MUSIC"]
+    defines = ["WITH_MUSIC"] + (["WITH_OWN_NOISES"] if noises else [])
     if effects:
         shutil.copyfile(os.path.join(root, effects),
                         os.path.join(folder, "effects.asm"))
@@ -571,7 +604,11 @@ def make_one(target, settings, ddb, name, root, output, where_regac_is,
         defs=os.path.join(tree, target.defs) if target.defs else None,
     )
     screen = None
-    defines = list(music) if target.music is not None else []
+    # A machine with no sound chip gets no tunes, but noises of the
+    # adventure's own are not tunes: they are played by a speaker, and every
+    # machine but the PCW has one.
+    defines = [word for word in music
+               if target.music is not None or word == "WITH_OWN_NOISES"]
     if music and target.music is None:
         print(f"  {target.machine:12} has no sound chip: the music is left out")
     if settings.get("screen"):

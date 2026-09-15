@@ -665,6 +665,14 @@ con el título de la canción**, y una canción sin título se exporta como
 ensamblador para en seco, así que cada melodía va envuelta en su `MODULE`, que
 le pone prefijo a todas, con la etiqueta de la dirección fuera.
 
+**Y los ruidos son del autor en los dos lados.** Con chip, `SOUND n` toca el
+efecto n del banco que exportó del tracker. Sin chip —o con uno que no está
+tocando nada—, toca el n de la sección `/SOUND` de la propia aventura: tono,
+pasos y paso, los mismos tres números que tienen los cinco que trae el
+intérprete, que ahora son un valor por defecto y no una regla. `regac build` lo
+escribe donde el ensamblador lo lee, como hace con las melodías, y de paso
+`regac check` ya puede decir «`SOUND 3` y esta aventura dice tener dos».
+
 **Los efectos de sonido, puestos.** Un efecto de Arkos es un instrumento suelto
 que el reproductor superpone a uno de los tres canales la próxima vez que la
 interrupción lo llama: pedirlo escribe cinco bytes y vuelve, la melodía sigue

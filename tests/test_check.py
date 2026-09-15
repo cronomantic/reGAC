@@ -150,6 +150,19 @@ def test_a_tune_the_adventure_has_not_got():
     assert any("no music at all" in s for s in faults(of(["MUSIC 0 END"])))
 
 
+def test_a_noise_the_adventure_has_not_got():
+    """A bank exported from the tracker is assembly and nothing here can count
+    what is in it, but an adventure that says its own noises can be counted."""
+    ddb = of(["SOUND 3 END"])
+    ddb["sounds"] = [[100, 40, -1], [30, 90, 2]]
+    assert any("SOUND 3" in s and "2 noises" in s for s in faults(ddb))
+    ddb["sounds"].append([200, 60, 0])
+    assert not faults(ddb)
+    # And with nothing said, nothing is claimed: the bank may hold anything.
+    assert not faults(of(["SOUND 9 END"]))
+    assert any("numbered from one" in s for s in faults(of(["SOUND 0 END"])))
+
+
 def test_the_messages_the_interpreter_says_for_itself():
     ddb = of()
     del ddb["messages"]["240"]

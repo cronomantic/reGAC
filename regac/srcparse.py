@@ -428,6 +428,7 @@ class Parser:
             "/GFX": self.gfx,
             "/FONT": self.font,
             "/MUSIC": self.music,
+            "/SOUND": self.sound,
         }
         while True:
             self.skip_blank()
@@ -711,6 +712,43 @@ class Parser:
                                       lineno, raw)
                 pieces = pieces[:-1]
             tunes.append({"file": " ".join(pieces), "subsong": subsong})
+
+    def sound(self):
+        """The noises this adventure asks for, where there is no sound chip
+        to play the tracker's own: one to a line, in the order SOUND counts
+        them from one.
+
+            /SOUND
+            ; pitch  steps  step
+                200    150     -1    ; cogido
+                 60    150      1    ; rechazado
+
+        A pitch is how long half a wave lasts and a bigger one is a lower
+        note; the step is what to add to it every time, so a step that takes
+        the pitch down takes the note up.  An adventure that says nothing here
+        gets five that come with the interpreter.
+        """
+        noises = self.ddb.setdefault("sounds", [])
+        while not self.at_section():
+            raw, lineno = self.cur(), self.i + 1
+            said = strip_comment(raw).strip()
+            self.i += 1
+            if not said:
+                continue
+            parts = said.split()
+            if len(parts) != 3:
+                self.fail("a noise is: pitch steps step", lineno=lineno,
+                          line=raw, column=self.starts_at(raw))
+            pitch, steps, step = (self.number(p, "a number", lineno, raw)
+                                  for p in parts)
+            for value, what, low, high in ((pitch, "a pitch", 1, 255),
+                                           (steps, "a length", 1, 255),
+                                           (step, "a step", -128, 127)):
+                if not low <= value <= high:
+                    self.fail(f"{value} is not {what}: they run from {low} to "
+                              f"{high}", lineno=lineno, line=raw,
+                              column=self.starts_at(raw, str(value)))
+            noises.append([pitch, steps, step])
 
     def font(self):
         """A typeface of the author's own, given whole or a letter at a time.

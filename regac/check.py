@@ -131,6 +131,7 @@ def follow(problems, where, code, ddb):
         ADVERB: set(ddb.get("adverbs", {}).values()),
     }
     tunes = len(ddb.get("music") or [])
+    noises = len(ddb.get("sounds") or [])
 
     for op, taken in walked(code):
         for kind, value in zip(op.argk, taken):
@@ -163,9 +164,17 @@ def follow(problems, where, code, ddb):
                 where,
                 f"MUSIC {taken[0]}, and this adventure has "
                 + (f"{tunes} tunes" if tunes else "no music at all")))
-        if op.name == "SOUND" and taken[0] is not None and taken[0] < 1:
-            problems.append(Problem(
-                where, "SOUND 0, and the effects of a bank are numbered from 1"))
+        if op.name == "SOUND" and taken[0] is not None:
+            if taken[0] < 1:
+                problems.append(Problem(
+                    where, "SOUND 0, and effects are numbered from one"))
+            elif noises and taken[0] > noises:
+                # Only when the adventure says what its noises are: a bank
+                # exported from the tracker is assembly and nothing here can
+                # count what is in it.
+                problems.append(Problem(
+                    where, f"SOUND {taken[0]}, and this adventure says what "
+                           f"{noises} noises it has"))
 
 
 def problems_of(ddb):

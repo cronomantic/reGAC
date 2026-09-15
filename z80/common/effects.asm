@@ -18,17 +18,22 @@
 CLICK_PITCH     equ 200
 CLICK_FLIPS     equ 20
 
-; Five of them, which is as many as an adventure of the original's kind ever
-; wanted: something taken, something refused, a door, a fall and a stab of
-; alarm.  An author with a sound chip writes their own in the tracker and gets
-; these only where there is no chip playing.
+; An adventure may say what noises it wants, in a section of its own, and
+; then regac build writes them here and this file takes them in.  One that
+; says nothing gets the five below, which is as many as an adventure of the
+; original's kind ever wanted: something taken, something refused, a door, a
+; fall and a stab of alarm.
 ;
 ; A bigger pitch is a lower note, so a step that takes it down takes the note
 ; up.  All five are between a twentieth and a tenth of a second.
 beep_effects:
+                IFDEF WITH_OWN_NOISES
+                include "../../music/noises.asm"
+                ELSE
                 db      200, 150, -1            ; 1: taken, rising
                 db      60, 150, 1              ; 2: refused, falling
                 db      250, 100, 0             ; 3: a door, flat and low
                 db      30, 110, 2              ; 4: a fall, high to low
                 db      60, 200, 0              ; 5: alarm, high and hard
+                ENDIF
 BEEP_SOUNDS     equ ($ - beep_effects) / 3

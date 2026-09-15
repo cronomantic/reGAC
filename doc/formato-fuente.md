@@ -77,6 +77,7 @@ lámina. El cambio dura hasta el siguiente, no hasta el final del mensaje.
 | `/GFX`   | Gráficos vectoriales                                        |
 | `/FONT`  | Fuente redefinida                                           |
 | `/MUSIC` | Las melodías que tiene la aventura                          |
+| `/SOUND` | Los ruidos que pide, donde no hay chip que toque los del tracker |
 
 ### `/CTL`
 
@@ -147,6 +148,27 @@ fuentecillo que los incluye a todos con la forma que cada máquina necesita —l
 lista por un lado y las melodías por otro, cada una en su `MODULE` y ensamblada
 para el buffer—, y un fichero nombrado dos veces se incluye una sola vez y se
 apunta dos: para eso son las subcanciones.
+
+### `/SOUND`
+
+Un ruido por línea, en el orden en que `SOUND` los cuenta desde uno:
+
+    /SOUND
+    ; tono  pasos  paso
+       200    150     -1    ; cogido
+        60    150      1    ; rechazado
+       250    100      0    ; una puerta
+
+El **tono** es lo que dura medio ciclo —uno más grande es una nota más grave—,
+los **pasos** son cuántas veces se repite, y el **paso** es lo que se le suma al
+tono en cada uno: un paso que baja el tono sube la nota. Los tres son números
+como cualquier otro, así que valen los nombres de `.def`.
+
+Esto es para las máquinas **sin chip que toque los efectos del tracker**: el
+altavoz de un bit del Spectrum, el Next y el MSX, y el AY del Amstrad cuando la
+versión no lleva música. Donde sí hay reproductor, `SOUND n` toca el efecto n
+del banco que el autor exportó de Arkos y nombró en el proyecto. Una aventura
+que no diga nada aquí se queda con los cinco que trae el intérprete.
 
 ### `/HIGH`, `/LOW`, `/LOCAL`
 

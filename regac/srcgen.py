@@ -80,6 +80,7 @@ class SourceWriter:
         self.gfx()
         self.font()
         self.music()
+        self.sound()
         return self.text()
 
     def header(self):
@@ -179,6 +180,16 @@ class SourceWriter:
         self.w("; what the tracker exported          subsong")
         for tune in tunes:
             self.w(f"{tune['file']:<36}{tune.get('subsong', 0)}")
+        self.w()
+
+    def sound(self):
+        noises = self.ddb.get("sounds") or []
+        if not noises:
+            return
+        self.w("/SOUND")
+        self.w("; pitch  steps  step")
+        for pitch, steps, step in noises:
+            self.w(f"{pitch:7}{steps:7}{step:6}")
         self.w()
 
     def font(self):

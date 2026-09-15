@@ -196,6 +196,34 @@ def test_a_def_can_be_kept_back_for_a_machine(tmp_path):
         assert ["PUSH", wanted] in ddb["hpcs"], machine
 
 
+def test_an_adventure_may_say_what_noises_it_wants(tmp_path):
+    """The five that come with the interpreter are a default and not a rule:
+    an adventure says its own in a section of its own, and they are the same
+    three numbers ours are."""
+    ddb = built(tmp_path,
+                "/CTL\nmodel SPECTRUM\n/SOUND\n; pitch steps step\n"
+                "  200   150   -1    ; cogido\n   60   150    1\n", None)
+    assert ddb["sounds"] == [[200, 150, -1], [60, 150, 1]]
+
+
+def test_a_noise_that_could_not_be_played(tmp_path):
+    for source, wanted in (
+        ("/SOUND\n  0  150  -1\n", "not a pitch"),
+        ("/SOUND\n200    0  -1\n", "not a length"),
+        ("/SOUND\n200  150\n", "a noise is: pitch steps step"),
+        ("/SOUND\n200  150  300\n", "not a step"),
+    ):
+        said = refused(tmp_path, "/CTL\nmodel SPECTRUM\n" + source, None)
+        assert wanted in said, f"{source!r}: {said}"
+
+
+def test_a_noise_may_be_named_like_anything_else(tmp_path):
+    ddb = built(tmp_path,
+                "/CTL\nmodel SPECTRUM\n.def GRAVE 250\n"
+                "/SOUND\n GRAVE 100 0\n", None)
+    assert ddb["sounds"] == [[250, 100, 0]]
+
+
 if __name__ == "__main__":
     import tempfile
     for name, test in sorted(globals().items()):
