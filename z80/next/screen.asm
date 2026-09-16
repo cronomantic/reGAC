@@ -223,6 +223,23 @@ scroll_window:
                 ldir
                 ret
 
+; TEXT and PICT, of which this machine does only half.
+;
+; The half it does is the one that matters most: with TEXT no picture is
+; drawn, which the interpreter sees to by itself.  The other half -- giving
+; the text the whole screen -- is not here, and the reason is measured and
+; ugly: the interpreter ends at $9F8B and anything past $A000 never reaches
+; the machine.  The file carries it, and the byte at $A017 in bank two of
+; game.nex is the right one, but the memory there reads back as noughts.
+; Until that is understood there are some seventy bytes to spare on this
+; machine, and this costs four hundred.  See doc/pendiente.md.
+; Corrupts: nothing
+text_window_all:
+                ret
+
+text_window_below:
+                ret
+
 ; Start a new line, scrolling if the window is full.
 ; Corrupts: everything
 new_line:

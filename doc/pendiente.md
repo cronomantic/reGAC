@@ -679,7 +679,8 @@ sabido explicar: cuando una palabra no cabe y salta de renglón, el original
 deja a veces el espacio que la separaba al principio del renglón nuevo —`La
 bodega de carga de la nave.` y debajo ` Salidas:Norte.`— y el nuestro lo deja
 al final del anterior, donde no se ve. Es una sangría de un espacio en un
-punto de corte.
+punto de corte, y se ha vuelto a ver en las pruebas de `TEXT`, así que es
+constante y no una casualidad de una pantalla.
 
 La prueba es [`test_wrapping_z80.py`](../tests/test_wrapping_z80.py), con la
 forma de MegaCorp escrita como MegaCorp la escribe.
@@ -706,14 +707,79 @@ lo que hay veinte bytes más allá, de modo que no depende de una dirección
 fija. De las versiones de Amstrad y de Commodore no se sabe dónde está; si no
 aparece, se queda en `Nothing` y se dice.
 
+### `TEXT` y `PICT`, medidos y sin hacer
+
+Se escriben en `vm_graphics` y no los lee nadie. Ya está medido qué hacen, y
+resultó más sencillo de lo que parecía.
+
+**Cómo se midió**, porque ninguna de las ocho deja ejecutarlos a voluntad: se
+escriben dos condiciones nuestras encima del principio de la tabla de baja
+prioridad de MegaCorp, en la memoria de la máquina, con un cero detrás para
+que no se lea a medias lo que quedaba de la suya. `PULSA` hace `TEXT` y `ABRE`
+hace `PICT`. Los opcodes son los del original, que son los nuestros, y de paso
+quedó comprobado: lo que había allí era `80 08 30 3E 80 EF 16 3B 36 2B 3F`,
+que es `IF ( VERB 8 ) MESS 239 WITH LIST WAIT END`, el inventario.
+
+Lo que hacen:
+
+- **`TEXT` no borra nada ni mueve el cursor.** La pantalla se queda exactamente
+  como estaba; lo único que cambia es que **la ventana de texto pasa a ser la
+  pantalla entera**, y eso se ve en cuanto algo se imprime: el texto arrastra
+  la lámina hacia arriba al desplazar, en vez de desplazar sólo el trozo de
+  abajo.
+- **Con `TEXT` puesto, una localidad nueva no dibuja su lámina.** Se va al sur,
+  se describe la bodega, y la lámina de la cabina sigue subiendo.
+- **`PICT` tampoco hace nada en el momento**: no redibuja ni borra. La pantalla
+  sigue desplazándose entera.
+- **La ventana vuelve a su sitio cuando se dibuja una lámina**, que con `PICT`
+  puesto es la siguiente localidad que se describa.
+
+O sea que, puesto en nuestros términos, no hace falta ninguna orden de «volver
+al modo lámina»: **`TEXT` pone la ventana en cero y dibujar una lámina la
+devuelve a la altura de la lámina**. `PICT` no es más que la bandera que
+permite volver a dibujarlas, que es justo lo que `vm_graphics` ya es.
+
+**Y está hecho a medias, que es lo honesto de contar.** La mitad que es común
+—con `TEXT` no se dibuja lámina— vale en las cinco máquinas: la decide
+`describe_location` mirando `vm_graphics`, que se escribía desde el principio
+y no leía nadie. La otra mitad, la ventana, sólo está en dos, y no por pereza:
+
+| máquina | la ventana | por qué |
+|---|---|---|
+| Spectrum | **sí** | |
+| MSX | **sí** | |
+| Amstrad | no | el intérprete acaba a **38 bytes** de un escalón de página que cuesta 256 a cada aventura; la ventana cuesta unos 60 |
+| Next | no | el intérprete acaba en `$9FC6` y **lo que pase de `$A000` no llega a la máquina** |
+| PCW | no | sus dos mitades viven en bancos distintos: la dirección de un renglón tendría que llevar un banco consigo |
+
+En el Spectrum el desplazamiento pasó a recorrer los renglones de uno en uno,
+porque el truco de un solo `LDIR` sólo vale mientras la ventana cabe en un
+tercio de la pantalla. En el MSX bastaron dos bytes, el primer renglón y
+cuántos se mueven. En las otras tres, `text_window_all` y `text_window_below`
+están y no hacen nada, con el porqué escrito en su propio `screen.asm`.
+
+Se ve en la presentación de MegaCorp, que es lo que lo motivó: antes se perdía
+desplazada en ocho renglones y ahora sale letra por letra como la del
+original. La prueba es [`test_textmode_z80.py`](../tests/test_textmode_z80.py).
+
 **Lo que queda de aquí**, apuntado y medido y no hecho:
 
-- **`TEXT` y `PICT` se escriben y no se leen.** En el original, `TEXT` le da al
-  texto la pantalla entera: así sale la presentación de MegaCorp, sin marco de
-  lámina. Cambiar eso es tocar la capa de pantalla de cada máquina —la altura
-  de la ventana de texto es hoy una constante y tendría que ser un byte—, y
-  antes hay que medir tres cosas más en la máquina: si `TEXT` borra la
-  pantalla, dónde deja el cursor, y qué hace `PICT` al volver.
+- **La pared de los `$A000` del Next.** El `.nex` lleva los bytes buenos en el
+  banco 2 —leídos del fichero, el `$A017` es el que debe ser— y la memoria de
+  la máquina ahí se lee como ceros. Quedan 58 bytes antes de esa pared y eso
+  es un problema con esto y sin esto: cualquier cosa que se le añada a esa
+  máquina la cruza. Es lo próximo que hay que entender del Next.
+- **Un mensaje se desempaqueta en `text_buffer`, que son 256 bytes, y nadie
+  comprueba que quepa.** Uno de 380 caracteres se lleva por delante la memoria
+  del intérprete y la máquina se va a pasear. Ninguna de las ocho aventuras
+  tiene uno tan largo, así que no ha mordido nunca, pero una aventura escrita
+  de ahora en adelante sí puede. Lo suyo es que la construcción lo diga, que
+  es donde se sabe.
+- **El Amstrad, otra vez el escalón.** Los 38 bytes de margen son de la misma
+  familia que los 162 de MegaCorp II: esa máquina necesita sitio antes de
+  poder crecer, y la salida conocida es repartir su base de datos en bancos
+  como hace el +3.
+
 - **El Amstrad va justo, y hay un escalón.** Está medido, aventura por
   aventura, antes y después de meter los marcadores, con un árbol aparte en el
   commit anterior para poder comparar.

@@ -6,6 +6,13 @@
 ; below, and only those eight ever scroll, which is how the original behaved.
 ; See doc/graficos.md.
 ;
+; Only usually, that is.  TEXT gives the text the whole screen, and then the
+; picture scrolls away with everything else: text_top says where the window
+; begins and it is a byte, not a constant, so the scrolling walks the rows
+; one at a time instead of trusting that the window sits inside one third of
+; the display.  What TEXT and PICT do was measured on the original -- see
+; doc/pendiente.md.
+;
 ; The printing is ours, not the ROM's.  Codes are places in the adventure's own
 ; character set, not ASCII, so an accented letter is a glyph like any other,
 ; and the same routine serves every machine once its screen layer is written.
@@ -69,41 +76,141 @@ cursor_address:
                 ld      l, a
                 ret
 
-; Move the text window up by one character row.
-; Corrupts: AF, BC, DE, HL
+; The address of pixel line C of character row B, in HL.
+; Corrupts: AF
+text_row_address:
+                ld      a, b
+                and     %00011000               ; the third, already times eight
+                or      c
+                or      $40
+                ld      h, a
+                ld      a, b
+                and     %00000111
+                rrca
+                rrca
+                rrca                            ; the row within the third, x32
+                ld      l, a
+                ret
+
+; The address of the colours of character row B, in HL.
+; Corrupts: AF
+text_row_colours:
+                ld      l, b
+                ld      h, 0
+                add     hl, hl
+                add     hl, hl
+                add     hl, hl
+                add     hl, hl
+                add     hl, hl                  ; thirty two to a row
+                ld      a, h
+                or      $58
+                ld      h, a
+                ret
+
+; Move the text window up by one character row.  The window is whatever
+; text_top says, so the rows are moved one by one: with TEXT it is the whole
+; screen and the old trick of one LDIR inside a single third does not hold.
+; Corrupts: everything
 scroll_window:
-                ld      b, 8                    ; one pass a pixel line
-                ld      hl, SCREEN_THIRD + 32
-                ld      de, SCREEN_THIRD
-.line:
-                push    bc
+                ld      a, (text_top)
+                ld      (scroll_row), a
+.each_row:
+                ld      a, (scroll_row)
+                cp      23
+                jr      nc, .the_last_one
+                xor     a
+                ld      (scroll_line), a
+.each_line:
+                ld      a, (scroll_row)
+                inc     a
+                ld      b, a
+                ld      a, (scroll_line)
+                ld      c, a
+                call    text_row_address             ; where it comes from
                 push    hl
-                push    de
-                ld      bc, (TEXT_ROWS - 1) * 32
+                ld      a, (scroll_row)
+                ld      b, a
+                ld      a, (scroll_line)
+                ld      c, a
+                call    text_row_address             ; where it goes
+                ex      de, hl
+                pop     hl
+                ld      bc, 32
                 ldir
-                ; the row that came free is where the copy ended, DE
-                ld      h, d
-                ld      l, e
+                ld      hl, scroll_line
+                inc     (hl)
+                ld      a, (hl)
+                cp      8
+                jr      c, .each_line
+                ; and the colours of that row move with it
+                ld      a, (scroll_row)
+                inc     a
+                ld      b, a
+                call    text_row_colours
+                push    hl
+                ld      a, (scroll_row)
+                ld      b, a
+                call    text_row_colours
+                ex      de, hl
+                pop     hl
+                ld      bc, 32
+                ldir
+                ld      hl, scroll_row
+                inc     (hl)
+                jr      .each_row
+.the_last_one:
+                ; the row that came free at the bottom
+                xor     a
+                ld      (scroll_line), a
+.each_blank:
+                ld      b, 23
+                ld      a, (scroll_line)
+                ld      c, a
+                call    text_row_address
+                ld      d, h
+                ld      e, l
                 inc     de
                 ld      (hl), 0
                 ld      bc, 31
                 ldir
-                pop     de
-                pop     hl
-                inc     d
-                inc     h                       ; on to the next pixel line
-                pop     bc
-                djnz    .line
-                ; the colours move with it
-                ld      hl, ATTR_BASE + 32
-                ld      de, ATTR_BASE
-                ld      bc, (TEXT_ROWS - 1) * 32
-                ldir
-                ld      hl, ATTR_BASE + (TEXT_ROWS - 1) * 32
-                ld      de, ATTR_BASE + (TEXT_ROWS - 1) * 32 + 1
-                ld      bc, 31
+                ld      hl, scroll_line
+                inc     (hl)
+                ld      a, (hl)
+                cp      8
+                jr      c, .each_blank
+                ld      b, 23
+                call    text_row_colours
+                ld      d, h
+                ld      e, l
+                inc     de
                 ld      (hl), TEXT_ATTR
+                ld      bc, 31
                 ldir
+                ret
+
+; TEXT: the text has the whole screen from now on.  Nothing is cleared and
+; the cursor does not move -- what changes is only how far the scrolling
+; reaches, which is what the original does.
+; Corrupts: AF
+text_window_all:
+                xor     a
+                ld      (text_top), a
+                ret
+
+; And back under the picture, which on the original is what drawing a picture
+; does rather than anything PICT says.  A cursor left above the new top comes
+; down to it.
+; Corrupts: AF, HL
+text_window_below:
+                ld      a, TEXT_TOP
+                ld      (text_top), a
+                ld      hl, cursor_y
+                cp      (hl)
+                ret     c
+                ret     z
+                ld      (hl), a
+                xor     a
+                ld      (cursor_x), a
                 ret
 
 ; Start a new line, scrolling if the window is full.
@@ -208,7 +315,8 @@ backspace:
                 or      a
                 jr      nz, .same_line
                 ld      a, (cursor_y)
-                cp      TEXT_TOP
+                ld      hl, text_top
+                cp      (hl)
                 ret     z                       ; nothing left to rub out
                 dec     a
                 ld      (cursor_y), a
@@ -231,6 +339,9 @@ font_first:     db      0
 font_count:     db      0
 cursor_x:       db      0
 cursor_y:       db      TEXT_TOP
+text_top:       db      TEXT_TOP                ; the first row the text may use
+scroll_row:     db      0
+scroll_line:    db      0
 
 ; What the border was last set to.  It is kept because the port it goes out on
 ; cannot be read back and the speaker is another bit of it: beep.asm has to

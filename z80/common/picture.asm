@@ -112,6 +112,7 @@ picture_find:
 ; Corrupts: everything
 draw_picture:
                 push    hl                      ; clearing treads on HL
+                call    text_window_below       ; a picture takes its rows back
                 ld      a, SECTION_GRAPHICS     ; printing may have taken the
                 call    db_bank_in              ; pictures' bank away
                 xor     a

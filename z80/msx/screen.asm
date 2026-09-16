@@ -44,7 +44,8 @@ ROW_BYTES       equ 256                 ; one character row of either table
 
 SCREEN_COLS     equ 32
 TEXT_TOP        equ 16                  ; the first row the text may use
-TEXT_ROWS       equ 24 - TEXT_TOP
+TEXT_LAST       equ 24                  ; and the one past the last
+TEXT_ROWS       equ TEXT_LAST - TEXT_TOP
 PICTURE_ROWS    equ TEXT_TOP * 8        ; the picture, in pixel lines
 PICTURE_BYTES   equ TEXT_TOP * ROW_BYTES
 
@@ -246,8 +247,10 @@ cursor_address:
 ; bytes, because of how these tables are laid out.
 ; Corrupts: everything
 scroll_window:
-                ld      b, TEXT_ROWS - 1
-                ld      c, TEXT_TOP                     ; the row it lands on
+                ld      a, (text_move)                  ; how many rows move
+                ld      b, a
+                ld      a, (text_top)
+                ld      c, a                            ; the row it lands on
 .each_row:
                 push    bc
                 ld      d, 0                            ; the patterns
@@ -303,6 +306,36 @@ copy_row:
                 out     (VDP_DATA), a
                 inc     hl
                 djnz    .give
+                ret
+
+; TEXT: the text has the whole screen from now on.  Nothing is cleared and
+; the cursor does not move -- what changes is only how far the scrolling
+; reaches, which is what the original does.  See doc/pendiente.md.
+; Corrupts: AF
+text_window_all:
+                xor     a
+                ld      (text_top), a
+                ld      a, TEXT_LAST - 1
+                ld      (text_move), a
+                ret
+
+; And back under the picture, which on the original is what drawing a picture
+; does rather than anything PICT says.  A cursor left above the new top comes
+; down to it.
+; Corrupts: AF, HL
+text_window_below:
+                ld      a, TEXT_TOP
+                ld      (text_top), a
+                ld      a, TEXT_LAST - TEXT_TOP - 1
+                ld      (text_move), a
+                ld      a, TEXT_TOP
+                ld      hl, cursor_y
+                cp      (hl)
+                ret     c
+                ret     z
+                ld      (hl), a
+                xor     a
+                ld      (cursor_x), a
                 ret
 
 ; Start a new line, scrolling if the window is full.
@@ -395,7 +428,8 @@ backspace:
                 or      a
                 jr      nz, .same_line
                 ld      a, (cursor_y)
-                cp      TEXT_TOP
+                ld      hl, text_top
+                cp      (hl)
                 ret     z                       ; nothing left to rub out
                 dec     a
                 ld      (cursor_y), a
@@ -419,4 +453,6 @@ font_first:     db      0
 font_count:     db      0
 cursor_x:       db      0
 cursor_y:       db      TEXT_TOP
+text_top:       db      TEXT_TOP                ; the first row the text may use
+text_move:      db      TEXT_ROWS - 1           ; and how many rows a scroll moves
 line_buffer:    ds      ROW_BYTES

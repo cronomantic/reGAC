@@ -130,6 +130,9 @@ describe_location:
                 ld      a, d
                 or      e
                 jr      z, .no_picture          ; a room may have none
+                ld      a, (vm_graphics)
+                or      a
+                jr      z, .no_picture          ; and TEXT says to draw none
                 ex      de, hl
                 call    draw_picture
 .no_picture:
@@ -880,6 +883,10 @@ op_list:
                 call    print_nothing_word      ; LIST always writes something
                 jp      vm_loop
 
+; TEXT and PICT, as they were measured on the original: TEXT gives the text
+; the whole screen and stops the pictures, and PICT only lets them be drawn
+; again -- it redraws nothing, and the window comes back when a picture is
+; next drawn.  See doc/pendiente.md.
 op_pict:
                 ld      a, 1
                 ld      (vm_graphics), a
@@ -888,6 +895,7 @@ op_pict:
 op_text:
                 xor     a
                 ld      (vm_graphics), a
+                call    text_window_all
                 jp      vm_loop
 
 op_conn:

@@ -250,6 +250,25 @@ scroll_window:
                 ldir
                 ret
 
+; TEXT and PICT, of which this machine does only half.
+;
+; With TEXT no picture is drawn, which the interpreter sees to by itself.
+; Giving the text the whole screen is not here: the two halves of this screen
+; live in different banks, so a text window of all thirty two rows means a
+; row's address carrying a bank with it, and a scroll that crosses the join
+; going through memory.  There is room for it here -- the interpreter ends at
+; $346F and the window begins at $4000 -- and it is written down in
+; doc/pendiente.md rather than done.
+;
+; Worth knowing while it is not done: the text window here is sixteen rows of
+; sixty four, which is already more than a whole Spectrum screen.
+; Corrupts: nothing
+text_window_all:
+                ret
+
+text_window_below:
+                ret
+
 ; Start a new line, scrolling if the window is full.
 ; Corrupts: AF, BC, DE, HL
 new_line:

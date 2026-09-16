@@ -212,6 +212,21 @@ scroll_window:
                 jr      nz, .each_block
                 ret
 
+; TEXT and PICT, of which this machine does only half.
+;
+; With TEXT no picture is drawn, which the interpreter sees to by itself.
+; Giving the text the whole screen is not here, and the reason is measured:
+; the database is laid on a boundary of 256 bytes behind the interpreter, and
+; the interpreter ends thirty eight bytes below one.  Crossing it costs every
+; adventure a page, and MegaCorp II has a hundred and sixty two bytes to
+; spare.  The window costs some sixty.  See doc/pendiente.md.
+; Corrupts: nothing
+text_window_all:
+                ret
+
+text_window_below:
+                ret
+
 ; Start a new line, scrolling if the window is full.
 ; Corrupts: everything
 new_line:
