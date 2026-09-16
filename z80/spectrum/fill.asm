@@ -209,6 +209,8 @@ point_at:
                 ld      de, bit_masks
                 add     a, e
                 ld      e, a
+                jr      nc, $+3                 ; the carry too, or a table
+                inc     d                       ; on a page's edge is misread
                 ld      a, (de)
                 ld      b, a
                 pop     de
@@ -227,6 +229,8 @@ span_bytes:
                 ld      de, mask_from
                 add     a, e
                 ld      e, a
+                jr      nc, $+3
+                inc     d
                 ld      a, (de)
                 ld      (span_first), a
                 ld      a, (fill_right)
@@ -234,6 +238,8 @@ span_bytes:
                 ld      de, mask_to
                 add     a, e
                 ld      e, a
+                jr      nc, $+3
+                inc     d
                 ld      a, (de)
                 ld      (span_last), a
                 ld      a, (fill_right)
