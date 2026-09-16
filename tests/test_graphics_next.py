@@ -214,14 +214,41 @@ def test_every_picture_of_an_adventure_comes_out_the_same():
         )
         for key in sorted(gfx, key=int):
             number = int(key)
-            session.command(
-                f"write-memory {where['picture_wanted']} {number & 255} {number >> 8}"
-            )
-            session.command(f"write-memory {where['done_flag']} 0")
-            session.command(f"set-register PC={where['redraw']:04X}H")
-            if not session.wait_for(where["done_flag"], 0xFF, timeout=60.0, every=0.1):
-                wrong[number] = "never finished"
-                continue
+            # Asked up to three times.  A program counter written into a
+            # processor that is running does not always take, and when it does
+            # not the machine is still going round its parking loop with
+            # nothing drawn, so the flag can never come and the wait is a
+            # minute thrown away: one run in five died that way, on a
+            # different picture each time.  Stopping the processor to write it
+            # cures it and leaves the emulator running nine times slower --
+            # two minutes a round became nineteen -- so it is asked again
+            # instead, which costs nothing at all on a round that goes well.
+            drew = False
+            for _ in range(3):
+                session.command(
+                    f"write-memory {where['picture_wanted']} "
+                    f"{number & 255} {number >> 8}"
+                )
+                session.command(f"write-memory {where['done_flag']} 0")
+                session.command(f"set-register PC={where['redraw']:04X}H")
+                if session.wait_for(where["done_flag"], 0xFF, timeout=60.0,
+                                    every=0.1):
+                    drew = True
+                    break
+            if not drew:
+                # Once a picture does not finish, the machine is still in the
+                # middle of it and nothing read afterwards means anything: the
+                # run that found this reported twenty six pictures wrong when
+                # only one thing had happened.  So it stops here, and says
+                # where the processor was, sampled, which tells a picture that
+                # is merely slow from one that is going round in a circle.
+                seen = []
+                for _ in range(5):
+                    seen.append(session.pc())
+                    time.sleep(0.2)
+                wrong[number] = ("never finished, PC at "
+                                 + " ".join(f"${at:04X}" for at in seen if at))
+                break
             drawn = layer2(session, where["piece_wanted"])
             reference = Renderer(gfx, next_device()).run(number).vram()
             differ = sum(1 for n in range(PICTURE_BYTES) if drawn[n] != reference[n])

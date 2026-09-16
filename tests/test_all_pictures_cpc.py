@@ -131,17 +131,28 @@ def draw_them_all(path):
             session.command(f"write-memory {where['picture_wanted']} "
                             f"{number & 255} {number >> 8}")
             session.command(f"write-memory {where['done_flag']} 0")
-            # The counter is stopped with the machine, on the loop the build
-            # parks in, so nothing that runs afterwards is counted.
-            session.command(f"set-breakpoint 1 PC={where['done_flag'] - 2:04X}H")
-            session.command("reset-tstates-partial")
-            session.command(f"set-register PC={where['redraw']:04X}H")
+            # Asked twice if need be.  A program counter written into a
+            # processor that is running does not always take, and then the
+            # machine goes on round its parking loop with nothing drawn and
+            # the flag can never come: the Next's test was losing one round in
+            # five that way.  Asking again costs nothing on a round that goes
+            # well, and the other cure -- stopping the processor to write it
+            # -- leaves the emulator running nine times slower.
             seconds = None
-            for _ in range(240):
-                time.sleep(0.5)
-                if session.read(where["done_flag"], 1)[0] == 0xFF:
-                    reply = session.command("get-tstates-partial")
-                    seconds = int(reply.split("\n")[0].strip()) / CPC_HZ
+            for _attempt in range(2):
+                # The counter is stopped with the machine, on the loop the
+                # build parks in, so nothing that runs afterwards is counted.
+                session.command(
+                    f"set-breakpoint 1 PC={where['done_flag'] - 2:04X}H")
+                session.command("reset-tstates-partial")
+                session.command(f"set-register PC={where['redraw']:04X}H")
+                for _ in range(240):
+                    time.sleep(0.5)
+                    if session.read(where["done_flag"], 1)[0] == 0xFF:
+                        reply = session.command("get-tstates-partial")
+                        seconds = int(reply.split("\n")[0].strip()) / CPC_HZ
+                        break
+                if seconds is not None:
                     break
             session.command("set-breakpoint 1 0")
             session.command("run")

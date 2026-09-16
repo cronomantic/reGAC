@@ -52,7 +52,7 @@ sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import emulator  # noqa: E402
-from test_music_z80 import TUNE, word  # noqa: E402
+from test_music_z80 import TUNE, pointer_moves, word  # noqa: E402
 
 SPECTRUM = os.path.join(ROOT, "z80", "spectrum")
 SOURCE = os.path.join(SPECTRUM, "test_sound.asm")
@@ -104,7 +104,7 @@ def test_an_effect_plays_over_the_tune_and_lets_go():
             "something was playing an effect before anything asked for one"
         )
 
-        was = word(session, where["PLY_AKM_Track1_PtTrack"])
+        was = pointer_moves(session, where["PLY_AKM_Track1_PtTrack"])
         session.command(f"write-memory {where['effect_wanted']} {AN_EFFECT}")
         time.sleep(0.2)
 
@@ -133,7 +133,7 @@ def test_an_effect_plays_over_the_tune_and_lets_go():
         assert not effect_on(session, where, CHANNEL), (
             "the effect finished and never gave its channel back"
         )
-        assert word(session, where["PLY_AKM_Track1_PtTrack"]) != was, (
+        assert pointer_moves(session, where["PLY_AKM_Track1_PtTrack"], was) != was, (
             "the tune stopped when the effect started"
         )
     finally:

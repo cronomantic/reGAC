@@ -108,6 +108,29 @@ def word(session, address):
     return high << 8 | low
 
 
+def pointer_moves(session, address, was=None, timeout=3.0, every=0.1):
+    """Where the player's track pointer got to, once it is somewhere else.
+
+    Looking at it once is not safe, for two reasons.  A flag going up says the
+    build asked for a tune, but the player only fills the pointer in on its
+    first interrupt, so for a frame or two after that flag it still reads
+    zero.  And the pointer walks a track that loops, so two looks far apart
+    can land on the same place with the tune playing perfectly well.
+
+    So this waits for it to be somewhere other than `was` and not nothing, and
+    gives back where it got to -- still `was` if it never moved, and it is the
+    caller who says what that means.
+    """
+    deadline = time.time() + timeout
+    while True:
+        at = word(session, address)
+        if at and at != was:
+            return at
+        if time.time() >= deadline:
+            return at
+        time.sleep(every)
+
+
 def watched(listing, *also):
     """Where the build keeps what is worth looking at."""
     return {name: emulator.label_address(listing, name)

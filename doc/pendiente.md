@@ -1417,19 +1417,39 @@ El segundo nombre tampoco se leía en Python: `__parse_input` tenía una
 condición que no podía ser cierta nunca. Arreglado, y con la misma regla que el
 Z80, que pide que haya un primer nombre antes de aceptar el segundo.
 
-### Las tres pruebas que fallan de vez en cuando
+### Las tres pruebas que fallaban de vez en cuando, y lo que eran
 
-No son fallos del intérprete, son carreras de la prueba contra el emulador, y
-cuestan un rato cada vez que se corre la suite entera porque hay que volver a
-pasarlas sueltas para ver que pasan:
+Ninguna era del intérprete: las tres eran carreras de la prueba contra el
+emulador. Están arregladas, y lo que se aprendió vale para la siguiente.
 
-- `test_music_source_z80::test_an_adventure_says_what_tunes_it_has_and_they_play`
-  y `test_sound_z80::test_an_effect_plays_over_the_tune_and_lets_go`. Las dos
-  miran el puntero del reproductor de Arkos (`PLY_AKM_Track1_PtTrack`) justo
-  después de que se encienda una bandera, y a veces lo leen antes de la primera
-  interrupción, cuando todavía vale cero. Una de cada tres o cuatro veces.
-- `test_graphics_next::test_every_picture`, que dice «never finished» de una
-  lámina distinta cada vez.
+**Las dos de música** —`test_music_source_z80` y `test_sound_z80`— miraban el
+puntero del reproductor de Arkos (`PLY_AKM_Track1_PtTrack`) una sola vez. Eso
+falla por dos motivos a la vez: recién encendida la bandera el reproductor
+todavía no ha tenido su primera interrupción y el puntero vale cero, y además
+**el puntero da vueltas a un track que se repite**, así que dos lecturas
+separadas pueden caer en el mismo sitio con la música sonando perfectamente.
+Ahora hay un `pointer_moves` en `tests/test_music_z80.py` que espera a que el
+puntero esté en otro sitio, con plazo. Trece vueltas seguidas en verde; antes
+fallaba una de cada tres.
 
-Lo que hay que hacer es esperar a lo que se mira y no a lo que lo anuncia: leer
-el puntero hasta que se mueva, con un plazo, en vez de una sola vez.
+**La del Next** decía «never finished» de una lámina distinta cada vez, y no
+era lentitud: muestreado el PC cuando falla, salía dentro del bucle de
+aparcamiento. O sea que la máquina seguía parada sin haber empezado, porque
+**un `set-register PC` sobre un procesador en marcha no siempre toma**. La
+bandera no podía llegar nunca y el minuto de espera era tirado.
+
+Y dos cosas que costaron encontrarse:
+
+- **No usar `enter-cpu-step` para escribir el PC con la máquina parada.** Cura
+  la carrera, pero deja al emulador corriendo nueve veces más lento: la vuelta
+  del Next pasó de 2 a 19 minutos. Lo que se hace en su lugar es preguntar otra
+  vez —hasta tres intentos—, que no cuesta nada en una vuelta que va bien. La
+  prueba del PCW sí lo usa, pero una vez y no en un bucle.
+- **Una prueba que sigue después de un fallo así miente.** Con la máquina a
+  medias, todo lo que se lee después es basura: la vuelta que encontró esto
+  reportó 26 láminas mal cuando había pasado una sola cosa. Ahora para en la
+  primera y dice dónde estaba el procesador, que es lo que distingue una lámina
+  lenta de una máquina que no arrancó.
+
+La prueba de las 196 del Amstrad tenía la misma carrera aunque no se la hubiera
+visto saltar, y lleva el mismo remedio.

@@ -52,7 +52,7 @@ from regac.binary import Database  # noqa: E402
 from regac.conds import compile_block  # noqa: E402
 from regac.srcgen import generate  # noqa: E402
 from regac.srcparse import parse  # noqa: E402
-from test_music_z80 import TUNE, word  # noqa: E402
+from test_music_z80 import TUNE, pointer_moves  # noqa: E402
 
 SPECTRUM = os.path.join(ROOT, "z80", "spectrum")
 MUSIC = os.path.join(ROOT, "music")
@@ -143,7 +143,7 @@ def test_an_adventure_says_what_tunes_it_has_and_they_play():
         assert session.read(where["music_tune"], 1)[0] == 1, (
             "it played a tune, but not the one the condition asked for"
         )
-        at = word(session, where["PLY_AKM_Track1_PtTrack"])
+        at = pointer_moves(session, where["PLY_AKM_Track1_PtTrack"])
         assert where["music_buffer"] <= at < where["start"], (
             f"the player is not reading the buffer: ${at:04X}"
         )
