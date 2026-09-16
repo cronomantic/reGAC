@@ -58,9 +58,7 @@ print_object_name:
                 ld      e, (hl)
                 inc     hl
                 ld      d, (hl)                 ; where its name is in the store
-                call    unpack_message
-                ld      hl, text_buffer
-                jp      print_text
+                jp      print_packed
 
 ; The names of the objects that are in room (list_room), with a comma between
 ; them, the way the original writes both an inventory and what is lying about.
@@ -142,9 +140,7 @@ describe_location:
                 ld      e, (hl)
                 inc     hl
                 ld      d, (hl)                 ; where the description is
-                call    unpack_message
-                ld      hl, text_buffer
-                call    print_text
+                call    print_packed
                 ld      a, 1
                 ld      (list_quiet), a
                 call    list_objects            ; is there anything here at all
@@ -871,9 +867,7 @@ op_vbno:
 ; Corrupts: everything
 print_nothing_word:
                 ld      de, (nothing_at)
-                call    unpack_message
-                ld      hl, text_buffer
-                jp      print_text
+                jp      print_packed
 
 op_list:
                 call    vm_pop

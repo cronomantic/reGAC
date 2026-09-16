@@ -8,7 +8,10 @@
 ; the eight adventures went was ten levels, which is forty bytes.
 ;
 ; A message unpacks on its own, touching nothing before it, which is what lets
-; the interpreter print message 137 and only that one.
+; the interpreter print message 137 and only that one.  And it is printed as it
+; unpacks: every character goes to the printer the moment it comes out, and the
+; printer holds a word at most, so nothing the length of a message is ever kept
+; in memory.  See textout.asm for why that matters.
 
 ; Read the text section header and remember where its parts are.
 ; Corrupts: AF, BC, DE, HL
@@ -71,9 +74,9 @@ message_offset:
                 ex      de, hl
                 ret
 
-; Unpack message DE into text_buffer.  Its length comes back in BC.
-; Corrupts: AF, DE, HL
-unpack_message:
+; Print message DE, unpacking it as it goes.
+; Corrupts: everything
+print_packed:
                 ld      a, SECTION_TEXT         ; where the machine keeps it,
                 call    db_bank_in              ; which may be a bank
                 push    de
@@ -93,11 +96,10 @@ unpack_message:
                 add     hl, bc                  ; HL = the packed bytes
                 ld      b, d
                 ld      c, e                    ; BC = how many
-                ld      de, text_buffer
 .next:
                 ld      a, b
                 or      c
-                jr      z, .done
+                jp      z, text_end             ; the last word goes out
                 dec     bc
                 ld      a, (hl)
                 inc     hl
@@ -107,26 +109,15 @@ unpack_message:
                 pop     bc
                 pop     hl
                 jr      .next
-.done:
-                ld      hl, text_buffer
-                ex      de, hl
-                or      a
-                sbc     hl, de                  ; HL = characters written
-                ld      b, h
-                ld      c, l
-                ret
 
-; Expand one code.  A is the code, DE points at the output and is advanced.
-; Calls itself for the left half of a pair, which is what gives the stack.
-; Corrupts: AF, BC, HL
+; Expand one code, A, and print what it stands for.  Calls itself for the left
+; half of a pair, which is what gives the stack, and nothing it keeps across
+; the call is anything the printer could tread on.
+; Corrupts: everything
 expand_code:
                 ld      hl, first_pair
                 cp      (hl)
-                jr      nc, .pair
-                ld      (de), a                 ; a character: write it out
-                inc     de
-                ret
-.pair:
+                jp      c, text_put             ; a character: print it
                 sub     (hl)                    ; which pair
                 ld      l, a
                 ld      h, 0
@@ -150,7 +141,6 @@ message_count:  dw      0
 data_size:      dw      0
 first_pair:     db      0
 pair_count:     db      0
-text_buffer:    ds      256
 
 
 ; The place in the store of message number A, in DE.  Carry set if there is no

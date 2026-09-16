@@ -115,8 +115,37 @@ def test_a_word_is_still_never_split():
     )
 
 
+@needs_tools
+def test_a_text_longer_than_any_buffer_prints_whole():
+    """A text is printed while it is unpacked, a word at a time, so it may be
+    as long as it likes.  It used to be unpacked whole into a buffer of 256
+    bytes and printed afterwards, and a longer one ran off the end of the
+    buffer and over the code behind it.  No original adventure does that --
+    GAC's editor would not let a text of more than 255 characters be typed,
+    its line reader beeps at the next one -- but a source of ours can.
+
+    This one is six hundred odd characters, with a word in it longer than the
+    line: that one cannot be held whole, and goes out in pieces that must land
+    exactly where the whole of it would have.  What is on the screen before
+    the prompt has to be the end of what it should come to, and the prompt has
+    to be there at all, which it was not while the text was trampling code."""
+    words = ["PALABRA" if n % 3 else "OTRA." for n in range(90)]
+    words.insert(84, "X" * 45)                  # near the end, so it is on the screen
+    text = " ".join(words)
+    assert len(text) > 600
+    lines = laid_out(text)
+    prompts = [n for n, line in enumerate(lines) if line.startswith(">")]
+    assert prompts, f"no prompt after the long text; the screen was {lines}"
+    shown = lines[:prompts[-1]]
+    want = emulator.wrapped([text], 32)
+    assert shown and want[-len(shown):] == shown, (
+        f"the long text came out as {shown}, not as the end of {want}"
+    )
+
+
 if __name__ == "__main__":
     test_a_mark_of_punctuation_ends_a_word()
     test_a_line_that_fills_itself_is_not_ended_again()
     test_a_word_is_still_never_split()
+    test_a_text_longer_than_any_buffer_prints_whole()
     print("the lines break where the author meant them to")

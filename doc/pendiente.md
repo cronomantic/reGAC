@@ -653,8 +653,9 @@ otros trece sin perder velocidad (la pluma sale de A, que `cpd` no toca, y
 | cinta sin música, que es lo que el 464 publica | 67 bytes |
 | cinta con música | 14 bytes |
 
-Catorce bytes es nada: **lo siguiente que se toque del Amstrad tiene que buscar
-sitio antes**, y la sección del hueco libre de más arriba dice dónde mirar.
+Catorce bytes eran nada, y duraron poco: al imprimir el texto palabra a palabra
+(ver «El texto, palabra a palabra», más abajo) el búfer de 256 bytes se quedó
+en 41, y la cuenta pasó a **288 bytes libres sin música y 235 con ella**.
 
 **Lo que queda, por si hay una tercera vuelta.** Muestreado el contador de
 programa al terminar, el reparto era: el rastreo un 38 por ciento, el tendido un
@@ -1045,6 +1046,91 @@ constante y no una casualidad de una pantalla.
 La prueba es [`test_wrapping_z80.py`](../tests/test_wrapping_z80.py), con la
 forma de MegaCorp escrita como MegaCorp la escribe.
 
+### El texto, palabra a palabra
+
+Un mensaje se desempaquetaba entero en `text_buffer`, 256 bytes, y sólo
+después se imprimía. Nada comprobaba que cupiera, y uno de 380 caracteres
+pisaba el código que hay detrás del búfer: la máquina se cae y no llega a
+sacar el *prompt*. Ninguna de las aventuras originales puede hacerlo —las ocho
+llegan como mucho a 255 caracteres—, pero una fuente nuestra sí.
+
+**Ese 255 es del editor de GAC, y está leído en su código**, en la versión de
+CPC, que trae el editor entero dentro de `CARVALHO.FAC`. La rutina que lee una
+línea recibe el tope en E, compara la longitud con él y, si ya está lleno,
+pita (`LD A,7 / JP $BB5A`) en vez de aceptar la letra. Tiene varias entradas,
+una por tope —de 3, 4, 16, 36 y 255—, y la de 255 (`LD E,$FF` en `$198C`) es la
+que usa la entrada de un mensaje en `$3129`, y otros ocho sitios del editor.
+Aparte hay otra comprobación, que es la que tiene mensaje propio: después de
+empaquetar, cuenta los bytes empaquetados del registro y si pasan de 255 —no
+caben en su byte de longitud— dice «Too long... Please shorten the message.».
+Esa cuenta es de bytes empaquetados, no de caracteres, y no se alcanza nunca
+desde el teclado: en las ocho aventuras hay 1.329 textos, ninguno pasa de 255
+caracteres, cinco están entre 251 y 255, y el que más ocupa empaquetado son
+106 bytes. Las salas, además, guardan su longitud en dos bytes. Lo de las
+versiones de Spectrum no está leído, porque sus instantáneas no traen el
+editor, pero sus datos dicen lo mismo.
+
+Lo que se pensó primero era que la construcción se negara a un texto que no
+cupiera. Lo que se hizo, por idea de Sergio, es mejor: **desempaquetar y
+imprimir a la vez, palabra a palabra**, de modo que en memoria no hay nunca más
+que una palabra. Así no hay límite ninguno.
+
+Cómo, porque tiene un detalle: una pareja del compresor puede cruzar el límite
+entre dos palabras (`o d` puede salir de `o␣` y `␣d`), así que no se puede
+parar la expansión al final de una palabra. Se hace al revés: `expand_code`
+suelta cada carácter en cuanto sale hacia `text_put`, que lo guarda en la
+palabra en curso y, cuando llega lo que la termina —un espacio, un signo o un
+cambio de tinta—, pregunta si cabe en la línea, la imprime y sigue. Es la
+misma regla que tenía `print_text`, que ahora se apoya en lo mismo carácter a
+carácter.
+
+La palabra se guarda en **el ancho de la línea más uno**, y con eso basta para
+cualquier palabra: una tan larga no cabe en la línea empiece donde empiece, así
+que lo que le pasa —línea nueva, salvo que el cursor esté al principio de una—
+se decide igual con su primer trozo que con ella entera, y el resto sólo hay que
+imprimirlo. Para eso está `held_going_on`.
+
+Tres cosas se comprobaron antes de tocarlo: que imprimir no pagina ningún banco
+—sólo lo hacen el desempaquetador, las láminas y la sala a oscuras—, porque
+ahora se imprime a mitad de leer el almacén de texto; que `word_ends_at` sólo
+mira el carácter y no el texto que lo rodea; y que ninguna prueba leía el
+búfer viejo.
+
+Lo que dio:
+
+- **Las 41 pruebas de texto de todas las máquinas salen igual**, que es lo que
+  dice que el corte de línea no ha cambiado.
+- **Una prueba nueva** (`test_wrapping_z80`): un texto de más de 600 caracteres
+  con una palabra de 45 letras, más larga que la línea. Con el código nuevo sale
+  exactamente como debe; con el viejo la pantalla se queda vacía.
+- **Memoria**, porque el búfer pasa de 256 bytes al ancho más uno —de 33 en el
+  Spectrum a 65 en el PCW— y el código sale unos bytes más corto. En el
+  Amstrad de cinta con música, que tenía 14 bytes libres, quedan 235; en el
+  Next, delante de la pared de `$A000`, de 58 a 267, contando ya el arreglo de
+  aquí abajo.
+
+**Y destapó un fallo que llevaba ahí desde el principio.** Con el búfer fuera,
+todo lo que va detrás se corrió 221 bytes, y cuatro pruebas de rellenos del MSX
+empezaron a fallar. No era el texto: el relleno del MSX, y el del Spectrum, el
+Next y el PCW, que son primos, buscaban en sus tablas de máscaras así:
+
+    ld      de, bit_masks
+    add     a, e            ; el índice, al byte bajo
+    ld      e, a            ; y el acarreo no pasa a D
+    ld      a, (de)
+
+Eso funciona mientras la tabla no quede al final de una página de memoria. Si
+queda, el índice da la vuelta y se lee un byte del principio de esa misma
+página. Nadie lo había visto porque ninguna tabla había caído en el borde; al
+moverse la memoria, una del MSX cayó. Eran catorce búsquedas en los cuatro
+rellenos —el del Amstrad no, que ya usaba `table_byte`, que sí arrastra el
+acarreo—, y las catorce llevan ahora `jr nc, $+3 / inc d`. Dos bytes cada una,
+y unos relojes que no se notan.
+
+Se buscaron con un rastreo de todo `z80/` por la forma `ld de|hl, tabla / add
+a, e|l / ld e|l, a` sin nada que recoja el acarreo detrás; las otras búsquedas
+que salieron ya lo recogían, con `jr nc` o con `ld a, 0 / adc a, h`.
+
 ### La palabra de «nada», que no está en la base de datos
 
 Es el único texto de una aventura que **no vive en su base de datos**: el
@@ -1126,15 +1212,12 @@ original. La prueba es [`test_textmode_z80.py`](../tests/test_textmode_z80.py).
 
 - **La pared de los `$A000` del Next.** El `.nex` lleva los bytes buenos en el
   banco 2 —leídos del fichero, el `$A017` es el que debe ser— y la memoria de
-  la máquina ahí se lee como ceros. Quedan 58 bytes antes de esa pared y eso
-  es un problema con esto y sin esto: cualquier cosa que se le añada a esa
-  máquina la cruza. Es lo próximo que hay que entender del Next.
-- **Un mensaje se desempaqueta en `text_buffer`, que son 256 bytes, y nadie
-  comprueba que quepa.** Uno de 380 caracteres se lleva por delante la memoria
-  del intérprete y la máquina se va a pasear. Ninguna de las ocho aventuras
-  tiene uno tan largo, así que no ha mordido nunca, pero una aventura escrita
-  de ahora en adelante sí puede. Lo suyo es que la construcción lo diga, que
-  es donde se sabe.
+  la máquina ahí se lee como ceros. Quedaban 58 bytes antes de esa pared, y
+  con el texto impreso palabra a palabra quedan 267; hay aire, pero la pared
+  sigue ahí y sigue sin entenderse, y es lo próximo que hay que mirar del Next.
+- ~~**Un mensaje se desempaquetaba en `text_buffer`, que son 256 bytes, y nadie
+  comprobaba que cupiera.**~~ **Hecho**, y no como se pensaba aquí: ver «El
+  texto, palabra a palabra».
 - **El 464 sigue sin sitio.** El relleno rápido costó unos 300 bytes y se
   pagaron rascando: se quitó el `ALIGN 256` de la base de datos, que nada
   necesitaba, y el intérprete de ruidos dejó de viajar cuando la aventura no

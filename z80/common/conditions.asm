@@ -281,9 +281,7 @@ obj_record:
 print_message:
                 call    message_index           ; DE = where it is in the store
                 ret     c
-                call    unpack_message          ; BC = how long
-                ld      hl, text_buffer
-                jp      print_text
+                jp      print_packed
 
 ; Find location HL in the table; its record comes back in HL.
 ; Carry set if there is no such location.

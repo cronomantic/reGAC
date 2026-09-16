@@ -24,9 +24,7 @@ start:
                 ld      de, 0
 .next_message:
                 push    de
-                call    unpack_message  ; BC = how many characters
-                ld      hl, text_buffer
-                call    print_text
+                call    print_packed
                 call    new_line
                 pop     de
                 inc     de
