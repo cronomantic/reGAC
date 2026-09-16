@@ -79,6 +79,17 @@ STACK_AT        equ $BF00
 
                 ORG     $8000
 start:
+                jr      start_up
+
+; Where the saved game is on the disk: the track and the record its file
+; starts at, and how many sectors it has.  The builder writes these three once
+; it has laid the disk out -- CPC6128_SAVE_WHERE in media.py is where in this
+; file it writes them -- and disc.asm reads them.  A build that was never put
+; on a disk that way leaves them nought, and saving says it could not.
+save_where:     db      0, 0, 0
+                ASSERT  save_where == $8002
+
+start_up:
                 di
                 ld      sp, STACK_AT
                 ; the resident half down out of the window, before anything
@@ -144,6 +155,9 @@ done_flag:      db      0
                 include "../common/picture.asm"
 last:
                 ASSERT  last <= STACK_AT        ; or the stack would land in it
+                ASSERT  last <= SAVE_AREA       ; or a saved game would land on us
+                ASSERT  SAVE_AREA + SAVE_BYTES <= STACK_AT - 256
+                ASSERT  vm_state_end - vm_state <= SAVE_BYTES   ; and a game fits
 
                 SAVEBIN "game6128.bin", start, last - start
 

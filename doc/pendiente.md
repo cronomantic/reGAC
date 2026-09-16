@@ -463,8 +463,8 @@ array sabe cambiar son las de `$4000`, con las cuatro configuraciones `&C4` a
 Y de ahí sale lo que cierra el medio: **ese build no puede llamar al firmware
 ni una vez**, porque una entrada del jumpblock es un `RST` y un `RST` trae la
 ROM baja, que taparía lo residente mientras dura. Así que la cinta queda
-descartada por el mapa y las partidas irán al disco por sectores, como en el
-PCW. Hoy `disc.asm` es un tocón honesto que dice que no pudo.
+descartada por el mapa y las partidas van al disco por sectores, como en el
+PCW: ver «Las partidas del 6128, en su disco», justo aquí debajo.
 
 El cargador es BASIC y pagina él: `OUT &7F00,&C4` y un `LOAD` por banco. De
 paso, algo que costó una tarde: **los dos puntos que separan dos sentencias no
@@ -475,6 +475,80 @@ dice «Syntax error».
 sesenta y cuatro, caben en un 6128 con un banco y de sobra. Y el intérprete,
 que en un 464 acaba a un palmo del firmware, ahí acaba en `$A011` con casi
 ocho kilobytes libres.
+
+### Las partidas del 6128, en su disco
+
+Hecho como estaba decidido: igual que en el PCW. `release` pone en el disco un
+fichero `.SAV` vacío y del tamaño justo —cuatro sectores, que una partida son
+unos mil cien bytes—, sin cabecera de AMSDOS porque nadie lo carga, y escribe
+dónde empieza en el propio intérprete antes de meterlo en el disco. El
+intérprete escribe y lee esos sectores él mismo, hablando con el PD765, sin
+tocar el directorio; lo que queda sigue siendo un fichero que AMSDOS copia.
+
+Lo que cambia respecto al PCW son tres cosas y media:
+
+- **Dónde se le dice.** El 6128 no arranca de un sector propio donde dejar el
+  dato, así que va en **tres bytes fijos del intérprete, en `$8002`**: pista,
+  registro y cuántos sectores. El intérprete empieza con un salto por encima
+  de ellos, `release` los rellena con lo que dice el directorio del disco que
+  acaba de montar, y se niega a escribir en un binario que no empiece por ese
+  salto. Un `ASSERT` vigila que no se muevan.
+- **Los puertos son de dieciséis bits** —estado en `$FB7E`, datos en `$FB7F`,
+  motor en `$FA7E`— y los sectores de un disco de datos se numeran de `$C1` a
+  `$C9`.
+- **Las interrupciones se quitan mientras dura.** En mitad de un sector el
+  controlador entrega un byte cada treinta y dos millonésimas y no espera, y las
+  trescientas por segundo de la música perderían alguno. El bucle de los datos
+  gasta unas veinte.
+- Y la media: **escucha la respuesta del controlador**, cosa que el del PCW no
+  hace. Un disco protegido o un sector que no se lee vuelven con el acarreo
+  quitado en vez de dar la partida por guardada; y cargar deja la partida como
+  estaba si no llegó entera.
+
+Las pruebas (`test_save_cpc.py`) comprueban las dos mitades: que el intérprete
+lleva escrito lo que dice el directorio, y que un bloque guardado vuelve
+entero en un 6128 emulado. Dos cosas que costaron:
+
+- **El emulador guarda en memoria y no en la imagen**, salvo con
+  `--dsk-persistent-writes`. Con esa opción la prueba lee el disco desde fuera
+  al acabar y ve el bloque **dentro de `JUEGO.SAV`**, que es lo que dice que va a
+  los sectores de ese fichero y no a otros en los que el constructor y el
+  intérprete simplemente coincidan. Y la prueba borra también el área de trabajo
+  entre guardar y cargar: sin eso, una lectura que no hiciera nada devolvía lo
+  que seguía allí y pasaba igual.
+- **Con el disco protegido la máquina se colgaba**, y la prueba pasaba porque la
+  bandera de «guardado» empieza a cero. El emulador, con `--dsk-write-protection`,
+  abandona la orden de escritura antes de oír sus nueve bytes y se pone a
+  contestar, y el código se quedaba esperando a que volviera a escuchar. Ahora
+  `send`, si el controlador quiere hablar en mitad de una orden, lo apunta y
+  deja de insistir, y el sector va a leer la respuesta, que dice por qué. Un
+  controlador de verdad oye la orden entera antes de negarse, así que en la
+  máquina real ese camino no se pisa, pero el código sirve para las dos. La
+  prueba exige ahora que la máquina termine.
+
+**Y de punta a punta, tecleando.** La última prueba arranca La guerra de las
+vajillas desde su disco del 6128 tal como lo hace `release` —es la única de las
+ocho cuya primera sala tiene salida—, teclea `SAVE`, `NORTE` y `LOAD`, y mira la
+sala en memoria: 1, 4 y otra vez 1. Al acabar lee el disco desde fuera y
+`JUEGO.SAV` empieza por la sala 1. Dos tropiezos de la prueba, no del
+intérprete, que valen para cualquier prueba que teclee:
+
+- **Una orden tecleada mientras se dibuja se pierde**, porque el teclado no se
+  mira mientras tanto. La sala cambia en cuanto se obedece la orden, pero hay
+  que esperar a que vuelva a preguntar.
+- **Y a que pregunte de nuevo**: la línea en la que se tecleó la orden empieza
+  por la misma pregunta. Lo que vale es la última línea con la pregunta sola.
+
+**Una pregunta abierta que salió de aquí.** Después de `LOAD` la sala se
+describe dos veces seguidas, y pegadas (`…ARENAS.ESTAS EN EL PLANETA…`):
+una porque `op_load` da la sala por nueva y otra por el `LOOK` que la propia
+aventura pone detrás (`LOAD LOOK WAIT`). No es de hoy: pasa igual en todas las
+máquinas desde que `LOAD` existe. Lo que no se sabe es qué hacía el original,
+porque ninguna de las dos referencias implementa `LOAD` —grackle dice «Not
+implemented (yet)» y `runGAC.py` tiene un `TODO`—. Que casi todas las aventuras
+pongan `LOOK` detrás de `LOAD` sugiere que el original no describía por su
+cuenta; Bangkok, que no lo pone, dice lo contrario. Para saberlo hay que
+cargar una partida en el intérprete original y mirar.
 
 ### La memoria que AMSDOS no suelta
 

@@ -361,6 +361,15 @@ CPC6128_PAGES = (0xC4, 0xC5, 0xC6, 0xC7)
 CPC6128_NORMAL = 0xC0           # the arrangement that puts the machine back
 CPC6128_PORT = 0x7F00           # any port whose high byte is that one
 
+# The saved game, which the interpreter writes by sectors itself: a file made
+# here, empty and the right size, and where it starts written into the three
+# bytes of the interpreter that z80/cpc/disc.asm reads.  Those bytes are the
+# third to the fifth of the binary, behind the jump over them.
+CPC6128_SAVE_SECTORS = 4        # what a game amounts to, rounded up; the same
+                                # number as SAVE_SECTORS in disc.asm
+CPC6128_SAVE_WHERE = 2          # where in the binary the three bytes go
+CPC6128_SECTOR = 512
+
 
 def cpc6128_loader(binary, resident, banks, screen=None, music=None):
     """The lines a 6128 needs, which are the 464's with the paging in the
@@ -396,6 +405,11 @@ def cpc6128_disk(code, resident, banks, name=NAME, screen=None, music=None):
     lets BASIC put each one where it belongs: the banks all say $4000 because
     they all come in through the window, and which bank they land in is what
     the OUT in front of the LOAD decides.
+
+    The saved game is one more file, empty, with no header, because nothing
+    loads it: the interpreter writes its sectors itself.  Where it starts is
+    written into the interpreter before that goes on the disk, and that is why
+    it goes on last.
     """
     if len(banks) > len(CPC6128_PAGES):
         raise ValueError(
@@ -419,9 +433,29 @@ def cpc6128_disk(code, resident, banks, name=NAME, screen=None, music=None):
     disk.add(held, amsdos(held, resident, load=CPC6128_WINDOW))
     for piece, what in zip(named, banks):
         disk.add(piece, amsdos(piece, bytes(what), load=CPC6128_WINDOW))
+    saved = f"{name}.SAV"
+    disk.add(saved, bytes(CPC6128_SAVE_SECTORS * CPC6128_SECTOR))
+    code = told_where_to_save(code, disk.where(saved))
     disk.add(binary, amsdos(binary, code, load=CPC6128_CODE_AT,
                             entry=CPC6128_CODE_AT))
     return disk.image()
+
+
+def told_where_to_save(code, where):
+    """The interpreter with the track and record of its saved game, and how
+    many sectors that is, in the three bytes it keeps for them.  A binary that
+    does not start by jumping over three bytes is not one that keeps them, and
+    writing into it would break it, so it is refused."""
+    at = CPC6128_SAVE_WHERE
+    if bytes(code[:at]) != bytes((0x18, 3)):
+        raise ValueError(
+            "the 6128's interpreter should start by jumping over the three "
+            "bytes that say where the saved game is, and this one does not"
+        )
+    track, record = where
+    out = bytearray(code)
+    out[at:at + 3] = bytes((track, record, CPC6128_SAVE_SECTORS))
+    return bytes(out)
 
 
 # -- the Spectrum Next, whose medium the assembler writes itself --------------
