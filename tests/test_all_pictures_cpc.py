@@ -79,14 +79,14 @@ SCREEN_BYTES = 0x4000
 # Not a budget -- the budget is four or five and only three of these meet it --
 # but a ratchet: the day one of them gets slower, this says so.
 CEILING = {
-    "Bangkok1": 4.0,            # the worst of its thirty two measured 3.1
-    "Bangkok2": 7.0,            # 6.5
-    "megacorp1": 4.0,           # 3.0
-    "megacorp2": 5.0,           # 3.8
-    "quijote1": 36.0,           # 34.5
-    "quijote2": 54.0,           # 51.6
-    "vajillas1": 13.0,          # 12.3
-    "vajillas2": 12.0,          # 11.2
+    "Bangkok1": 3.0,            # the worst of its thirty two measured 2.5
+    "Bangkok2": 7.0,            # 6.2
+    "megacorp1": 3.0,           # 2.5
+    "megacorp2": 4.0,           # 3.1
+    "quijote1": 18.0,           # 16.8
+    "quijote2": 27.0,           # 25.4
+    "vajillas1": 9.0,           # 7.8
+    "vajillas2": 8.0,           # 7.1
 }
 
 needs = (
@@ -122,9 +122,17 @@ def draw_them_all(path):
         for at in range(0, len(blob), 512):
             session.command(f"write-memory-raw {LOADS_AT + at} "
                             + blob[at:at + 512].hex().upper())
-        session.command(f"set-register PC={LOADS_AT:04X}H")
-        assert session.wait_for(where["done_flag"], 0xFF, timeout=60.0,
-                                every=0.1), "the Amstrad never got going"
+        # Asked three times over, for the same reason every picture is: a
+        # program counter written into a processor that is running does not
+        # always take, and one round in five or so never got off the ground.
+        started = False
+        for _ in range(3):
+            session.command(f"set-register PC={LOADS_AT:04X}H")
+            if session.wait_for(where["done_flag"], 0xFF, timeout=20.0,
+                                every=0.1):
+                started = True
+                break
+        assert started, "the Amstrad never got going"
         session.command("enable-breakpoints")
         for key in sorted(gfx, key=int):
             number = int(key)

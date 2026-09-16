@@ -25,13 +25,31 @@ FILL_SHADE      equ 2
 
 ; Whether a fill is stopped at (D across, E up the commands' way).
 ; Zero flag set while it is still the pen the fill started on.
+;
+; It is also where the row gets worked out: which screen row it is, where that
+; row begins, and the byte and the pixel the fill's own column falls in.  That
+; is not tidy, but fill_run wants exactly the same sums and every call here is
+; followed by one or by the fill stopping, and working an address out on this
+; machine is forty instructions: asking four times a row instead of once was
+; an eighth of what a picture cost.
 ; Corrupts: AF, BC, HL
 blocked:
                 push    de
                 ld      a, e
                 call    to_row
                 ld      e, a
-                call    pen_at
+                ld      d, 0
+                call    pixel_address           ; where the row begins
+                ld      (row_at), hl
+                ld      a, (fill_x)
+                call    byte_of                 ; and the column's own byte
+                ld      (seed_at), hl
+                ld      b, a                    ; which pixel of it
+                call    pixel_mask
+                ld      (seed_mask), a
+                ld      hl, (seed_at)
+                ld      a, (hl)
+                call    pen_of                  ; the pen of pixel B
                 ld      hl, fill_seed
                 cp      (hl)
                 pop     de
@@ -90,10 +108,9 @@ flood_fill:
 ; Lay the two pens across the run through (fill_x, fill_y).
 ; Corrupts: everything
 fill_run:
-                ld      a, (fill_y)
-                call    to_row
-                ld      (fill_row), a
-                ; Where the seed is: the byte it is in and its two bits of it.
+                ; Where the seed is -- the byte it is in and its two bits of
+                ; it -- is already worked out, because blocked had to work out
+                ; the same thing to answer and this always follows one.
                 ; The two walks below keep the byte in HL and the two bits in
                 ; C, and step them with a rotate -- moving one pixel to the
                 ; right is rrc, and the carry it puts out is exactly "and over
@@ -101,14 +118,6 @@ fill_run:
                 ; the pen of a point is ever worked out again: a fill looks at
                 ; every point of every run it lays, and that was costing a
                 ; picture of MegaCorp twenty seconds.  See doc/pendiente.md.
-                ld      a, (fill_row)
-                ld      e, a
-                ld      a, (fill_x)
-                ld      d, a
-                call    pixel_address           ; HL the byte, A the pixel
-                ld      (seed_at), hl
-                call    pixel_mask
-                ld      (seed_mask), a
                 ; how far it reaches to the left
                 ld      a, (fill_x)
                 ld      (fill_left), a
@@ -122,19 +131,50 @@ fill_run:
                 ld      a, c
                 cp      %10001000               ; standing on the first of one
                 jr      nz, .one_to_the_left
+                ; Standing on the first pixel of a byte, so everything to the
+                ; left of here is whole bytes, and cpd walks them: it compares,
+                ; steps and counts in one instruction, which is thirty three
+                ; clocks for four pixels against a hundred and thirty eight
+                ; asking for each byte the long way round.  How many there are
+                ; is the x over four, which is exact because the x is a
+                ; multiple of four wherever this is reached.  The count wants
+                ; BC, so the pen the walk carries in B is put back afterwards;
+                ; C goes back to the pixel it was on, which a whole byte at a
+                ; time never moves off.
                 ld      a, (fill_left)
-                sub     4
-                jr      c, .one_to_the_left     ; too near the edge to jump
-                dec     hl
-                ld      a, (hl)
-                cp      b
-                jr      nz, .not_a_whole_byte
-                ld      a, (fill_left)
-                sub     4
+                rrca
+                rrca                            ; and no mask: the x is a
+                ld      c, a                    ; multiple of four here, so
+                ld      b, 0                    ; nothing wraps round
+                ld      a, (seed_byte)
+                dec     hl                      ; the first one to the left
+.whole_left:
+                cpd
+                jr      nz, .left_differs
+                jp      pe, .whole_left
+                ; every one of them was the seed's, so the run reaches the
+                ; edge of the picture and there is nothing more to ask.  What
+                ; the walk was carrying is not put back: the walk is over, and
+                ; what comes next starts again from the seed.
+                xor     a
                 ld      (fill_left), a
-                jr      .leftwards
-.not_a_whole_byte:
+                jr      .left_done
+.left_differs:
+                ; the one just looked at is not the seed's, so the run stops
+                ; somewhere inside it and its pixels are asked for one at a
+                ; time.  What is left in BC says where it stands: the bytes not
+                ; walked, without the one it stopped on.  The pen goes back
+                ; into B without being read again, because cpd leaves A alone
+                ; and A is what it was comparing against.
+                ld      b, a
                 inc     hl
+                inc     hl
+                ld      a, c
+                inc     a
+                add     a, a
+                add     a, a                    ; four pixels to each of them
+                ld      (fill_left), a
+                ld      c, %10001000
 .one_to_the_left:
                 rlc     c                       ; the pixel to the left of it
                 jr      nc, .same_byte_left
@@ -159,19 +199,34 @@ fill_run:
                 ld      a, c
                 cp      %00010001               ; standing on the last of one
                 jr      nz, .one_to_the_right
+                ; The same the other way about, with cpi, and the count is
+                ; what is left of the row over four.
                 ld      a, (fill_right)
-                add     a, 4
-                jr      c, .one_to_the_right
-                inc     hl
-                ld      a, (hl)
-                cp      b
-                jr      nz, .nor_a_whole_byte
-                ld      a, (fill_right)
-                add     a, 4
+                cpl                             ; 255 less the x, which is
+                rrca                            ; again a multiple of four
+                rrca
+                ld      c, a
+                ld      b, 0
+                ld      a, (seed_byte)
+                inc     hl                      ; the first one to the right
+.whole_right:
+                cpi
+                jr      nz, .right_differs
+                jp      pe, .whole_right
+                ld      a, 255                  ; out to the edge of the row
                 ld      (fill_right), a
-                jr      .rightwards
-.nor_a_whole_byte:
+                jr      .right_done
+.right_differs:
+                ld      b, a                    ; the pen, still in A
                 dec     hl
+                dec     hl
+                ld      a, c
+                inc     a
+                add     a, a
+                add     a, a
+                cpl                             ; 255 less four to each of them
+                ld      (fill_right), a
+                ld      c, %00010001
 .one_to_the_right:
                 rrc     c                       ; the pixel to the right of it
                 jr      nc, .same_byte_right
@@ -234,6 +289,12 @@ fill_run:
                 ld      b, l
                 dec     b
                 ret     z                       ; they are next to each other
+                ; Laid one at a time.  Eight at a time is a fifth quicker
+                ; on the runs long enough to pay for the splitting, and it was
+                ; written and measured and handed back: it costs forty odd
+                ; bytes, and on this machine the tape build with music ends
+                ; fifty three bytes below the firmware's variables.  If room
+                ; ever turns up, see doc/pendiente.md.
                 ld      hl, (fill_from)
                 inc     hl
                 ld      a, (fill_byte)
@@ -254,13 +315,22 @@ from_the_seed:
                 ld      b, a
                 ret
 
-; The byte point A of the row being laid is in, and which pixel of it.
-; Corrupts: AF, BC, DE, HL
+; The byte point A of the row being laid is in, and which pixel of it.  Where
+; the row begins is already known, so this is a shift and an add rather than
+; the forty instructions an address costs from nothing.
+; Corrupts: AF, BC, HL
 byte_of:
-                ld      d, a
-                ld      a, (fill_row)
-                ld      e, a
-                jp      pixel_address
+                ld      b, a                    ; the x, kept for its pixel
+                rrca
+                rrca
+                and     %00111111               ; four pixels to a byte
+                ld      c, a
+                ld      a, b
+                ld      b, 0
+                ld      hl, (row_at)
+                add     hl, bc
+                and     3                       ; which of the four it is
+                ret
 
 ; The byte four whole pixels of the run come to: the two pens woven, with the
 ; one that goes on an even x in the even pixels.  A byte begins at a multiple
@@ -371,7 +441,7 @@ gfx_show:
 fill_x:         db      0
 fill_seed_y:    db      0
 fill_y:         db      0
-fill_row:       db      0
+row_at:         dw      0                       ; where the row being laid begins
 fill_left:      db      0
 fill_right:     db      0
 seed_byte:      db      0                       ; four pixels of the seed's pen

@@ -595,9 +595,84 @@ Los cuatro pasos, por si hay que volver:
 4. **Se saltan bytes enteros** mientras los cuatro píxeles son la pluma de la
    semilla, que es de lo que está hecho casi todo un trazo.
 
-Queda cola, y está medida: vajillas1 #7 va a 12,2 s y quijote2 #14 a 36,5 (era
-del orden de cuatro minutos). Lo que queda se va en los extremos de los trazos
-y en `blocked`, que sigue preguntando punto a punto una vez por fila.
+### La segunda vuelta del relleno, que es otro doble
+
+Con la prueba de las 196 ya escrita se podía medir de verdad, y además
+muestrear el contador de programa mientras dibuja para ver dónde se va el
+tiempo. Salió repartido en tres sitios, y los tres se tocaron:
+
+1. **El rastreo con `cpd` y `cpi`.** Comparar, andar y contar en una sola
+   instrucción: 33 relojes por cuatro píxeles donde el bucle a mano gastaba
+   138. Lo que lo hace limpio es que esas instrucciones llevan ellas mismas HL
+   y BC, así que **todas las salidas del bucle se arreglan igual** y lo que
+   queda en BC dice exactamente dónde paró: los bytes que no anduvo, sin
+   contar aquel en el que se detuvo.
+2. **La fila, una vez por fila.** `pixel_address` son cuarenta instrucciones y
+   se llamaba cuatro veces por fila —en `blocked`, en `fill_run` y dos en
+   `byte_of`—. Ahora la calcula `blocked`, que tenía que hacer las mismas
+   cuentas para contestar, y guarda dónde empieza la fila; los demás la
+   encuentran hecha. Era un octavo de la lámina.
+Otro doble, y de nuevo sin cambiar un píxel: 196 de 196 idénticas.
+
+| lámina | antes | ahora | |
+|---|---:|---:|---:|
+| quijote1 #15 | 34,46 s | 16,81 | 2,1x |
+| quijote2 #15 | 51,7 | 25,28 | 2,0x |
+| quijote2 #14 | 23,32 | 11,58 | 2,0x |
+| quijote1 #9 | 14,94 | 8,35 | 1,8x |
+| vajillas1 #7 | 12,24 | 7,71 | 1,6x |
+| vajillas1 #12 | 10,30 | 7,17 | 1,4x |
+| vajillas2 #10 | 4,85 | 3,85 | 1,3x |
+| quijote1 #8 | 4,21 | 3,02 | 1,4x |
+| megacorp2 #29 | 3,81 | 3,02 | 1,3x |
+
+### Y el tercer cambio, que se escribió, se midió y se devolvió
+
+**El tendido de a ocho.** Un `ld (hl),d` y un `inc hl` son trece relojes y el
+`djnz` que iba con cada uno era otros trece, así que desenrollando de ocho en
+ocho se paga la cuenta una vez. Dos cosas que enseñó:
+
+- **Desenrollar siempre salió peor.** Las láminas del Quijote están hechas de
+  trazos cortos, y repartir un trazo de tres bytes cuesta más que tenderlo a
+  pelo: quijote1 #9 llegó a empeorar. Con una guarda de «ocho o más» ganaba en
+  los dos casos.
+- **Y aun así valía un 4 por ciento.** Con él, las peores de las ocho aventuras
+  eran 2,5 / 6,3 / 2,3 / 3,2 / 16,1 / 23,8 / 7,9 / 6,8 contra 2,5 / 6,2 / 2,5 /
+  3,1 / 16,8 / 25,4 / 7,8 / 7,1 sin él. Nada.
+
+Y costaba cuarenta y cuatro bytes, que el Amstrad no tiene. Así que se devolvió.
+
+**La cuenta de memoria, que es la que manda aquí.** Las dos vueltas de rellenos
+juntas costaban 92 bytes, y el build de cinta **con música** —el del movedor que
+baja la música a `$0300`— sólo tenía 53 libres. Devuelto el tendido y sacados
+otros trece sin perder velocidad (la pluma sale de A, que `cpd` no toca, y
+`fill_row` ya no lo lee nadie), la cuenta con MegaCorp II queda así:
+
+| build | libre |
+|---|---:|
+| cinta sin música, que es lo que el 464 publica | 67 bytes |
+| cinta con música | 14 bytes |
+
+Catorce bytes es nada: **lo siguiente que se toque del Amstrad tiene que buscar
+sitio antes**, y la sección del hueco libre de más arriba dice dónde mirar.
+
+**Lo que queda, por si hay una tercera vuelta.** Muestreado el contador de
+programa al terminar, el reparto era: el rastreo un 38 por ciento, el tendido un
+14, y el resto en los extremos de los trazos (`.right_done`, `.several`,
+`merge_byte`) y en lo poco que queda de `pixel_address` y `byte_of`. El rastreo
+ya está en el hueso: `cpd` son 16 relojes y las dos pruebas de bandera otros 17,
+y no se pueden quitar porque hay que mirar el byte y el contador. Donde queda
+margen es en el tendido: **con la pila** se escriben dos bytes por `push` en
+once relojes, cinco y medio por byte contra los trece de ahora. Obliga a quitar
+las interrupciones mientras la pila apunta a la pantalla —y el Amstrad las tiene
+puestas cuando lleva música y quitadas cuando no, así que haría falta una
+bandera para saber si hay que volver a ponerlas—, y a estas alturas lo que se
+gana no cambia de sitio a ninguna aventura.
+
+**Y las dos partes del Quijote siguen siendo otro problema.** 17 y 25 segundos
+contra un presupuesto de 4 o 5 no se arregla apretando esto: son sus láminas,
+que tienen cuarenta y tantos rellenos cada una. Para eso hay que mirar qué hizo
+el original de CPC, que es la sección de aquí abajo.
 
 Y por qué no lo había visto nadie: **el Amstrad era la única máquina sin la
 prueba de todas las láminas de todas las aventuras**, que el Spectrum tiene
@@ -613,18 +688,21 @@ tiempo no son los 4-5 s del presupuesto —sólo tres aventuras los cumplen— s
 el día que algo se vuelva más lento la prueba lo diga. La vuelta entera son 27
 minutos.
 
-Lo que mide, después del arreglo que cuenta más abajo:
+Lo que mide, con el arreglo que cuenta más abajo y la segunda vuelta de
+rellenos:
 
 | aventura | la más lenta |
 |---|---|
-| Bangkok1 | 3,1 s |
-| Bangkok2 | 6,5 s |
-| megacorp1 | 3,0 s |
-| megacorp2 | 3,8 s |
-| quijote1 | 34,5 s |
-| quijote2 | 51,6 s |
-| vajillas1 | 12,3 s |
-| vajillas2 | 11,2 s |
+| Bangkok1 | 2,5 s |
+| Bangkok2 | 6,2 s |
+| megacorp1 | 2,5 s |
+| megacorp2 | 3,1 s |
+| quijote1 | 16,8 s |
+| quijote2 | 25,4 s |
+| vajillas1 | 7,8 s |
+| vajillas2 | 7,1 s |
+
+La vuelta entera son dieciocho minutos y medio, que eran veintisiete.
 
 Y lo que encontró: **tres láminas de las 196 salían mal**, y no de ahora —se
 comprobó volviéndolas a dibujar con el relleno viejo y salían igual de mal—.
