@@ -79,14 +79,14 @@ SCREEN_BYTES = 0x4000
 # Not a budget -- the budget is four or five and only three of these meet it --
 # but a ratchet: the day one of them gets slower, this says so.
 CEILING = {
-    "Bangkok1": 3.0,            # the worst of its thirty two measured 2.5
-    "Bangkok2": 7.0,            # 6.2
-    "megacorp1": 3.0,           # 2.5
-    "megacorp2": 4.0,           # 3.1
+    "Bangkok1": 3.0,            # the worst of its thirty two measured 2.4
+    "Bangkok2": 7.0,            # 6.1
+    "megacorp1": 3.0,           # 2.3
+    "megacorp2": 4.0,           # 2.9
     "quijote1": 18.0,           # 16.8
-    "quijote2": 27.0,           # 25.4
+    "quijote2": 27.0,           # 25.3
     "vajillas1": 9.0,           # 7.8
-    "vajillas2": 8.0,           # 7.1
+    "vajillas2": 8.0,           # 6.9
 }
 
 needs = (
@@ -98,6 +98,30 @@ needs = (
     if pytest is not None
     else (lambda f: f)
 )
+
+
+def finished_after(session, flag, timeout=120.0):
+    """Seconds of a real Amstrad from the counter being cleared to the flag
+    going up, or None if it never does.
+
+    The emulator's cycle counter is exact, but nothing stops it: a breakpoint
+    on the loop the build parks in was set here for a long time on the belief
+    that it froze the counter with the machine, and it does not -- outside the
+    emulator's step mode a breakpoint fires and the machine carries on, and in
+    step mode it runs hundreds of times slower.  So whatever passes between
+    the picture finishing and the flag being looked at is counted too.  That
+    was every half second, which added up to three tenths of a second to every
+    picture and made different pictures come out at the same count to within
+    ten cycles.  Looked at every hundredth of a second instead, what is added
+    is about that and no more.
+    """
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        if session.read(flag, 1)[0] == 0xFF:
+            reply = session.command("get-tstates-partial")
+            return int(reply.split("\n")[0].strip()) / CPC_HZ
+        time.sleep(0.01)
+    return None
 
 
 def draw_them_all(path):
@@ -133,7 +157,6 @@ def draw_them_all(path):
                 started = True
                 break
         assert started, "the Amstrad never got going"
-        session.command("enable-breakpoints")
         for key in sorted(gfx, key=int):
             number = int(key)
             session.command(f"write-memory {where['picture_wanted']} "
@@ -148,22 +171,11 @@ def draw_them_all(path):
             # -- leaves the emulator running nine times slower.
             seconds = None
             for _attempt in range(2):
-                # The counter is stopped with the machine, on the loop the
-                # build parks in, so nothing that runs afterwards is counted.
-                session.command(
-                    f"set-breakpoint 1 PC={where['done_flag'] - 2:04X}H")
                 session.command("reset-tstates-partial")
                 session.command(f"set-register PC={where['redraw']:04X}H")
-                for _ in range(240):
-                    time.sleep(0.5)
-                    if session.read(where["done_flag"], 1)[0] == 0xFF:
-                        reply = session.command("get-tstates-partial")
-                        seconds = int(reply.split("\n")[0].strip()) / CPC_HZ
-                        break
+                seconds = finished_after(session, where["done_flag"])
                 if seconds is not None:
                     break
-            session.command("set-breakpoint 1 0")
-            session.command("run")
             if seconds is None:
                 out.append((number, None, None))
                 continue

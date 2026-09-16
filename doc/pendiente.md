@@ -671,8 +671,10 @@ gana no cambia de sitio a ninguna aventura.
 
 **Y las dos partes del Quijote siguen siendo otro problema.** 17 y 25 segundos
 contra un presupuesto de 4 o 5 no se arregla apretando esto: son sus láminas,
-que tienen cuarenta y tantos rellenos cada una. Para eso hay que mirar qué hizo
-el original de CPC, que es la sección de aquí abajo.
+que tienen cuarenta y tantos rellenos cada una. Mirado lo que hacía el original
+de CPC —en la sección de más abajo—, la respuesta es que su intérprete era
+más lento que el nuestro, y que lo que hizo Dinamic fue dibujar las láminas otra
+vez para la máquina.
 
 Y por qué no lo había visto nadie: **el Amstrad era la única máquina sin la
 prueba de todas las láminas de todas las aventuras**, que el Spectrum tiene
@@ -693,16 +695,17 @@ rellenos:
 
 | aventura | la más lenta |
 |---|---|
-| Bangkok1 | 2,5 s |
-| Bangkok2 | 6,2 s |
-| megacorp1 | 2,5 s |
-| megacorp2 | 3,1 s |
+| Bangkok1 | 2,4 s |
+| Bangkok2 | 6,1 s |
+| megacorp1 | 2,3 s |
+| megacorp2 | 2,9 s |
 | quijote1 | 16,8 s |
-| quijote2 | 25,4 s |
+| quijote2 | 25,3 s |
 | vajillas1 | 7,8 s |
-| vajillas2 | 7,1 s |
+| vajillas2 | 6,9 s |
 
-La vuelta entera son dieciocho minutos y medio, que eran veintisiete.
+Medido ya con el reloj arreglado (ver «El reloj de las pruebas contaba de más»,
+más abajo). La vuelta entera son dieciséis minutos, que eran veintisiete.
 
 Y lo que encontró: **tres láminas de las 196 salían mal**, y no de ahora —se
 comprobó volviéndolas a dibujar con el relleno viejo y salían igual de mal—.
@@ -858,6 +861,102 @@ mismas escenas.
 De paso, `deGAC` avisa cuando las tablas de una máquina no parecen punteros. Sin
 ese aviso, una imagen de memoria puesta donde la máquina no la pondría se lee
 como una aventura con un solo nombre y nadie se entera.
+
+### Lo que tardaba el original en dibujar, que era más que nosotros
+
+La pregunta vino del Quijote: 17 y 25 segundos su peor lámina en nuestro
+Amstrad contra un presupuesto de 4 o 5. Antes de apretar más hacía falta saber
+contra qué se compara eso, y la única vara honrada es **el intérprete original
+de CPC dibujando sus propias láminas**. Así que se midió, con el mismo reloj
+que las nuestras: los ciclos del Z80 que cuenta el emulador, a cuatro millones
+por segundo.
+
+| Los pájaros de Bangkok, versión de CPC | el original | el nuestro |
+|---|---:|---:|
+| la peor lámina (la #35 en los dos) | 8,57 s | **2,62 s** |
+| la media | 3,25 s | **1,22 s** |
+| las 44 juntas | 143,1 s | **53,4 s** |
+| láminas de más de 5 s | 7 | 0 |
+| láminas de más de 4 s | 12 | 0 |
+
+Son **las mismas 44 láminas**, las de la versión de CPC sacadas de su disco con
+`disk.py` y `deGAC -m cpc`, y las 44 salen punto por punto iguales que la
+referencia. El nuestro es más rápido en 43 de las 44, con una mediana de 2,6
+veces y hasta 3,3. La única en que pierde es la #1, de 75 bytes: 0,24 contra
+0,32, porque ahí manda lo que cuesta borrar la ventana antes de empezar, y el
+original la borra con el firmware, que lo hace de un tirón.
+
+Tres cosas que salen de aquí:
+
+- **El original no cumplía el presupuesto.** Una lámina de cada cuatro pasaba
+  de 4 segundos y la peor rozaba los 9. El tope de 4 o 5 es nuestro, no suyo, y
+  en el Amstrad lo cumplimos con holgura en todo lo que el original dibujó.
+- **Por qué era más lento.** El relleno del original ya iba por bytes, como el
+  nuestro (está contado más arriba); lo que no hace él mismo son las rectas y
+  los puntos, que pide al firmware, y el firmware del CPC los hace en
+  coordenadas de 640 por 400 pasando por la escala en cada punto. Eso no está
+  medido rutina por rutina, pero es lo único que no se parece.
+- **La lección del Quijote es la del dibujante, no la del programador.** El
+  Quijote nunca salió en CPC, y sus láminas son las del Spectrum, que rellenan
+  áreas enormes con cuarenta y tantos rellenos cada una. Lo que hizo Dinamic
+  con Bangkok no fue portar las láminas del Spectrum, fue **dibujarlas otra vez
+  para la máquina**: 44 en vez de 32, ninguna igual. Con el intérprete
+  original, y sólo echando la cuenta a la misma proporción, las del Quijote
+  habrían tardado del orden de un minuto; con el nuestro tardan 17 y 25. Si algún día importa, el camino es el de
+  entonces: láminas pensadas para el Amstrad, no un relleno más rápido.
+
+**Cómo se midió, por si hay que repetirlo con Megacorp o las Vajillas.** Se
+arranca el juego de verdad desde su disco —`run"carvalho`, la comilla tecleada
+con mayúsculas y 2 como en la máquina, y luego la opción del cargador— y se
+deja llegar a su *prompt*. Ahí el procesador está dentro de la ROM del
+firmware, y eso es lo que complica todo: **por debajo de `$4000` la misma
+dirección es a la vez la ROM y el código del juego**, así que ningún punto de
+parada en esa zona se puede creer, y la tabla de saltos de `$BB00` tampoco sirve
+porque el juego espera la tecla dentro de la ROM sin pasar por ella. Lo que sí
+funciona es escribir treinta bytes propios en `$A300`, justo detrás del juego,
+que hacen lo mismo que el original hace en `$04CD`: pedir al firmware que quite
+la ROM baja con su propia llamada (`KL L ROM DISABLE`, `$B909`), buscar la
+lámina en la tabla con `$268C`, preparar los gráficos con `$06D8`, y dibujar
+con `$0538`, que pone las cuatro tintas y salta al intérprete de órdenes de
+`$3F20`. Al terminar levantan una bandera y se quedan dando vueltas. El número
+de lámina va dentro de esos bytes, para no escribir registros con la máquina
+en marcha. Megacorp de CPC lleva el mismo intérprete —un 98 por ciento de
+bytes iguales, y las cuatro rutinas en las mismas direcciones—, así que sirve
+tal cual.
+
+### El reloj de las pruebas contaba de más
+
+Midiendo lo de arriba salió algo que no tenía que ver con el original: láminas
+muy distintas nuestras daban **el mismo número de ciclos con diferencias de
+diez**, y la misma lámina variaba hasta tres décimas de una vuelta a otra.
+
+La causa: la prueba de las 196 ponía un punto de parada en el bucle donde la
+compilación se aparca, en la creencia de que así el contador se paraba con la
+máquina. **No se para.** Fuera del modo paso a paso del emulador el punto de
+parada salta y la máquina sigue; comprobado leyendo el contador con la máquina
+ya aparcada, que subía unos 2,4 millones de ciclos por segundo de reloj. Y el
+modo paso a paso no es salida: con `run` o no vuelve o va cientos de veces más
+lento. Así que se contaba también lo que pasaba entre que la lámina acababa y la
+prueba miraba la bandera, que era cada medio segundo: **hasta tres décimas de
+más en cada lámina**.
+
+El arreglo es mirar la bandera cada centésima (`finished_after` en la prueba).
+Con eso **la misma lámina da exactamente el mismo número de ciclos vuelta tras
+vuelta**, y lo que queda de error es como mucho un cuadro, veinte milisegundos.
+megacorp2 #29, que medía 3,02, son en verdad 2,90.
+
+Lo que eso cambia de lo de arriba: nada de lo grande. Las mejoras del relleno
+son de segundos en láminas de 15 a 35, muy por encima de tres décimas. Lo que
+sí queda en duda son las diferencias pequeñas, como el 4 por ciento del tendido
+desenrollado; pero se devolvió por memoria, no por eso. Y la comparación con el
+original se hizo con el reloj ya arreglado en los dos lados.
+
+Dos cosas que quedan: **cuidado con pedir los registros muy a menudo**, que
+cada diez milisegundos tumba el emulador y en cambio leer un byte de memoria
+no; y **las pruebas de todas las láminas del Spectrum y del MSX** miran la
+bandera cada décima, así que cuentan hasta una décima de más. No cambia nada
+de lo que se dijo con ellas, pero conviene pasarles el mismo arreglo la
+próxima vez que se toquen.
 
 ## Los cuatro marcadores que son del intérprete
 
