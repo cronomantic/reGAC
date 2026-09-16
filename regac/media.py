@@ -30,8 +30,8 @@ memory, because that is the one thing it takes without argument: a listing in
 plain text works off a disk but the tape wants this.  There are only three
 statements to encode, so the table below is three tokens long.
 
-    open("juego.dsk", "wb").write(cpc_disk(code))
     open("juego.cdt", "wb").write(cpc_tape(code))
+    open("juego.dsk", "wb").write(cpc6128_disk(code, resident, banks))
 """
 
 import struct
@@ -45,9 +45,14 @@ from .dsk import Disk
 CALL = 0x83
 LOAD = 0xA8
 MEMORY = 0xAA
+OUT = 0xB9
 HEX = 0x1C
 SPACE = 0x20
 QUOTE = 0x22
+COLON = 0x01                    # what separates two statements on a line:
+                                # a tokenised line keeps it as a one and
+                                # not as the letter, which LIST prints
+                                # the same way and BASIC does not run
 
 BASIC_AT = 0x0170               # where a BASIC program lives on an Amstrad
 CODE_AT = 0x4000                # and where the interpreter is built to run
@@ -115,25 +120,14 @@ def amsdos(name, data, kind=BINARY, load=CODE_AT, entry=0):
     return bytes(head) + bytes(data)
 
 
-def cpc_disk(code, name=NAME, load=CODE_AT, entry=CODE_AT, screen=None,
-             music=None):
-    """A data disk with the loader and the interpreter on it, which a machine
-    starts with RUN and the name.  A loading screen, when there is one, is a
-    dump of that machine's own screen and travels as a file of its own, and so
-    does the music."""
-    binary = f"{name}.BIN"
-    picture = f"{name}.SCR" if screen else None
-    tunes = f"{name}.MUS" if music else None
-    disk = Disk("cpc-data")
-    disk.add(f"{name}.BAS",
-             amsdos(f"{name}.BAS", loader(binary, load - 1, entry, picture, tunes),
-                    kind=0, load=BASIC_AT))
-    if screen:
-        disk.add(picture, amsdos(picture, screen, load=SCREEN_AT))
-    if music:
-        disk.add(tunes, amsdos(tunes, music, load=MUSIC_LOADS_AT))
-    disk.add(binary, amsdos(binary, code, load=load, entry=entry))
-    return disk.image()
+# A disk for the older shape -- the interpreter and the whole database in one
+# stretch from $4000 -- is not written any more, and the reason is worth
+# keeping: AMSDOS holds two kilobytes of buffer around $A700 and does not give
+# them up when BASIC asks for the memory, so a file loaded across them comes
+# back with a hole in it.  It was there for as long as that disk was, and only
+# showed the day a picture landed in the hole.  A 464 loads from tape, which
+# has no such thing, and the 6128 loads its interpreter at $8000 and its
+# database through a window: neither goes near it.  See tests/test_media_cpc.py.
 
 
 # -- the Spectrum +3, which loads from disk and not from tape -----------------
@@ -352,6 +346,82 @@ def cpc_tape(code, name=NAME, load=CODE_AT, entry=CODE_AT, screen=None,
         files.append(File(name, music, kind=BINARY, load=MUSIC_LOADS_AT))
     files.append(File(name, code, kind=BINARY, load=load, entry=entry))
     return tape(files)
+
+
+# -- and the 6128, which has a disk and another sixty four kilobytes ----------
+
+# The only sixteen kilobytes the gate array can swap are the ones at $4000, so
+# that is where the window goes and the interpreter lives above it.  Which is
+# also why the loader has to page: a bank is loaded through the window with
+# the bank in it, one file at a time, and BASIC can do that because OUT is a
+# word it knows.
+CPC6128_WINDOW = 0x4000         # where a bank is loaded, and the resident half
+CPC6128_CODE_AT = 0x8000        # and where the interpreter goes
+CPC6128_PAGES = (0xC4, 0xC5, 0xC6, 0xC7)
+CPC6128_NORMAL = 0xC0           # the arrangement that puts the machine back
+CPC6128_PORT = 0x7F00           # any port whose high byte is that one
+
+
+def cpc6128_loader(binary, resident, banks, screen=None, music=None):
+    """The lines a 6128 needs, which are the 464's with the paging in the
+    middle: protect the memory, put up the screen, bring the music down, lay
+    the resident half of the database in the window -- in the bank that is
+    there when nothing has been paged, which none of the four ever covers --
+    then each bank in turn through the window, put the machine back and go.
+    """
+    out = basic_line(10, [MEMORY, SPACE] + list(hex_number(CPC6128_WINDOW - 1)))
+    if screen is not None:
+        out += basic_line(20, [LOAD, SPACE] + list(quoted(screen))
+                          + [ord(",")] + list(hex_number(SCREEN_AT)))
+    if music is not None:
+        out += basic_line(25, [LOAD, SPACE] + list(quoted(music)))
+        out += basic_line(26, [CALL, SPACE] + list(hex_number(MUSIC_LOADS_AT)))
+    out += basic_line(30, [LOAD, SPACE] + list(quoted(resident)))
+    for number, named in enumerate(banks):
+        out += basic_line(40 + number,
+                          [OUT, SPACE] + list(hex_number(CPC6128_PORT))
+                          + [ord(",")] + list(hex_number(CPC6128_PAGES[number]))
+                          + [COLON, LOAD, SPACE] + list(quoted(named)))
+    out += basic_line(50, [OUT, SPACE] + list(hex_number(CPC6128_PORT))
+                      + [ord(",")] + list(hex_number(CPC6128_NORMAL)))
+    out += basic_line(60, [LOAD, SPACE] + list(quoted(binary)))
+    out += basic_line(70, [CALL, SPACE] + list(hex_number(CPC6128_CODE_AT)))
+    return out + bytes(2)
+
+
+def cpc6128_disk(code, resident, banks, name=NAME, screen=None, music=None):
+    """A disk a 6128 starts with RUN and the name.
+
+    Every piece is a file of its own with its own AMSDOS header, which is what
+    lets BASIC put each one where it belongs: the banks all say $4000 because
+    they all come in through the window, and which bank they land in is what
+    the OUT in front of the LOAD decides.
+    """
+    if len(banks) > len(CPC6128_PAGES):
+        raise ValueError(
+            f"a 6128 has {len(CPC6128_PAGES)} banks to give and this wants "
+            f"{len(banks)}"
+        )
+    binary = f"{name}.BIN"
+    held = f"{name}.RES"
+    picture = f"{name}.SCR" if screen else None
+    tunes = f"{name}.MUS" if music else None
+    named = [f"{name}.B{n}" for n in range(len(banks))]
+    disk = Disk("cpc-data")
+    disk.add(f"{name}.BAS",
+             amsdos(f"{name}.BAS",
+                    cpc6128_loader(binary, held, named, picture, tunes),
+                    kind=0, load=BASIC_AT))
+    if screen:
+        disk.add(picture, amsdos(picture, screen, load=SCREEN_AT))
+    if music:
+        disk.add(tunes, amsdos(tunes, music, load=MUSIC_LOADS_AT))
+    disk.add(held, amsdos(held, resident, load=CPC6128_WINDOW))
+    for piece, what in zip(named, banks):
+        disk.add(piece, amsdos(piece, bytes(what), load=CPC6128_WINDOW))
+    disk.add(binary, amsdos(binary, code, load=CPC6128_CODE_AT,
+                            entry=CPC6128_CODE_AT))
+    return disk.image()
 
 
 # -- the Spectrum Next, whose medium the assembler writes itself --------------

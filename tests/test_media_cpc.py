@@ -26,6 +26,19 @@ to the byte without turning anything on.  Then a disk is put in a 6128 and
 started the way a person would, with RUN and the name.  And then the tape,
 which is the same thing but takes minutes of tape time, so it only runs when
 asked for.
+
+The disk is the 6128's, with its own map and its banks, because that is the
+only Amstrad here that has one: a 464 loads from tape.  It used not to be --
+there was one disk for both, with the interpreter and the whole database in
+one stretch from $4000 -- and taking it away settled something that had been
+true all along without anyone noticing.  **AMSDOS keeps two kilobytes of
+buffer around $A700 and does not give them up**: a file loaded over them comes
+back with a hole in it.  The old disk had one and got away with it because
+what fell there was database nobody read early; the day the graphics landed in
+the hole, a picture came out as a scribble of lines.  The 6128 build cannot
+have the problem at all -- its interpreter is eight kilobytes at $8000 and its
+database goes in through a window at $4000 -- which is worth knowing if anyone
+ever wants the old shape back.
 """
 
 import json
@@ -47,7 +60,8 @@ import disk as reader  # noqa: E402
 import emulator  # noqa: E402
 from regac import cdt  # noqa: E402
 from regac.binary import Database  # noqa: E402
-from regac.media import SCREEN_AT, cpc_disk, cpc_tape  # noqa: E402
+from regac.binary import Reader  # noqa: E402
+from regac.media import SCREEN_AT, banks_of, cpc6128_disk, cpc_tape  # noqa: E402
 from test_game_cpc import glyph_table, wait_screen  # noqa: E402
 
 CPC = os.path.join(ROOT, "z80", "cpc")
@@ -55,6 +69,11 @@ SOURCE = os.path.join(CPC, "game.asm")
 DATABASE = os.path.join(CPC, "game.rgac")
 BINARY = os.path.join(CPC, "game.bin")
 LISTING = os.path.join(CPC, "game.lst")
+SOURCE_6128 = os.path.join(CPC, "game6128.asm")
+DATABASE_6128 = os.path.join(CPC, "game6128.rgac")
+BINARY_6128 = os.path.join(CPC, "game6128.bin")
+LISTING_6128 = os.path.join(CPC, "game6128.lst")
+DEFS_6128 = os.path.join(CPC, "banks6128.inc")
 ADVENTURE = os.path.join(ROOT, "snapshots", "megacorp2.json")
 REAL_TAPE = os.path.join(ROOT, "juegos", "megacorp_ams.zip")
 
@@ -110,6 +129,23 @@ def built():
         return f.read()
 
 
+def a_6128_disk(screen=None):
+    """The 6128's disk: its interpreter, the resident half of its database and
+    a file for every bank, which the loader pages in one at a time."""
+    subprocess.run(
+        [sys.executable, "-m", "regac", "build", ADVENTURE, DATABASE_6128,
+         "-m", "cpc", "-b", "16k", "--defs", DEFS_6128],
+        cwd=ROOT, check=True, capture_output=True,
+    )
+    emulator.assemble(SOURCE_6128, listing=LISTING_6128)
+    with open(BINARY_6128, "rb") as f:
+        code = f.read()
+    with open(DATABASE_6128, "rb") as f:
+        image = f.read()
+    resident = image[:Reader(image).resident_size]
+    return cpc6128_disk(code, resident, banks_of(image), screen=screen)
+
+
 def asking(ddb):
     """What the adventure says when it wants an order."""
     return ddb["messages"]["240"].strip()[:3]
@@ -144,7 +180,7 @@ def test_the_disk_starts_the_game(tmp_path):
         ddb = json.load(f)
     path = str(tmp_path / "juego.dsk")
     with open(path, "wb") as f:
-        f.write(cpc_disk(built()))
+        f.write(a_6128_disk())
     glyphs = glyph_table(Database(ddb))
 
     session = emulator.Session(
@@ -171,7 +207,7 @@ def test_the_disk_puts_up_a_loading_screen(tmp_path):
     screen = bytes(filler.randrange(256) for _ in range(0x4000))
     path = str(tmp_path / "juego.dsk")
     with open(path, "wb") as f:
-        f.write(cpc_disk(built(), screen=screen))
+        f.write(a_6128_disk(screen=screen))
 
     area = reader.data_area(open(path, "rb").read())
     listing = reader.directory(area)

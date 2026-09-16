@@ -32,7 +32,7 @@ from .check import problems_of
 from .binary import MACHINES, SECTION_NAMES, Database, Reader
 from .devices import DEVICES, device_for, make
 from .gfx import Renderer
-from .media import (MSX_SCREEN_BYTES, PCW_SCREEN_BYTES, banks_of, cpc_disk,
+from .media import (MSX_SCREEN_BYTES, PCW_SCREEN_BYTES, banks_of, cpc6128_disk,
                     cpc_tape, msx_screen, msx_tape, pcw_release,
                     plus3_banked_disk, plus3_disk)
 from .project import (TARGETS, ProjectError, assemble, screen_for,
@@ -197,12 +197,13 @@ BANK_SIZES = {"none": 0, "8k": 13, "16k": 14}
 
 # Where each machine's interpreter is built to sit, which is where its medium
 # has to put it.
-LOADS_AT = {"cpc": 0x4000, "plus3": 0x8000, "pcw": 0x0100, "msx": 0x8000}
+LOADS_AT = {"cpc464": 0x4000, "cpc6128": 0x8000, "plus3": 0x8000,
+            "pcw": 0x0100, "msx": 0x8000}
 
 # And how big a dump of each machine's screen is, which is what a loading
 # screen has to be.
-SCREEN_BYTES = {"cpc": 0x4000, "plus3": 6912, "pcw": PCW_SCREEN_BYTES,
-                "msx": MSX_SCREEN_BYTES}
+SCREEN_BYTES = {"cpc464": 0x4000, "cpc6128": 0x4000, "plus3": 6912,
+                "pcw": PCW_SCREEN_BYTES, "msx": MSX_SCREEN_BYTES}
 
 
 # What Arkos Tracker's own exporter is called, for an author who would rather
@@ -419,13 +420,30 @@ def write_media(machine, code, where, name, load, entry, screen=None,
         written.append(path)
         how = (f'BLOAD"CAS:",R, with {"a screen and " if screen else ""}'
                f'{len(database or b"")} bytes behind it')
-    elif machine == "cpc":
-        for suffix, make in ((".dsk", cpc_disk), (".cdt", cpc_tape)):
-            path = os.path.join(where, name.lower() + suffix)
-            with open(path, "wb") as f:
-                f.write(make(code, name, load, entry, screen, music))
-            written.append(path)
-        how = f'RUN"{name}" on the disk, RUN"" on the tape'
+    elif machine == "cpc6128":
+        # A disk and another sixty four kilobytes: every piece is a file with
+        # its own header, and the loader pages before each bank goes in.  The
+        # resident half travels the same way, through the window, in the bank
+        # that is there when nothing has been paged.
+        if database is None:
+            sys.exit("ERROR: a cpc6128 release wants --database")
+        resident = database[:Reader(database).resident_size]
+        path = os.path.join(where, name.lower() + ".dsk")
+        with open(path, "wb") as f:
+            f.write(cpc6128_disk(code, resident, banks or [], name, screen,
+                                 music))
+        written.append(path)
+        how = f'RUN"{name}" on the disk, with {len(banks or [])} banks behind it'
+        if music:
+            how += f", and {len(music)} bytes of music"
+    elif machine == "cpc464":
+        # A tape and sixty four kilobytes: the loader is in BASIC, and what
+        # it runs is whatever comes first, so RUN and nothing else.
+        path = os.path.join(where, name.lower() + ".cdt")
+        with open(path, "wb") as f:
+            f.write(cpc_tape(code, name, load, entry, screen, music))
+        written.append(path)
+        how = 'RUN"" on the tape'
         if music:
             how += f", with {len(music)} bytes of music in front of it"
     else:
@@ -592,6 +610,22 @@ def make_music(ddb, root, where_regac_is, effects=None, tool=None):
     return defines
 
 
+def makes_a_noise(ddb):
+    """Whether the adventure ever asks for a noise.
+
+    The interpreter that can make one costs the Amstrad a hundred and sixty
+    three bytes, and that machine counts every one of them.  None of the eight
+    adventures of 1986 asks: SOUND and QUIET are opcodes of ours and nothing
+    written then could use them.  The same rule as the music, which the
+    project set long ago -- what an adventure does not do does not travel
+    with it.
+    """
+    tables = [ddb.get("hpcs") or [], ddb.get("lpcs") or []]
+    tables += list((ddb.get("lcs") or {}).values())
+    return any(step and step[0] in ("SOUND", "QUIET")
+               for table in tables for step in table)
+
+
 def make_one(target, settings, ddb, name, root, output, where_regac_is,
              music=()):
     """One machine, end to end: its database, its interpreter, its medium."""
@@ -609,8 +643,10 @@ def make_one(target, settings, ddb, name, root, output, where_regac_is,
     # machine but the PCW has one.
     defines = [word for word in music
                if target.music is not None or word == "WITH_OWN_NOISES"]
+    if makes_a_noise(ddb):
+        defines.append("NOISES")
     if music and target.music is None:
-        print(f"  {target.machine:12} has no sound chip: the music is left out")
+        print(f"  {target.machine:12} carries no music: it is left out")
     if settings.get("screen"):
         screen = screen_for(target, settings["screen"], root)
         if target.screen_when == "assembly":
@@ -741,7 +777,7 @@ def main():
     p = sub.add_parser("release", help="put an assembled interpreter on a disk and a tape")
     p.add_argument("input", help="the binary the assembler wrote")
     p.add_argument("output", help="where to write the disk and the tape")
-    p.add_argument("-m", "--machine", default="cpc", choices=sorted(LOADS_AT))
+    p.add_argument("-m", "--machine", default="cpc464", choices=sorted(LOADS_AT))
     p.add_argument("--name", default="JUEGO", help="what the files are called")
     p.add_argument("--load", type=lambda n: int(n, 0), default=None,
                    help="where the binary loads, if not where that machine has it")

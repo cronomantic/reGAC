@@ -150,6 +150,12 @@ MACHINE_LABELS = {
     "spectrum128": ("spectrum128", "spectrum"),
     "plus3": ("plus3", "spectrum128", "spectrum"),
     "cpc": ("cpc", "amstrad"),
+    # The two Amstrads of the target table are the same machine to a source
+    # that only wants to know what it is writing for, so both answer to cpc
+    # as well as to their own name: a 464 has a tape and sixty four
+    # kilobytes, a 6128 a disk and another sixty four.
+    "cpc464": ("cpc464", "cpc", "amstrad"),
+    "cpc6128": ("cpc6128", "cpc", "amstrad"),
     "pcw": ("pcw", "amstrad"),
     "msx": ("msx",),
     "msx2": ("msx2", "msx"),

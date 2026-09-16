@@ -443,6 +443,57 @@ para las 196 y lleva esa única lámina apuntada con nombre y con su número en
 `KNOWN_SLOW`, de modo que si crece se entera, y si crece otra distinta,
 también.
 
+### Los dos Amstrad, que son dos máquinas
+
+Un 464 tiene cinta y sesenta y cuatro kilobytes; un 6128 tiene disco y otros
+sesenta y cuatro. Eso no es una perilla de un destino, son dos destinos:
+`cpc464` y `cpc6128`, y el `cpc` de antes —que hacía disco y cinta y daba lo
+mismo qué máquina fuera— ya no está.
+
+**El 6128 pagina como el +3.** Las únicas dieciséis kilobytes que el gate
+array sabe cambiar son las de `$4000`, con las cuatro configuraciones `&C4` a
+`&C7`, así que la ventana va ahí y todo lo demás se coloca alrededor:
+
+    $0300-$1FFF  la música, si la hay
+    $2000-$3FFF  lo residente de la base de datos (desde $0300 sin música)
+    $4000-$7FFF  la ventana, uno de cuatro bancos
+    $8000-$BEFF  el intérprete, con la pila encima
+    $C000-$FFFF  la pantalla
+
+Y de ahí sale lo que cierra el medio: **ese build no puede llamar al firmware
+ni una vez**, porque una entrada del jumpblock es un `RST` y un `RST` trae la
+ROM baja, que taparía lo residente mientras dura. Así que la cinta queda
+descartada por el mapa y las partidas irán al disco por sectores, como en el
+PCW. Hoy `disc.asm` es un tocón honesto que dice que no pudo.
+
+El cargador es BASIC y pagina él: `OUT &7F00,&C4` y un `LOAD` por banco. De
+paso, algo que costó una tarde: **los dos puntos que separan dos sentencias no
+son el carácter `:` sino un `01`**. Con `3A` el `LIST` los enseña igual y BASIC
+dice «Syntax error».
+
+**Lo que gana**: las dos partes del Quijote, que no caben en un Amstrad de
+sesenta y cuatro, caben en un 6128 con un banco y de sobra. Y el intérprete,
+que en un 464 acaba a un palmo del firmware, ahí acaba en `$A011` con casi
+ocho kilobytes libres.
+
+### La memoria que AMSDOS no suelta
+
+El disco de antes —el intérprete y la base de datos entera de un tirón desde
+`$4000`— tenía un agujero desde siempre y se descubrió al llenarlo: **AMSDOS
+se queda dos kilobytes de buffer alrededor de `$A700` y no los suelta** cuando
+BASIC pide la memoria con `MEMORY`. Un fichero cargado por encima vuelve con
+un boquete de dos kilobytes.
+
+Llevaba años ahí sin morder porque lo que caía en el boquete era base de datos
+que no se leía pronto. El día que le tocó a los gráficos, una lámina salió
+como un garabato de líneas. Se midió comparando la memoria después de cargar
+contra el fichero: 2418 bytes distintos, el primero en `$A700` clavado.
+
+Ninguno de los dos Amstrad de ahora pasa por ahí —el 464 carga de cinta y el
+6128 deja el intérprete en `$8000` y la base de datos entra por la ventana—,
+así que la función que escribía aquel disco ya no está. Queda escrito por si
+alguien quiere volver a esa forma.
+
 ### Lo que le queda libre al Amstrad, que es poco
 
 Su mapa es fijo: el intérprete desde `$4000`, la base de datos detrás alineada
@@ -476,6 +527,94 @@ bytes** hasta el escalón, y el día que se crucen, las ocho pierden 256 de golp
 y megacorp2 se sale. Eso es justo lo que pasó a mitad de esta tanda: con una
 tabla de separadores metida a capón el intérprete pasó de `$6000`, la base de
 datos se fue a `$6100` y `regac make` dejó de construir esta máquina.
+
+### Lo que cuesta dibujar en el Amstrad, que es mucho
+
+Medido con el contador de ciclos parado en seco, igual que el MSX, y sale lo
+peor que hemos encontrado en este proyecto:
+
+| lámina | Spectrum | Amstrad |
+|---|---:|---:|
+| megacorp2 #29 | 3,53 s | **27,54 s** |
+| megacorp2 #4 | 2,58 s | **21,31 s** |
+| quijote1 #8 | 2,54 s | **45,03 s** |
+| quijote1 #2 | 1,60 s | 4,89 s |
+| quijote1 #3 | 1,34 s | 4,93 s |
+
+No es del Quijote: **MegaCorp II se publicó en Amstrad** y sus láminas tardan
+veinte y veintisiete segundos con nuestro intérprete. El tope que este
+proyecto se puso es de cuatro o cinco.
+
+Y lo primero que había que descartar: **las láminas salen bien**. Comparadas
+punto a punto contra el renderizador de referencia con la paleta del Amstrad,
+**cero diferencias**. No están mal dibujadas, están lentas.
+
+Dónde se va el tiempo se ve contando lo que pide cada una:
+
+| lámina | órdenes | rellenos |
+|---|---:|---:|
+| quijote1 #8 | 181 | 41 |
+| quijote1 #2 | 43 | 12 |
+| quijote1 #3 | 9 | 0 |
+
+Cuarenta y cinco segundos entre cuarenta y un rellenos es **1,1 s por
+relleno**; en el Spectrum los mismos salen a unos 60 ms. La razón está en el
+fuente de cada uno: **el del Spectrum trabaja por bytes** —ocho píxeles de una
+vez, con máscara— y **el del Amstrad va punto a punto**, porque en modo 1 un
+píxel son dos bits y tanto `blocked` como `put_pen` preguntan y escriben de
+uno en uno. Un `put_pen` son una dirección, una máscara, un byte de pluma y
+una mezcla, por píxel.
+
+**Y eso está hecho**, en cuatro pasos, midiendo cada uno:
+
+| | quijote1 #8 | megacorp2 #29 |
+|---|---:|---:|
+| como estaba | 45,03 s | 27,54 s |
+| tendiendo el trazo por bytes | 23,32 | 14,88 |
+| sacando la pluma con rotaciones | 21,31 | 13,94 |
+| andando la dirección en vez de calcularla | 13,32 | 9,23 |
+| saltando bytes enteros de la pluma de la semilla | 5,67 | 4,89 |
+| y con el rastreo en registros | **4,17** | **4,87** |
+
+De ocho a once veces, y **sin cambiar un píxel**: las tres láminas más
+cargadas de cada una de las ocho aventuras, veinticuatro en total, comparadas
+punto a punto contra el renderizador de referencia, cero diferencias.
+
+Los cuatro pasos, por si hay que volver:
+
+1. **El trazo se tiende por bytes.** Cuatro píxeles por byte en modo 1, y como
+   un byte empieza en un múltiplo de cuatro, cuál de las dos plumas toca a
+   cada píxel suyo depende sólo de la y: **todos los bytes enteros de un trazo
+   son el mismo byte**, y sólo los dos de los extremos hay que desmenuzarlos.
+2. **La pluma de un píxel** sale rotando el byte hasta alinearlo y mirando dos
+   bits, en vez de recorrer las cuatro plumas comparando.
+3. **El rastreo lleva la dirección** —el byte en HL y los dos bits del píxel en
+   C— y la anda: un píxel a la derecha es `rrc c`, y el acarreo que suelta es
+   exactamente «y pasamos al byte siguiente». Ni una dirección se vuelve a
+   calcular.
+4. **Se saltan bytes enteros** mientras los cuatro píxeles son la pluma de la
+   semilla, que es de lo que está hecho casi todo un trazo.
+
+Queda cola, y está medida: vajillas1 #7 va a 12,2 s y quijote2 #14 a 36,5 (era
+del orden de cuatro minutos). Lo que queda se va en los extremos de los trazos
+y en `blocked`, que sigue preguntando punto a punto una vez por fila.
+
+Y por qué no lo había visto nadie: **el Amstrad es la única máquina sin la
+prueba de todas las láminas de todas las aventuras**, que el Spectrum tiene
+desde hace tiempo y el MSX desde ayer. Sigue sin tenerla, y sigue siendo lo
+primero que hay que escribirle. La lista de las más caras, por número de
+rellenos, para cuando se escriba:
+
+| aventura | las tres peores |
+|---|---|
+| vajillas1 | #12 con 163 rellenos, #4 con 83, #7 con 76 |
+| vajillas2 | #10 con 142, #16 con 93, #14 con 74 |
+| megacorp2 | #29 con 87, #4 con 51, #8 con 40 |
+| megacorp1 | #3 con 63, #20 con 43, #6 con 40 |
+| quijote2 | #10 con 46, #14 con 45, #5 con 45 |
+| quijote1 | #8 con 41, #1 con 41, #16 con 36 |
+| Bangkok1 | #33 con 35, #3 con 31, #7 con 25 |
+| Bangkok2 | #18 con 21, #19 con 18, #28 con 17 |
 
 ### Mirar las versiones de CPC, que es la lección para el PCW
 
@@ -775,10 +914,17 @@ original. La prueba es [`test_textmode_z80.py`](../tests/test_textmode_z80.py).
   tiene uno tan largo, así que no ha mordido nunca, pero una aventura escrita
   de ahora en adelante sí puede. Lo suyo es que la construcción lo diga, que
   es donde se sabe.
-- **El Amstrad, otra vez el escalón.** Los 38 bytes de margen son de la misma
-  familia que los 162 de MegaCorp II: esa máquina necesita sitio antes de
-  poder crecer, y la salida conocida es repartir su base de datos en bancos
-  como hace el +3.
+- **El 464 sigue sin sitio.** El relleno rápido costó unos 300 bytes y se
+  pagaron rascando: se quitó el `ALIGN 256` de la base de datos, que nada
+  necesitaba, y el intérprete de ruidos dejó de viajar cuando la aventura no
+  pide ninguno —ninguna de las ocho de 1986 puede pedirlo, porque `SOUND` y
+  `QUIET` son opcodes nuestros—, que son 163 bytes en esa máquina. Con eso
+  MegaCorp II vuelve a caber, con 133 de margen. El Quijote no: le faltan 410
+  y 279, y para eso hace falta o bancos, que un 464 no tiene, o bajar el
+  código debajo de `$4000` y dejarle a la base de datos los veintiocho
+  kilobytes de `$4000` a `$B100` —con la pega de que la rutina de cinta
+  tendría que vivir arriba, porque el firmware tapa la ROM baja mientras
+  dura—.
 
 - **El Amstrad va justo, y hay un escalón.** Está medido, aventura por
   aventura, antes y después de meter los marcadores, con un árbol aparte en el

@@ -83,9 +83,14 @@ done_flag:      db      0
 ; sound chip: ay.asm makes the same noises the others make with a bit of a
 ; port.  It comes in before the opcodes, which ask whether there is anything
 ; here that can make one.  With music the effects are the tracker's and this
-; stays out.
+; stays out -- and so does it when the adventure never asks for a noise,
+; which the build says with NOISES and which none of the eight of 1986 does:
+; SOUND and QUIET are opcodes of ours.  A hundred and sixty three bytes on a
+; machine that counts them one by one.
                 IFNDEF WITH_MUSIC
+                IFDEF NOISES
                 include "ay.asm"
+                ENDIF
                 ENDIF
                 include "tape.asm"
                 include "draw.asm"
@@ -97,7 +102,6 @@ done_flag:      db      0
                 include "../common/loop.asm"
                 include "../common/picture.asm"
 
-                ALIGN   256
 database:
                 INCBIN  "game.rgac"
 last:

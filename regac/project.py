@@ -126,10 +126,22 @@ TARGETS = {
         release="plus3", binary="game3_code.bin", boot="game3_boot.bin",
         screen_bytes=6912, screen_when="assembly",
     ),
-    "cpc": Target(
-        music="game_music.bin",
+    # The two Amstrads are two machines and not one.  A 464 has a tape and
+    # sixty four kilobytes; a 6128 has a disk and another sixty four, and
+    # uses them for the database the way a +3 does.  What they share is the
+    # interpreter; what differs is the map, the medium and the memory, so
+    # they are two targets and not one with a flag.
+    "cpc464": Target(
+        music=None,                     # on purpose: see doc/pendiente.md
         machine="cpc", folder=CPC, source="game.asm", database="game.rgac",
-        release="cpc", binary="game.bin",
+        release="cpc464", binary="game.bin",
+        screen_bytes=0x4000,
+    ),
+    "cpc6128": Target(
+        music="game6128_music.bin",
+        machine="cpc", folder=CPC, source="game6128.asm",
+        database="game6128.rgac", banks="16k", defs="banks6128.inc",
+        release="cpc6128", binary="game6128.bin",
         screen_bytes=0x4000,
     ),
     "next": Target(

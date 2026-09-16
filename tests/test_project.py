@@ -91,7 +91,10 @@ screen = "carga.scr"
 [targets.plus3]
 screen = "carga.scr"
 
-[targets.cpc]
+[targets.cpc464]
+screen = "carga.cpc"
+
+[targets.cpc6128]
 screen = "carga.cpc"
 
 [targets.pcw]
@@ -114,11 +117,11 @@ def test_it_says_what_is_wrong_with_a_project(tmp_path):
         ('name = "x"\n[targets.spectrum48]\n', "source"),
         ('name = "x"\nsource = "megacorp.json"\n', "which machines"),
         ('name = "x"\nsource = "megacorp.json"\n[targets.oric]\n', "no oric"),
-        ('name = "x"\nsource = "megacorp.json"\n[targets.cpc]\nbancos = "16k"\n',
+        ('name = "x"\nsource = "megacorp.json"\n[targets.cpc464]\nbancos = "16k"\n',
          "bancos"),
-        ('name = "x"\nsource = "megacorp.json"\n[targets.cpc]\nscale = 2\n',
+        ('name = "x"\nsource = "megacorp.json"\n[targets.cpc464]\nscale = 2\n',
          "cannot draw"),
-        ('name = "x"\nsource = "megacorp.json"\nsalida = "x"\n[targets.cpc]\n',
+        ('name = "x"\nsource = "megacorp.json"\nsalida = "x"\n[targets.cpc464]\n',
          "salida"),
     ):
         path = a_project(where, body, screens=False)
@@ -164,8 +167,8 @@ def test_one_command_builds_every_machine(tmp_path):
         ("spectrum48", "megacorp.tap"),
         ("spectrum128", "megacorp.tap"),
         ("plus3", "megacorp.dsk"),
-        ("cpc", "megacorp.dsk"),
-        ("cpc", "megacorp.cdt"),
+        ("cpc464", "megacorp.cdt"),
+        ("cpc6128", "megacorp.dsk"),
         ("pcw", "megacorp.dsk"),
     ):
         made = os.path.join(out, folder, name)
@@ -177,7 +180,7 @@ def test_one_command_builds_every_machine(tmp_path):
     for folder, name, suffix in (
         ("spectrum128", "megacorp.tap", "scr"),
         ("plus3", "megacorp.dsk", "scr"),
-        ("cpc", "megacorp.dsk", "cpc"),
+        ("cpc6128", "megacorp.dsk", "cpc"),
         ("pcw", "megacorp.dsk", "pcw"),
     ):
         with open(os.path.join(where, "carga." + suffix), "rb") as f:
@@ -201,7 +204,9 @@ def test_only_the_machine_that_was_asked_for(tmp_path):
     assert done.returncode == 0, f"regac make failed:\n{done.stdout}\n{done.stderr}"
     out = os.path.join(where, "salida")
     assert os.path.exists(os.path.join(out, "pcw", "megacorp.dsk"))
-    assert not os.path.exists(os.path.join(out, "cpc")), "it built more than it was told"
+    assert not os.path.exists(os.path.join(out, "cpc464")), (
+        "it built more than it was told"
+    )
 
 
 @needs_tools
@@ -240,7 +245,7 @@ output = "salida"
 
 [targets.spectrum48]
 
-[targets.cpc]
+[targets.cpc464]
 """
 
 

@@ -108,19 +108,19 @@ pixel_address:
 pen_byte:
                 and     3
                 ld      hl, pen_bytes
-                add     a, l
-                ld      l, a
-                jr      nc, .no_carry
-                inc     h
-.no_carry:
-                ld      a, (hl)
-                ret
+                jr      table_byte
 
 ; The two bits belonging to pixel A of a byte.
 ; Corrupts: AF, HL
 pixel_mask:
                 and     3
                 ld      hl, pixel_masks
+                ; fall through
+
+; Entry A of the table at HL.  Every one of these tables is four or eight
+; bytes long and the index is small, so the carry is the whole of the care.
+; Corrupts: AF, HL
+table_byte:
                 add     a, l
                 ld      l, a
                 jr      nc, .no_carry
@@ -165,33 +165,43 @@ pen_at:
                 cp      PICTURE_ROWS
                 jr      nc, .outside
                 push    de
-                call    pixel_address
-                push    hl
-                call    pixel_mask
-                ld      c, a
-                pop     hl
-                ld      a, (hl)
-                and     c                       ; just this pixel's two bits
+                call    pixel_address           ; HL the byte, A the pixel
                 ld      b, a
-                ld      d, 0                    ; work out which pen that is
-                ld      hl, pen_bytes
-.each_pen:
                 ld      a, (hl)
-                and     c
-                cp      b
-                jr      z, .found
-                inc     hl
-                inc     d
-                ld      a, d
-                cp      4
-                jr      nz, .each_pen
-                ld      d, 0
-.found:
-                ld      a, d
+                call    pen_of
                 pop     de
                 ret
 .outside:
                 ld      a, 255
+                ret
+
+; The pen of pixel B of the byte in A.
+;
+; A pixel's two bits are seven less its number and three less its number, and
+; pen_bytes says which is which: pen one is $F0, so the high one is the pen's
+; low bit and the low one its high bit.  Rotating the byte left by the pixel's
+; number brings them to seven and three whatever pixel it was, and then they
+; are two ands and a shift.  What was here before walked the four pens
+; comparing masked bytes, which is four times the work for every point a fill
+; looks at; see doc/pendiente.md.
+; Corrupts: AF, BC
+pen_of:
+                inc     b
+.align:
+                dec     b
+                jr      z, .aligned
+                rlca
+                jr      .align
+.aligned:
+                ld      c, a
+                and     %00001000               ; bit three, the pen's high bit
+                rrca
+                rrca                            ; down to bit one
+                ld      b, a
+                ld      a, c
+                rlca                            ; bit seven round to bit nought
+                and     %00000001
+                or      b
                 ret
 
 ; Turn a command's y into a screen row, in A.  Out A.

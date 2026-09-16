@@ -65,7 +65,9 @@ effects = "efectos.asm"
 
 [targets.plus3]
 
-[targets.cpc]
+[targets.cpc6128]
+
+[targets.cpc464]
 
 [targets.spectrum48]
 """
@@ -180,23 +182,28 @@ def test_one_command_puts_the_music_in(tmp_path):
         tape = f.read()
     assert len(tape) > 20 * 1024, "the 128 tape is too small to hold anything"
 
-    # The Amstrad's music is a file of its own, on the disk and on the tape,
-    # because there it cannot be loaded where it is going to live.  A
-    # directory entry is the name padded to eight and three.
-    with open(os.path.join(out, "cpc", "megacorp.dsk"), "rb") as f:
+    # The 6128's music is a file of its own on the disk, because there it
+    # cannot be loaded where it is going to live.  A directory entry is the
+    # name padded to eight and three.
+    with open(os.path.join(out, "cpc6128", "megacorp.dsk"), "rb") as f:
         disk = f.read()
-    assert b"MEGACORPMUS" in disk, "the Amstrad's disk has no music file on it"
-    with open(os.path.join(out, "cpc", "megacorp.cdt"), "rb") as f:
-        assert b"megacorp" in f.read().lower(), "the Amstrad's tape is empty"
+    assert b"MEGACORPMUS" in disk, "the 6128 disk has no music file on it"
+    # And the 464 carries none at all, on purpose: it is the target that says
+    # so and not the machine, which has the same sound chip as the other one.
+    with open(os.path.join(out, "cpc464", "megacorp.cdt"), "rb") as f:
+        tape = f.read()
+    assert b"megacorp" in tape.lower(), "the 464 tape is empty"
+    assert len(tape) < len(disk), "the 464 tape carries as much as the disk"
 
     # The +3 carries its music inside the one file its loader reads, so what
     # says it is there is that the file grew by the two pieces.
     with open(os.path.join(out, "plus3", "megacorp.dsk"), "rb") as f:
         assert len(f.read()) > 64 * 1024, "the +3 disk is too small"
 
-    # And the machine with no sound chip built anyway, and said why.
+    # And the two that carry none built anyway, and said so: the 48K because
+    # it has no sound chip, the 464 because that target does not take music.
     assert os.path.exists(os.path.join(out, "spectrum48", "megacorp.tap"))
-    assert "no sound chip" in done.stdout, done.stdout
+    assert done.stdout.count("carries no music") == 2, done.stdout
 
 
 if __name__ == "__main__":

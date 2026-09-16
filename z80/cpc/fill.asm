@@ -37,30 +37,6 @@ blocked:
                 pop     de
                 ret
 
-; Put pen A down at (D across, E down in screen rows).
-; Corrupts: everything but DE
-put_pen:
-                push    de
-                push    af
-                call    pixel_address
-                push    hl
-                call    pixel_mask
-                ld      c, a
-                pop     hl
-                pop     af
-                push    hl
-                call    pen_byte
-                and     c
-                ld      b, a
-                ld      a, c
-                cpl
-                pop     hl
-                and     (hl)
-                or      b
-                ld      (hl), a
-                pop     de
-                ret
-
 ; Fill from (D across, E up).
 ; Corrupts: everything
 flood_fill:
@@ -75,6 +51,8 @@ flood_fill:
                 pop     de
                 cp      255
                 ret     z                       ; the seed is off the picture
+                call    pen_byte                ; and what four of it look like
+                ld      (seed_byte), a
                 ld      a, e
                 ld      (fill_seed_y), a
                 ld      (fill_y), a
@@ -115,66 +93,224 @@ fill_run:
                 ld      a, (fill_y)
                 call    to_row
                 ld      (fill_row), a
+                ; Where the seed is: the byte it is in and its two bits of it.
+                ; The two walks below keep the byte in HL and the two bits in
+                ; C, and step them with a rotate -- moving one pixel to the
+                ; right is rrc, and the carry it puts out is exactly "and over
+                ; into the next byte".  Which is why neither the address nor
+                ; the pen of a point is ever worked out again: a fill looks at
+                ; every point of every run it lays, and that was costing a
+                ; picture of MegaCorp twenty seconds.  See doc/pendiente.md.
+                ld      a, (fill_row)
+                ld      e, a
+                ld      a, (fill_x)
+                ld      d, a
+                call    pixel_address           ; HL the byte, A the pixel
+                ld      (seed_at), hl
+                call    pixel_mask
+                ld      (seed_mask), a
                 ; how far it reaches to the left
                 ld      a, (fill_x)
                 ld      (fill_left), a
+                call    from_the_seed
 .leftwards:
                 ld      a, (fill_left)
                 or      a
                 jr      z, .left_done
-                dec     a
-                ld      d, a
-                ld      a, (fill_row)
-                ld      e, a
-                call    pen_at
-                ld      hl, fill_seed
-                cp      (hl)
+                ; a whole byte at a stride while all four of its pixels are
+                ; the seed's pen, which is what most of a run is made of
+                ld      a, c
+                cp      %10001000               ; standing on the first of one
+                jr      nz, .one_to_the_left
+                ld      a, (fill_left)
+                sub     4
+                jr      c, .one_to_the_left     ; too near the edge to jump
+                dec     hl
+                ld      a, (hl)
+                cp      b
+                jr      nz, .not_a_whole_byte
+                ld      a, (fill_left)
+                sub     4
+                ld      (fill_left), a
+                jr      .leftwards
+.not_a_whole_byte:
+                inc     hl
+.one_to_the_left:
+                rlc     c                       ; the pixel to the left of it
+                jr      nc, .same_byte_left
+                dec     hl
+.same_byte_left:
+                ld      a, (hl)
+                xor     b                       ; where it differs from the pen
+                and     c                       ; the fill started on
                 jr      nz, .left_done
-                ld      hl, fill_left
-                dec     (hl)
+                ld      a, (fill_left)
+                dec     a
+                ld      (fill_left), a
                 jr      .leftwards
 .left_done:
                 ld      a, (fill_x)
                 ld      (fill_right), a
+                call    from_the_seed
 .rightwards:
                 ld      a, (fill_right)
                 inc     a
                 jr      z, .right_done          ; the edge of the picture
-                ld      d, a
-                ld      a, (fill_row)
-                ld      e, a
-                call    pen_at
-                ld      hl, fill_seed
-                cp      (hl)
+                ld      a, c
+                cp      %00010001               ; standing on the last of one
+                jr      nz, .one_to_the_right
+                ld      a, (fill_right)
+                add     a, 4
+                jr      c, .one_to_the_right
+                inc     hl
+                ld      a, (hl)
+                cp      b
+                jr      nz, .nor_a_whole_byte
+                ld      a, (fill_right)
+                add     a, 4
+                ld      (fill_right), a
+                jr      .rightwards
+.nor_a_whole_byte:
+                dec     hl
+.one_to_the_right:
+                rrc     c                       ; the pixel to the right of it
+                jr      nc, .same_byte_right
+                inc     hl
+.same_byte_right:
+                ld      a, (hl)
+                xor     b
+                and     c
                 jr      nz, .right_done
-                ld      hl, fill_right
-                inc     (hl)
+                ld      a, (fill_right)
+                inc     a
+                ld      (fill_right), a
                 jr      .rightwards
 .right_done:
-                ; and then lay it
+                ; And then lay it, by bytes and not by points.  Four pixels
+                ; to a byte in this mode, and a byte begins at a multiple of
+                ; four, so which of the two pens each of its pixels gets turns
+                ; on y alone: every whole byte of a run is the same byte, and
+                ; only the two at the ends have to be picked apart.  Laying a
+                ; point at a time is what made a picture of MegaCorp take
+                ; twenty seconds; see doc/pendiente.md.
+                call    run_byte
+                ld      (fill_byte), a
                 ld      a, (fill_left)
-                ld      (fill_at), a
-.each_point:
-                ld      a, (fill_at)
+                call    byte_of                 ; where it begins
+                ld      (fill_from), hl
+                ld      (fill_first), a
+                ld      a, (fill_right)
+                call    byte_of                 ; and where it ends
+                ld      (fill_to), hl
+                ld      (fill_last), a
+                ld      a, (fill_first)
+                call    from_pixel
+                ld      c, a                    ; from where it begins on
+                ld      hl, (fill_from)
+                ld      de, (fill_to)
+                or      a
+                sbc     hl, de
+                jr      nz, .several
+                ; all of it inside one byte, so cut the mask short at the end
+                ld      a, (fill_last)
+                call    upto_pixel
+                and     c
+                ld      hl, (fill_from)
+                jp      merge_byte
+.several:
+                ld      a, c
+                ld      hl, (fill_from)
+                call    merge_byte
+                ld      a, (fill_last)
+                call    upto_pixel
+                ld      hl, (fill_to)
+                call    merge_byte
+                ; and the whole bytes between the two ends, which is how
+                ; many bytes apart they are less the one that is the end
+                ld      hl, (fill_to)
+                ld      de, (fill_from)
+                or      a
+                sbc     hl, de
+                ld      b, l
+                dec     b
+                ret     z                       ; they are next to each other
+                ld      hl, (fill_from)
+                inc     hl
+                ld      a, (fill_byte)
+.whole:
+                ld      (hl), a
+                inc     hl
+                djnz    .whole
+                ret
+
+; Put the walk back where the seed is: the byte in HL, its two bits in C, and
+; in B what four pixels of the pen the fill started on look like.
+; Corrupts: AF, BC, HL
+from_the_seed:
+                ld      hl, (seed_at)
+                ld      a, (seed_mask)
+                ld      c, a
+                ld      a, (seed_byte)
+                ld      b, a
+                ret
+
+; The byte point A of the row being laid is in, and which pixel of it.
+; Corrupts: AF, BC, DE, HL
+byte_of:
                 ld      d, a
-                ld      hl, fill_y
-                add     a, (hl)                 ; which of the two pens
-                and     1
-                ld      hl, gfx_pen1
-                jr      z, .have_pen
-                ld      hl, gfx_pen2
-.have_pen:
                 ld      a, (fill_row)
                 ld      e, a
+                jp      pixel_address
+
+; The byte four whole pixels of the run come to: the two pens woven, with the
+; one that goes on an even x in the even pixels.  A byte begins at a multiple
+; of four, so that is the same for every whole byte of the run.
+; Corrupts: everything
+run_byte:
+                ld      hl, gfx_pen1
+                ld      de, gfx_pen2
+                ld      a, (fill_y)
+                and     1
+                jr      z, .this_way_round
+                ex      de, hl
+.this_way_round:
                 ld      a, (hl)
-                call    put_pen
-                ld      a, (fill_at)
-                ld      hl, fill_right
-                cp      (hl)
-                ret     z
-                ld      hl, fill_at
-                inc     (hl)
-                jr      .each_point
+                call    pen_byte
+                and     %10101010               ; pixels nought and two
+                ld      c, a
+                ld      a, (de)
+                call    pen_byte
+                and     %01010101               ; and pixels one and three
+                or      c
+                ret
+
+; Put the bits A names of (fill_byte) into the byte at HL, leaving the rest of
+; it as it was.
+; Corrupts: AF, BC
+merge_byte:
+                ld      c, a
+                cpl
+                and     (hl)
+                ld      b, a
+                ld      a, (fill_byte)
+                and     c
+                or      b
+                ld      (hl), a
+                ret
+
+; The bits of pixel A of a byte and of every pixel after it, and the bits of
+; it and of every pixel before it.  The two halves of one table, because the
+; second follows the first and four more is all the difference.
+; Corrupts: AF, HL
+upto_pixel:
+                add     a, 4
+from_pixel:
+                and     7
+                ld      hl, pixel_run_bits
+                jp      table_byte
+
+pixel_run_bits: db      %11111111, %01110111, %00110011, %00010001
+                db      %10001000, %11001100, %11101110, %11111111
 
 ; -- what the picture interpreter calls -------------------------------------
 
@@ -238,5 +374,12 @@ fill_y:         db      0
 fill_row:       db      0
 fill_left:      db      0
 fill_right:     db      0
-fill_at:        db      0
+seed_byte:      db      0                       ; four pixels of the seed's pen
+seed_at:        dw      0                       ; the byte the seed is in
+seed_mask:      db      0                       ; and its two bits of it
+fill_byte:      db      0                       ; what a whole four pixels come to
+fill_from:      dw      0                       ; the byte the run begins in
+fill_to:        dw      0                       ; and the one it ends in
+fill_first:     db      0                       ; the pixel of each that is in it
+fill_last:      db      0
 fill_seed:      db      0

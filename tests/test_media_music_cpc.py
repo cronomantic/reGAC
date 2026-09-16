@@ -51,17 +51,20 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import emulator  # noqa: E402
 from regac.binary import Database  # noqa: E402
 from regac.conds import compile_block  # noqa: E402
-from regac.media import cpc_disk  # noqa: E402
+from regac.__main__ import write_database  # noqa: E402
+from regac.binary import Reader  # noqa: E402
+from regac.media import banks_of, cpc6128_disk  # noqa: E402
 from test_game_cpc import glyph_table, wait_screen  # noqa: E402
 from test_media_cpc import asking  # noqa: E402
 from test_music_z80 import TUNE, word  # noqa: E402
 
 CPC = os.path.join(ROOT, "z80", "cpc")
-SOURCE = os.path.join(CPC, "game.asm")
-DATABASE = os.path.join(CPC, "game.rgac")
-BINARY = os.path.join(CPC, "game.bin")
-MUSIC_BINARY = os.path.join(CPC, "game_music.bin")
-LISTING = os.path.join(CPC, "game.lst")
+SOURCE = os.path.join(CPC, "game6128.asm")
+DATABASE = os.path.join(CPC, "game6128.rgac")
+BINARY = os.path.join(CPC, "game6128.bin")
+MUSIC_BINARY = os.path.join(CPC, "game6128_music.bin")
+LISTING = os.path.join(CPC, "game6128.lst")
+DEFS = os.path.join(CPC, "banks6128.inc")
 ADVENTURE = os.path.join(ROOT, "snapshots", "megacorp2.json")
 EFFECTS = os.path.join(ROOT, "music", "effects.asm")
 
@@ -89,9 +92,11 @@ def test_the_disk_carries_the_music_under_4000(tmp_path):
     ddb["hpcs"] = compile_block(
         [f"IF ( RES? {A_FLAG} ) SET {A_FLAG} MUSIC 0 END"]
     ) + ddb["hpcs"]
-    database = Database(ddb, machine="cpc")
-    with open(DATABASE, "wb") as f:
-        f.write(database.build())
+    # The 6128's database, in banks, with the include its game6128.asm wants.
+    database = write_database(ddb, DATABASE, machine="cpc", banks="16k",
+                              defs=DEFS)
+    with open(DATABASE, "rb") as f:
+        image = f.read()
     listing = emulator.assemble(SOURCE, listing=LISTING,
                                 defines=("WITH_MUSIC", "WITH_EFFECTS"))
     where = {name: emulator.label_address(listing, name)
@@ -103,8 +108,9 @@ def test_the_disk_carries_the_music_under_4000(tmp_path):
     with open(MUSIC_BINARY, "rb") as f:
         music = f.read()
     path = str(tmp_path / "juego.dsk")
+    resident = image[:Reader(image).resident_size]
     with open(path, "wb") as f:
-        f.write(cpc_disk(code, music=music))
+        f.write(cpc6128_disk(code, resident, banks_of(image), music=music))
 
     glyphs = glyph_table(database)
     session = emulator.Session(
