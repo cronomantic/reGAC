@@ -144,8 +144,7 @@ plot_point:
                 push    hl
                 call    pixel_mask
                 ld      c, a                    ; the pixel's own bits
-                ld      a, (gfx_ink)
-                call    pen_byte
+                ld      a, (ink_byte)           ; settled when the ink was set
                 and     c
                 ld      b, a                    ; the pen, in place
                 ld      a, c
@@ -417,8 +416,7 @@ plot_row:
                 push    hl
                 call    pixel_mask
                 ld      c, a
-                ld      a, (gfx_ink)
-                call    pen_byte
+                ld      a, (ink_byte)           ; settled when the ink was set
                 and     c
                 ld      b, a
                 ld      a, c
@@ -454,18 +452,38 @@ gfx_start_colours:
                 ld      (gfx_paper), a
                 ld      (gfx_bright), a
                 ld      (gfx_flash), a
+                ld      a, 1                    ; and the pen that ink comes to
+                jp      settle_ink
+
+; The colours in force have changed, and on this machine that is where the ink
+; is turned into one of the four pens.  An ink of eight or more is the format's
+; way of saying leave the colour alone -- it came from a machine whose BASIC
+; spelt transparent that way -- so only a real one settles anything, and the
+; carry the compare leaves does the asking without a jump.
+                MACRO   GFX_COLOURS
+                ld      a, (gfx_ink)
+                cp      8
+                call    c, settle_ink
+                ENDM
+
+; The pen of the ink in A, kept for the plotting to use.  Here and not at each
+; point because a picture sets a colour a few thousand times and plots a few
+; hundred thousand: what the two sites did before was a load, a call and a walk
+; through a table for every point, and now it is a load.
+; Corrupts: AF
+settle_ink:
+                push    hl
+                call    pen_byte
+                ld      (ink_byte), a
+                pop     hl
                 ret
+
+ink_byte:       db      $F0                     ; pen one, where a picture starts
 
 ; The border, which here is one more pen.  Too long to put inline, so the
 ; macro the picture interpreter expands is the call, and the routine keeps
 ; every register but AF, which is what that promises.
 ; Corrupts: AF
-; The colours in force have changed.  Nothing to do here: this machine
-; settles them once per shape, which is where the picture interpreter's own
-; hook leaves it free to.
-                MACRO   GFX_COLOURS
-                ENDM
-
                 MACRO   GFX_BORDER
                 call    set_border
                 ENDM

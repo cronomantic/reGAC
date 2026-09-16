@@ -599,11 +599,55 @@ Queda cola, y está medida: vajillas1 #7 va a 12,2 s y quijote2 #14 a 36,5 (era
 del orden de cuatro minutos). Lo que queda se va en los extremos de los trazos
 y en `blocked`, que sigue preguntando punto a punto una vez por fila.
 
-Y por qué no lo había visto nadie: **el Amstrad es la única máquina sin la
+Y por qué no lo había visto nadie: **el Amstrad era la única máquina sin la
 prueba de todas las láminas de todas las aventuras**, que el Spectrum tiene
-desde hace tiempo y el MSX desde ayer. Sigue sin tenerla, y sigue siendo lo
-primero que hay que escribirle. La lista de las más caras, por número de
-rellenos, para cuando se escriba:
+desde hace tiempo y el MSX desde hace poco.
+
+### La prueba de las 196 láminas, que ya está y ya ha servido
+
+`tests/test_all_pictures_cpc.py`, con `REGAC_SLOW=1`. Dibuja las 196 láminas de
+las ocho aventuras en el emulador, cuenta los ciclos de reloj de cada una y
+compara punto a punto contra el renderizador de referencia. Lo que exige de
+tiempo no son los 4-5 s del presupuesto —sólo tres aventuras los cumplen— sino
+**lo que la máquina tarda hoy, aventura por aventura**: un trinquete, para que
+el día que algo se vuelva más lento la prueba lo diga. La vuelta entera son 27
+minutos.
+
+Lo que mide, después del arreglo que cuenta más abajo:
+
+| aventura | la más lenta |
+|---|---|
+| Bangkok1 | 3,1 s |
+| Bangkok2 | 6,5 s |
+| megacorp1 | 3,0 s |
+| megacorp2 | 3,8 s |
+| quijote1 | 34,5 s |
+| quijote2 | 51,6 s |
+| vajillas1 | 12,3 s |
+| vajillas2 | 11,2 s |
+
+Y lo que encontró: **tres láminas de las 196 salían mal**, y no de ahora —se
+comprobó volviéndolas a dibujar con el relleno viejo y salían igual de mal—.
+Las tres eran de color y no de forma, y las tres pedían una tinta de ocho o
+más, que en este formato quiere decir *deja el color como está*, porque viene de
+una máquina cuyo BASIC lo escribía así. El Spectrum lo mira en cinco sitios, el
+MSX en dos y el PCW en dos; **el Amstrad no lo miraba en ninguno**: se quedaba
+con los dos bits de abajo, así que una `INK 9` le cambiaba la pluma cuando no
+debía. En megacorp1 #10 el bosque entero se dibujaba de un color que no se
+distingue del fondo y la lámina salía casi vacía —y de paso era la más cara de
+su aventura, 7,2 s, porque el relleno que la seguía se iba por todo el hueco
+que el bosque tenía que haber cerrado; arreglada, la aventura entera baja a
+3,0 s—.
+
+Arreglado en `z80/cpc/draw.asm`: la tinta se convierte en pluma **una vez por
+orden de color**, en el gancho `GFX_COLOURS` que el intérprete de láminas deja
+para eso y que en esta máquina estaba vacío, y sólo si es una tinta de verdad.
+Sale además más barato que antes, porque los dos sitios que ponen un punto
+hacían tres cargas, una llamada y un paseo por una tabla por cada punto, y
+ahora hacen una carga.
+
+La lista de las láminas más caras, por número de rellenos, que sigue siendo por
+donde hay que seguir apretando:
 
 | aventura | las tres peores |
 |---|---|
@@ -1372,3 +1416,20 @@ empiezan igual gana la más corta.
 El segundo nombre tampoco se leía en Python: `__parse_input` tenía una
 condición que no podía ser cierta nunca. Arreglado, y con la misma regla que el
 Z80, que pide que haya un primer nombre antes de aceptar el segundo.
+
+### Las tres pruebas que fallan de vez en cuando
+
+No son fallos del intérprete, son carreras de la prueba contra el emulador, y
+cuestan un rato cada vez que se corre la suite entera porque hay que volver a
+pasarlas sueltas para ver que pasan:
+
+- `test_music_source_z80::test_an_adventure_says_what_tunes_it_has_and_they_play`
+  y `test_sound_z80::test_an_effect_plays_over_the_tune_and_lets_go`. Las dos
+  miran el puntero del reproductor de Arkos (`PLY_AKM_Track1_PtTrack`) justo
+  después de que se encienda una bandera, y a veces lo leen antes de la primera
+  interrupción, cuando todavía vale cero. Una de cada tres o cuatro veces.
+- `test_graphics_next::test_every_picture`, que dice «never finished» de una
+  lámina distinta cada vez.
+
+Lo que hay que hacer es esperar a lo que se mira y no a lo que lo anuncia: leer
+el puntero hasta que se mueva, con un plazo, en vez de una sola vez.
