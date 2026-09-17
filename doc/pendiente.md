@@ -1301,7 +1301,7 @@ no por pereza:
 | Spectrum | **sí** | |
 | MSX | **sí** | |
 | Amstrad | **sí** | tardó por falta de sitio: el intérprete acababa a 38 bytes de un escalón de página. El escalón se quitó y el texto palabra a palabra devolvió el búfer; la ventana costó 65 bytes |
-| Next | no | el intérprete acaba en `$9FC6` y **lo que pase de `$A000` no llega a la máquina** |
+| Next | no | el intérprete tiene que acabar antes de la máscara del relleno, en `$A000`, y le quedan unos doscientos bytes; hay unos tres kilobytes libres encima de la rutina de interrupción que el build todavía no usa. Lo de que «lo que pasa de `$A000` no llega a la máquina» no era verdad: ver «La pared del Next» |
 | PCW | no | sus dos mitades viven en bancos distintos: la dirección de un renglón tendría que llevar un banco consigo |
 
 **En el Amstrad salió más fácil que en el Spectrum.** Allí la ventana dejó
@@ -1327,11 +1327,8 @@ original. La prueba es [`test_textmode_z80.py`](../tests/test_textmode_z80.py).
 
 **Lo que queda de aquí**, apuntado y medido y no hecho:
 
-- **La pared de los `$A000` del Next.** El `.nex` lleva los bytes buenos en el
-  banco 2 —leídos del fichero, el `$A017` es el que debe ser— y la memoria de
-  la máquina ahí se lee como ceros. Quedaban 58 bytes antes de esa pared, y
-  con el texto impreso palabra a palabra quedan 267; hay aire, pero la pared
-  sigue ahí y sigue sin entenderse, y es lo próximo que hay que mirar del Next.
+- ~~**La pared de los `$A000` del Next.**~~ **Entendida**, y era nuestra: ver
+  «La pared del Next».
 - ~~**Un mensaje se desempaquetaba en `text_buffer`, que son 256 bytes, y nadie
   comprobaba que cupiera.**~~ **Hecho**, y no como se pensaba aquí: ver «El
   texto, palabra a palabra».
@@ -1350,6 +1347,44 @@ original. La prueba es [`test_textmode_z80.py`](../tests/test_textmode_z80.py).
 - **El Amstrad va justo, y hay un escalón.** Está medido, aventura por
   aventura, antes y después de meter los marcadores, con un árbol aparte en el
   commit anterior para poder comparar.
+
+### La pared del Next, que era la máscara
+
+Durante mucho tiempo pareció un misterio de la máquina o del emulador: el
+`.nex` llevaba los bytes que pasaban de `$A000` —leídos del fichero, estaban
+bien— y en la máquina esa memoria se leía a ceros. No era ninguna de las dos
+cosas. **En `$A000` vive la máscara del relleno**, cuatro kilobytes, y
+`gfx_clear` la borra entera cada vez que se borra una lámina. El código que
+creciera hasta ahí llegaba bien y el primer cuarto lo machacaba.
+
+Comprobado: un build de prueba con una marca en `$A020` y otra en `$B300`,
+cargado con el procesador parado. Las dos marcas están en memoria; después de
+dibujar la primera sala, la de `$A020` son ceros y la de `$B300` sigue.
+
+Nada lo avisaba porque el build del Next sólo comprobaba no llegar a la pila;
+el banco de pruebas de láminas sí comprobaba la máscara, y el juego no. Ahora
+`game.asm` tiene el mismo `ASSERT last <= MASK`, así que un intérprete que
+crezca de más no se construye en vez de romperse en la primera sala.
+
+**El mapa de verdad** de `$8000` a `$BFFF`, que es lo que nunca se pagina:
+
+| desde | qué |
+|---|---|
+| `$8000` | el intérprete; le quedan unos doscientos bytes hasta la máscara |
+| `$A000` | la máscara del relleno, que se borra con cada lámina |
+| `$B000` | la tabla de las interrupciones en modo 2, y en `$B1B1` su rutina: sólo con música, y puestas al empezar |
+| `$B200` | **libre**, unos tres kilobytes hasta la pila |
+| `$BF00` | la cima de la pila, que baja |
+
+La pila se midió para saber cuánto de eso es de verdad libre: rellenado con un
+byte testigo, dibujando todas las láminas de MegaCorp I, MegaCorp II, el
+Quijote II y las Vajillas I, baja 34 bytes como mucho, y jugando otros tantos.
+Aunque se le dejara un kilobyte entero, quedan más de dos libres.
+
+Así que el Next no está lleno: está lleno **debajo de la máscara**. La ventana
+de `TEXT`, que es lo que chocó con la pared, puede ir a ese hueco de arriba; es
+lo que queda por hacer, y es ahora trabajo de colocar código y no de entender
+la máquina.
 
 ## Los caracteres latinos, que ya se ven
 

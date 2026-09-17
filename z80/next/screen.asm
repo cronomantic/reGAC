@@ -227,12 +227,13 @@ scroll_window:
 ;
 ; The half it does is the one that matters most: with TEXT no picture is
 ; drawn, which the interpreter sees to by itself.  The other half -- giving
-; the text the whole screen -- is not here, and the reason is measured and
-; ugly: the interpreter ends at $9F8B and anything past $A000 never reaches
-; the machine.  The file carries it, and the byte at $A017 in bank two of
-; game.nex is the right one, but the memory there reads back as noughts.
-; Until that is understood there are some seventy bytes to spare on this
-; machine, and this costs four hundred.  See doc/pendiente.md.
+; the text the whole screen -- is not here, for want of room where the code
+; is: the interpreter has to end before the fill's mask at $A000, which is
+; wiped with every picture, and there are a couple of hundred bytes left under
+; it.  That was once taken for bytes past $A000 never reaching the machine;
+; they reach it, and the first picture wipes them.  There are some three
+; kilobytes free above the interrupt routine, from about $B200, which the
+; build does not use yet.  See doc/pendiente.md.
 ; Corrupts: nothing
 text_window_all:
                 ret

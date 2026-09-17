@@ -12,8 +12,14 @@
 ;   $5C00  left free, because that is where the ROM keeps its variables and
 ;          the ROM is borrowed to save a game
 ;   $5D00  what is resident of the database
-;   $8000  this, its buffers and its stack
-;   $A000  the mask a fill walks, four kilobytes on its own boundary
+;   $8000  this, and its buffers
+;   $A000  the mask a fill walks, four kilobytes on its own boundary, and
+;          wiped whole every time a picture is: nothing else may live there
+;   $B000  the table mode two interrupts go through, and $B1B1 the routine it
+;          points at, both put there when the music starts
+;   $B200  free, some three kilobytes of it up to the stack -- which comes down
+;          from $BF00 and was measured going thirty four bytes deep, drawing
+;          every picture of four adventures and playing
 ;   $C000  whichever sixteen kilobytes of layer 2 are wanted: the top half of
 ;          the picture, the bottom half, or the text
 ;
@@ -244,6 +250,14 @@ done_flag:      db      0
                 include "../common/picture.asm"
 
 last:
+                ; Not past the mask.  This was the Next's "wall at $A000", which
+                ; for a long time looked like bytes the file carried and the
+                ; machine never received: they were received, and the first
+                ; picture wiped them, because gfx_clear clears the mask and the
+                ; mask is there.  Loaded with the processor held, a marker at
+                ; $A020 is in memory; after the first room it is noughts, and
+                ; one at $B300 is still there.
+                ASSERT  last <= MASK            ; or the first picture wipes it
                 ASSERT  last < STACK_AT         ; or the stack would land in it
 
 ; A loading screen, if the build says there is one.  It is put where layer 2
