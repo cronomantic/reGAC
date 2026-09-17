@@ -63,6 +63,18 @@ read_a_line:
 .stop:
                 jr      .stop
 
+; Or here, to wait the way HOLD does, for HOLD_FRAMES fiftieths of a second
+; with nothing pressed: a test counts the processor's cycles until it is over.
+HOLD_FRAMES     equ 100
+hold_a_while:
+                ld      sp, STACK_AT
+                ld      hl, HOLD_FRAMES
+                call    wait_or_key
+                ld      a, $FF
+                ld      (line_done), a
+.stop:
+                jr      .stop
+
 line_done:      db      0
 line_seen:      dw      0
 ready_flag:     db      0

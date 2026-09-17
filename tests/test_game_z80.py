@@ -42,6 +42,7 @@ sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import emulator  # noqa: E402
+import keystrokes  # noqa: E402
 from regac.binary import S_FONT, Database, Reader  # noqa: E402
 
 SPECTRUM = os.path.join(ROOT, "z80", "spectrum")
@@ -144,6 +145,35 @@ def test_it_describes_asks_and_answers():
     assert answered != opening, "typing changed nothing on screen"
     assert any(puzzled[:10] in line for line in answered), (
         f"expected {puzzled!r} somewhere in {answered}"
+    )
+
+
+@needs_tools
+def test_it_keeps_up_with_quick_typing_and_repeats_a_held_key():
+    """Typing as people type: each key down before the last one is up, and a
+    key held until it repeats.  See keystrokes.py for what the original does."""
+    ddb, listing = build()
+    glyphs = glyph_table(Database(ddb))
+    prompt = ddb["messages"]["240"].strip()[:3]
+    events = emulator.Session.EVENT_KEYS
+
+    session = emulator.Session()
+    try:
+        session.load(SNAPSHOT)
+        wait_screen(session, glyphs, prompt)
+        keystrokes.play(session, keystrokes.ROLLED, events)
+        rolled = wait_screen(session, glyphs, keystrokes.ROLLED_GIVES, timeout=20.0)
+        time.sleep(3.0)
+        keystrokes.play(session, keystrokes.HELD[:3], events)
+        held = screen(session, glyphs)
+    finally:
+        session.close()
+
+    assert any(keystrokes.ROLLED_GIVES in line for line in rolled), (
+        f"keys typed over each other were lost: {rolled}"
+    )
+    assert any(keystrokes.HELD_KEY * 3 in line for line in held), (
+        f"a key held down did not repeat: {held}"
     )
 
 

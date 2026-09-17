@@ -45,6 +45,7 @@ sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import emulator  # noqa: E402
+import keystrokes  # noqa: E402
 
 PCW = os.path.join(ROOT, "z80", "pcw")
 SOURCE = os.path.join(PCW, "test_keyboard.asm")
@@ -57,6 +58,10 @@ KEYS_AT = 0xFFF0
 # What the host's keys are called here.  Enter and the rub out are the two the
 # emulator does not give a character of its own; everything else is its ASCII.
 EVENTS = {chr(13): 129, chr(10): 129, chr(8): 132}
+
+MACHINE = "pcw"
+NEWLINE = chr(10)
+FRAME_CYCLES = 80000          # a fiftieth of a second of this processor
 
 if pytest is not None:
     needs_tools = pytest.mark.skipif(
@@ -103,7 +108,7 @@ def type_them(session, text, hold_for=0.06):
     for char in text:
         code = EVENTS.get(char, ord(char.lower()))
         if code == last:
-            time.sleep(hold_for * 2)
+            time.sleep(emulator.Session.SAME_KEY_GAP)
         session.command(f"send-keys-event {code} 1")
         time.sleep(hold_for)
         session.command(f"send-keys-event {code} 0")
@@ -180,30 +185,151 @@ def test_a_whole_line_is_read_and_shown():
 
     from regac.binary import Database
 
-    session, where = watching()
-    listing = os.path.join(PCW, "keys.lst")
-    at = {
-        name: emulator.label_address(listing, name)
-        for name in ("read_a_line", "line_done", "line_seen", "input_buffer")
-    }
-    try:
-        session.command(f"write-memory {at['line_done']} 0")
-        session.jump(at['read_a_line'])
-        time.sleep(0.2)
-        type_them(session, "MIRARX" + chr(8) + chr(13))
-        assert session.wait_for(at["line_done"], 0xFF, timeout=10.0, every=0.2), (
-            "the line was never finished"
-        )
-        length = session.read(at["line_seen"], 2)
-        typed = session.read(at["input_buffer"], length[0])
-    finally:
-        session.close()
+    # Three goes at it: a key held while the machine stalls repeats, as it
+    # does on the original, so a host busy enough can turn one letter into
+    # two.  What is being tested is the reading of a line, not the emulator's
+    # sense of time, so a line that did not arrive as it was sent is typed
+    # again.
+    for attempt in range(3):
+        session, where = watching()
+        at = {
+            name: emulator.label_address(LISTING, name)
+            for name in ("read_a_line", "line_done", "line_seen", "input_buffer")
+        }
+        try:
+            session.command(f"write-memory {at['line_done']} 0")
+            session.jump(at['read_a_line'])
+            time.sleep(0.2)
+            type_them(session, "MIRARX" + chr(8) + chr(13))
+            assert session.wait_for(at["line_done"], 0xFF, timeout=10.0, every=0.2), (
+                "the line was never finished"
+            )
+            length = session.read(at["line_seen"], 2)
+            typed = session.read(at["input_buffer"], length[0])
+        finally:
+            session.close()
+        if length[0] == 5:
+            break
 
     with open(os.path.join(ROOT, "snapshots", "megacorp2.json"), encoding="utf-8") as f:
         chars = Database(json.load(f), machine="pcw").store.charset.chars
     code = {char: number for number, char in chars.items()}
     assert length[0] == 5, f"five characters were left, not {length[0]}"
     assert typed == bytes(code[c] for c in "MIRAR")
+
+
+def line_typed(steps, machine, events):
+    """Start the build, point it at read_line, play the steps at it and give
+    back the line it read, as characters."""
+    import json
+
+    from regac.binary import Database
+
+    session, where = watching()
+    at = {
+        name: emulator.label_address(LISTING, name)
+        for name in ("read_a_line", "line_done", "line_seen", "input_buffer")
+    }
+    try:
+        session.command(f"write-memory-raw {at['line_done']} 00")
+        session.jump(at["read_a_line"])
+        time.sleep(0.3)
+        keystrokes.play(session, steps, events)
+        assert session.wait_for(at["line_done"], 0xFF, timeout=10.0, every=0.2), (
+            "the line was never finished"
+        )
+        length = session.read(at["line_seen"], 2)[0]
+        typed = session.read(at["input_buffer"], length)
+    finally:
+        session.close()
+
+    with open(os.path.join(ROOT, "snapshots", "megacorp2.json"), encoding="utf-8") as f:
+        chars = Database(json.load(f), machine=machine).store.charset.chars
+    return "".join(chars[code] for code in typed)
+
+
+@needs_tools
+def test_keys_typed_over_each_other_all_arrive():
+    """Each key down before the last one is up, which is typing quickly: the
+    original keeps all of them, and so does this."""
+    assert line_typed(keystrokes.ROLLED, MACHINE, EVENTS) == keystrokes.ROLLED_GIVES
+
+
+@needs_tools
+def test_a_key_pressed_while_another_is_held_types_nothing_twice():
+    """While two keys are down nothing is decided, so the one that stays down
+    is not typed a second time when the other goes up."""
+    assert line_typed(keystrokes.TWO_AT_ONCE, MACHINE, EVENTS) == keystrokes.TWO_AT_ONCE_GIVES
+
+
+@needs_tools
+def test_a_key_held_down_repeats():
+    """As on the original, where the ROM repeats a key that is held."""
+    line = line_typed(keystrokes.HELD, MACHINE, EVENTS)
+    assert len(line) > 1 and set(line) == {keystrokes.HELD_KEY}, line
+
+
+@needs_tools
+def test_a_hold_lasts_as_long_as_it_says():
+    """A wait like HOLD's, a hundred frames with nothing pressed, counted in
+    the processor's own cycles: this emulator does not keep the machine's
+    time, and a frame is only as long as the looks at the keyboard it is
+    counted in.  Those were guessed once and out by up to three and a half
+    times."""
+    session, where = watching()
+    at = {name: emulator.label_address(LISTING, name)
+          for name in ("hold_a_while", "line_done")}
+    try:
+        session.command(f"write-memory-raw {at['line_done']} 00")
+        session.command("reset-tstates-partial")
+        session.jump(at["hold_a_while"])
+        deadline = time.time() + 30.0
+        while session.read(at["line_done"], 1)[0] != 0xFF:
+            assert time.time() < deadline, "the wait never ended"
+            time.sleep(0.02)
+        cycles = int(session.command("get-tstates-partial").split("\n")[0].strip())
+    finally:
+        session.close()
+    frame = cycles / 100
+    assert FRAME_CYCLES * 0.9 < frame < FRAME_CYCLES * 1.1, (
+        f"a frame took {frame:.0f} cycles, not about {FRAME_CYCLES}"
+    )
+
+
+@needs_tools
+def test_a_held_key_repeats_in_frames_as_long_as_frames():
+    """While a key is held next_key counts the frames to its repeat, and a
+    look at the keyboard that finds a key costs more than one that finds
+    nothing, so those frames are counted in looks of their own.  Measured in
+    the processor's cycles, from the counter as it goes down."""
+    session, where = watching()
+    at = {name: emulator.label_address(LISTING, name)
+          for name in ("read_a_line", "key_repeat")}
+    code = EVENTS.get("R", ord("r"))
+    try:
+        session.jump(at["read_a_line"])
+        time.sleep(0.3)
+        session.command(f"send-keys-event {code} 1")
+        time.sleep(0.05)
+        session.command("reset-tstates-partial")
+        first = last = session.read(at["key_repeat"], 1)[0]
+        spent = 0
+        while True:
+            now = session.read(at["key_repeat"], 1)[0]
+            cycles = int(session.command("get-tstates-partial").split(NEWLINE)[0].strip())
+            if now < 4 or now > last:
+                break
+            last, spent = now, cycles
+            time.sleep(0.05)
+        session.command(f"send-keys-event {code} 0")
+    finally:
+        session.close()
+    frames = first - last
+    assert frames >= 10, f"only {frames} frames were counted"
+    frame = spent / frames
+    assert FRAME_CYCLES * 0.85 < frame < FRAME_CYCLES * 1.15, (
+        f"a frame with a key held took {frame:.0f} cycles, not about {FRAME_CYCLES}"
+    )
 
 
 if __name__ == "__main__":

@@ -46,6 +46,7 @@ sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import emulator  # noqa: E402
+import keystrokes  # noqa: E402
 from regac.binary import S_FONT, Database, Reader  # noqa: E402
 from regac.devices import next_device  # noqa: E402
 from regac.gfx import Renderer  # noqa: E402
@@ -178,6 +179,37 @@ def test_it_asks_and_answers_on_a_next():
     )
     assert drawn == Renderer(ddb["gfx"], next_device()).run(int(room)).vram(), (
         f"the picture of room {ddb['init_loc']} is not the one the reference draws"
+    )
+
+
+@needs_tools
+def test_it_keeps_up_with_quick_typing_and_repeats_a_held_key():
+    """Typing as people type: each key down before the last one is up, and a
+    key held until it repeats.  See keystrokes.py for what the original does."""
+    with open(ADVENTURE, encoding="utf-8") as f:
+        ddb = json.load(f)
+    build()
+    glyphs = glyph_table(Database(ddb, machine="next", page_bits=14))
+    prompt = ddb["messages"]["240"].strip()[:3]
+    events = emulator.Session.EVENT_KEYS
+
+    session = emulator.Session(machine="TBBlue")
+    try:
+        session.load(IMAGE)
+        wait_screen(session, glyphs, prompt)
+        keystrokes.play(session, keystrokes.ROLLED, events)
+        rolled = wait_screen(session, glyphs, keystrokes.ROLLED_GIVES, timeout=20.0)
+        time.sleep(3.0)
+        keystrokes.play(session, keystrokes.HELD[:3], events)
+        held = screen(session, glyphs)
+    finally:
+        session.close()
+
+    assert any(keystrokes.ROLLED_GIVES in line for line in rolled), (
+        f"keys typed over each other were lost: {rolled}"
+    )
+    assert any(keystrokes.HELD_KEY * 3 in line for line in held), (
+        f"a key held down did not repeat: {held}"
     )
 
 

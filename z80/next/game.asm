@@ -238,6 +238,12 @@ done_flag:      db      0
                 include "../common/unpack.asm"
                 include "screen.asm"
                 include "../common/textout.asm"
+; The Spectrum's keyboard, read at twenty eight megahertz: a fiftieth of a
+; second is 559104 cycles here and a look at the keyboard with nothing held
+; about 2080 of them, measured, so a frame would be 268 looks.  The count is
+; a byte, so it is 255, and a frame here is five per cent short.
+                DEFINE  NEXT_LOOKS_A_FRAME 255
+                DEFINE  NEXT_LOOKS_HELD 247     ; a look with a key held, 2260
                 include "../spectrum/keyboard.asm"
                 include "tape.asm"
                 include "draw.asm"

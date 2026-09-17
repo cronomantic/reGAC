@@ -106,26 +106,54 @@ def adventure(separators):
     }
 
 
-def how_long(order, separators=()):
+def how_long(order, separators=(), tries=3):
     """Type one line and say how many of the Z80's own seconds it took to
-    reach the end of the game, or None if it never did."""
+    reach the end of the game, or None if it never did.
+
+    What was typed is read back out of the machine before anything is
+    believed about it.  A key held down repeats, as it does on the original,
+    so a machine that stalls for a second while this holds one down -- which
+    a busy afternoon of the whole suite does -- types that letter twice; the
+    verb is then not a verb, the order it was in never runs, and the game
+    ends at once.  That looked like a HOLD that did not hold, and the run is
+    simply done again."""
+    built = Database(adventure(list(separators)))
+    chars = built.store.charset.chars
+    for attempt in range(tries):
+        took, codes = once(built, order)
+        # back into letters, and whatever the adventure has no character of
+        # its own for is the code itself, which is this machine's ASCII
+        typed = "".join(chars.get(code, chr(code)) for code in codes)
+        if typed == order:
+            return took
+    raise AssertionError(
+        f"three times over, what reached the interpreter was {typed!r} "
+        f"and not {order!r}: the keys did not arrive as they were sent"
+    )
+
+
+def once(built, order):
+    """One run: type the order and give back how long it took and the codes
+    the interpreter read."""
     with open(DATABASE, "wb") as f:
-        f.write(Database(adventure(list(separators))).build())
+        f.write(built.build())
     listing = emulator.assemble(SOURCE, listing=LISTING)
     over = emulator.label_address(listing, "done_flag")
+    buffer = emulator.label_address(listing, "input_buffer")
     session = emulator.Session()
     try:
         session.load(SNAPSHOT)
         time.sleep(2.0)
         session.type(order + ENTER)
+        typed = bytes(session.read(buffer, len(order)))
         session.command("reset-tstates-partial")
         deadline = time.time() + 20.0
         while time.time() < deadline:
             time.sleep(0.05)
             if session.read(over, 1)[0] == 0xFF:
                 reply = session.command("get-tstates-partial")
-                return int(reply.split("\n")[0].strip()) / SPECTRUM_HZ
-        return None
+                return int(reply.split("\n")[0].strip()) / SPECTRUM_HZ, typed
+        return None, typed
     finally:
         session.close()
 

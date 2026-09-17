@@ -1344,7 +1344,7 @@ La prueba del PCW enseñó además dos cosas de las pruebas. Una lectura larga
 de memoria con la máquina parada hace que la primera tecla mandada justo
 después se pierda —probado orden a orden: es la lectura, no la parada ni los
 puertos—, y medio segundo de máquina en marcha lo cura. Y la otra no es de
-las pruebas: ver «Las teclas que se solapan».
+las pruebas: ver «Las teclas que se solapan, que ya no se pierden».
 
 **En el Next la pantalla entera no se ve nunca de una vez**: son tres trozos
 de dieciséis kilobytes y sólo uno está en `$C000`. Así que desplazarla toda no
@@ -1839,23 +1839,103 @@ hace que se pueda pintar un renglón entero sin repetir el comando, pero tambié
 lo que hace que un mensaje que cambia la tinta y no la devuelve tiña todo lo que
 venga después.
 
-## Las teclas que se solapan, que se pierden
+## Las teclas que se solapan, que ya no se pierden
 
-**Sin arreglar todavía.** Lo destapó la prueba de `TEXT` del PCW, que una vez
-de cada varias se quedaba con `>ANDA` en pantalla y sin contestar: el enter se
-había perdido. No es del emulador. `read_key` es igual en las cinco máquinas:
-espera a que no haya **ninguna** tecla pulsada y luego a que haya una. Si la
-siguiente tecla baja antes de soltar la anterior —la A todavía abajo cuando ya
-se pulsa el enter, que es escribir deprisa—, nunca hay un instante sin teclas,
-y la espera de soltar se come el enter entero: cuando la A sube, el enter ya
-está abajo y cuenta como «lo que había que soltar». En el emulador pasa cuando
-la soltada de una y la pulsada de la siguiente caen en el mismo refresco del
-teclado.
+Lo destapó la prueba de `TEXT` del PCW, que una vez de cada varias se quedaba
+con `>ANDA` en pantalla y sin contestar: el enter se había perdido. No era del
+emulador. `read_key` era igual en las cinco máquinas: esperaba a que no hubiera
+**ninguna** tecla pulsada y luego a que hubiera una. Si la siguiente tecla
+bajaba antes de soltar la anterior —la A todavía abajo cuando ya se pulsa el
+enter, que es escribir deprisa—, nunca había un instante sin teclas, y la
+espera de soltar se comía el enter entero.
 
-Lo que falta es mirar qué hace el original con eso —el Spectrum lee `LAST_K`
-de la ROM, que sí da la tecla nueva aunque la vieja siga abajo— y hacer lo
-mismo en las cinco: tomar como nueva la tecla que no estaba pulsada en la
-vuelta anterior, en vez de pedir el teclado vacío.
+**Lo que hace el original, medido.** Su lectura está en `$7157` de MegaCorp:
+pone a cero el bit 5 de `FLAGS`, espera a que la interrupción de la ROM lo
+encienda y lee `LAST_K`. O sea que lo que cuenta como teclear una tecla es de
+la ROM. Probado en la máquina: L, O y K pulsadas cada una antes de soltar la
+anterior dan **LOK**, y una X mantenida dos segundos sale **seis veces**. Las
+reglas de la ROM, que son las que hay ahora en
+[`keys.asm`](../z80/common/keys.asm) para las cinco:
+
+- una tecla que no es la última tecleada cuenta en el acto, siga o no la otra
+  abajo;
+- mientras hay dos teclas que no son mayúsculas no se decide nada, así que la
+  que se queda abajo no sale dos veces cuando sube la otra (y la que se pulsó
+  y soltó encima se pierde, como en la ROM);
+- una tecla soltada se olvida a los cinco cuadros: pulsada otra vez antes, es
+  la misma que sigue abajo;
+- una tecla mantenida se repite a los treinta y cinco cuadros, y luego cada
+  cinco.
+
+Cada máquina sólo pone su parte: su `scan_keyboard` cuenta en `key_count` las
+teclas que no son mayúsculas. Las pruebas están en
+[`keystrokes.py`](../tests/keystrokes.py) —rodadas, dos a la vez y
+mantenida— y se tocan en el Amstrad, el MSX y el PCW sobre `read_line`, y en el
+Spectrum y el Next sobre el juego entero. Al Amstrad le hizo falta que su banco
+de pruebas de teclado supiera leer una línea, como los otros.
+
+**Y destapó otro fallo, más viejo: los cuadros no eran cuadros.** Sin
+interrupciones no hay reloj, así que un cuadro son `LOOKS_A_FRAME` miradas al
+teclado, y ese número se había calculado a ojo. La repetición no llegaba nunca
+en el Amstrad, y medido con el contador de ciclos del procesador —una espera
+como la de `HOLD`, sin nada pulsado— salió esto:
+
+| máquina | ciclos por mirada | miradas por cuadro, antes | medidas |
+|---|---|---|---|
+| Spectrum | 1840 | 38 | 38 |
+| Amstrad | 6680 | 40 | 12 |
+| MSX | 5780 | 28 | 12 |
+| PCW | 5750 | 20 | 14 |
+| Next | 2080 | 38, las del Spectrum | 268, que no caben en un byte: 255 |
+
+Y una mirada **con una tecla pulsada** cuesta más que una sin nada: 2370 en el
+Spectrum contra 1840. Contando la repetición en las miradas vacías, una tecla
+mantenida empezaba a repetirse un 30 % tarde, así que el bucle usa
+`LOOKS_A_FRAME` mientras no ve nada y `LOOKS_HELD` mientras ve una tecla: 29 en
+el Spectrum, 11 en el Amstrad, 12 en el MSX, 13 en el PCW y 247 en el Next.
+Medido con eso puesto, el cuadro con una tecla pulsada dura 67633 ciclos en el
+Spectrum, 74364 en el Amstrad, 71448 en el MSX, 77117 en el PCW y 579134 en el
+Next, contra 69888, 80000, 71591, 80000 y 559104.
+
+O sea que **`HOLD` esperaba 3,3 veces de más en el Amstrad**, 2,3 en el MSX y
+1,4 en el PCW, y **siete veces de menos en el Next**, que lee el teclado del
+Spectrum a veintiocho megahercios y usaba su número. El del Spectrum estaba
+bien, y la prueba que lo mide saltó en cuanto se le puso uno medido con una
+tecla pulsada, que cuesta un 30 % más: por eso la medida buena es sin teclas, y
+una tecla mantenida se repite un poco tarde. Con los números nuevos: 79872
+ciclos por cuadro en el Amstrad, 69304 en el MSX y 80371 en el PCW, contra
+80000, 71591 y 80000 de verdad; el Next queda un 5 % corto. Los bancos de
+pruebas de teclado de esas tres tienen ahora una espera de cien cuadros y una
+prueba que la cuenta en ciclos. El Next dice su número con un `DEFINE` antes
+de incluir el teclado: con `IFNDEF` sobre una etiqueta, el ensamblador la ve
+definida en la segunda pasada venga de donde venga.
+
+**Y una tercera cosa, que costó media tarde.** `test_and_parts_them_too`
+empezó a fallar una vez de cada cinco diciendo que un `HOLD` de dos segundos
+había durado 0,02. No era el `HOLD`: era la orden. Con una tecla pulsada y el
+ordenador anfitrión atascado un segundo —que es lo que pasa con la suite
+entera corriendo—, la tecla se repite, que es lo correcto, y la línea sale
+`ESPPPPPPPERA AND SALIR`. Entonces «ESPPPPPPPERA» no es un verbo, la orden que
+llevaba el `HOLD` no se ejecuta, el `AND` parte igual y `SALIR` acaba la
+partida al instante. Reproducido a mano manteniendo una tecla tres segundos:
+sale el mismo número exacto de segundos que en el fallo, 0,01997142857142857.
+
+O sea que la repetición convierte un atasco del anfitrión en una letra de más,
+y una prueba que da por hecho lo que tecleó miente. Las que comprueban letra a
+letra —los separadores del Spectrum y la línea del MSX y del PCW— **leen ahora
+lo que entró de verdad** y repiten la vuelta hasta tres veces si no coincide,
+diciendo qué llegó cuando se rinden.
+
+**Lo que cambia para las pruebas.** Dos letras iguales seguidas necesitan ahora
+un hueco de una décima de segundo **de la máquina** entre soltar y volver a
+pulsar, que en un emulador que va a un cuarto de velocidad —el Next— son cuatro
+de reloj: `Session.SAME_KEY_GAP` es medio segundo y lo usan todos los que
+teclean. Con el hueco de antes, `XYZZY` salía `XYZY` en el Next.
+
+Para medir, una cosa que no se entiende del todo y conviene saber: con una
+tecla pulsada, parar la máquina un momento con `Session.held()` hace que al
+soltarla el intérprete ya no la vea pulsada. Las medidas de arriba se hicieron
+sin parar la máquina.
 
 ## Cosas menores
 

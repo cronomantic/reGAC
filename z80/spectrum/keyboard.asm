@@ -11,10 +11,25 @@ KEY_ENTER       equ 13
 KEY_DELETE      equ 8
 INPUT_MAX       equ 64                  ; as much of a line as is kept
 
-; A fiftieth of a second is about seventy thousand clock cycles, and one look
-; at the whole keyboard is about nineteen hundred, so this many looks fill a
-; frame.  Nothing here turns on it being exact.
+; A fiftieth of a second is 69888 clock cycles, and one look at the whole
+; keyboard with nothing held is about 1840, so this many looks fill a frame.
+; It was measured, and not guessed as it was at first: a wait like HOLD's with
+; nothing pressed, against the processor's own cycle counter.  This one the guess
+; had right; the other machines' were out by up to three and a half times.  A look
+; with a key held costs a little more, so a key repeats a little late.
+;
+; The Next reads this same keyboard at eight times the speed, so it says its
+; own number before it includes this, as a define: a label asked about with
+; IFNDEF is there on the assembler's second pass whoever defined it.
+; With a key held a look is about 2370 cycles, which is what a key repeating
+; is counted in.
+                IFDEF NEXT_LOOKS_A_FRAME
+LOOKS_A_FRAME   equ NEXT_LOOKS_A_FRAME
+LOOKS_HELD      equ NEXT_LOOKS_HELD
+                ELSE
 LOOKS_A_FRAME   equ 38
+LOOKS_HELD      equ 29
+                ENDIF
 
 ; Look once at the whole keyboard.  The character comes back in A, and zero
 ; with the zero flag set when nothing useful is held.
@@ -28,6 +43,7 @@ LOOKS_A_FRAME   equ 38
 scan_keyboard:
                 xor     a
                 ld      (key_found), a
+                ld      (key_count), a
                 ld      hl, key_table
                 ld      bc, $FEFE
                 ld      d, 8
@@ -44,6 +60,10 @@ scan_keyboard:
                 or      a
                 jr      z, .a_shift             ; a shift on its own says nothing
                 ld      (key_found), a
+                push    hl
+                ld      hl, key_count
+                inc     (hl)                    ; one more that is not a shift
+                pop     hl
 .a_shift:
                 pop     af
 .next_key:
@@ -117,18 +137,11 @@ caps_held:
                 and     1
                 ret
 
-; Wait for a key and give it back in A, having waited for the last one to be
-; let go first.
+; Wait for a key to be typed and give it back in A.  What counts as typing one
+; is the ROM's rules, in common/keys.asm.
 ; Corrupts: BC, DE, HL
 read_key:
-.wait_release:
-                call    scan_keyboard
-                or      a
-                jr      nz, .wait_release
-.wait_press:
-                call    scan_keyboard
-                or      a
-                jr      z, .wait_press
+                call    next_key
                 push    af                      ; the original clicked at every
                 call    beep_click              ; key, and so does this
                 pop     af
@@ -255,3 +268,5 @@ key_table:
                 db      ' ', 0, 'M', 'N', 'B'
 
                 include "beep.asm"
+
+                include "../common/keys.asm"

@@ -403,11 +403,24 @@ class Session:
         pair = "".join(f"{v & 0xFF:02X}{v >> 8:02X}" for v in (end, self.MSX_KEYBUF))
         return self.command(f"write-memory-raw {self.MSX_PUTPNT} " + pair)
 
+    # How long to wait before pressing a key again straight after letting it
+    # go.  Every interpreter here decides what a typed key is by the Spectrum
+    # ROM's rules, as the original did, and those forget a key five frames
+    # after it is let go: pressed again sooner, it is the same key still held,
+    # and a double letter comes out single.  The emulators run a Next at about
+    # a quarter of its speed and the rest at about half, so a tenth of a
+    # second of the machine's is up to four tenths of ours.
+    SAME_KEY_GAP = 0.5
+
     def type(self, text, hold_for=0.12):
         """Type at the keyboard, one key at a time, letting each go before the
         next.  Driving the matrix directly keeps the timing ours rather than
         the emulator's, which drops keys when they are sent in a stream."""
+        last = None
         for char in text.upper():
+            if char == last:
+                time.sleep(self.SAME_KEY_GAP)
+            last = char
             with_shift = self.SYMBOLS.get(char)
             if with_shift:
                 self.hold_both(self.SYMBOL_SHIFT, self.KEY_MATRIX[with_shift])
@@ -448,7 +461,7 @@ class Session:
                 # The same key twice running needs a gap between them or the
                 # machine takes it for one long press: "&3FFF" comes out as
                 # "&3FF" without this.
-                time.sleep(hold_for * 2)
+                time.sleep(self.SAME_KEY_GAP)
             if with_shift:
                 self.command(f"send-keys-event {self.SHIFT_KEY} 1")
                 time.sleep(hold_for)

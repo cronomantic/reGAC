@@ -45,6 +45,31 @@ start:
                 ld      (was_clear), a
                 jr      .look
 
+; A test can point the processor here instead, and then type a whole line at
+; it: this is the path the runtime really uses.
+read_a_line:
+                ld      sp, $BF00
+                call    read_line
+                ld      (line_seen), bc
+                ld      a, $FF
+                ld      (line_done), a
+.stop:
+                jr      .stop
+
+; Or here, to wait the way HOLD does, for HOLD_FRAMES fiftieths of a second
+; with nothing pressed: a test counts the processor's cycles until it is over.
+HOLD_FRAMES     equ 100
+hold_a_while:
+                ld      sp, $BF00
+                ld      hl, HOLD_FRAMES
+                call    wait_or_key
+                ld      a, $FF
+                ld      (line_done), a
+.stop:
+                jr      .stop
+
+line_done:      db      0
+line_seen:      dw      0
 ready_flag:     db      0
 last_seen:      db      0
 raw_row:        db      0

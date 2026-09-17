@@ -20,10 +20,15 @@ KEY_ENTER       equ 13
 KEY_DELETE      equ 8
 INPUT_MAX       equ 64                  ; as much of a line as is kept
 
-; A fiftieth of a second is about eighty thousand clock cycles here, and one
-; look at the whole keyboard is about two thousand, so this many looks fill a
-; frame.  Nothing turns on it being exact.
-LOOKS_A_FRAME   equ 40
+; A fiftieth of a second is eighty thousand clock cycles here, and one look at
+; the whole keyboard is about 6680 -- ten rows through the 8255 -- so this
+; many looks fill a frame.
+; It was measured, and not guessed as it was at first: a wait like HOLD's with
+; nothing pressed, against the processor's own cycle counter.  The guesses were
+; out by up to three and a half times, which made a HOLD that long.  A look
+; with a key held costs a little more, so a key repeats a little late.
+LOOKS_A_FRAME   equ 12
+LOOKS_HELD      equ 11                  ; a look with a key held, about 6960
 
 ; Read the eight keys of row A, into A.  A bit low means held.
 ;
@@ -94,6 +99,7 @@ keyboard_init:
 scan_keyboard:
                 xor     a
                 ld      (key_found), a
+                ld      (key_count), a
                 ld      hl, key_table
                 ld      d, 0                    ; which row
 .row:
@@ -112,6 +118,10 @@ scan_keyboard:
                 or      a
                 jr      z, .a_shift             ; a shift on its own says nothing
                 ld      (key_found), a
+                push    hl
+                ld      hl, key_count
+                inc     (hl)                    ; one more that is not a shift
+                pop     hl
 .a_shift:
                 pop     af
 .next_key:
@@ -164,19 +174,11 @@ to_shifted:
                 xor     a
                 ret
 
-; Wait for a key and give it back in A, having waited for the last one to be
-; let go first.
+; Wait for a key to be typed and give it back in A.  What counts as typing one
+; is the ROM's rules, in common/keys.asm.
 ; Corrupts: everything
 read_key:
-.wait_release:
-                call    scan_keyboard
-                or      a
-                jr      nz, .wait_release
-.wait_press:
-                call    scan_keyboard
-                or      a
-                jr      z, .wait_press
-                ret
+                jp      next_key
 
 ; Wait for a key, or for HL fiftieths of a second, whichever comes first.
 ;
@@ -295,3 +297,5 @@ key_found:      db      0
 line_ptr:       dw      0
 line_length:    db      0
 input_buffer:   ds      INPUT_MAX
+
+                include "../common/keys.asm"
