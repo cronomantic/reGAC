@@ -29,10 +29,16 @@ si la respuesta es sí; vale S, SI, Y o YES, comparados en los códigos de la
 aventura y no en letras.
 
 `SAVE` y `LOAD` usan la cinta a través de la ROM, un bloque de datos sin
-cabecera delante, que es como lo hacía el original. Lo que viaja es sólo la
-partida, de `vm_state` a `vm_state_end`: la aventura no cambia nunca, así que
-no hace falta guardarla. El original sí la guardaba entera, de $5DC0 al final
-de su base de datos, porque tenía el estado metido dentro.
+cabecera delante. Lo que viaja es sólo la partida, de `vm_state` a
+`vm_state_end`: la aventura no cambia nunca, así que no hace falta guardarla.
+
+El original no lo hacía así, y aquí decía que sí: está leído en su código
+(ver «Lo que hace el `LOAD` del original», más abajo). Pide un nombre y
+graba un fichero CODE normal, con cabecera, de 768 bytes desde `$A1FD`, que es
+su estado de partida. Lo de guardar de `$5DC0` al final de la base de datos,
+que también se decía aquí, es el **editor** grabando la aventura entera, no el
+`SAVE` del juego. Nuestro formato es distinto a propósito —y en un disco pedir
+un nombre no tendría sentido—, así que eso se queda como está.
 
 De esos dos, en el Spectrum, no hay prueba automática: el emulador no sabe
 grabar lo que sale por la cinta, así que sólo están comprobados a mano. En el
@@ -539,16 +545,41 @@ intérprete, que valen para cualquier prueba que teclee:
 - **Y a que pregunte de nuevo**: la línea en la que se tecleó la orden empieza
   por la misma pregunta. Lo que vale es la última línea con la pregunta sola.
 
-**Una pregunta abierta que salió de aquí.** Después de `LOAD` la sala se
-describe dos veces seguidas, y pegadas (`…ARENAS.ESTAS EN EL PLANETA…`):
-una porque `op_load` da la sala por nueva y otra por el `LOOK` que la propia
-aventura pone detrás (`LOAD LOOK WAIT`). No es de hoy: pasa igual en todas las
-máquinas desde que `LOAD` existe. Lo que no se sabe es qué hacía el original,
-porque ninguna de las dos referencias implementa `LOAD` —grackle dice «Not
-implemented (yet)» y `runGAC.py` tiene un `TODO`—. Que casi todas las aventuras
-pongan `LOOK` detrás de `LOAD` sugiere que el original no describía por su
-cuenta; Bangkok, que no lo pone, dice lo contrario. Para saberlo hay que
-cargar una partida en el intérprete original y mirar.
+### Lo que hace el `LOAD` del original
+
+Salió de la prueba de arriba: después de `LOAD` la sala se describía dos
+veces seguidas, y pegadas (`…ARENAS.ESTAS EN EL PLANETA…`), una porque
+`op_load` daba la sala por nueva y otra por el `LOOK` que la aventura pone
+detrás (`LOAD LOOK WAIT`). Ninguna de las dos referencias implementa `LOAD`
+—grackle dice «Not implemented (yet)» y `runGAC.py` tiene un `TODO`—, así que
+se miró en el original de Spectrum, leído y viéndolo funcionar.
+
+**Leído.** Los opcodes del juego están en `$788F` (`SAVE`) y `$78B3` (`LOAD`).
+Los dos piden un nombre —«Introduce nombre del fichero...»— y usan la ROM
+para un fichero CODE con cabecera, de 768 bytes desde `$A1FD`. `LOAD`, antes
+de cargar, se guarda dos punteros del intérprete que van dentro de ese bloque
+(`$A4E8` y `$A4F4`) y los repone después: es lo que le deja **volver a la
+condición** y seguir con lo que venga detrás. Luego imprime unos códigos de
+control que dejan la zona del dibujo en blanco y el cursor en la ventana de
+texto, un salto de línea, y vuelve. En ningún sitio marca la sala como nueva.
+
+**Visto.** Se arrancó Vajillas 1, se fue a la sala 4 y se hizo una cinta con
+esa partida en su formato; se volvió a arrancar en la sala 1, con esa cinta
+puesta, y se teclearon `LOAD` y el nombre. La sala 4 sale **una sola vez**, y
+detrás la pregunta. Para que la cinta se leyera hizo falta cargar la
+instantánea con `snapshot-load` y no con `smartload`, que se ponía por medio, y
+arrancar el emulador con `--noautoload`, porque si no teclea él solo `""` en
+cuanto hay cinta.
+
+**Lo que se cambió:** `op_load` ya no marca la sala como nueva, en ninguna
+máquina. Con `LOAD LOOK WAIT` la sala se describe una vez, por el `LOOK`; con
+el `LOAD WAIT` de Bangkok, como en el original, no se describe. La prueba de
+teclear del 6128 cuenta las descripciones después de `LOAD`: con el código de
+antes daba dos, y ahora una.
+
+**Lo que no se cambió**, y es distinto del original: no se borra la pantalla
+al cargar, que es cosmético, y no se pide nombre de fichero, porque nuestro
+formato de partida es otro a propósito.
 
 ### La memoria que AMSDOS no suelta
 
@@ -1787,3 +1818,32 @@ Y dos cosas que costaron encontrarse:
 
 La prueba de las 196 del Amstrad tenía la misma carrera aunque no se la hubiera
 visto saltar, y lleva el mismo remedio.
+
+**Y el remedio no lo era del todo.** Dos días después la del Next volvió a
+fallar de vez en cuando —tres de trece vueltas—, y ahora con otra cara: el
+PC en el relleno o en las rectas, dibujando sin acabar nunca. Metido un
+diagnóstico en la prueba, la vez que cayó el procesador estaba **dentro de la
+base de datos**, con la pila también ahí y bytes de código cambiados, como
+`config_init+4` y `text_init+3`: la máquina se había ido a ejecutar basura.
+
+Lo que encaja con eso es que el emulador atiende las órdenes en un hilo propio,
+y **un `set-register PC` puede caer entre el primer byte de una instrucción y
+el resto**, que entonces se lee de donde apunta el PC nuevo. En el bucle de
+aparcamiento del Next hay un `call map_piece`: si el cambio cae después del
+`CD`, la dirección sale de los primeros bytes de `redraw` —`ld sp`, `31 00 9F`—
+y la llamada va a `$0031`, a la base de datos. Las órdenes «perdidas» que
+arreglaban los reintentos eran seguramente la cara buena de lo mismo. Con el
+intérprete de antes no había saltado en diez vueltas, pero cambiar el tamaño
+del código cambia qué instrucciones están donde cae la orden.
+
+Ahora **no se escribe el PC con la máquina en marcha**. Los cuatro bancos de
+pruebas que dibujan lámina tras lámina —Spectrum, Amstrad, MSX y Next— tienen
+un byte `go_flag` que su bucle de aparcamiento mira, y la prueba escribe ese
+byte en vez del PC. Un byte de memoria no tiene un medio donde caer. Con eso la
+del Next salió **diez de diez, y ninguna vuelta necesitó volver a pedir**,
+cuando antes una de cada tres o cuatro tardaba el minuto de más del reintento.
+Los reintentos se han quitado.
+
+Quedan otras pruebas que escriben el PC, pero una sola vez, para arrancar lo
+que acaban de poner en memoria, y ya reintentan: el riesgo es el mismo, pero
+se corre una vez por sesión y no treinta.

@@ -201,7 +201,7 @@ def test_every_picture_of_an_adventure_comes_out_the_same():
     )
     listing = emulator.assemble(SOURCE, listing=LISTING)
     where = {name: emulator.label_address(listing, name)
-             for name in ("done_flag", "picture_wanted", "piece_wanted", "redraw")}
+             for name in ("done_flag", "picture_wanted", "piece_wanted", "redraw", "go_flag")}
     with open(ADVENTURE, encoding="utf-8") as f:
         gfx = json.load(f)["gfx"]
 
@@ -214,27 +214,22 @@ def test_every_picture_of_an_adventure_comes_out_the_same():
         )
         for key in sorted(gfx, key=int):
             number = int(key)
-            # Asked up to three times.  A program counter written into a
-            # processor that is running does not always take, and when it does
-            # not the machine is still going round its parking loop with
-            # nothing drawn, so the flag can never come and the wait is a
-            # minute thrown away: one run in five died that way, on a
-            # different picture each time.  Stopping the processor to write it
-            # cures it and leaves the emulator running nine times slower --
-            # two minutes a round became nineteen -- so it is asked again
-            # instead, which costs nothing at all on a round that goes well.
-            drew = False
-            for _ in range(3):
-                session.command(
-                    f"write-memory {where['picture_wanted']} "
-                    f"{number & 255} {number >> 8}"
-                )
-                session.command(f"write-memory {where['done_flag']} 0")
-                session.command(f"set-register PC={where['redraw']:04X}H")
-                if session.wait_for(where["done_flag"], 0xFF, timeout=60.0,
-                                    every=0.1):
-                    drew = True
-                    break
+            # Asked for with a byte the build's parking loop looks at, and not
+            # by writing the program counter while the processor runs.  That
+            # was done here for a long time, and asked again when it seemed
+            # not to take; but it can land between an instruction's first
+            # byte and the rest, and the parking loop's CALL then went into
+            # the database and trampled code on the way -- a picture that
+            # never finished, a different one each time, one round in four.
+            # See z80/next/test_picture.asm.
+            session.command(
+                f"write-memory {where['picture_wanted']} "
+                f"{number & 255} {number >> 8}"
+            )
+            session.command(f"write-memory {where['done_flag']} 0")
+            session.command(f"write-memory {where['go_flag']} 1")
+            drew = session.wait_for(where["done_flag"], 0xFF, timeout=60.0,
+                                    every=0.1)
             if not drew:
                 # Once a picture does not finish, the machine is still in the
                 # middle of it and nothing read afterwards means anything: the

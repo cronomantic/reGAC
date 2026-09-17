@@ -98,7 +98,7 @@ def draw_them_all(path):
     )
     listing = emulator.assemble(SOURCE, listing=LISTING)
     where = {name: emulator.label_address(listing, name)
-             for name in ("redraw", "done_flag", "picture_wanted")}
+             for name in ("redraw", "done_flag", "picture_wanted", "go_flag")}
     with open(BINARY, "rb") as f:
         blob = f.read()
     with open(path, encoding="utf-8") as f:
@@ -116,7 +116,7 @@ def draw_them_all(path):
                             f"{number & 255} {number >> 8}")
             session.command(f"write-memory {where['done_flag']} 0")
             session.command("reset-tstates-partial")
-            session.command(f"set-register PC={where['redraw']:04X}H")
+            session.command(f"write-memory {where['go_flag']} 1")
             if not session.wait_for(where["done_flag"], 0xFF, timeout=120.0,
                                     every=0.1):
                 out.append((number, None, None))

@@ -133,7 +133,7 @@ def draw_them_all(path):
     )
     listing = emulator.assemble(SOURCE, listing=LISTING)
     where = {name: emulator.label_address(listing, name)
-             for name in ("redraw", "done_flag", "picture_wanted")}
+             for name in ("redraw", "done_flag", "picture_wanted", "go_flag")}
     with open(BINARY, "rb") as f:
         blob = f.read()
     with open(path, encoding="utf-8") as f:
@@ -162,20 +162,12 @@ def draw_them_all(path):
             session.command(f"write-memory {where['picture_wanted']} "
                             f"{number & 255} {number >> 8}")
             session.command(f"write-memory {where['done_flag']} 0")
-            # Asked twice if need be.  A program counter written into a
-            # processor that is running does not always take, and then the
-            # machine goes on round its parking loop with nothing drawn and
-            # the flag can never come: the Next's test was losing one round in
-            # five that way.  Asking again costs nothing on a round that goes
-            # well, and the other cure -- stopping the processor to write it
-            # -- leaves the emulator running nine times slower.
-            seconds = None
-            for _attempt in range(2):
-                session.command("reset-tstates-partial")
-                session.command(f"set-register PC={where['redraw']:04X}H")
-                seconds = finished_after(session, where["done_flag"])
-                if seconds is not None:
-                    break
+            # Asked for with a byte and not by writing the program counter,
+            # which can land in the middle of an instruction: see
+            # z80/cpc/test_picture.asm.
+            session.command("reset-tstates-partial")
+            session.command(f"write-memory {where['go_flag']} 1")
+            seconds = finished_after(session, where["done_flag"])
             if seconds is None:
                 out.append((number, None, None))
                 continue

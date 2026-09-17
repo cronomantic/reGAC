@@ -41,10 +41,23 @@ start:
                 call    picture_init
                 ; fall through
 
-; Drawing again needs none of the setting up, so the tests can poke a new
-; number in here, clear the flag and point the processor back at this label.
+; Drawing again is asked for with go_flag: a test writes the picture's number,
+; clears done_flag and sets go_flag, and the loop the build parks in sees it
+; and comes back here.  It used to be asked for by writing this label into the
+; program counter while the processor ran, and that is not safe: the emulator
+; takes its orders on a thread of its own, and a program counter changed
+; between an instruction's first byte and the rest of it finishes the
+; instruction with bytes from here.  In the parking loop that instruction can
+; be a CALL, whose address then comes out of the LD SP in front of this -- a
+; call into the database, which fits what the Next's test caught now and then:
+; the processor and the stack both down in the database, and code trampled.
+; Asked with this byte instead, ten rounds of that test in a row came out
+; clean, and none of them needed asking twice.  A byte of memory has nothing
+; in the middle to be caught in.
 redraw:
                 ld      sp, STACK_AT
+                xor     a
+                ld      (go_flag), a
                 ld      hl, (picture_wanted)
                 call    draw_picture
                 ld      a, $FF
@@ -54,11 +67,15 @@ redraw:
                 ; kilobytes of it are in the map at a time and only the machine
                 ; itself can say which.
 .stop:
+                ld      a, (go_flag)
+                or      a
+                jr      nz, redraw
                 ld      a, (piece_wanted)
                 call    map_piece
                 jr      .stop
 
 done_flag:      db      0
+go_flag:        db      0
 picture_wanted: dw      1
 piece_wanted:   db      PIECE_TOP
 
