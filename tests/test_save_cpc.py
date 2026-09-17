@@ -311,6 +311,19 @@ def test_a_game_saved_and_loaded_at_the_keyboard(tmp_path):
             f"LOAD did not bring it back to {start}: it is in "
             f"{room(session, where)}"
         )
+        # And the room is described once, by the LOOK the adventure puts after
+        # LOAD, and not a second time by LOAD itself.  The original does not
+        # describe anything on a load -- watched on the Spectrum's, see
+        # doc/pendiente.md -- and ours used to, so every LOAD LOOK told the
+        # player where they were twice over.
+        after = screen(session, glyphs)
+        at = max(n for n, line in enumerate(after) if line and "LOAD" in line)
+        said = "".join(after[at + 1:]).replace(" ", "")
+        room_text = ddb["locations"][str(start)]["desc"].replace(" ", "")[:24]
+        assert said.count(room_text) == 1, (
+            f"after LOAD the room was described {said.count(room_text)} "
+            f"times: {after[at:]}"
+        )
     finally:
         session.close()
 

@@ -577,8 +577,14 @@ op_load:
                 call    music_back
 .loaded:
                 ENDIF
-                ld      a, 1
-                ld      (vm_new_room), a        ; wherever we are now, say so
+                ; And on with the condition, without describing anything.
+                ; This used to mark the room as new, and every adventure but
+                ; one follows LOAD with a LOOK of its own, so the player was
+                ; told where they were twice over.  The original does not
+                ; describe on a load: its LOAD reads the block, keeps its own
+                ; place in the condition and goes back to it, and what is said
+                ; is what the adventure's LOOK says -- read in its code and
+                ; watched on a Spectrum, see doc/pendiente.md.
                 jp      vm_loop
 
 op_here:
