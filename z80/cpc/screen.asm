@@ -151,20 +151,28 @@ hardware_ink:
 ; four the machine starts with.
 picture_inks:   db      0, 24, 20, 6
 
-; Where the cursor's character cell starts, in HL.  Its eight pixel lines are
-; two kilobytes apart from there.
-; Corrupts: AF, BC, DE
-cursor_address:
-                ld      a, (cursor_y)
+; How far along its pixel line character row A starts, in HL: eighty bytes a
+; row.
+; Corrupts: AF, BC
+row_offset:
                 add     a, a
                 ld      c, a
                 ld      b, 0
                 ld      hl, block_starts
                 add     hl, bc
-                ld      c, (hl)
+                ld      a, (hl)
                 inc     hl
-                ld      b, (hl)
-                ld      hl, SCREEN
+                ld      h, (hl)
+                ld      l, a
+                ret
+
+; Where the cursor's character cell starts, in HL.  Its eight pixel lines are
+; two kilobytes apart from there.
+; Corrupts: AF, BC, DE
+cursor_address:
+                ld      a, (cursor_y)
+                call    row_offset
+                ld      bc, SCREEN
                 add     hl, bc
                 ld      a, (cursor_x)
                 add     a, a                    ; two bytes a character
@@ -174,8 +182,26 @@ cursor_address:
                 ret
 
 ; Move the text window up by one character row.
+;
+; The window begins where text_top says, which TEXT sets to nought, and on this
+; machine that still costs only one LDIR a pixel line: each of the eight holds
+; the twenty five character rows end to end, so moving rows from any one down
+; to the last is one run however many there are.  The Spectrum's thirds have
+; no such luck.  What the three numbers are is worked out once for all eight.
 ; Corrupts: everything
 scroll_window:
+                ld      a, (text_top)
+                call    row_offset
+                ld      (scroll_to), hl         ; where the window begins
+                ld      a, (text_top)
+                inc     a
+                call    row_offset
+                ld      (scroll_from), hl       ; and the row under that
+                ld      a, TEXT_LAST - 1
+                ld      hl, text_top
+                sub     (hl)
+                call    row_offset
+                ld      (scroll_count), hl      ; every row but the first
                 ld      d, 0
 .each_block:
                 push    de
@@ -186,16 +212,15 @@ scroll_window:
                 or      SCREEN >> 8
                 ld      h, a
                 ld      l, 0
+                ex      de, hl                  ; the pixel line's start
+                ld      hl, (scroll_from)
+                add     hl, de                  ; where the copy comes from
                 push    hl
-                ld      bc, (TEXT_TOP + 1) * LINE_BYTES
-                add     hl, bc                  ; where the copy comes from
-                pop     de
-                push    hl
-                ld      hl, TEXT_TOP * LINE_BYTES
+                ld      hl, (scroll_to)
                 add     hl, de
                 ex      de, hl                  ; and where it goes
                 pop     hl
-                ld      bc, (TEXT_ROWS - 1) * LINE_BYTES
+                ld      bc, (scroll_count)
                 ldir
                 ; the row that came free is where the copy ended
                 ld      h, d
@@ -212,19 +237,34 @@ scroll_window:
                 jr      nz, .each_block
                 ret
 
-; TEXT and PICT, of which this machine does only half.
+; TEXT: the text has the whole screen from now on.  Nothing is cleared and
+; the cursor does not move -- what changes is only how far the scrolling
+; reaches, which is what the original does.  See doc/pendiente.md.
 ;
-; With TEXT no picture is drawn, which the interpreter sees to by itself.
-; Giving the text the whole screen is not here, and the reason is measured:
-; the database is laid on a boundary of 256 bytes behind the interpreter, and
-; the interpreter ends thirty eight bytes below one.  Crossing it costs every
-; adventure a page, and MegaCorp II has a hundred and sixty two bytes to
-; spare.  The window costs some sixty.  See doc/pendiente.md.
-; Corrupts: nothing
+; This machine went without it for a long time, for want of room: the
+; interpreter ended thirty eight bytes below a boundary that cost every
+; adventure a page to cross.  The boundary went, and printing a message a word
+; at a time gave back the two hundred bytes of its buffer.
+; Corrupts: AF
 text_window_all:
+                xor     a
+                ld      (text_top), a
                 ret
 
+; And back under the picture, which on the original is what drawing a picture
+; does rather than anything PICT says.  A cursor left above the new top comes
+; down to it.
+; Corrupts: AF, HL
 text_window_below:
+                ld      a, TEXT_TOP
+                ld      (text_top), a
+                ld      hl, cursor_y
+                cp      (hl)
+                ret     c
+                ret     z
+                ld      (hl), a
+                xor     a
+                ld      (cursor_x), a
                 ret
 
 ; Start a new line, scrolling if the window is full.
@@ -350,7 +390,8 @@ backspace:
                 or      a
                 jr      nz, .same_line
                 ld      a, (cursor_y)
-                cp      TEXT_TOP
+                ld      hl, text_top
+                cp      (hl)
                 ret     z                       ; nothing left to rub out
                 dec     a
                 ld      (cursor_y), a
@@ -379,4 +420,8 @@ font_first:     db      0
 font_count:     db      0
 cursor_x:       db      0
 cursor_y:       db      TEXT_TOP
+text_top:       db      TEXT_TOP                ; the first row the text may use
+scroll_from:    dw      0
+scroll_to:      dw      0
+scroll_count:   dw      0
 

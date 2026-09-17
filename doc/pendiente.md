@@ -1293,15 +1293,27 @@ permite volver a dibujarlas, que es justo lo que `vm_graphics` ya es.
 **Y está hecho a medias, que es lo honesto de contar.** La mitad que es común
 —con `TEXT` no se dibuja lámina— vale en las cinco máquinas: la decide
 `describe_location` mirando `vm_graphics`, que se escribía desde el principio
-y no leía nadie. La otra mitad, la ventana, sólo está en dos, y no por pereza:
+y no leía nadie. La otra mitad, la ventana, está en tres, y en las otras dos
+no por pereza:
 
 | máquina | la ventana | por qué |
 |---|---|---|
 | Spectrum | **sí** | |
 | MSX | **sí** | |
-| Amstrad | no | el intérprete acaba a **38 bytes** de un escalón de página que cuesta 256 a cada aventura; la ventana cuesta unos 60 |
+| Amstrad | **sí** | tardó por falta de sitio: el intérprete acababa a 38 bytes de un escalón de página. El escalón se quitó y el texto palabra a palabra devolvió el búfer; la ventana costó 65 bytes |
 | Next | no | el intérprete acaba en `$9FC6` y **lo que pase de `$A000` no llega a la máquina** |
 | PCW | no | sus dos mitades viven en bancos distintos: la dirección de un renglón tendría que llevar un banco consigo |
+
+**En el Amstrad salió más fácil que en el Spectrum.** Allí la ventana dejó
+de caber en un tercio de la pantalla y el desplazamiento tuvo que ir fila a
+fila. En el Amstrad cada una de las ocho líneas de píxel de un carácter guarda
+las veinticinco filas seguidas, así que desplazar sigue siendo un `LDIR` por
+línea; lo único que cambia es que el origen, el destino y la cuenta se sacan de
+`text_top` en vez de ser constantes. Con MegaCorp II quedan 175 bytes libres en
+la cinta con música, 228 sin ella y **65 con el intérprete de ruidos**, que es
+ahora el caso más justo. `test_textmode_cpc.py` es la prueba del Spectrum en
+un Amstrad; con el `screen.asm` de antes falla la mitad de la ventana y pasa la
+de las láminas, que es lo que había.
 
 En el Spectrum el desplazamiento pasó a recorrer los renglones de uno en uno,
 porque el truco de un solo `LDIR` sólo vale mientras la ventana cabe en un

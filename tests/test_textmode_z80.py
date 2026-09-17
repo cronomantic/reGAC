@@ -33,9 +33,10 @@ own over the start of MegaCorp's low priority table in the machine's memory:
 So there is no order that says "back to pictures": TEXT puts the top of the
 window at nought, and drawing a picture puts it back.  See doc/pendiente.md.
 
-This is the Spectrum's, where all of it is done.  The Amstrad and the Next
-do the half that stops the pictures and not the window, and why is written
-in their own screen.asm and in the pending list: neither has the room.
+This is the Spectrum's, where all of it is done.  The Amstrad has all of it
+too, and its own test in test_textmode_cpc.py.  The Next does the half that
+stops the pictures and not the window, and why is written in its screen.asm
+and in the pending list.
 """
 
 import os
@@ -63,9 +64,9 @@ PICTURE_AREA = 0x4000           # the top sixteen rows, which is two thirds
 PICTURE_BYTES = 0x1000
 PLAIN, WITH_TEXT, GO, GO_QUIETLY = 1, 2, 3, 4
 # Two hundred and forty characters, which is seven lines and a half, said
-# twice.  Not one message of five hundred: a message is unpacked into a buffer
-# of two hundred and fifty six bytes and nothing checks that it fits, which is
-# its own thing to mend and is in the pending list.
+# three times.  It could be one message of seven hundred now that a message
+# is printed a word at a time; three of these is simply what this test has
+# always said, and the Amstrad's says the same.
 LONG = ("UN CUARTO MUY LARGO DE DESCRIBIR " * 8)[:240]
 
 if pytest is not None:
