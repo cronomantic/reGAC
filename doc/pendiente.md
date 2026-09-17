@@ -1295,8 +1295,7 @@ permite volver a dibujarlas, que es justo lo que `vm_graphics` ya es.
 **Y está hecho a medias, que es lo honesto de contar.** La mitad que es común
 —con `TEXT` no se dibuja lámina— vale en las cinco máquinas: la decide
 `describe_location` mirando `vm_graphics`, que se escribía desde el principio
-y no leía nadie. La otra mitad, la ventana, está en cuatro, y en la que
-falta no por pereza:
+y no leía nadie. La otra mitad, la ventana, está ya en las cinco:
 
 | máquina | la ventana | por qué |
 |---|---|---|
@@ -1304,7 +1303,7 @@ falta no por pereza:
 | MSX | **sí** | |
 | Amstrad | **sí** | tardó por falta de sitio: el intérprete acababa a 38 bytes de un escalón de página. El escalón se quitó y el texto palabra a palabra devolvió el búfer; la ventana costó 65 bytes |
 | Next | **sí** | tardó por una pared en `$A000` que resultó ser la máscara del relleno: ver «La pared del Next». Costó 54 bytes y cabe debajo de la máscara |
-| PCW | no | sus dos mitades viven en bancos distintos: la dirección de un renglón tendría que llevar un banco consigo |
+| PCW | **sí** | sus dos mitades viven en bancos distintos y sólo una está en el mapa; el renglón que cruza de una a otra pasa por un búfer. Costó 49 bytes |
 
 **En el Amstrad salió más fácil que en el Spectrum.** Allí la ventana dejó
 de caber en un tercio de la pantalla y el desplazamiento tuvo que ir fila a
@@ -1320,8 +1319,32 @@ de las láminas, que es lo que había.
 En el Spectrum el desplazamiento pasó a recorrer los renglones de uno en uno,
 porque el truco de un solo `LDIR` sólo vale mientras la ventana cabe en un
 tercio de la pantalla. En el MSX bastaron dos bytes, el primer renglón y
-cuántos se mueven. En el PCW `text_window_all` y `text_window_below` están y
-no hacen nada, con el porqué escrito en su propio `screen.asm`.
+cuántos se mueven.
+
+**En el PCW salió más fácil de lo que se había apuntado.** Se temía que la
+dirección de un renglón tuviera que llevar su banco consigo, y no hace falta:
+el cursor vive siempre en la mitad del texto, así que escribir no cambia, y lo
+único que cruza la juntura es el desplazamiento. Cada mitad sube un renglón en
+una sola copia —márgenes incluidos, que son oscuros en todos los renglones, y
+eso simplificó de paso el desplazamiento de siempre, que iba renglón a
+renglón—, y el renglón que sale por arriba del texto pasa por un búfer de 720
+bytes en `$E000` para ser el último de la lámina: la máscara está en `$C000` y
+una partida se prepara en `$D000`.
+
+**Y destapó un fallo que habría quedado escondido.** Con la lámina a un punto
+de ancho, la lámina es la mitad de ancha que el texto, y `gfx_clear` sólo
+pintaba de blanco sus propias columnas: lo que `TEXT` hubiera subido a los
+lados se quedaba ahí debajo de la lámina siguiente. Ahora la mitad entera se
+pone oscura antes. Medido: 4096 píxeles encendidos al lado de la lámina sin el
+arreglo, ninguno con él. [`test_textmode_pcw.py`](../tests/test_textmode_pcw.py)
+tiene las dos pruebas de las otras máquinas y una tercera para esto, y las dos
+que tocan la ventana fallan con el código de antes.
+
+La prueba del PCW enseñó además dos cosas de las pruebas. Una lectura larga
+de memoria con la máquina parada hace que la primera tecla mandada justo
+después se pierda —probado orden a orden: es la lectura, no la parada ni los
+puertos—, y medio segundo de máquina en marcha lo cura. Y la otra no es de
+las pruebas: ver «Las teclas que se solapan».
 
 **En el Next la pantalla entera no se ve nunca de una vez**: son tres trozos
 de dieciséis kilobytes y sólo uno está en `$C000`. Así que desplazarla toda no
@@ -1815,6 +1838,24 @@ tinta por defecto en vez de heredar la del anterior. Hoy hereda, que es lo que
 hace que se pueda pintar un renglón entero sin repetir el comando, pero también
 lo que hace que un mensaje que cambia la tinta y no la devuelve tiña todo lo que
 venga después.
+
+## Las teclas que se solapan, que se pierden
+
+**Sin arreglar todavía.** Lo destapó la prueba de `TEXT` del PCW, que una vez
+de cada varias se quedaba con `>ANDA` en pantalla y sin contestar: el enter se
+había perdido. No es del emulador. `read_key` es igual en las cinco máquinas:
+espera a que no haya **ninguna** tecla pulsada y luego a que haya una. Si la
+siguiente tecla baja antes de soltar la anterior —la A todavía abajo cuando ya
+se pulsa el enter, que es escribir deprisa—, nunca hay un instante sin teclas,
+y la espera de soltar se come el enter entero: cuando la A sube, el enter ya
+está abajo y cuenta como «lo que había que soltar». En el emulador pasa cuando
+la soltada de una y la pulsada de la siguiente caen en el mismo refresco del
+teclado.
+
+Lo que falta es mirar qué hace el original con eso —el Spectrum lee `LAST_K`
+de la ROM, que sí da la tecla nueva aunque la vieja siga abajo— y hacer lo
+mismo en las cinco: tomar como nueva la tecla que no estaba pulsada en la
+vuelta anterior, en vez de pedir el teclado vacío.
 
 ## Cosas menores
 

@@ -34,9 +34,8 @@ So there is no order that says "back to pictures": TEXT puts the top of the
 window at nought, and drawing a picture puts it back.  See doc/pendiente.md.
 
 This is the Spectrum's, where all of it is done.  The Amstrad has all of it
-too, and its own test in test_textmode_cpc.py, and so has the Next, in
-test_textmode_next.py.  The PCW does the half that stops the pictures and not
-the window, and why is written in its screen.asm and in the pending list.
+too, and its own test in test_textmode_cpc.py, and so have the Next and the
+PCW, in test_textmode_next.py and test_textmode_pcw.py.
 """
 
 import os

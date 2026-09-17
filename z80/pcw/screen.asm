@@ -67,6 +67,10 @@ DISPLAY_PORT    equ $F7
 DISPLAY_ON      equ %01000000           ; and bit seven would turn it inside out
 
 TEXT_ROWS       equ SCREEN_ROWS
+SCROLL_BUFFER   equ $E000               ; a row on its way from one half to
+                                        ; the other: clear of the mask, at
+                                        ; $C000, and of where a saved game is
+                                        ; put together, at $D000
 PAPER_BYTE      equ $FF                 ; white, because every lit pixel is
 
 ; Set the screen up: the table the video reads, both halves wiped, and the
@@ -219,29 +223,39 @@ cursor_address:
                 ret
 
 ; Move the text window up by one row.  A row is 720 bytes and the eight lines
-; of it are interleaved, so the whole row moves in one go and nothing has to
-; be done a line at a time.
+; of it are interleaved, so a row moves whole, and since the margins of the
+; text are dark in every row fifteen rows move in one copy.
+;
+; With TEXT the picture's half goes up as well, and the row that leaves the
+; top of the text becomes the last row of the picture.  The two halves are in
+; different banks and only one is ever in the map, so that row crosses the
+; join by way of a buffer: out of the text, the picture brought in, and into
+; the picture.
 ; Corrupts: AF, BC, DE, HL
 scroll_window:
+                ld      a, (text_whole)
+                or      a
+                jr      z, .text
+                ld      a, PICTURE_BANK
+                call    scroll_half
                 ld      a, TEXT_BANK
                 call    screen_bank
-                ld      c, TEXT_ROWS - 1
-                xor     a
-                call    row_base                ; where the first row lands
-.each_row:
-                push    bc
-                ld      d, h
-                ld      e, l
+                ld      hl, SCREEN_AT
+                ld      de, SCROLL_BUFFER
                 ld      bc, ROW_BYTES
-                add     hl, bc                  ; and the row above it, which
-                push    hl                      ; is simply 720 bytes on
-                ld      bc, SCREEN_COLS * 8
                 ldir
-                pop     hl
-                pop     bc
-                dec     c
-                jr      nz, .each_row
-                ; the row that came free is the last one, and HL is at it
+                ld      a, PICTURE_BANK
+                call    screen_bank
+                ld      hl, SCROLL_BUFFER
+                ld      de, SCREEN_AT + (SCREEN_ROWS - 1) * ROW_BYTES
+                ld      bc, ROW_BYTES
+                ldir
+.text:
+                ld      a, TEXT_BANK
+                call    scroll_half
+                ; the row that came free is the last one
+                ld      a, TEXT_ROWS - 1
+                call    row_base
                 ld      d, h
                 ld      e, l
                 inc     de
@@ -250,24 +264,35 @@ scroll_window:
                 ldir
                 ret
 
-; TEXT and PICT, of which this machine does only half.
-;
-; With TEXT no picture is drawn, which the interpreter sees to by itself.
-; Giving the text the whole screen is not here: the two halves of this screen
-; live in different banks, so a text window of all thirty two rows means a
-; row's address carrying a bank with it, and a scroll that crosses the join
-; going through memory.  There is room for it here -- the interpreter ends at
-; $346F and the window begins at $4000 -- and it is written down in
-; doc/pendiente.md rather than done.
-;
-; Worth knowing while it is not done: the text window here is sixteen rows of
-; sixty four, which is already more than a whole Spectrum screen.
-; Corrupts: nothing
-text_window_all:
+; Bring half A into the map and move its rows up by one, margins and all.
+; Corrupts: AF, BC, DE, HL
+scroll_half:
+                call    screen_bank
+                ld      hl, SCREEN_AT + ROW_BYTES
+                ld      de, SCREEN_AT
+                ld      bc, (SCREEN_ROWS - 1) * ROW_BYTES
+                ldir
                 ret
 
-text_window_below:
+; TEXT: the text has the whole screen from now on.  Nothing is cleared and
+; the cursor does not move -- what changes is only how far the scrolling
+; reaches, which is what the original does.  The cursor is always in the text
+; half, so giving the window back has nothing to put right.
+; Corrupts: AF
+text_window_all:
+                ld      a, 1
+                ld      (text_whole), a
                 ret
+
+; And back under the picture, which on the original is what drawing a picture
+; does rather than anything PICT says.
+; Corrupts: AF
+text_window_below:
+                xor     a
+                ld      (text_whole), a
+                ret
+
+text_whole:     db      0                       ; TEXT has the whole screen
 
 ; Start a new line, scrolling if the window is full.
 ; Corrupts: AF, BC, DE, HL

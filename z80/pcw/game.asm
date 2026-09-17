@@ -9,8 +9,10 @@
 ;   $0000  the interpreter, and the part of the database that stays
 ;   $4000  the window the rest of the database is paged through
 ;   $8000  whichever half of the screen is being written to
-;   $C000  the mask, the buffers, the stack, the table the video reads, and at
-;          the very top the sixteen bytes the keyboard leaves itself
+;   $C000  the mask, the buffers -- a saved game is put together at $D000 and
+;          a row of text crosses from one half of the screen to the other at
+;          $E000 -- the stack, the table the video reads, and at the very top
+;          the sixteen bytes the keyboard leaves itself
 ;
 ; What comes out of here is not a medium but the pieces of one, because the
 ; disk itself is put together by regac release:

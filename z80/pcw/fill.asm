@@ -481,7 +481,10 @@ set_fill_pattern:
                 ret
 
 ; Wipe the picture: the mask to nothing and the screen to white paper, which
-; is what it starts in.  The margins to either side are left dark.
+; is what it starts in.  The margins to either side go dark, and not only are
+; left dark: with TEXT the text scrolls up into this half, and a picture drawn
+; a point wide is narrower than the text, so what the text left beside it
+; would stay there.
 ; Corrupts: everything
 gfx_clear:
                 ld      a, PICTURE_BANK
@@ -489,6 +492,11 @@ gfx_clear:
                 ld      hl, MASK_AT
                 ld      de, MASK_AT + 1
                 ld      bc, PICTURE_ROWS * 32 - 1
+                ld      (hl), 0
+                ldir
+                ld      hl, SCREEN_AT
+                ld      de, SCREEN_AT + 1
+                ld      bc, SCREEN_BYTES - 1
                 ld      (hl), 0
                 ldir
                 ld      c, SCREEN_ROWS
