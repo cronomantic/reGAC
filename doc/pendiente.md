@@ -1041,8 +1041,10 @@ compilación se aparca, en la creencia de que así el contador se paraba con la
 máquina. **No se para.** Fuera del modo paso a paso del emulador el punto de
 parada salta y la máquina sigue; comprobado leyendo el contador con la máquina
 ya aparcada, que subía unos 2,4 millones de ciclos por segundo de reloj. Y el
-modo paso a paso no es salida: con `run` o no vuelve o va cientos de veces más
-lento. Así que se contaba también lo que pasaba entre que la lámina acababa y la
+modo paso a paso no es salida: `run` en ese modo **tumba el emulador** —se
+corta la conexión y el proceso desaparece—. Aquí se había escrito que «o no
+vuelve o va cientos de veces más lento», y eso lo daba otra cosa: ver «El
+indicador del modo paso a paso», más abajo. Así que se contaba también lo que pasaba entre que la lámina acababa y la
 prueba miraba la bandera, que era cada medio segundo: **hasta tres décimas de
 más en cada lámina**.
 
@@ -1852,11 +1854,9 @@ bandera no podía llegar nunca y el minuto de espera era tirado.
 
 Y dos cosas que costaron encontrarse:
 
-- **No usar `enter-cpu-step` para escribir el PC con la máquina parada.** Cura
-  la carrera, pero deja al emulador corriendo nueve veces más lento: la vuelta
-  del Next pasó de 2 a 19 minutos. Lo que se hace en su lugar es preguntar otra
-  vez —hasta tres intentos—, que no cuesta nada en una vuelta que va bien. La
-  prueba del PCW sí lo usa, pero una vez y no en un bucle.
+- ~~**No usar `enter-cpu-step` para escribir el PC con la máquina parada**,
+  que deja al emulador nueve veces más lento.~~ **Falso**, y es justo lo que
+  hay que hacer: ver «El indicador del modo paso a paso», más abajo.
 - **Una prueba que sigue después de un fallo así miente.** Con la máquina a
   medias, todo lo que se lee después es basura: la vuelta que encontró esto
   reportó 26 láminas mal cuando había pasado una sola cosa. Ahora para en la
@@ -1891,6 +1891,47 @@ del Next salió **diez de diez, y ninguna vuelta necesitó volver a pedir**,
 cuando antes una de cada tres o cuatro tardaba el minuto de más del reintento.
 Los reintentos se han quitado.
 
-Quedan otras pruebas que escriben el PC, pero una sola vez, para arrancar lo
-que acaban de poner en memoria, y ya reintentan: el riesgo es el mismo, pero
-se corre una vez por sesión y no treinta.
+~~Quedan otras pruebas que escriben el PC, pero una sola vez, y ya reintentan.~~
+Ya no queda ninguna: ver lo que sigue.
+
+### El indicador del modo paso a paso, que costaba ocho segundos por orden
+
+La prueba gráfica del MSX empezó a fallar de vez en cuando por lo mismo, pero
+en el arranque: `start_code` escribe el código y apunta el PC **una vez**, con
+el MSX dentro de su BIOS, y a veces la máquina no llegaba a dibujar ni en tres
+intentos. No se pudo cazar a propósito —veinticinco arranques seguidos sin
+fallar—, así que se fue a la causa: no escribir el PC con la máquina en marcha
+en ningún sitio.
+
+La manera limpia es parar el procesador, escribir y soltarlo, que es
+`enter-cpu-step`, `set-register` y `exit-cpu-step`. Se había descartado porque
+«dejaba al emulador nueve veces más lento». **No lo deja**: medido en ciclos
+por segundo, 2,04 millones antes de parar y 2,04 después. Lo lento era nuestro
+lector del socket. Con el procesador parado el emulador contesta
+`command@cpu-step> ` en vez de `command> `, el lector sólo reconocía el
+segundo, y cada orden dada en ese estado esperaba entera su espera máxima de
+ocho segundos. Aquella vuelta del Next daba cuatro órdenes así por lámina —la
+parada, las dos escrituras y la del PC—, y treinta y una láminas por cuatro
+por ocho segundos son los diecisiete minutos de más.
+
+Ahora el lector reconoce los dos indicadores, y `Session.jump` para, escribe y
+suelta. **Las catorce pruebas que escribían el PC lo hacen por ahí**, y
+`start_code` también. La del MSX vuelve a tardar sus dos minutos. Las pruebas
+de láminas se quedan con su `go_flag`, que ni siquiera necesita parar nada.
+
+Y la suite con eso puesto destapó **otra de la misma familia**, que llevaba
+mucho tiempo fallando de vez en cuando sin estar apuntada:
+`test_fills_original[shade]`, «the original never came back from its fill».
+Esa prueba llama al relleno del GAC original con una pila de dos bytes que
+apuntan a un bucle suyo, y ponía **el `SP` con la aventura original en marcha**.
+Si en ese instante la aventura hacía un `RET`, se comía la vuelta preparada
+para el relleno, y cuando el relleno acababa su propio `RET` sacaba basura. Toda
+su preparación va ahora dentro de `Session.held()`, que para la máquina
+mientras dura el bloque y la suelta al salir; `jump` es ese mismo bloque con
+sólo el PC dentro. Ocho vueltas seguidas en verde. No queda en las pruebas
+ningún registro escrito con la máquina en marcha.
+
+De paso se miró lo otro que se había dado por imposible, `run` en paso a paso
+con un punto de parada, que sería un reloj exacto al ciclo: no era el
+indicador. Tumba el emulador. El reloj sigue siendo el de mirar la bandera cada
+centésima.

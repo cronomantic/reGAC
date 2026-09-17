@@ -135,26 +135,31 @@ def ours(mode):
 
 def theirs(session, before, mode):
     """The same box, filled by the original's own routine."""
-    bitmap = to_screen(before[0])
-    for at in range(0, SCREEN_BYTES, 512):
-        session.command(
-            f"write-memory-raw {SCREEN + at} " + bitmap[at:at + 512].hex().upper()
-        )
-    # The colours are not what is being looked at, but the routine is given a
-    # sane world to work in: the attributes the box was drawn with, and the
-    # ROM's own idea of what to print in.
-    for at in range(0, 768, 256):
-        session.command(
-            f"write-memory-raw {ATTRIBUTES + at} " + before[1][at:at + 256].hex().upper()
-        )
-    session.command(f"write-memory {ATTR_P} {PAPER_ON_BLACK} {PAPER_ON_BLACK}")
-    session.command(f"write-memory {ATTR_T} {PAPER_ON_BLACK} 0 0")
-    session.command(f"write-memory {SEED_AT} {SEED[0]} {SEED[1]}")
-    # A jump to itself for it to come back to, and a stack that points at it.
-    session.command(f"write-memory-raw {STOP_AT} 18FE")
-    session.command(f"write-memory {STACK_AT} {STOP_AT & 255} {STOP_AT >> 8}")
-    session.command(f"set-register SP={STACK_AT:04X}H")
-    session.command(f"set-register PC={ENTRY[mode]:04X}H")
+    # All of it with the machine held.  The stack pointer used to be set
+    # while the adventure ran, and now and then it returned through the two
+    # bytes put there for the fill before the fill was ever started -- after
+    # which the fill's own return found nothing and never came back.
+    with session.held():
+        bitmap = to_screen(before[0])
+        for at in range(0, SCREEN_BYTES, 512):
+            session.command(
+                f"write-memory-raw {SCREEN + at} " + bitmap[at:at + 512].hex().upper()
+            )
+        # The colours are not what is being looked at, but the routine is given a
+        # sane world to work in: the attributes the box was drawn with, and the
+        # ROM's own idea of what to print in.
+        for at in range(0, 768, 256):
+            session.command(
+                f"write-memory-raw {ATTRIBUTES + at} " + before[1][at:at + 256].hex().upper()
+            )
+        session.command(f"write-memory {ATTR_P} {PAPER_ON_BLACK} {PAPER_ON_BLACK}")
+        session.command(f"write-memory {ATTR_T} {PAPER_ON_BLACK} 0 0")
+        session.command(f"write-memory {SEED_AT} {SEED[0]} {SEED[1]}")
+        # A jump to itself for it to come back to, and a stack that points at it.
+        session.command(f"write-memory-raw {STOP_AT} 18FE")
+        session.command(f"write-memory {STACK_AT} {STOP_AT & 255} {STOP_AT >> 8}")
+        session.command(f"set-register SP={STACK_AT:04X}H")
+        session.command(f"set-register PC={ENTRY[mode]:04X}H")
     for _ in range(40):
         time.sleep(0.2)
         if session.pc() == STOP_AT:

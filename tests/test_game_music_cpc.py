@@ -125,7 +125,7 @@ def test_an_adventure_plays_with_the_music_on():
         time.sleep(3.0)
         put(session, music, where["music_at"])
         put(session, game, LOADS_AT)
-        session.command(f"set-register PC={LOADS_AT:04X}H")
+        session.jump(LOADS_AT)
 
         opening = wait_screen(session, glyphs, prompt)
         assert any(prompt in line for line in opening if line), (

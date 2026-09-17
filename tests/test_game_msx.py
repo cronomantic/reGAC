@@ -146,7 +146,7 @@ def start_playing(session, where, database):
             f"write-memory-raw {CODE_AT + at} " + blob[at:at + 512].hex().upper()
         )
     session.command(f"write-memory-raw {where['database_ready']} 00")
-    session.command(f"set-register PC={where['start']:04X}H")
+    session.jump(where['start'])
     time.sleep(0.5)  # it switches to all RAM and waits for the word
     for at in range(0, len(database), 512):
         piece = database[at:at + 512]

@@ -131,7 +131,7 @@ def test_the_amstrad_prints_what_the_database_holds():
         for at in range(0, len(blob), 512):
             piece = blob[at:at + 512]
             session.command(f"write-memory-raw {LOADS_AT + at} " + piece.hex().upper())
-        session.command(f"set-register PC={LOADS_AT:04X}H")
+        session.jump(LOADS_AT)
         finished = session.wait_for(done, 0xFF, timeout=40.0, every=0.1)
         memory = session.read(SCREEN, 0x4000)
     finally:

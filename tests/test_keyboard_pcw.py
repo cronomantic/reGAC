@@ -188,7 +188,7 @@ def test_a_whole_line_is_read_and_shown():
     }
     try:
         session.command(f"write-memory {at['line_done']} 0")
-        session.command(f"set-register PC={at['read_a_line']:04X}H")
+        session.jump(at['read_a_line'])
         time.sleep(0.2)
         type_them(session, "MIRARX" + chr(8) + chr(13))
         assert session.wait_for(at["line_done"], 0xFF, timeout=10.0, every=0.2), (

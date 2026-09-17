@@ -179,7 +179,7 @@ def test_a_whole_line_is_read():
     session, where = watching()
     try:
         session.command(f"write-memory-raw {where['line_done']} 00")
-        session.command(f"set-register PC={where['read_a_line']:04X}H")
+        session.jump(where['read_a_line'])
         time.sleep(0.2)
         type_them(session, "MIRARX" + chr(8) + chr(13))
         assert session.wait_for(where["line_done"], 0xFF, timeout=10.0, every=0.2), (

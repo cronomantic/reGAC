@@ -83,7 +83,7 @@ def start(session):
         blob = f.read()
     for at in range(0, len(blob), 512):
         session.command(f"write-memory-raw {LOADS_AT + at} " + blob[at:at + 512].hex().upper())
-    session.command(f"set-register PC={LOADS_AT:04X}H")
+    session.jump(LOADS_AT)
 
 
 def screen(session, glyphs):

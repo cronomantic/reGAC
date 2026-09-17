@@ -92,7 +92,7 @@ def picture_area_after(orders, settle=6.0):
         for at in range(0, len(blob), 512):
             session.command(f"write-memory-raw {LOADS_AT + at} "
                             + blob[at:at + 512].hex().upper())
-        session.command(f"set-register PC={LOADS_AT:04X}H")
+        session.jump(LOADS_AT)
         # the first room is described once the location is set, and its
         # picture takes a moment on this machine
         deadline = time.time() + 30.0

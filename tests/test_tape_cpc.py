@@ -93,7 +93,7 @@ def started(session, where, wanted):
             f"write-memory-raw {LOADS_AT + at} " + blob[at:at + 512].hex().upper()
         )
     session.command(f"write-memory {where['wanted']} {wanted}")
-    session.command(f"set-register PC={LOADS_AT:04X}H")
+    session.jump(LOADS_AT)
     time.sleep(1.0)
     assert session.read(where["ready_flag"], 1)[0] == 1, "the build never started"
 

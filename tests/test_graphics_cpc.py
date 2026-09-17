@@ -155,7 +155,7 @@ def draw_on_both(commands):
             session.command(
                 f"write-memory-raw {LOADS_AT + at} " + piece.hex().upper()
             )
-        session.command(f"set-register PC={LOADS_AT:04X}H")
+        session.jump(LOADS_AT)
         finished = session.wait_for(done, 0xFF, timeout=40.0, every=0.1)
         screen = session.read(SCREEN, 0x4000)
     finally:

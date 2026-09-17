@@ -108,7 +108,8 @@ def finished_after(session, flag, timeout=120.0):
     on the loop the build parks in was set here for a long time on the belief
     that it froze the counter with the machine, and it does not -- outside the
     emulator's step mode a breakpoint fires and the machine carries on, and in
-    step mode it runs hundreds of times slower.  So whatever passes between
+    step mode the run that would wait for it brings the emulator down.  So
+    whatever passes between
     the picture finishing and the flag being looked at is counted too.  That
     was every half second, which added up to three tenths of a second to every
     picture and made different pictures come out at the same count to within
@@ -146,12 +147,12 @@ def draw_them_all(path):
         for at in range(0, len(blob), 512):
             session.command(f"write-memory-raw {LOADS_AT + at} "
                             + blob[at:at + 512].hex().upper())
-        # Asked three times over, for the same reason every picture is: a
-        # program counter written into a processor that is running does not
-        # always take, and one round in five or so never got off the ground.
+        # Asked up to three times, which with the machine held while the
+        # counter is written should never be needed; it costs nothing when it
+        # is not.
         started = False
         for _ in range(3):
-            session.command(f"set-register PC={LOADS_AT:04X}H")
+            session.jump(LOADS_AT)
             if session.wait_for(where["done_flag"], 0xFF, timeout=20.0,
                                 every=0.1):
                 started = True

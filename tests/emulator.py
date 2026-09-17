@@ -29,6 +29,7 @@ seconds to finish booting its ROM before a snapshot will load, and the run has
 to be polled until the program counter is actually inside our code.
 """
 
+import contextlib
 import os
 import re
 import socket
@@ -229,7 +230,11 @@ class Session:
             if not chunk:
                 break
             data += chunk
-            if data.endswith(b"command> "):
+            # The prompt is a different one while the processor is held,
+            # and not knowing it cost every order given in that state the
+            # whole of the socket's timeout.  That was taken for a while for
+            # the emulator running slower after a stop, which it does not.
+            if data.endswith(b"command> ") or data.endswith(b"command@cpu-step> "):
                 break
         return data.decode("latin-1")
 
@@ -298,10 +303,36 @@ class Session:
                 self.command(
                     f"write-memory-raw {at + offset} " + piece.hex().upper()
                 )
-            self.command(f"set-register PC={at:04X}H")
+            self.jump(at)
             if self.wait_for(flag, wanted, timeout=timeout, every=0.2):
                 return True
         return False
+
+    def jump(self, at):
+        """Point the processor at `at` with the machine held still.
+
+        Writing the program counter of a processor that is running is not
+        safe: the emulator takes its orders on a thread of its own, and a
+        counter changed between an instruction's first byte and the rest
+        finishes that instruction with bytes from the new place -- a CALL whose
+        address comes out of whatever is there.  The Next's picture test caught
+        that sending the machine into its database; see doc/pendiente.md.  So
+        the processor is stopped for the moment the counter is written."""
+        with self.held():
+            self.command(f"set-register PC={at:04X}H")
+
+    @contextlib.contextmanager
+    def held(self):
+        """The machine stopped for as long as the block lasts, and let go at
+        the end of it.  Anything that sets up more than the program counter --
+        a stack pointer, memory the running code might read -- goes in here
+        whole: a register changed while the processor runs is changed under
+        whatever it happens to be doing."""
+        self.command("enter-cpu-step")
+        try:
+            yield self
+        finally:
+            self.command("exit-cpu-step")
 
     def wait_for(self, address, wanted, timeout=20.0, every=0.4):
         """Run until a byte in memory takes a value, and say whether it did.
