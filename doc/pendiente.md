@@ -1295,15 +1295,15 @@ permite volver a dibujarlas, que es justo lo que `vm_graphics` ya es.
 **Y está hecho a medias, que es lo honesto de contar.** La mitad que es común
 —con `TEXT` no se dibuja lámina— vale en las cinco máquinas: la decide
 `describe_location` mirando `vm_graphics`, que se escribía desde el principio
-y no leía nadie. La otra mitad, la ventana, está en tres, y en las otras dos
-no por pereza:
+y no leía nadie. La otra mitad, la ventana, está en cuatro, y en la que
+falta no por pereza:
 
 | máquina | la ventana | por qué |
 |---|---|---|
 | Spectrum | **sí** | |
 | MSX | **sí** | |
 | Amstrad | **sí** | tardó por falta de sitio: el intérprete acababa a 38 bytes de un escalón de página. El escalón se quitó y el texto palabra a palabra devolvió el búfer; la ventana costó 65 bytes |
-| Next | no | el intérprete tiene que acabar antes de la máscara del relleno, en `$A000`, y le quedan unos doscientos bytes; hay unos tres kilobytes libres encima de la rutina de interrupción que el build todavía no usa. Lo de que «lo que pasa de `$A000` no llega a la máquina» no era verdad: ver «La pared del Next» |
+| Next | **sí** | tardó por una pared en `$A000` que resultó ser la máscara del relleno: ver «La pared del Next». Costó 54 bytes y cabe debajo de la máscara |
 | PCW | no | sus dos mitades viven en bancos distintos: la dirección de un renglón tendría que llevar un banco consigo |
 
 **En el Amstrad salió más fácil que en el Spectrum.** Allí la ventana dejó
@@ -1320,8 +1320,27 @@ de las láminas, que es lo que había.
 En el Spectrum el desplazamiento pasó a recorrer los renglones de uno en uno,
 porque el truco de un solo `LDIR` sólo vale mientras la ventana cabe en un
 tercio de la pantalla. En el MSX bastaron dos bytes, el primer renglón y
-cuántos se mueven. En las otras tres, `text_window_all` y `text_window_below`
-están y no hacen nada, con el porqué escrito en su propio `screen.asm`.
+cuántos se mueven. En el PCW `text_window_all` y `text_window_below` están y
+no hacen nada, con el porqué escrito en su propio `screen.asm`.
+
+**En el Next la pantalla entera no se ve nunca de una vez**: son tres trozos
+de dieciséis kilobytes y sólo uno está en `$C000`. Así que desplazarla toda no
+es copiar trozo a trozo, sino recorrer las seis páginas de 8K de la capa 2
+con la siguiente vista detrás: cada copia trae las líneas de su página desde
+ocho más abajo, y esas ocho son el principio de la página siguiente, que no
+se escribe hasta la vuelta de después. La última vuelta lee ocho líneas de
+una página que no es de la capa 2, que no hace daño, y son justo el renglón
+que se borra. Escribir en el texto no cambia: el cursor vive siempre en los
+renglones de abajo, así que devolver la ventana no tiene nada que corregir.
+Comprobado aparte que la lámina sube renglones enteros exactos a través de
+las tres fronteras de página y que el renglón de abajo sale limpio.
+[`test_textmode_next.py`](../tests/test_textmode_next.py) es la prueba del
+Spectrum en un Next, y con el `screen.asm` de antes falla la mitad de la
+ventana.
+
+Queda debajo de la máscara: 218 bytes libres sin música y **158 con música y
+efectos**, que es el caso más justo. Los tres kilobytes de encima de `$B200`
+siguen sin usar, para cuando haga falta.
 
 Se ve en la presentación de MegaCorp, que es lo que lo motivó: antes se perdía
 desplazada en ocho renglones y ahora sale letra por letra como la del
@@ -1384,9 +1403,8 @@ Quijote II y las Vajillas I, baja 34 bytes como mucho, y jugando otros tantos.
 Aunque se le dejara un kilobyte entero, quedan más de dos libres.
 
 Así que el Next no está lleno: está lleno **debajo de la máscara**. La ventana
-de `TEXT`, que es lo que chocó con la pared, puede ir a ese hueco de arriba; es
-lo que queda por hacer, y es ahora trabajo de colocar código y no de entender
-la máquina.
+de `TEXT`, que es lo que chocó con la pared, al final cupo debajo —54 bytes—,
+así que el hueco de arriba sigue entero.
 
 ## Los caracteres latinos, que ya se ven
 

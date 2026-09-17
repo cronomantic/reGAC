@@ -207,9 +207,12 @@ cursor_address:
                 ret
 
 ; Move the text window up by one row of characters and wipe the row that came
-; free.  All of it is in one piece, so it is one long copy.
+; free.  Under a picture all of it is in one piece, so it is one long copy.
 ; Corrupts: everything
 scroll_window:
+                ld      a, (text_whole)
+                or      a
+                jr      nz, scroll_screen
                 ld      a, PIECE_TEXT
                 call    map_piece
                 ld      hl, WINDOW + 8 * ROW_BYTES
@@ -217,29 +220,63 @@ scroll_window:
                 ld      bc, (TEXT_ROWS - 1) * 8 * ROW_BYTES
                 ldir
                 ld      hl, WINDOW + (TEXT_ROWS - 1) * 8 * ROW_BYTES
-                ld      de, WINDOW + (TEXT_ROWS - 1) * 8 * ROW_BYTES + 1
+wipe_row:
+                ld      d, h
+                ld      e, l
+                inc     de
                 ld      (hl), TEXT_PAPER
                 ld      bc, 8 * ROW_BYTES - 1
                 ldir
                 ret
 
-; TEXT and PICT, of which this machine does only half.
-;
-; The half it does is the one that matters most: with TEXT no picture is
-; drawn, which the interpreter sees to by itself.  The other half -- giving
-; the text the whole screen -- is not here, for want of room where the code
-; is: the interpreter has to end before the fill's mask at $A000, which is
-; wiped with every picture, and there are a couple of hundred bytes left under
-; it.  That was once taken for bytes past $A000 never reaching the machine;
-; they reach it, and the first picture wipes them.  There are some three
-; kilobytes free above the interrupt routine, from about $B200, which the
-; build does not use yet.  See doc/pendiente.md.
-; Corrupts: nothing
+; With TEXT the whole screen goes up, picture and all, and the screen is three
+; pieces of which only one is ever seen.  So it is walked an 8K page at a time
+; instead, with the page after it seen behind it: each copy takes the page's
+; lines from eight further down, and those eight are the start of the next
+; page, which is only written on the next turn round.  The last turn reads
+; eight lines of a page that is not layer 2's, which does no harm, and they
+; are the row that is wiped.
+; Corrupts: everything
+scroll_screen:
+                ld      a, L2_FIRST_PAGE
+                ld      b, 6                    ; the six pages of layer 2
+.page:
+                nextreg MMU6, a
+                inc     a
+                nextreg MMU7, a
+                push    af
+                push    bc
+                ld      hl, WINDOW + 8 * ROW_BYTES
+                ld      de, WINDOW
+                ld      bc, $2000
+                ldir
+                pop     bc
+                pop     af
+                djnz    .page
+                ld      a, $FF
+                ld      (piece_now), a          ; none of the three is there now
+                ld      hl, WINDOW + $2000 - 8 * ROW_BYTES
+                jr      wipe_row
+
+; TEXT: the text has the whole screen from now on.  Nothing is cleared and
+; the cursor does not move -- what changes is only how far the scrolling
+; reaches, which is what the original does.  The cursor is always in the rows
+; under the picture, so giving the window back has nothing to put right.
+; Corrupts: AF
 text_window_all:
+                ld      a, 1
+                ld      (text_whole), a
                 ret
 
+; And back under the picture, which on the original is what drawing a picture
+; does rather than anything PICT says.
+; Corrupts: AF
 text_window_below:
+                xor     a
+                ld      (text_whole), a
                 ret
+
+text_whole:     db      0                       ; TEXT has the whole screen
 
 ; Start a new line, scrolling if the window is full.
 ; Corrupts: everything
