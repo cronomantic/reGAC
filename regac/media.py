@@ -331,6 +331,58 @@ def pcw_release(boot, code, banks, screen=None):
     return pcw_disk(boot, pieces)
 
 
+# The other way round, for an adventure whose database leaves no room for the
+# interpreter above $4000: the interpreter goes under it and the database has
+# everything from $4000 up.  See the map at the top of z80/cpc/game.asm.
+CPC_LOW_CODE_AT = 0x0400        # where the interpreter runs
+CPC_LOW_DATABASE_AT = 0x4000    # and where the database is loaded
+CPC_LOW_ISLAND_AT = 0xAB00      # up to the island, which is the interpreter's
+CPC_LOW_ROOM = CPC_LOW_ISLAND_AT - CPC_LOW_DATABASE_AT
+
+
+def low_loader(wanted, screen=None):
+    """The lines for that one: keep BASIC out of everything from $4000 up,
+    bring the interpreter in there, call the mover in front of it that carries
+    it down to $0400 and comes back, load the database over where it was, and
+    go.
+
+    What is called at the end is not the interpreter but the starter the mover
+    left at the island: with the lower ROM still in, $0400 is ROM and not the
+    interpreter, so something above $4000 has to put the ROMs out of the way
+    and jump down.
+
+    BASIC keeps its variables under HIMEM, which is $3FFF here, and grows them
+    downwards; the interpreter ends around $2450, so there are some seven
+    kilobytes between the two and nothing of ours is written over."""
+    out = basic_line(10, [MEMORY, SPACE] + list(hex_number(CPC_LOW_DATABASE_AT - 1)))
+    if screen is not None:
+        out += basic_line(20, [LOAD, SPACE] + list(quoted(screen))
+                          + [ord(",")] + list(hex_number(SCREEN_AT)))
+    out += basic_line(30, [LOAD, SPACE] + list(quoted(wanted)))
+    out += basic_line(40, [CALL, SPACE] + list(hex_number(CPC_LOW_DATABASE_AT)))
+    out += basic_line(50, [LOAD, SPACE] + list(quoted(wanted)))
+    out += basic_line(60, [CALL, SPACE] + list(hex_number(CPC_LOW_ISLAND_AT)))
+    return out + bytes(2)
+
+
+def cpc_low_tape(code, database, name=NAME, screen=None):
+    """A tape of that shape: the loader, the screen if there is one, the
+    interpreter with its mover in front, and the database as a file of its
+    own."""
+    if len(database) > CPC_LOW_ROOM:
+        raise ValueError(
+            f"the database is {len(database)} bytes and {CPC_LOW_ROOM} fit "
+            "under the island, even with the interpreter out of the way"
+        )
+    files = [File(name, low_loader("!", "!" if screen else None),
+                  kind=BASIC, load=BASIC_AT)]
+    if screen:
+        files.append(File(name, screen, kind=BINARY, load=SCREEN_AT))
+    files.append(File(name, code, kind=BINARY, load=CPC_LOW_DATABASE_AT))
+    files.append(File(name, database, kind=BINARY, load=CPC_LOW_DATABASE_AT))
+    return tape(files)
+
+
 def cpc_tape(code, name=NAME, load=CODE_AT, entry=CODE_AT, screen=None,
              music=None):
     """A tape with the same, which a machine starts with RUN and nothing else

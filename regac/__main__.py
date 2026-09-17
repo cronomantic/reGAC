@@ -33,7 +33,8 @@ from .binary import MACHINES, SECTION_NAMES, Database, Reader
 from .devices import DEVICES, device_for, make
 from .gfx import Renderer
 from .media import (MSX_SCREEN_BYTES, PCW_SCREEN_BYTES, banks_of, cpc6128_disk,
-                    cpc_tape, msx_screen, msx_tape, pcw_release,
+                    cpc_low_tape, cpc_tape, msx_screen, msx_tape,
+                    pcw_release, CPC_LOW_CODE_AT, CPC_LOW_ROOM,
                     plus3_banked_disk, plus3_disk)
 from .project import (TARGETS, ProjectError, assemble, screen_for,
                       wide)
@@ -441,9 +442,17 @@ def write_media(machine, code, where, name, load, entry, screen=None,
         # it runs is whatever comes first, so RUN and nothing else.
         path = os.path.join(where, name.lower() + ".cdt")
         with open(path, "wb") as f:
-            f.write(cpc_tape(code, name, load, entry, screen, music))
+            if entry == CPC_LOW_CODE_AT:
+                # The other way round, because this database leaves no room
+                # above $4000: the interpreter is carried under it and the
+                # database is a file of its own.
+                f.write(cpc_low_tape(code, database or b"", name, screen))
+            else:
+                f.write(cpc_tape(code, name, load, entry, screen, music))
         written.append(path)
         how = 'RUN"" on the tape'
+        if entry == CPC_LOW_CODE_AT:
+            how += ", with the interpreter under the database"
         if music:
             how += f", with {len(music)} bytes of music in front of it"
     else:
@@ -658,7 +667,21 @@ def make_one(target, settings, ddb, name, root, output, where_regac_is,
     if settings.get("scale"):
         across, _ = wide(settings["scale"])
         defines.append(f"PICTURE_SCALE={across}")
-    assemble(target, where_regac_is, defines)
+    low = False
+    try:
+        assemble(target, where_regac_is, defines)
+    except ProjectError:
+        # The one machine with nowhere to put an overflow is the 464: no
+        # banks, and a database that has to sit in one stretch.  When the two
+        # together pass the firmware, the interpreter goes under $4000
+        # instead and the database has everything above it -- 27392 bytes
+        # rather than what is left over the code.  See z80/cpc/game.asm.
+        if target.release != "cpc464":
+            raise
+        assemble(target, where_regac_is, list(defines) + ["LOW_CODE"])
+        low = True
+        print(f"  {target.machine:12} does not fit the usual way round: the "
+              "interpreter goes under the database")
 
     where = os.path.join(output, target.machine if target.release is None
                          else target.release)
@@ -695,7 +718,11 @@ def make_one(target, settings, ddb, name, root, output, where_regac_is,
             with open(os.path.join(tree, named), "rb") as f:
                 pieces.append(f.read())
         tunes = pieces[0] if len(pieces) == 1 else pieces
-    written, _ = write_media(target.release, code, where, name, load, load,
+    if low:
+        load = entry = CPC_LOW_CODE_AT
+    else:
+        entry = load
+    written, _ = write_media(target.release, code, where, name, load, entry,
                              screen, boot, banks, image, tunes)
     return written
 

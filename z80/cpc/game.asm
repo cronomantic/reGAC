@@ -34,11 +34,74 @@ FIRMWARE_AT     equ $B100               ; what the firmware keeps for itself
 MUSIC_AT        equ $0300               ; above the BASIC line that loads us
 MUSIC_LOADS_AT  equ $4000               ; where its file comes in, to be moved
 
+; An adventure whose database does not leave room for the interpreter above
+; $4000 -- the two parts of the Quijote are the ones that do not -- is built
+; with -DLOW_CODE, and then the two change places: the interpreter goes into
+; the sixteen kilobytes under $4000, which are RAM like any other with both
+; ROMs out of the way, and the database has everything from $4000 to the
+; island below.  That gives it 27392 bytes instead of the eight and a half
+; thousand it has left over the interpreter.
+;
+;   $0400  the interpreter, which is some 8200 bytes
+;   $4000  the database, all of it
+;   $AB00  the island: a copy of the game and the two calls that put it on
+;          tape, which cannot be under $4000 -- see tape.asm
+;   $B100  the firmware's own
+;
+; It travels like the music does, because the BASIC line that loads it is
+; itself at $0170: the file comes in at $4000 with a mover in front of it,
+; the mover carries it down and comes back, and then the database is loaded
+; over where it landed.  Music and this do not go together -- the music lives
+; at $0300 and is seven kilobytes -- and none of the adventures that need
+; this has any.
+                IFDEF LOW_CODE
+CODE_AT         equ $0400
+CODE_LOADS_AT   equ $4000               ; where its file comes in, to be moved
+DATABASE_AT     equ $4000
+ISLAND_AT       equ $AB00
+                IFDEF WITH_MUSIC
+                DISPLAY "a low build has no room for music: it is at $0300"
+                ASSERT 0
+                ENDIF
+; The mover, and with it the seven bytes that start the thing.  BASIC cannot
+; call $0400 itself: at that moment the lower ROM is still in and $0400 is
+; ROM, not the interpreter.  So what BASIC calls is the starter, up where
+; there is no ROM, which puts both of them out of the way and jumps down.  It
+; is left where the island goes, which the interpreter writes over once it is
+; running and has no more use for it.
+                ORG     CODE_LOADS_AT
+code_mover:
+                ld      hl, starter
+                ld      de, ISLAND_AT
+                ld      bc, starter_end - starter
+                ldir
+                ld      hl, code_image
+                ld      de, CODE_AT
+                ld      bc, CODE_BYTES
+                ldir
+                ret
+
+; Assembled here and run up there: it names no address of its own.
+starter:
+                di
+                ld      bc, GATE_ARRAY
+                ld      a, MODE_1               ; mode one, both ROMs out
+                out     (c), a
+                jp      CODE_AT
+starter_end:
+
+code_image:
+                DISP    CODE_AT
+                ELSE
                 ; above the lower ROM, which covers anything under $4000
                 ORG     $4000
+                ENDIF
 start:
                 di
                 ld      sp, $BF00
+                IFDEF LOW_CODE
+                call    island_init             ; the tape's calls, up above
+                ENDIF
                 call    keyboard_init
                 call    db_init
                 call    config_init
@@ -102,12 +165,25 @@ done_flag:      db      0
                 include "../common/loop.asm"
                 include "../common/picture.asm"
 
+                IFDEF LOW_CODE
+; The database is not in here: it is a file of its own, loaded at $4000 after
+; the mover has carried this down.  How much of it fits is the builder's to
+; check, because the assembler never sees it.
+last:
+                ASSERT  last <= DATABASE_AT     ; or the database would land on it
+database        equ DATABASE_AT
+CODE_BYTES      equ last - start
+                ENT                             ; back to where the file loads
+
+                SAVEBIN "game.bin", code_mover, last - start + code_image - code_mover
+                ELSE
 database:
                 INCBIN  "game.rgac"
 last:
                 ASSERT  last <= FIRMWARE_AT     ; or the tape would stop working
 
                 SAVEBIN "game.bin", start, last - start
+                ENDIF
 
 ; And the music, as a file of its own.  It is assembled here, after the
 ; interpreter has been written out, because the mover in front of it is put

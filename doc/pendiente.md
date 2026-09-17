@@ -616,12 +616,8 @@ a 256, y el firmware empezando en `$B100`, que es donde salta el `ASSERT` de su
 | quijote2 | 20984 | — | **le faltan 248** |
 | quijote1 | 21115 | — | **le faltan 379** |
 
-**Las dos partes del Quijote no caben en un Amstrad**, y no es de ahora: sale
-igual en el árbol de antes de todo esto. Es un agujero que estaba y que nadie
-había nombrado. Lo que se puede hacer cuando toque es lo mismo que hace el +3
-—repartir la base de datos en bancos, que el formato ya sabe y el 6128 tiene
-memoria de sobra— o dibujar sus láminas más baratas, que en el Quijote son casi
-la mitad del total.
+~~**Las dos partes del Quijote no caben en un Amstrad.**~~ **Ya caben**, dando
+la vuelta al mapa: ver «El Quijote en un 464», más abajo.
 
 Y hay un **escalón** que conviene saber, porque muerde sin avisar: como la base
 de datos va alineada a 256, lo que importa no es cuánto crece el intérprete
@@ -632,6 +628,64 @@ bytes** hasta el escalón, y el día que se crucen, las ocho pierden 256 de golp
 y megacorp2 se sale. Eso es justo lo que pasó a mitad de esta tanda: con una
 tabla de separadores metida a capón el intérprete pasó de `$6000`, la base de
 datos se fue a `$6100` y `regac make` dejó de construir esta máquina.
+
+### El Quijote en un 464, con el mapa del revés
+
+Un 464 no tiene bancos y su base de datos va de una pieza, así que las dos
+partes del Quijote —21115 y 20984 bytes— no cabían de ninguna manera: el
+intérprete ocupa desde `$4000` y el firmware corta en `$B100`. Ahora caben
+porque **el intérprete y la base de datos se cambian el sitio**.
+
+Los dieciséis kilobytes de debajo de `$4000` son RAM como cualquier otra en
+cuanto las dos ROM están fuera, y ahí ya vivía la música. Ahí va ahora el
+intérprete, y la base de datos se queda con todo lo de arriba:
+
+| desde | qué |
+|---|---|
+| `$0400` | el intérprete, unos 8280 bytes |
+| `$4000` | la base de datos entera, **27392 bytes** de sitio |
+| `$AB00` | la isla: las dos llamadas de la cinta y una copia de la partida |
+| `$B100` | lo del firmware |
+
+**Tres cosas costaron entenderse**, y las tres son de la ROM baja:
+
+1. **La cinta se graba por el firmware, y el firmware devuelve la ROM baja
+   mientras dura.** Así que ni la llamada ni los bytes que se le dan pueden
+   estar debajo de `$4000`: serían ROM. De ahí la isla, que es lo único de un
+   build bajo que vive arriba. La partida se copia allí para grabarla y se
+   copia de vuelta al cargarla. La isla no nombra ninguna dirección suya, así
+   que se ensambla abajo y se ejecuta arriba sin más.
+2. **BASIC no puede llamar a `$0400`**, porque en ese momento `$0400` es ROM.
+   Lo que llama es un arranque de siete bytes que el movedor deja en la isla:
+   quita las dos ROM por el chip y salta abajo. El intérprete lo pisa después
+   con la isla de verdad, que ya no lo necesita.
+3. **Al volver de la cinta, el firmware repone la paginación que él cree**, y
+   lo que cree es que la ROM baja está puesta: el intérprete nunca se lo dijo,
+   mueve el chip por su cuenta. Un `ret` a una dirección de abajo con esa idea
+   en vigor cae en ROM y la máquina se va al monte, que es justo lo que hizo
+   hasta que la isla aprendió a reponer la nuestra antes de devolver el
+   control.
+
+**Cómo viaja.** Como la música, porque la línea de BASIC que carga está ella
+misma en `$0170`: el fichero entra en `$4000` con un movedor delante, el
+movedor lo baja y vuelve, y entonces la base de datos se carga encima de donde
+estuvo. El cargador son cinco líneas: `MEMORY &3FFF`, cargar el intérprete,
+llamar al movedor, cargar la base de datos y llamar al arranque de la isla.
+BASIC guarda sus variables debajo de `$3FFF` y hacia abajo; el intérprete acaba
+sobre `$2450`, así que hay siete kilobytes de nadie entre los dos.
+
+**Música y esto no van juntos** —la música vive en `$0300` y son siete
+kilobytes—, y ninguna de las aventuras que lo necesitan tiene.
+
+**Se elige solo.** `regac make` construye como siempre y, si el ensamblador
+dice que no cabe, vuelve a construir con `-DLOW_CODE` y lo dice por pantalla.
+Las seis aventuras que caben siguen saliendo exactamente igual.
+
+Las pruebas son [`test_low_cpc.py`](../tests/test_low_cpc.py) —el Quijote
+jugando con el mapa del revés, el cargador, y la cinta entera cuando se pide
+con `REGAC_SLOW=1`— y una más en
+[`test_tape_cpc.py`](../tests/test_tape_cpc.py), que graba un bloque desde un
+build bajo y mira que la copia llegó a la isla y que la máquina volvió entera.
 
 ### Lo que cuesta dibujar en el Amstrad, que es mucho
 
@@ -2032,6 +2086,17 @@ Los reintentos se han quitado.
 
 ~~Quedan otras pruebas que escriben el PC, pero una sola vez, y ya reintentan.~~
 Ya no queda ninguna: ver lo que sigue.
+
+### Y una que sigue apareciendo, en el PCW
+
+`test_graphics_pcw` falló una vez en una vuelta entera de la suite —una lámina
+con puntos distintos de los de la referencia, no una que no acabara— y pasó
+tres veces seguidas al repetirla. Lo que encaja es lo que ya está escrito en
+`start_code`: un PCW sin disquete sigue ocupado con el cargador que le da su
+teclado, y de vez en cuando ese cargador pisa lo que se le acaba de escribir.
+Los reintentos de `start_code` cubren el caso de que no arranque, no el de que
+arranque con un byte cambiado. Si vuelve a salir, el remedio es el mismo que
+en las demás: escribir, volver a leer lo escrito y repetir si no coincide.
 
 ### El indicador del modo paso a paso, que costaba ocho segundos por orden
 
