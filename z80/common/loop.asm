@@ -243,8 +243,15 @@ play_turn:
                 ld      a, (vm_any_true)
                 or      a
                 ret     nz
+                ; The verb or the noun: a word it knows with nothing to do
+                ; about it is "you cannot do that", and only a line with
+                ; neither is "I do not understand".  Read in the original --
+                ; it asks after both -- and then asked of it: JARRO on its own
+                ; at MegaCorp answers "No puedo hacer eso", and XYZZY answers
+                ; "Perdon?".  This looked at the verb alone.
                 ld      a, (vm_verb)
-                or      a
+                ld      hl, vm_noun1
+                or      (hl)
                 ld      a, MSG_CANTDO
                 jr      nz, .say
                 ld      a, MSG_NOTUNDERSTAND

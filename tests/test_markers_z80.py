@@ -178,6 +178,22 @@ STOPS_ON_DESCRIBED = [["PUSH", 0], ["SET?"], ["IF"], ["EXIT"], ["END"]]
 
 
 @needs_tools
+def test_a_noun_on_its_own_is_something_it_cannot_do():
+    """A word it knows and no verb: that is an order it cannot do, not one it
+    did not understand.  Read in the original -- it asks after the verb and
+    the noun before choosing which to say -- and then asked of it: JARRO on
+    its own at MegaCorp answers "No puedo hacer eso" and XYZZY answers
+    "Perdon?"."""
+    ddb = adventure()
+    ddb["nouns"] = {"PIEDRA": 1}
+    known = played(ddb, orders=["PIEDRA"])
+    assert any("NO PUEDES." in line for line in known), known
+    assert not any("COMO DICES?" in line for line in known), known
+    unknown = played(ddb, orders=["XYZZY"])
+    assert any("COMO DICES?" in line for line in unknown), unknown
+
+
+@needs_tools
 def test_a_look_pays_what_a_new_room_is_owed():
     """An adventure that opens by looking from its own high priority table --
     which is what MegaCorp does -- has its first room described once and not

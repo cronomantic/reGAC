@@ -2156,11 +2156,46 @@ queda en el scratchpad, fuera del repositorio, como las instantáneas.
 | `$7315` | apilar un valor; su pila de condiciones tiene el puntero en `$A537` y la base en `$A4E3` |
 | `$73E0`–`$7410` | el recorrido de una condición: se salta lo que no toca mirando el bit 7 de cada byte --que es como marca una constante-- hasta el `$3F`, que es `END` |
 
-**Lo que queda por leer**, y es lo que de verdad importa: el bucle de turno y
-el despachador. De una sentada contestan lo que llevamos midiendo de tarde en
-tarde --cuándo se describe, cuándo se cuenta el turno, cuándo se queja, qué
-hace cada opcode con la pila-- y dicen dónde mirar antes de que un fallo
-aparezca por casualidad.
+**El despachador, leído** (`$797B`). Recorre la tabla byte a byte: un byte con
+el bit 7 puesto es una constante y se apila; si no, los seis bits de abajo son
+el opcode, que se busca en `$A155 + 2n` y se llama. **Y después de cada
+opcode mira su byte de estado: si el bit 6 o el 5 están puestos, sale de la
+tabla.** Al entrar en una tabla los limpia --`AND 9F`-- y vacía la pila. Eso es
+lo que hoy se había medido a ciegas: `WAIT` pone el bit 6 y por eso acaba la
+tabla en la que está.
+
+**El bucle de turno, leído** (`$7C5D`), que es lo que más costaba medir:
+
+    tabla de alta prioridad -> describir la sala si es nueva -> preguntar ->
+    la orden -> tabla local -> tabla baja -> la queja -> otra vez
+
+Exactamente el orden que hoy se había deducido a base de medir aperturas: la
+tabla de alta prioridad va **antes** de la descripción que una sala nueva debe.
+Después de ella mira el bit 5, que es el de acabar la partida.
+
+**Y los bits de su byte de estado, `$A4E7`:**
+
+| bit | qué significa | quién lo pone |
+|---|---|---|
+| 6 | el turno está servido | `WAIT` en `$78F8`, `OKAY` en `$78ED` |
+| 5 | la partida se acaba | `EXIT` en `$7918` |
+| 3 | algo atendió la orden | la evaluación de un `IF` que sale cierto, en `$73EB` |
+
+El bit 3 se limpia **justo antes de la tabla local** (`$7B03`), así que lo que
+haga la de alta prioridad no cuenta para la queja; y la queja misma
+(`$7B2C`) elige entre el 241 y el 242 **mirando el verbo y el nombre**: si
+alguno de los dos es algo, «no puedo hacer eso»; si ninguno, «perdón».
+
+**Y eso era una diferencia nuestra, ya arreglada**: mirábamos sólo el verbo,
+de modo que un nombre suelto que la aventura conoce --`JARRO` en MegaCorp--
+contestaba «perdón» en vez de «no puedo hacer eso». Comprobado en el original
+antes de tocar nada, y con prueba en `test_markers_z80.py`.
+
+**Lo que queda por leer**: qué hace cada opcode con la pila --se llega a
+cualquiera por su entrada en la tabla--, el parser, y cómo decide describir
+una sala. Lo leído hasta aquí ya ha confirmado dos arreglos de hoy (`SWAP` en
+`$759F` cambia las dos direcciones; el orden del turno) y ha encontrado uno
+nuevo sin tener que tropezarse con él.
 
 ## Cosas menores
 
