@@ -280,23 +280,48 @@ op_hold:
                 call    wait_or_key
                 jp      vm_loop
 
+; GET, and everything it can say instead.  Read in the original and then
+; measured on it: it looks in the hand first, then round the room, and last
+; at the weight, and every one of the three refusals ends the turn -- the
+; conditions under it in the same table are not looked at.  What it lets you
+; carry is the strength less one: with a strength of three it takes two
+; things of weight one.
 op_get:
                 call    vm_pop
                 ld      (vm_arg), hl
                 call    obj_location            ; DE = where it is
                 jp      c, vm_loop
+                ld      hl, CARRIED
+                or      a
+                sbc     hl, de
+                jr      z, .already
                 ld      hl, (vm_location)
                 or      a
                 sbc     hl, de
                 jr      nz, .not_here
                 ld      hl, (vm_arg)
+                call    obj_weight
+                ld      hl, vm_weight
+                add     a, (hl)                 ; what would be carried then
+                ld      hl, vm_max_weight
+                cp      (hl)
+                jr      nc, .too_much
+                ld      (vm_weight), a
+                ld      hl, (vm_arg)
                 ld      de, CARRIED
                 call    obj_move
                 jp      vm_loop
+.already:
+                ld      a, MSG_HAVEIT
+                jr      .complain
 .not_here:
                 ld      a, MSG_CANTSEE
+                jr      .complain
+.too_much:
+                ld      a, MSG_TOOMUCH
+.complain:
                 call    print_message
-                jp      vm_loop
+                jp      end_turn
 
 op_drop:
                 call    vm_pop
@@ -310,11 +335,36 @@ op_drop:
                 ld      hl, (vm_arg)
                 ld      de, (vm_location)
                 call    obj_move
+                ld      hl, (vm_arg)
+                call    obj_weight
+                ld      b, a
+                ld      a, (vm_weight)
+                sub     b
+                ld      (vm_weight), a
                 jp      vm_loop
 .not_carried:
                 ld      a, MSG_DONTHAVE
                 call    print_message
-                jp      vm_loop
+                jp      end_turn
+
+; What object L weighs, in A; nought if there is no such object.
+; Corrupts: AF, DE, HL
+obj_weight:
+                call    obj_record
+                ld      a, 0
+                ret     c
+                inc     hl
+                ld      a, (hl)
+                ret
+
+; A refusal of the original's ends the line and with it the turn, and so the
+; table it is in: its GET, DROP, BRIN and FIND all finish at the same two
+; instructions, which set the bit WAIT sets.
+end_turn:
+                call    new_line
+                ld      a, 1
+                ld      (vm_done), a
+                ret
 
 ; Each of the two goes where the other was.  This had them both going to the
 ; first one's place, and obj_location's own quirk -- it read the location of
@@ -506,6 +556,9 @@ op_rand:
                 call    vm_push_false
                 jp      vm_loop
 
+; Less and greater take the sign of the difference, which is what the
+; original looks at -- it subtracts and tests the top bit -- so a difference
+; that has gone below zero counts as less.
 op_less:
                 call    vm_pop
                 ld      d, h
@@ -513,7 +566,8 @@ op_less:
                 call    vm_pop
                 or      a
                 sbc     hl, de
-                jr      c, .yes
+                bit     7, h
+                jr      nz, .yes
                 call    vm_push_false
                 jp      vm_loop
 .yes:
@@ -528,7 +582,8 @@ op_greater:
                 ex      de, hl
                 or      a
                 sbc     hl, de
-                jr      c, .yes
+                bit     7, h
+                jr      nz, .yes
                 call    vm_push_false
                 jp      vm_loop
 .yes:
@@ -687,28 +742,55 @@ op_at:
                 call    vm_push_true
                 jp      vm_loop
 
+; BRIN fetches something to where the player is, and says so when it cannot:
+; 245 for what is already in the hand and 252 for what is nowhere, both of
+; which end the turn.  Measured on the original.
 op_brin:
                 call    vm_pop
+                ld      (vm_arg), hl
+                call    obj_location
+                jp      c, vm_loop
+                ld      hl, CARRIED
+                or      a
+                sbc     hl, de
+                jr      z, .already
+                ld      a, d
+                or      e
+                jr      z, .nowhere
+                ld      hl, (vm_arg)
                 ld      de, (vm_location)
                 call    obj_move
                 jp      vm_loop
+.already:
+                ld      a, MSG_HAVEIT
+                jr      .complain
+.nowhere:
+                ld      a, MSG_CANTFIND
+.complain:
+                call    print_message
+                jp      end_turn
 
+; FIND goes to where the thing is and describes the room on arriving, which
+; is the same code GOTO uses.  About what is already in the hand it says
+; nothing; what is nowhere gets 252 and the turn ends.
 op_find:
                 call    vm_pop
                 ld      (vm_arg), hl
                 call    obj_location
                 jp      c, vm_loop
-                ld      a, d
-                or      e
-                jp      z, vm_loop              ; nowhere to go
                 ld      hl, CARRIED
                 or      a
                 sbc     hl, de
                 jp      z, vm_loop              ; already with you
+                ld      a, d
+                or      e
+                jr      z, .nowhere
                 ld      (vm_location), de
-                ld      a, 1
-                ld      (vm_new_room), a
-                jp      vm_loop
+                jp      op_look
+.nowhere:
+                ld      a, MSG_CANTFIND
+                call    print_message
+                jp      end_turn
 
 op_in:
                 call    vm_pop
@@ -750,84 +832,37 @@ op_wait:
                 ld      (vm_done), a
                 ret
 
-; QUIT asks first and only stops if the answer is yes; EXIT just stops.
+; QUIT asks first.  The original reads one key and nothing else: N calls it
+; off and anything at all -- a letter, a space, the enter key -- goes ahead
+; with it.  Measured on it by answering with an X, which ended the game.
+; EXIT just stops.
 op_quit:
                 ld      a, MSG_YOUSURE
                 call    print_message
-                call    read_line               ; HL = the codes, BC = how many
-                call    said_yes
-                jp      nc, vm_loop
+                call    read_key
+                and     $DF                     ; as their own code does
+                cp      'N'
+                jp      z, vm_loop
 op_exit:
                 ld      a, 1
                 ld      (vm_over), a
                 ld      (vm_done), a
                 jp      vm_loop
 
-; Whether the line at HL, BC characters of it, says yes.  The words are kept
-; in plain letters and turned into this adventure's own codes as they are
-; compared, because that is what was typed into the buffer.
-; Carry set when it does.
-; Corrupts: everything
-said_yes:
-                ld      a, b
-                or      a
-                ret     nz                      ; nothing that long is a yes
-                ld      a, c
-                or      a
-                ret     z
-                ld      (yes_length), a
-                ld      (yes_line), hl
-                ld      ix, yes_words
-.each_word:
-                ld      a, (ix+0)
-                or      a
-                ret     z                       ; none of them matched
-                ld      c, a
-                ld      a, (yes_length)
-                cp      c
-                jr      nz, .next
-                push    ix
-                ld      de, (yes_line)
-                ld      b, c
-                inc     ix
-.each_letter:
-                ld      a, (ix+0)
-                call    ascii_to_code
-                ld      c, a
-                ld      a, (de)
-                cp      c
-                jr      nz, .no_match
-                inc     ix
-                inc     de
-                djnz    .each_letter
-                pop     ix
-                scf
-                ret
-.no_match:
-                pop     ix
-.next:
-                ld      c, (ix+0)
-                ld      b, 0
-                inc     ix
-                add     ix, bc                  ; on past this one
-                jr      .each_word
-
-yes_words:      db      1, "S"
-                db      2, "SI"
-                db      1, "Y"
-                db      3, "YES"
-                db      0
-yes_length:     db      0
-yes_line:       dw      0
-
 op_room:
                 ld      hl, (vm_location)
                 call    vm_push
                 jp      vm_loop
 
+; NOUN n answers for either of the two nouns a line can name and not just
+; the first: read in the original, which compares both bytes, and then asked
+; of it -- COGE DISCO AGUJA answers to NOUN 4, which is the aguja.
 op_noun:
                 call    vm_pop
                 ld      a, (vm_noun1)
+                cp      l
+                jr      z, .yes
+                ld      a, (vm_noun2)
                 cp      l
                 jr      z, .yes
                 call    vm_push_false
@@ -858,12 +893,14 @@ op_adve:
                 call    vm_push_true
                 jp      vm_loop
 
+; GOTO is their LOOK with a room put in first -- their code for it is two
+; instructions and a jump into LOOK -- so the room is described there and
+; then, not when the turn comes round again.  Measured: GOTO 20 with a
+; message after it printed room 20 first.
 op_goto:
                 call    vm_pop
                 ld      (vm_location), hl
-                ld      a, 1
-                ld      (vm_new_room), a
-                jp      vm_loop
+                jp      op_look
 
 op_no1:
                 ld      a, (vm_noun1)
@@ -1089,8 +1126,8 @@ vm_table:
                 dw      op_save         ; $1C
                 dw      op_load         ; $1D
                 dw      op_here         ; $1E
-                dw      op_carr         ; $1F
-                dw      op_avai         ; $20
+                dw      op_avai         ; $1F
+                dw      op_carr         ; $20
                 dw      op_add          ; $21
                 dw      op_sub          ; $22
                 dw      op_turn         ; $23

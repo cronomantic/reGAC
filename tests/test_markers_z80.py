@@ -194,6 +194,42 @@ def test_a_noun_on_its_own_is_something_it_cannot_do():
 
 
 @needs_tools
+def test_goto_describes_the_room_it_arrives_in():
+    """Their GOTO is their LOOK with a room put in first, so the description
+    comes out where the GOTO is and not when the turn comes round again.
+    Measured on the original: GOTO 20 with a message after it printed room
+    20 and then the message."""
+    ddb = adventure(
+        lpcs=[["PUSH", LOOK_VERB], ["VERB"], ["IF"],
+              ["PUSH", 2], ["GOTO"], ["PUSH", 100], ["MESS"], ["END"]],
+        rooms={
+            "1": {"graphic_id": 0, "exits": [], "desc": "UN CUARTO"},
+            "2": {"graphic_id": 0, "exits": [], "desc": "EL OTRO CUARTO"},
+        },
+        messages={"100": "Y LUEGO ESTO"},
+    )
+    said = played(ddb, orders=["MIRA"])
+    where = [n for n, line in enumerate(said) if "EL OTRO CUARTO" in line]
+    after = [n for n, line in enumerate(said) if "Y LUEGO ESTO" in line]
+    assert where and after, said
+    assert where[0] <= after[0], "the room is described before the message"
+
+
+@needs_tools
+def test_a_noun_is_either_of_the_two():
+    """NOUN n answers for the second noun of a line as well as the first:
+    read in the original, which compares both, and asked of it -- COGE DISCO
+    AGUJA answers to the aguja."""
+    ddb = adventure(
+        lpcs=[["PUSH", 2], ["NOUN"], ["IF"], ["PUSH", 100], ["MESS"], ["END"]],
+        messages={"100": "EL SEGUNDO"},
+    )
+    ddb["nouns"] = {"PIEDRA": 1, "PALO": 2}
+    said = played(ddb, orders=["MIRA PIEDRA PALO"])
+    assert any("EL SEGUNDO" in line for line in said), said
+
+
+@needs_tools
 def test_a_look_pays_what_a_new_room_is_owed():
     """An adventure that opens by looking from its own high priority table --
     which is what MegaCorp does -- has its first room described once and not

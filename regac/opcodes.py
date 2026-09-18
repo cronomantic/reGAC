@@ -100,8 +100,11 @@ OPS = [
     Op("SAVE",     0x1C, NULLARY),
     Op("LOAD",     0x1D, NULLARY),
     Op("HERE",     0x1E, PREFIX,  (OBJ,),        pushes=True),
-    Op("CARR",     0x1F, PREFIX,  (OBJ,),        pushes=True),
-    Op("AVAI",     0x20, PREFIX,  (OBJ,),        pushes=True, aliases=("AVAIL",)),
+    # Which byte is which was read in the original and then measured on it:
+    # $1F is the one that also looks round the room and $20 the one that
+    # only looks in the hand.  deGAC had them the other way about.
+    Op("AVAI",     0x1F, PREFIX,  (OBJ,),        pushes=True, aliases=("AVAIL",)),
+    Op("CARR",     0x20, PREFIX,  (OBJ,),        pushes=True),
     Op("+",        0x21, INFIX,   (NUM, NUM),    pushes=True),
     Op("-",        0x22, INFIX,   (NUM, NUM),    pushes=True),
     Op("TURN",     0x23, NULLARY,  (),           pushes=True),

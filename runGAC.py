@@ -114,7 +114,8 @@ class GAC_Interpreter:
         self.adverb = 0
         self.noun1 = 0
         self.noun2 = 0
-        self.max_weight = 0
+        self.max_weight = 250
+        self.weight = 0
         self.ready = False
         self.show_exits = False
         self.old_noun = 0
@@ -375,7 +376,13 @@ class GAC_Interpreter:
         self.noun1 = 0
         self.noun2 = 0
         self.old_noun = 0
-        self.max_weight = 255
+        # What can be carried at once, and what is being carried.  The
+        # original starts every game with a strength of 250 and keeps the
+        # count itself, adding in GET and taking away in DROP and nowhere
+        # else, so an object moved out of the hand by TO or SWAP leaves the
+        # count where it was.
+        self.max_weight = 250
+        self.weight = 0
         self.ready = True
         # Set light on
         self.flags[1] = True
@@ -530,33 +537,36 @@ class GAC_Interpreter:
                     if not self.wait_key_or_timeout(s0):
                         finished = True
                 elif cmd == "GET":
+                    # The order of the three refusals is the original's -- the
+                    # hand, then the room, then the weight -- and every one of
+                    # them ends the turn, and with it the table.  It refuses
+                    # when the total *reaches* the strength, measured on it:
+                    # with a strength of three it carries two things of one.
                     s0 = self.stack.pop()
                     if s0 in self.objects.keys():
                         obj = self.objects[s0]
-                        # First check object is present
-                        if obj["loc"] == self.current_loc:
-                            playerweight = 0
-                            for v in self.objects.values():
-                                if v["loc"] == self.CARRIED_LOC:
-                                    playerweight += v["weight"]
-                            if playerweight + obj["weight"] > self.max_weight:
-                                self.print(self.messages[self.TOOMUCH] + "\n")
-                            else:
-                                obj["loc"] = self.CARRIED_LOC
-                        else:
+                        if obj["loc"] == self.CARRIED_LOC:
+                            self.print(self.messages[self.ALREADYHAVE] + "\n")
+                            done = True
+                        elif obj["loc"] != self.current_loc:
                             self.print(self.messages[self.CANTSEE] + "\n")
+                            done = True
+                        elif self.weight + obj["weight"] >= self.max_weight:
+                            self.print(self.messages[self.TOOMUCH] + "\n")
+                            done = True
+                        else:
+                            self.weight += obj["weight"]
+                            obj["loc"] = self.CARRIED_LOC
                 elif cmd == "DROP":
                     s0 = self.stack.pop()
                     if s0 in self.objects.keys():
                         obj = self.objects[s0]
-                        if s0 not in self.objects.keys():
-                            self.print(self.messages[self.DONTHAVE] + "\n")
+                        if obj["loc"] == self.CARRIED_LOC:
+                            obj["loc"] = self.current_loc
+                            self.weight -= obj["weight"]
                         else:
-                            obj = self.objects[s0]
-                            if obj["loc"] == self.CARRIED_LOC:
-                                obj["loc"] = self.current_loc
-                            else:
-                                self.print(self.messages[self.DONTHAVE] + "\n")
+                            self.print(self.messages[self.DONTHAVE] + "\n")
+                            done = True
                 elif cmd == "SWAP":
                     s0 = self.stack.pop()
                     s1 = self.stack.pop()
@@ -571,16 +581,33 @@ class GAC_Interpreter:
                     if o in self.objects.keys():
                         self.objects[o]["loc"] = r
                 elif cmd == "BRIN":
-                    # Bring the object here, if it exists.
-                    o = self.stack.pop()
-                    if o in self.objects.keys():
-                        self.objects[o]["loc"] = self.current_loc
-                elif cmd == "FIND":
-                    # Move the player to the object, ignoring the connections.
+                    # Bring the object here.  What is already in the hand and
+                    # what is nowhere at all each get their own message, and
+                    # the turn ends there: read in the original and measured.
                     o = self.stack.pop()
                     if o in self.objects.keys():
                         loc = self.objects[o]["loc"]
-                        if loc in self.locations.keys():
+                        if loc == self.CARRIED_LOC:
+                            self.print(self.messages[self.ALREADYHAVE] + "\n")
+                            done = True
+                        elif loc == self.NOTHING_LOC:
+                            self.print(self.messages[self.CANTFIND] + "\n")
+                            done = True
+                        else:
+                            self.objects[o]["loc"] = self.current_loc
+                elif cmd == "FIND":
+                    # Move the player to the object, ignoring the connections.
+                    # About what is in the hand it says nothing; what is
+                    # nowhere gets 252 and ends the turn.
+                    o = self.stack.pop()
+                    if o in self.objects.keys():
+                        loc = self.objects[o]["loc"]
+                        if loc == self.CARRIED_LOC:
+                            pass
+                        elif loc == self.NOTHING_LOC:
+                            self.print(self.messages[self.CANTFIND] + "\n")
+                            done = True
+                        elif loc in self.locations.keys():
                             self.current_loc = loc
                             self.__display_room(self.current_loc)
                 elif cmd == "OBJ":
@@ -751,11 +778,15 @@ class GAC_Interpreter:
                 elif cmd == "WAIT":
                     done = True
                 elif cmd == "QUIT":
+                    # The original reads one key and takes anything that is
+                    # not an N for a yes -- measured on it by answering with
+                    # an X, which ended the game.  A line is read here, so it
+                    # is the first letter that speaks.
                     self.print(self.messages[self.YOUSURE])
                     res = self.input()
                     if not isinstance(res, str):
                         finished = True
-                    elif res.upper() in ["YES", "Y", "SI", "S"]:
+                    elif not res.strip().upper().startswith("N"):
                         finished = True
                 elif cmd == "EXIT":
                     finished = True

@@ -22,10 +22,12 @@ MSG_SCORE       equ 249
 MSG_TOOK        equ 250
 MSG_PRESSKEY    equ 243
 MSG_YOUSURE     equ 244
+MSG_HAVEIT      equ 245
 MSG_DONTHAVE    equ 246
 MSG_CANTSEE     equ 247
 MSG_TOOMUCH     equ 248
 MSG_ITSDARK     equ 251
+MSG_CANTFIND    equ 252
 MSG_OBJHERE     equ 253
 MSG_OKAY        equ 254
 MSG_TURNS       equ 255
@@ -66,6 +68,10 @@ vm_init:
                 ld      (vm_flags), a
                 ld      a, 1
                 ld      (vm_graphics), a
+                ld      a, 250                  ; what a game starts able to carry
+                ld      (vm_max_weight), a
+                xor     a
+                ld      (vm_weight), a
                 ; walk the object table, noting where each one lives
                 ld      a, SECTION_OBJECTS
                 call    db_section
@@ -354,12 +360,19 @@ vm_verb:        db      0
 vm_noun1:       db      0
 vm_noun2:       db      0
 vm_adverb:      db      0
-vm_max_weight:  db      0
 ; Everything from here to vm_state_end is what a game amounts to, so it is
 ; what SAVE writes out and LOAD reads back.  The adventure itself never
 ; changes, which is why only this much has to travel.
 vm_state:
 vm_location:    dw      0
+; What can be carried at once and what is being carried, both bytes of the
+; game and not of the machine -- the original keeps them inside the block it
+; saves, and starts every game with a strength of 250.  GET adds a weight to
+; the second and refuses when the total *reaches* the first; DROP takes it
+; away again.  Nothing else touches it, so an object moved by TO or SWAP
+; leaves the count where it was, which is what the original does too.
+vm_max_weight:  db      250
+vm_weight:      db      0
 vm_seed:        dw      $A55A
 ; What the music was doing, which is part of a game and not of the machine: a
 ; nought for silence, and otherwise the tune plus one.  It is a byte of every

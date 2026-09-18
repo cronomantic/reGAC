@@ -61,7 +61,7 @@ else:
         return func
 
 
-def adventure(conditions):
+def adventure(conditions, weights=(7, 1, 2)):
     """A small adventure whose only content is the conditions under test."""
     return {
         "font": [0] * 1024,
@@ -71,9 +71,9 @@ def adventure(conditions):
         "pronouns": [],
         "messages": {"1": "hola"},
         "objects": {
-            "1": {"weight": 7, "initial_loc": 3, "name": "una cosa"},
-            "2": {"weight": 1, "initial_loc": CARRIED, "name": "otra cosa"},
-            "3": {"weight": 2, "initial_loc": 7, "name": "la tercera"},
+            "1": {"weight": weights[0], "initial_loc": 3, "name": "una cosa"},
+            "2": {"weight": weights[1], "initial_loc": CARRIED, "name": "otra cosa"},
+            "3": {"weight": weights[2], "initial_loc": 7, "name": "la tercera"},
         },
         "locations": {
             "1": {"graphic_id": 0, "exits": [], "desc": "el principio"},
@@ -92,9 +92,9 @@ def adventure(conditions):
     }
 
 
-def run(conditions):
+def run(conditions, weights=(7, 1, 2)):
     """Run the conditions and give back what the machine ended up holding."""
-    database = Database(adventure(conditions))
+    database = Database(adventure(conditions, weights))
     with open(DATABASE, "wb") as f:
         f.write(database.build())
     listing = emulator.assemble(SOURCE, listing=LISTING)
@@ -182,7 +182,7 @@ def test_objects():
         "WITH CSET 31 END",
         "1 TO 9 END",
         "2 SWAP 3 END",
-        "BRIN 3 END",
+        "BRIN 2 END",
         "CONN 1 CSET 32 END",
     ])
     assert state["flags"] == {20, 21, 22, 23, 25}, "object 3 is not in the room"
@@ -190,8 +190,93 @@ def test_objects():
     assert state["counters"][31] == CARRIED, "WITH stands for what you carry"
     assert state["counters"][32] == 7, "the way out of room 3 leads to room 7"
     assert state["objects"][1] == 9, "TO moves an object"
-    assert state["objects"][2] == 7, "SWAP exchanges two objects"
-    assert state["objects"][3] == 3, "BRIN fetches one to where you are"
+    assert state["objects"][3] == CARRIED, "SWAP exchanges two objects"
+    assert state["objects"][2] == 3, "BRIN fetches one to where you are"
+
+
+@needs_tools
+def test_what_get_refuses():
+    """Read in the original and measured on it: GET looks in the hand, then
+    round the room, and last at the weight, and each of the three refusals
+    ends the turn, so nothing written under it in the same table is looked
+    at.  Object 2 starts in the hand, object 3 in room 7, the player in 1."""
+    for refused, conditions in (
+        ("it is already in the hand", ["SET 19 GET 2 SET 20 END", "SET 21 END"]),
+        ("it is somewhere else", ["SET 19 GET 3 SET 20 END", "SET 21 END"]),
+        ("it weighs too much", ["STRE 5 SET 19 GET 1 SET 20 END", "SET 21 END"]),
+    ):
+        state = run(conditions)
+        assert state["flags"] == {19}, refused
+    assert state["objects"][1] == 3, "and the object stays where it was"
+
+
+@needs_tools
+def test_what_can_be_carried_at_once():
+    """The strength is the total it refuses at and not the last it allows:
+    with a strength of three, two things of weight one go into the hand and
+    the third does not.  Measured on the original, which carried two."""
+    state = run([
+        "STRE 3 END",
+        "1 TO 1 END",
+        "3 TO 1 END",
+        "GET 1 SET 20 END",
+        "GET 3 SET 21 END",
+    ], weights=(1, 1, 1))
+    assert state["flags"] == {20, 21}, "two of them, and the second is the last"
+    assert state["objects"][1] == CARRIED
+    assert state["objects"][3] == CARRIED
+    state = run([
+        "STRE 3 END",
+        "1 TO 1 END",
+        "3 TO 1 END",
+        "GET 1 GET 3 END",
+        "SET 20 GET 2 SET 21 END",
+    ], weights=(1, 1, 1))
+    assert state["flags"] == {20}, "and a third is one too many"
+
+
+@needs_tools
+def test_dropping_gives_the_weight_back():
+    state = run([
+        "STRE 5 END",
+        "1 TO 1 END",
+        "3 TO 1 END",
+        "GET 1 DROP 1 GET 3 SET 20 END",
+    ], weights=(3, 1, 3))
+    assert state["flags"] == {20}, "what was put down is not carried any more"
+    assert state["objects"][3] == CARRIED
+
+
+@needs_tools
+def test_bring_says_what_it_cannot_do():
+    """Their BRIN answers 245 for what is already in the hand and 252 for
+    what is nowhere at all, and ends the turn either way."""
+    state = run(["SET 19 BRIN 2 SET 20 END", "SET 21 END"])
+    assert state["flags"] == {19}, "the one in the hand ends the table"
+    state = run(["1 TO 0 END", "SET 19 BRIN 1 SET 20 END", "SET 21 END"])
+    assert state["flags"] == {19}, "and so does the one that is nowhere"
+
+
+@needs_tools
+def test_find_goes_to_it():
+    state = run(["FIND 3 SET 20 END"])
+    assert state["location"] == 7, "FIND goes to where the thing is"
+    assert state["flags"] == {20}, "and carries on with the table"
+    state = run(["1 TO 0 END", "SET 19 FIND 1 SET 20 END", "SET 21 END"])
+    assert state["flags"] == {19}, "but says 252 for what is nowhere, and stops"
+    assert state["location"] == 1
+
+
+@needs_tools
+def test_less_and_greater_are_signed():
+    """Their two take the sign of the difference, so a subtraction that has
+    gone below zero is less than anything."""
+    state = run([
+        "IF ( ( 2 - 5 ) < 1 ) SET 20 END",
+        "IF ( 1 > ( 2 - 5 ) ) SET 21 END",
+        "IF ( ( 2 - 5 ) > 1 ) SET 22 END",
+    ])
+    assert state["flags"] == {20, 21}
 
 
 @needs_tools

@@ -2191,11 +2191,74 @@ de modo que un nombre suelto que la aventura conoce --`JARRO` en MegaCorp--
 contestaba «perdón» en vez de «no puedo hacer eso». Comprobado en el original
 antes de tocar nada, y con prueba en `test_markers_z80.py`.
 
-**Lo que queda por leer**: qué hace cada opcode con la pila --se llega a
-cualquiera por su entrada en la tabla--, el parser, y cómo decide describir
-una sala. Lo leído hasta aquí ya ha confirmado dos arreglos de hoy (`SWAP` en
-`$759F` cambia las dos direcciones; el orden del turno) y ha encontrado uno
-nuevo sin tener que tropezarse con él.
+### Los sesenta y dos opcodes, leídos de una sentada
+
+No era una tarde por opcode: la tarde era **medir**. Con la tabla de saltos en
+la mano se sacan los sesenta y dos de una vez --`disassemble` en cada
+`$A155 + 2n`-- y se leen seguidos. Lo que se midió después fue sólo lo que
+salió distinto, que es como debe ser: **primero preguntarle al original, y
+sólo entonces tocar código**.
+
+**El error gordo: `CARR` y `AVAI` estaban cambiados.** Su opcode `$1F` mira la
+mano **y** la sala, y el `$20` mira sólo la mano. `deGAC` los tenía al revés,
+y de ahí lo heredó `regac`, así que toda aventura decompilada traía el nombre
+cambiado y --lo que importa-- **nuestro intérprete ejecutaba sus bytes con el
+sentido contrario**: un `AVAIL` suyo, que es la comprobación corriente de «lo
+tengo o lo veo», sólo se cumplía con el objeto en la mano. En MegaCorp son
+dieciocho sitios.
+
+Medido en los dos sentidos, poniendo el objeto 1 en la sala y preguntando por
+`HERE`, `$1F` y `$20` con un mensaje cada uno:
+
+| dónde está el objeto | `HERE` | `$1F` | `$20` |
+|---|---|---|---|
+| en la sala, no en la mano | sí | **sí** | no |
+| en la mano | no | **sí** | **sí** |
+
+Arreglado en `regac/opcodes.py` (los códigos), en la tabla de saltos de
+`z80/common/opcodes.asm`, en `deGAC.py` y en las bases ya decompiladas, donde
+los dos nombres se han intercambiado. `runGAC.py` trabaja con los nombres y no
+hacía falta tocarlo.
+
+**Y otras seis diferencias, todas medidas antes de tocar nada:**
+
+| qué | el original | lo nuestro, antes |
+|---|---|---|
+| `NOUN n` | vale para **los dos** nombres de la orden: `COGE DISCO AGUJA` responde a `NOUN 4` | sólo el primero |
+| `GOTO` | es su `LOOK` con una sala puesta antes (`$7805`), así que **describe ahí mismo**: `GOTO 20 MESS 89` sacó la sala 20 y luego el mensaje | lo dejaba a deber al principio del turno siguiente |
+| `FIND` | va a donde esté; lo que no está en ninguna parte da el 252 y **acaba el turno** | no decía nada |
+| `BRIN` | lo que ya se lleva da el 245 y lo que no está en ninguna parte el 252, y acaba el turno | lo movía sin más |
+| `GET`, `DROP` | sus tres negativas --ya lo tengo, no está aquí, peso-- **acaban el turno**, y hay **peso**: rechaza cuando el total *alcanza* la fuerza, que empieza valiendo 250 | ni peso ni fin de turno |
+| `<` y `>` | miran el **signo de la resta**, no el acarreo | sin signo |
+| `QUIT` | **una tecla**, y sólo la N lo deja correr: contestado con una X, la aventura se acabó | leía una línea entera y una lista de síes |
+
+La fuerza y lo que se lleva encima van ahora dentro del bloque que se guarda,
+como en el original, y sólo `GET` y `DROP` lo llevan: un objeto que `TO` o
+`SWAP` saquen de la mano deja la cuenta como estaba, que es lo que hace él.
+
+**El bucle, mejor leído.** `CALL 7B79` no era la pregunta: es **seguir la
+salida**. Si el verbo nombra una salida de la sala, mueve, describe y vuelve
+al principio del bucle, **sin pasar por la tabla local ni por la baja**.
+Medido: con un `MESS` puesto encima de la tabla baja, `COGE` lo saca y
+`NORTE` no.
+
+**Y no hay ninguna descripción «a deber».** Describe quien mueve --`LOOK`,
+`DESC`, `GOTO`, `FIND`, la salida-- y el arranque de la partida, que acaba en
+un `LOOK` (`$7B75`). Lo que hacía que MegaCorp no dijera dos veces su primera
+sala, con el `LOOK` del arranque y el de su propia tabla alta, es otra cosa:
+**describir borra la ventana de texto**. Medido: `MESS 89 LOOK` deja la
+pantalla sin el mensaje. En modo `TEXT` no lo borra --su `DESC` se salta ahí
+toda la parte de la ventana-- y el mensaje sobrevive, medido también.
+
+**Eso último es lo que queda por hacer**, y es de por sí: cambiar nuestro
+modelo de la descripción --marca `vm_new_room` y deuda al principio del
+turno-- por el suyo, describir al mover y borrar la ventana al describir, que
+toca las cinco máquinas. Como lo que se ve en pantalla sale igual en modo
+lámina, no corre prisa, pero es una diferencia de fondo y está apuntada.
+
+**Lo que queda por leer**: el parser --ya se sabe que llena dos nombres, que
+se salta las palabras que no conoce y que el `$FF` es el pronombre, que toma
+el último nombre dicho-- y el dibujo.
 
 ## Cosas menores
 

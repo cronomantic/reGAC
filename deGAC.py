@@ -742,9 +742,9 @@ def get_cond(sysram, cond):
             elif bt == 0x1E:
                 result.append(("HERE",))
             elif bt == 0x1F:
-                result.append(("CARR",))
-            elif bt == 0x20:
                 result.append(("AVAI",))
+            elif bt == 0x20:
+                result.append(("CARR",))
             elif bt == 0x21:
                 result.append(("+",))
             elif bt == 0x22:
