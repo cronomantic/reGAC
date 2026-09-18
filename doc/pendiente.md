@@ -2121,6 +2121,47 @@ exactamente como que algo pasó --describir la sala, imprimir, las dos-- antes
 de tocarlo, que es de esas cosas que se arreglan en diez minutos y se eligen
 mal en uno.
 
+## Leyendo el intérprete original, que es el camino corto
+
+Lo de hoy dejó claro que medir de una en una sale caro: cuatro fallos de fondo
+en un día --`SWAP` que no intercambiaba, `WAIT` que no cortaba la tabla, el
+orden del turno cambiado y el banco del texto sin paginar-- todos en partes que
+nunca se habían mirado contra el original. Así que se ha empezado a leer su
+código.
+
+**La regla, primero.** Se lee para **documentar qué hace**, nunca para copiar:
+`z80/` es nuestro y es MIT, y su intérprete tiene dueño. El desensamblado se
+queda en el scratchpad, fuera del repositorio, como las instantáneas.
+
+**Cómo se entra**, que es lo que costaba:
+
+- Sus tablas de condiciones se encuentran buscando en su memoria los bytes que
+  `regac` compila de la misma aventura: en MegaCorp, la de alta prioridad está
+  en `$ADA0` y la de baja en `$B3ED`.
+- **Su tabla de saltos de opcodes está en `$A157`**, y la entrada *n* es el
+  opcode *n+1* de `regac/opcodes.py`, que es su propia numeración. Se reconoce
+  por la forma de las rutinas: `SET?` y `RES?` son la misma con el salto al
+  revés. Con eso se tiene la dirección de cada opcode del original.
+- Los puntos de parada del emulador no sirven para esto: fuera del modo paso a
+  paso no detienen el procesador. Lo que vale es leer la memoria y
+  desensamblar.
+
+**Lo que ya se ha leído**, y de paso confirma dos arreglos de hoy:
+
+| dónde | qué es |
+|---|---|
+| `$759F` | `SWAP`: coge las dos fichas y **cambia sus dos direcciones**, que es lo que el nuestro no hacía |
+| `$78F8` | `WAIT`: pone el bit 6 de `$A4E7` y vuelve |
+| `$A4E7` | su byte de estado: el bit 6 es el `WAIT`, el 7 se pone y se quita en `$72AE` y `$72BB`, el 3 en `$73EB` |
+| `$7315` | apilar un valor; su pila de condiciones tiene el puntero en `$A537` y la base en `$A4E3` |
+| `$73E0`–`$7410` | el recorrido de una condición: se salta lo que no toca mirando el bit 7 de cada byte --que es como marca una constante-- hasta el `$3F`, que es `END` |
+
+**Lo que queda por leer**, y es lo que de verdad importa: el bucle de turno y
+el despachador. De una sentada contestan lo que llevamos midiendo de tarde en
+tarde --cuándo se describe, cuándo se cuenta el turno, cuándo se queja, qué
+hace cada opcode con la pila-- y dicen dónde mirar antes de que un fallo
+aparezca por casualidad.
+
 ## Cosas menores
 
 `deGAC` ya lee las tres máquinas. Reconoce por sí solo una instantánea de
