@@ -40,11 +40,21 @@ que también se decía aquí, es el **editor** grabando la aventura entera, no e
 `SAVE` del juego. Nuestro formato es distinto a propósito —y en un disco pedir
 un nombre no tendría sentido—, así que eso se queda como está.
 
-De esos dos, en el Spectrum, no hay prueba automática: el emulador no sabe
-grabar lo que sale por la cinta, así que sólo están comprobados a mano. En el
-Amstrad y en el MSX sí la hay, y la mitad que se puede probar aquí también se
-podría: darle una cinta de Spectrum de verdad y leer un bloque de ella, como
-se hace allí.
+~~De esos dos, en el Spectrum, no hay prueba automática: el emulador no sabe
+grabar lo que sale por la cinta.~~ **Sí sabe**, y ya la hay. Lo que no puede
+grabar es la cinta que suena; la otra, la de verdad, entra y sale con `--tape`
+y `--outtape`, y el emulador engancha las dos rutinas de la ROM. Así que
+[`test_save_z80.py`](../tests/test_save_z80.py) mira las dos direcciones
+contra el fichero: lo que `SAVE` saca se lee de la cinta donde se escribió
+—bloque, marca y suma—, lo que `LOAD` lee viene de una cinta escrita aquí, y
+la vuelta entera, que es grabar en una cinta y volver a cargar de esa misma
+cinta. Cada mitad por su lado sólo se pone de acuerdo con lo que la prueba
+cree que es un bloque; las dos juntas se ponen de acuerdo entre ellas.
+
+Una cosa que costó y conviene saber: **cargar una instantánea saca la cinta de
+la máquina**. Con la instantánea puesta como siempre, la ROM se quedaba
+esperando una cinta que ya no estaba. El banco de pruebas se escribe en memoria
+y se arranca, y la cinta se queda donde estaba.
 
 Partir la línea en varias órdenes ya está, y de dónde salen los separadores
 costó dos vueltas. La primera fue mirar la base de datos: los ocho signos de
@@ -1990,6 +2000,33 @@ Para medir, una cosa que no se entiende del todo y conviene saber: con una
 tecla pulsada, parar la máquina un momento con `Session.held()` hace que al
 soltarla el intérprete ya no la vea pulsada. Las medidas de arriba se hicieron
 sin parar la máquina.
+
+## La aventura de ejemplo, que no está escrita
+
+Está en la cola desde hace tiempo y se ha ido apartando a propósito, porque
+siempre había algo del intérprete por cerrar. Ya no lo hay, así que aquí queda
+escrita para que no se pierda.
+
+**Qué es:** una aventura pequeña, escrita en el formato fuente que cuenta
+[`formato-fuente.md`](formato-fuente.md), con su fichero de proyecto, que se
+construya con `regac make` para todas las máquinas. No es una demostración de
+lo que el intérprete aguanta: es lo que lee alguien que llega nuevo y quiere
+ver cómo se escribe una.
+
+**Para qué sirve, además de enseñar:**
+
+- es lo único que probaría el camino entero tal como lo anda un autor —fuente,
+  proyecto, `make`, medio— sin pasar por una aventura decompilada de 1986;
+- ejercita lo que las ocho de entonces no pueden ejercitar, porque son
+  opcodes nuestros: `SOUND`, `QUIET`, los separadores propios, los caracteres
+  acentuados, la música;
+- y da una aventura que se puede cambiar libremente en las pruebas, que las
+  ocho originales no: son material con dueño y no viajan en el repositorio.
+
+**Lo que hay que decidir al escribirla:** cuántas salas —pocas, que las
+láminas se dibujan a mano—, si lleva música, y si se queda en castellano o se
+escribe también en inglés para enseñar que el vocabulario es de la aventura y
+no del intérprete.
 
 ## Cosas menores
 
