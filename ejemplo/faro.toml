@@ -1,0 +1,27 @@
+# El faro de Santa Bárbara, para todas las máquinas de una vez:
+#
+#     python -m regac make ejemplo/faro.toml
+#
+# Lo que es de la aventura está en faro.gac; aquí sólo está lo que es de la
+# máquina a la que va.  Esta no pide nada especial -- ni pantalla de carga, ni
+# bancos distintos de los de siempre -- así que cada destino es una línea.
+
+name   = "faro"
+source = "faro.gac"
+output = "salida"
+
+[targets.spectrum48]
+
+[targets.spectrum128]
+
+[targets.plus3]
+
+[targets.cpc464]
+
+[targets.cpc6128]
+
+[targets.msx]
+
+[targets.next]
+
+[targets.pcw]

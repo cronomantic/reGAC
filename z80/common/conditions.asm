@@ -223,16 +223,22 @@ vm_constant:
 ; Corrupts: AF, HL
 obj_location:
                 ld      h, 0
+                push    hl                      ; the object, for the second look
                 add     hl, hl
                 ld      de, obj_entry
                 add     hl, de
                 ld      a, (hl)
                 inc     hl
                 or      (hl)
+                pop     hl
                 scf
                 ret     z                       ; no record, no object
-                ld      hl, (vm_arg)
-                ld      h, 0
+                ; It used to take the object from vm_arg here rather than from
+                ; what it was given, which was the same thing everywhere but
+                ; in SWAP: there the second look asked after the first one's
+                ; object, so a swap moved one of the two and left the other
+                ; where it was.  Found by the example adventure, whose lit
+                ; candil never reached the player's hands.
                 add     hl, hl
                 ld      de, obj_loc
                 add     hl, de

@@ -61,6 +61,9 @@ def of(conditions=(), **changes):
     ddb["messages"].update({str(n): "." for n in
                             (240, 241, 242, 243, 244, 246, 247, 248, 251, 253,
                              254)})
+    # and a letter of a font, because an adventure with none of it is a
+    # warning of its own and never what these are looking at
+    ddb["font"] = [0] * 8 + [0x18, 0x24, 0x42, 0x7E, 0x42, 0x42, 0x42, 0x00]
     ddb.update(changes)
     return ddb
 

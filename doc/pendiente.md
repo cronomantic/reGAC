@@ -2001,32 +2001,64 @@ tecla pulsada, parar la máquina un momento con `Session.held()` hace que al
 soltarla el intérprete ya no la vea pulsada. Las medidas de arriba se hicieron
 sin parar la máquina.
 
-## La aventura de ejemplo, que no está escrita
+## La aventura de ejemplo, que ya está escrita
 
-Está en la cola desde hace tiempo y se ha ido apartando a propósito, porque
-siempre había algo del intérprete por cerrar. Ya no lo hay, así que aquí queda
-escrita para que no se pierda.
+[`ejemplo/faro.gac`](../ejemplo/faro.gac): **El faro de Santa Bárbara**, cinco
+salas, cuatro objetos y un solo enigma, con su
+[fichero de proyecto](../ejemplo/faro.toml) y su tipografía
+(`ejemplo/letras.bin`, dibujada aquí). Se construye para las ocho máquinas con
+`python -m regac make ejemplo/faro.toml` y se juega de principio a fin: coger
+la llave, abrir la puerta, coger el candil, encenderlo, subir y encender la
+lente.
 
-**Qué es:** una aventura pequeña, escrita en el formato fuente que cuenta
-[`formato-fuente.md`](formato-fuente.md), con su fichero de proyecto, que se
-construya con `regac make` para todas las máquinas. No es una demostración de
-lo que el intérprete aguanta: es lo que lee alguien que llega nuevo y quiere
-ver cómo se escribe una.
+Es pequeña a propósito. No enseña lo que el intérprete aguanta, sino cómo se
+escribe una aventura, y de paso ejercita lo que las ocho de 1986 no pueden
+ejercitar porque es nuestro: los acentos, las palabras propias que parten una
+orden (`COGE LLAVE Y NORTE`), los ruidos de `/SOUND`, los nombres para los
+números y una tipografía que viene en un fichero. Su prueba es
+[`test_example.py`](../tests/test_example.py): compila, comprueba que nada
+apunta a donde no debe, construye las ocho máquinas y la juega entera en un
+Spectrum.
 
-**Para qué sirve, además de enseñar:**
+**Y encontró cinco cosas**, que es para lo que estaba en la cola:
 
-- es lo único que probaría el camino entero tal como lo anda un autor —fuente,
-  proyecto, `make`, medio— sin pasar por una aventura decompilada de 1986;
-- ejercita lo que las ocho de entonces no pueden ejercitar, porque son
-  opcodes nuestros: `SOUND`, `QUIET`, los separadores propios, los caracteres
-  acentuados, la música;
-- y da una aventura que se puede cambiar libremente en las pruebas, que las
-  ocho originales no: son material con dueño y no viajan en el repositorio.
+1. **`SWAP` no intercambiaba dos objetos**, y llevaba así desde que existe.
+   Movía uno de los dos y dejaba el otro donde estaba. Se tapaba solo: como
+   `obj_location` leía la posición del objeto que hubiera en `vm_arg` en vez
+   de la del que le pasaban, y la prueba de `SWAP` sólo preguntaba por uno de
+   los dos, todo parecía correcto desde fuera. El candil encendido de esta
+   aventura no llegaba nunca a las manos del jugador. Arreglados los dos, y la
+   prueba pregunta ahora por los dos objetos.
+2. **Una aventura sin `/FONT` se construye sin quejarse y sale muda**: cada
+   letra son ocho ceros, así que juega perfectamente e imprime líneas en
+   blanco. Ahora `regac check` lo avisa.
+3. **`regac make` buscaba los ficheros del fuente donde se lanzara el
+   comando**, no junto al fuente, que es lo que dice el formato; `regac
+   compile` sí lo hacía bien. Con la aventura en `ejemplo/` la tipografía no
+   aparecía.
+4. **Decía «carries no music» a una aventura que no tiene ninguna**, sólo
+   porque pide ruidos.
+5. Y una lección del propio GAC que ahora está escrita en la aventura, porque
+   cuesta un rato descubrirla: **el número de un nombre del vocabulario y el
+   del objeto que nombra son el mismo**, ya que coger es `GET NO1`.
 
-**Lo que hay que decidir al escribirla:** cuántas salas —pocas, que las
-láminas se dibujan a mano—, si lleva música, y si se queda en castellano o se
-escribe también en inglés para enseñar que el vocabulario es de la aventura y
-no del intérprete.
+**Dos cosas que quedan de esto**, apuntadas y sin hacer:
+
+- **`WAIT` no significa lo mismo en los dos intérpretes.** En el Z80 acaba el
+  turno pero no la tabla: las condiciones que vengan detrás en la misma tabla
+  se prueban igual. En [`runGAC.py`](../runGAC.py) la tabla local y la de baja
+  prioridad se cortan en el primer `WAIT`, y la de alta no. Uno de los dos se
+  parece al original y el otro no, y **medirlo pide pasar la protección de
+  MegaCorp**, que arranca pidiendo su clave: se intentó escribiendo condiciones
+  propias encima de su tabla de baja prioridad —que está donde se creía, se
+  encontró por el contenido— y nada de lo que se teclea llega al juego hasta
+  que se dé la clave. Mientras tanto, las condiciones de la aventura de
+  ejemplo se excluyen entre sí, que es lo que hacen las de 1986 y vale con
+  cualquiera de los dos comportamientos.
+- **Una coma puede quedar sola al principio de una línea.** «La lente, enorme»
+  partió como «La lente» y «, enorme» al llegar al borde. No siempre: en otro
+  mensaje la coma se quedó pegada a su palabra. Falta mirar si el signo viaja
+  a veces separado de la palabra que lo precede.
 
 ## Cosas menores
 

@@ -1,0 +1,376 @@
+; El faro de Santa Bárbara -- una aventura de ejemplo para reGAC.
+;
+; Es pequeña a propósito: cinco salas, cuatro objetos y un solo enigma.  Lo
+; que enseña no es lo que el intérprete aguanta, sino cómo se escribe una
+; aventura de principio a fin, y de paso ejercita lo que las de 1986 no
+; pueden ejercitar porque es nuestro: los acentos, las palabras que parten
+; una orden, los ruidos propios, los nombres para los números y las líneas
+; que sólo son de algunas máquinas.
+;
+; Se construye para todas las máquinas de una vez con:
+;
+;     python -m regac make ejemplo/faro.toml
+;
+; y se comprueba, antes de construir nada, con:
+;
+;     python -m regac compile ejemplo/faro.gac faro.json
+;     python -m regac check faro.json
+
+; -- nombres para los números ------------------------------------------------
+;
+; A partir de aquí el nombre vale donde valdría el número, así que las
+; condiciones dicen lo que quieren decir en lugar de lo que cuentan.
+
+.def SENDERO            1
+.def PUERTA_DEL_FARO    2
+.def ZAGUAN             3
+.def ESCALERA           4
+.def LINTERNA_DEL_FARO  5
+
+.def LA_LLAVE           1
+.def CANDIL_APAGADO     2
+.def CANDIL_ENCENDIDO   3
+.def LA_CARACOLA        4
+
+.def PUERTA_ABIERTA     1       ; la bandera del único enigma
+.def LENTE_ENCENDIDA    2
+
+.def RUIDO_CERRADURA    1       ; los de /SOUND, contados desde uno
+.def RUIDO_CHIRRIDO     2
+.def RUIDO_FOSFORO      3
+.def RUIDO_FARO         4
+
+.def VERBO_NORTE        1
+.def VERBO_SUR          2
+.def VERBO_COGE         5
+.def VERBO_DEJA         6
+.def VERBO_EXAMINA      7
+.def VERBO_INVENTARIO   8
+.def VERBO_ABRE         9
+.def VERBO_ENCIENDE    10
+.def VERBO_GRABA       11
+.def VERBO_CARGA       12
+.def VERBO_FIN         13
+.def VERBO_MIRA        14
+.def VERBO_SUBE        15
+.def VERBO_BAJA        16
+.def VERBO_AYUDA       17
+.def VERBO_ESCUCHA     18
+
+; Un nombre y el objeto que nombra llevan el mismo número, y no es un capricho:
+; COGE es GET NO1, o sea coger el objeto cuyo número es el del nombre que se
+; ha tecleado.  Los nombres que no son objetos -- la puerta, la lente -- van
+; detrás de los que sí lo son.
+.def NOMBRE_LLAVE       1
+.def NOMBRE_CANDIL      2
+.def NOMBRE_CARACOLA    4
+.def NOMBRE_PUERTA      5
+.def NOMBRE_LENTE       6
+
+.def SALUDO            10
+.def CERRADA           11
+.def SE_ABRE           12
+.def NO_ES_LA_LLAVE    13
+.def SIN_LUZ           14
+.def PRENDE            15
+.def YA_ARDE           16
+.def EL_MAR            17
+.def VICTORIA          18
+.def LA_AYUDA          19
+.def NADA_QUE_VER      20
+
+/CTL
+model    SPECTRUM
+start    SENDERO
+width    32
+punct    "\0" " " "." "," "-" "!" "?" ":"
+sep      "Y" "LUEGO"
+nothing  "Nada."
+
+; -- el vocabulario ----------------------------------------------------------
+;
+; Los sinónimos comparten identificador, y las palabras se comparan por el
+; principio: basta escribir CARAC para que valga CARACOLA.
+
+/VOC
+; palabra                   id  tipo
+N                            1  verb
+NORTE                        1  verb
+S                            2  verb
+SUR                          2  verb
+E                            3  verb
+ESTE                         3  verb
+O                            4  verb
+OESTE                        4  verb
+COGE                         5  verb
+TOMA                         5  verb
+DEJA                         6  verb
+SUELTA                       6  verb
+EXAMINA                      7  verb
+MIRA                        14  verb
+I                            8  verb
+INVENTARIO                   8  verb
+ABRE                         9  verb
+ENCIENDE                    10  verb
+PRENDE                      10  verb
+GRABA                       11  verb
+CARGA                       12  verb
+FIN                         13  verb
+SUBE                        15  verb
+BAJA                        16  verb
+AYUDA                       17  verb
+ESCUCHA                     18  verb
+
+LLAVE                        1  noun
+CANDIL                       2  noun
+CARACOLA                     4  noun
+PUERTA                       5  noun
+LENTE                        6  noun
+FARO                         7  noun
+
+; -- lo que dice -------------------------------------------------------------
+;
+; El texto es UTF-8 y se escribe como se escribe en español: no hay que
+; declarar nada para que salgan los acentos, la eñe y los signos de apertura.
+; Del 240 para arriba son los mensajes que el intérprete dice por su cuenta.
+
+/MSG
+#SALUDO
+EL FARO DE SANTA BÁRBARA \ink 6 -- \ink 7 una aventura de ejemplo. Escribe
+AYUDA si no sabes por dónde empezar.
+
+#CERRADA
+La puerta está cerrada con llave.
+
+#SE_ABRE
+La llave gira con esfuerzo y la puerta se abre hacia dentro.
+
+#NO_ES_LA_LLAVE
+No tienes con qué abrirla.
+
+#SIN_LUZ
+Los escalones se pierden en la oscuridad. No subirás ahí sin una luz.
+
+#PRENDE
+El candil prende con un chasquido y una llama pequeña.
+
+#YA_ARDE
+Ya está encendido.
+
+#EL_MAR
+Escuchas el mar, que suena dentro de la caracola igual que fuera de ella.
+
+#VICTORIA
+La lente gira, se enciende, y un brazo de luz sale a buscar el mar. Los
+barcos ya saben dónde está la costa.\ink 6 Fin de la aventura.
+
+#LA_AYUDA
+Escribe las órdenes como NORTE, COGE LLAVE o ABRE PUERTA. Puedes poner dos
+en una línea: COGE LLAVE Y NORTE.
+
+#NADA_QUE_VER
+No ves nada de particular.
+
+#240
+>
+
+#241
+No puedes hacer eso.
+
+#242
+No entiendo esa orden.
+
+#243
+Pulsa una tecla.
+
+#244
+¿Seguro que quieres dejarlo?
+
+#246
+No llevas eso encima.
+
+#247
+No hay nada de eso por aquí.
+
+#248
+Llevas demasiadas cosas.
+
+#251
+Está oscuro.
+
+#253
+También ves:
+
+#254
+Hecho.
+
+/FONT file="letras.bin"
+; La tipografía de la aventura.  Sin esto todas las letras salen en blanco:
+; una aventura no hereda ninguna fuente, y lo que no está dibujado no se ve.
+; Son las noventa y seis del espacio en adelante, ocho bytes por letra; las
+; acentuadas y los signos de apertura no están aquí, porque el compilador los
+; compone con estas mismas letras.
+;
+; Y ojo con dónde se pone un comentario: dentro de un bloque de texto -- un
+; mensaje, el nombre de un objeto, la descripción de una sala -- todo es
+; literal, así que un punto y coma ahí no abre un comentario, se imprime.  Por
+; eso éste va detrás de la línea de la sección y no delante.
+
+/OBJ
+; El candil apagado y el encendido son dos objetos que se cambian el sitio,
+; que es como se hacía entonces y sigue siendo lo más sencillo.
+#LA_LLAVE  weight=1  start=SENDERO
+una llave oxidada
+#CANDIL_APAGADO  weight=1  start=ZAGUAN
+un candil apagado
+#CANDIL_ENCENDIDO  weight=1  start=nowhere
+un candil encendido
+#LA_CARACOLA  weight=1  start=SENDERO
+una caracola
+
+/LOC #SENDERO  gfx=1
+Un sendero de arena sube entre los tojos. Al norte, en lo alto, está el faro.
+  /CONN
+    NORTE        PUERTA_DEL_FARO
+
+/LOC #PUERTA_DEL_FARO  gfx=2
+La puerta del faro, de madera vieja y con una cerradura de hierro.
+  /CONN
+    SUR          SENDERO
+  /LOCAL
+    IF ( VERB VERBO_ABRE AND NOUN NOMBRE_PUERTA AND CARR LA_LLAVE ) SET PUERTA_ABIERTA SOUND RUIDO_CERRADURA MESS SE_ABRE WAIT END
+    IF ( VERB VERBO_ABRE AND NOUN NOMBRE_PUERTA AND NOT CARR LA_LLAVE ) MESS NO_ES_LA_LLAVE WAIT END
+    IF ( VERB VERBO_NORTE AND SET? PUERTA_ABIERTA ) SOUND RUIDO_CHIRRIDO GOTO ZAGUAN END
+    IF ( VERB VERBO_NORTE AND RES? PUERTA_ABIERTA ) MESS CERRADA WAIT END
+
+/LOC #ZAGUAN  gfx=3
+El zaguán del faro. Huele a salitre y a aceite. Una escalera de caracol sube
+por dentro de la torre.
+  /CONN
+    SUR          PUERTA_DEL_FARO
+    SUBE         ESCALERA
+
+/LOC #ESCALERA  gfx=4
+Estás a media escalera. Los peldaños siguen subiendo, y arriba se adivina la
+sala de la linterna.
+  /CONN
+    BAJA         ZAGUAN
+  /LOCAL
+    IF ( VERB VERBO_SUBE AND CARR CANDIL_ENCENDIDO ) GOTO LINTERNA_DEL_FARO END
+    IF ( VERB VERBO_SUBE AND NOT CARR CANDIL_ENCENDIDO ) MESS SIN_LUZ WAIT END
+
+/LOC #LINTERNA_DEL_FARO  gfx=5
+La sala de la linterna. La lente, enorme y llena de aristas, espera apagada
+en el centro.
+  /CONN
+    BAJA         ESCALERA
+  /LOCAL
+    IF ( VERB VERBO_ENCIENDE AND NOUN NOMBRE_LENTE AND CARR CANDIL_ENCENDIDO ) SET LENTE_ENCENDIDA SOUND RUIDO_FARO MESS VICTORIA EXIT END
+    IF ( VERB VERBO_ENCIENDE AND NOUN NOMBRE_LENTE AND NOT CARR CANDIL_ENCENDIDO ) MESS SIN_LUZ WAIT END
+
+; -- lo que vale en cualquier sala -------------------------------------------
+;
+; Las condiciones de una tabla se prueban todas: un WAIT acaba el turno, pero
+; no impide que las de más abajo de la misma tabla se cumplan también.  Por eso
+; las que dicen dos cosas distintas del mismo verbo se excluyen entre sí --
+; NOT CARR LA_LLAVE frente a CARR LA_LLAVE-- en lugar de fiarse del orden.
+
+/LOW
+; GAC no tiene precedencia y evalúa de izquierda a derecha, así que el
+; operando derecho de un AND que es a su vez una comparación va entre
+; paréntesis: sin ellos esto se leería ((VERB 5 AND NO1) = 0), que es
+; cierto justamente cuando el verbo no es COGE.
+IF ( VERB VERBO_COGE AND ( NO1 = 0 ) ) MESS 242 WAIT END
+IF ( VERB VERBO_COGE AND NOT ( NO1 = 0 ) ) GET NO1 OKAY END
+IF ( VERB VERBO_DEJA ) DROP NO1 OKAY END
+IF ( VERB VERBO_INVENTARIO ) LIST WITH WAIT END
+IF ( VERB VERBO_MIRA ) LOOK WAIT END
+IF ( VERB VERBO_EXAMINA AND NOUN NOMBRE_CARACOLA AND AVAI LA_CARACOLA ) MESS EL_MAR WAIT END
+IF ( VERB VERBO_ESCUCHA AND AVAI LA_CARACOLA ) MESS EL_MAR WAIT END
+IF ( VERB VERBO_EXAMINA AND NOT NOUN NOMBRE_CARACOLA ) MESS NADA_QUE_VER WAIT END
+IF ( VERB VERBO_ENCIENDE AND NOUN NOMBRE_CANDIL AND CARR CANDIL_ENCENDIDO ) MESS YA_ARDE WAIT END
+IF ( VERB VERBO_ENCIENDE AND NOUN NOMBRE_CANDIL AND CARR CANDIL_APAGADO ) CANDIL_APAGADO SWAP CANDIL_ENCENDIDO SOUND RUIDO_FOSFORO MESS PRENDE WAIT END
+IF ( VERB VERBO_AYUDA ) MESS LA_AYUDA WAIT END
+IF ( VERB VERBO_GRABA ) SAVE LOOK OKAY END
+IF ( VERB VERBO_CARGA ) LOAD WAIT END
+IF ( VERB VERBO_FIN ) QUIT END
+
+; -- las láminas -------------------------------------------------------------
+;
+; Las coordenadas son las del original: 256 de ancho, y de alto de la 48 a la
+; 175.  La lámina 10 es el horizonte, y las demás la llaman con CALL en vez de
+; repetirla, que es lo que hace también el original.
+
+/GFX
+#10
+  PAPER 5
+  INK 0
+  LINE 0 96 255 96
+  PAPER 4
+  BGFILL 128 60
+
+#1
+  CALL 10
+  INK 0
+  LINE 96 48 112 120
+  LINE 160 48 144 120
+  LINE 112 120 144 120
+  RECT 118 120 138 132
+  LINE 112 132 144 132
+  ELLIPSE 128 140 10 8
+  PLOT 40 100
+  PLOT 56 104
+  PLOT 72 100
+
+#2
+  CALL 10
+  INK 0
+  RECT 88 48 168 160
+  RECT 104 48 152 136
+  ELLIPSE 144 92 3 3
+  LINE 128 48 128 136
+
+#3
+  CALL 10
+  INK 0
+  RECT 32 48 224 168
+  LINE 64 48 64 128
+  LINE 64 128 96 144
+  LINE 96 144 128 128
+  LINE 128 128 160 144
+  LINE 160 144 192 128
+  LINE 192 128 192 48
+
+#4
+  CALL 10
+  INK 0
+  LINE 48 48 48 168
+  LINE 208 48 208 168
+  LINE 72 56 184 56
+  LINE 72 76 184 76
+  LINE 72 96 184 96
+  LINE 72 116 184 116
+  LINE 72 136 184 136
+
+#5
+  CALL 10
+  INK 0
+  RECT 40 48 216 160
+  ELLIPSE 128 104 48 40
+  ELLIPSE 128 104 30 24
+  ELLIPSE 128 104 12 10
+  LINE 80 104 176 104
+  LINE 128 64 128 144
+
+; -- los ruidos --------------------------------------------------------------
+;
+; Para las máquinas sin chip que toque los efectos de un tracker: el altavoz
+; de un bit del Spectrum, el Next y el MSX, y el chip del Amstrad cuando la
+; versión no lleva música.
+;
+; tono  pasos  paso
+/SOUND
+   180    120     -1    ; la cerradura
+   240     90      2    ; la puerta al abrirse
+   120     60     -2    ; el fósforo
+    90    200      1    ; el faro encendiéndose

@@ -236,6 +236,17 @@ def problems_of(ddb):
                                  f"interpreter reaches for {what}",
                                  fault=False))
 
+    # And the typeface, which is the one thing an adventure can be missing
+    # without anything complaining: every letter is then eight noughts, so it
+    # builds, runs, and prints blank lines.  The example adventure did exactly
+    # that until it was given one.
+    if not any(ddb.get("font") or []):
+        found.append(Problem("the font",
+                             "there is not one: every letter would print "
+                             "blank.  A source says /FONT file=\"...\", or "
+                             "draws the letters it wants one at a time",
+                             fault=False))
+
     found += said_twice(ddb)
 
     return sorted(found, key=lambda p: (not p.fault, p.where, p.message))

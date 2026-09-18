@@ -194,8 +194,19 @@ def test_objects():
     assert state["objects"][3] == 3, "BRIN fetches one to where you are"
 
 
+@needs_tools
+def test_swap_moves_both_of_them():
+    """Both, and not one: object two is carried and object three is in room
+    seven, so after the swap the player has the third and the second is in
+    seven.  Asking only after one of the two hid a swap that moved one and
+    left the other where it was, for as long as there was a test at all."""
+    state = run(["2 SWAP 3 END"])
+    assert state["objects"][2] == 7, "the one that was carried did not go"
+    assert state["objects"][3] == CARRIED, "the other one never arrived"
+
+
 if __name__ == "__main__":
     for check in (test_flags_counters_and_arithmetic, test_tests_and_skipping,
-                  test_objects):
+                  test_objects, test_swap_moves_both_of_them):
         check()
         print(f"{check.__name__}: correcto")

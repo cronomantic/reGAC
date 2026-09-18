@@ -574,7 +574,12 @@ def cmd_make(args):
         # is read once.
         if written_source is not None:
             try:
+                # From the folder the source is in, which is what a file= in
+                # it is relative to: a font, another source it includes.  This
+                # said nothing, so `make` looked for them where it was run
+                # from and `compile` looked where the source was.
                 ddb = parse(written_source, os.path.basename(source),
+                            os.path.dirname(os.path.abspath(source)),
                             machine=which)
             except SourceError as e:
                 sys.exit(f"ERROR: {e}")
@@ -654,7 +659,7 @@ def make_one(target, settings, ddb, name, root, output, where_regac_is,
                if target.music is not None or word == "WITH_OWN_NOISES"]
     if makes_a_noise(ddb):
         defines.append("NOISES")
-    if music and target.music is None:
+    if music and target.music is None and (ddb.get("music") or []):
         print(f"  {target.machine:12} carries no music: it is left out")
     if settings.get("screen"):
         screen = screen_for(target, settings["screen"], root)

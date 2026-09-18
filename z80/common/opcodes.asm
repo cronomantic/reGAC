@@ -316,6 +316,12 @@ op_drop:
                 call    print_message
                 jp      vm_loop
 
+; Each of the two goes where the other was.  This had them both going to the
+; first one's place, and obj_location's own quirk -- it read the location of
+; whatever was in vm_arg rather than of what it was given -- made that look
+; right from the outside: the test asked only where one of the two had ended
+; up.  The example adventure asked after the other one, whose lit candil
+; stayed nowhere while the unlit one left the player's hands.
 op_swap:
                 call    vm_pop
                 ld      (vm_arg), hl            ; the second object
@@ -324,19 +330,18 @@ op_swap:
                 ld      hl, (vm_arg)
                 call    obj_location
                 jp      c, vm_loop
-                push    de
+                push    de                      ; where the first one is
                 ld      hl, (vm_arg2)
-                call    obj_location
-                pop     bc
-                jp      c, vm_loop
-                push    de
+                call    obj_location            ; DE = where the second one is
+                jr      c, .no_second
                 ld      hl, (vm_arg)
-                ld      d, b
-                ld      e, c
-                call    obj_move
-                pop     de
+                call    obj_move                ; the first goes there
+                pop     de                      ; and the second where it was
                 ld      hl, (vm_arg2)
                 call    obj_move
+                jp      vm_loop
+.no_second:
+                pop     de
                 jp      vm_loop
 
 op_to:
