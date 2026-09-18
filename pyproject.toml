@@ -17,6 +17,10 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pytest (>=8.0)",
+    # Almost every test drives a real emulator, so the suite spends its time
+    # waiting rather than computing and goes several at a time: see
+    # doc/pruebas.md and tests/conftest.py.
+    "pytest-xdist (>=3.0)",
 ]
 
 

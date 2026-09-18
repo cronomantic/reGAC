@@ -155,7 +155,7 @@ def draw_on_both(commands, scale=2):
 
     session = emulator.Session(machine="PCW8256")
     try:
-        time.sleep(4.0)  # let the machine ask for a disk
+        time.sleep(emulator.longer(4.0))  # let the machine ask for a disk
         finished = session.start_code(blob, LOADS_AT, done)
         screen = session.read(SCREEN, SCREEN_BYTES)
     finally:

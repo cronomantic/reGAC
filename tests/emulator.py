@@ -38,8 +38,41 @@ import time
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TOOLS = os.path.join(ROOT, "tools")
-PORT = 10000
-BOOT_SECONDS = 2.5
+
+
+def worker_port(first=10000):
+    """A port of this worker's own, so that the suite can run several tests at
+    a time.  Two sessions on one port talk to whichever emulator came first,
+    so each worker gets a port to itself: xdist names them gw0, gw1 and so on,
+    and the number in the name is what tells them apart.  Run on its own there
+    is no name and the port is the one it always was."""
+    name = os.environ.get("PYTEST_XDIST_WORKER", "")
+    digits = "".join(c for c in name if c.isdigit())
+    return first + (int(digits) if digits else 0)
+
+
+PORT = worker_port()
+
+
+def workers():
+    """How many of these are running at once, which xdist says."""
+    how_many = os.environ.get("PYTEST_XDIST_WORKER_COUNT", "1")
+    return int(how_many) if how_many.isdigit() else 1
+
+
+def longer(seconds, each_more=0.4):
+    """A wait grown for the company the machine is keeping.
+
+    Some waits cannot be replaced by looking at the machine -- waiting for a
+    ROM to finish booting, or for a Joyce to ask for its disk -- and four
+    seconds of a machine to itself are not four seconds of a machine running
+    four emulators.  What comes out of a wait that fell short is not a
+    failure of the test but of the waiting, and it looks like anything at
+    all, which is the worst way to spend an afternoon."""
+    return seconds * (1 + each_more * (workers() - 1))
+
+
+BOOT_SECONDS = longer(2.5)
 CODE_START = 0x8000
 
 
