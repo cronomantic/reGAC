@@ -58,6 +58,9 @@ from test_music_z80 import TUNE, word  # noqa: E402
 EFFECTS = os.path.join(ROOT, "music", "effects.asm")
 
 ENTER = chr(13)
+# Its own code, which is in its own vocabulary: room 5000 takes verb 29,
+# and verb 29 of MegaCorp is REBECA.
+PASSWORD = "REBECA"
 NOT_UNDERSTOOD = "242"
 A_FLAG = 250                    # one this adventure does not use
 
@@ -120,6 +123,17 @@ def test_an_adventure_plays_with_the_music_on():
             "the music was never told how often this machine wakes up"
         )
 
+        # Past its own code first.  While the game is still asking for it,
+        # its high priority table looks at every turn, and a description is
+        # written over the line it starts on, so the complaint below would be
+        # covered as soon as it is printed -- which is what the original does
+        # there too, watched on it.
+        type_them(session, PASSWORD + ENTER)
+        wait_screen(session, glyphs, ddb["locations"]["1"]["desc"][:12], timeout=30.0)
+        # Where the tune is just before the parser is given something to
+        # do, so that what is compared below is one turn of it and not a
+        # whole game: the track loops, and over long enough it can come back
+        # to the very place it started from.
         was = word(session, where["PLY_AKM_Track1_PtTrack"])
         type_them(session, "XYZZY" + ENTER)
         answered = wait_screen(session, glyphs, puzzled[:6], timeout=30.0)

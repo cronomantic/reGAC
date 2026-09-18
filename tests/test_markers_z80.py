@@ -139,11 +139,10 @@ def ends(ddb, within=6.0):
     session = emulator.Session()
     try:
         session.load(SNAPSHOT)
-        # An order is typed first: these probes sit in the high priority
-        # table, which is looked at before the description a new room is owed,
-        # so on the opening pass there is nothing described for them to find.
-        # The word is one the adventure does not know, so that nothing but the
-        # asking happens because of it.
+        # An order is typed first so that the probes in the high priority
+        # table get a second pass at the state a turn leaves behind.  The word
+        # is one the adventure does not know, so that nothing but the asking
+        # happens because of it.
         time.sleep(2.0)
         session.type("X" + ENTER)
         deadline = time.time() + within
@@ -156,18 +155,38 @@ def ends(ddb, within=6.0):
         session.close()
 
 
-def played(ddb, orders=(), settle=3.0):
+def asked_again(session, glyphs, times, timeout=30.0):
+    """Wait until the interpreter has asked for an order that many times.
+
+    Waiting a fixed while instead is waiting either too little or too long,
+    and too little is what a machine shared between several emulators gives:
+    the screen comes back empty and the test fails for nothing of its own.
+    The prompt is the adventure's own message 240, a ">" here.
+    """
+    deadline = time.time() + timeout
+    lines = []
+    while time.time() < deadline:
+        lines = [line for line in screen(session, glyphs) if line]
+        if sum(line.count(">") for line in lines) >= times:
+            return lines
+        time.sleep(0.2)
+    return lines
+
+
+def played(ddb, orders=()):
     """The lines on the screen after typing whatever was asked for."""
     database, listing = build(ddb)
     glyphs = glyph_table(database)
     session = emulator.Session()
     try:
         session.load(SNAPSHOT)
-        time.sleep(settle)
+        asked = 1
+        lines = asked_again(session, glyphs, asked)
         for order in orders:
             session.type(order + ENTER)
-            time.sleep(settle)
-        return [line for line in screen(session, glyphs) if line]
+            asked += 1
+            lines = asked_again(session, glyphs, asked)
+        return lines
     finally:
         session.close()
 
@@ -230,16 +249,48 @@ def test_a_noun_is_either_of_the_two():
 
 
 @needs_tools
-def test_a_look_pays_what_a_new_room_is_owed():
-    """An adventure that opens by looking from its own high priority table --
-    which is what MegaCorp does -- has its first room described once and not
-    twice.  The high priority conditions are looked at before the description
-    a new room is owed, so a LOOK there stands in for it.  Measured on the
-    original: its table replaced by IF ( AT 1 ) LOOK END and the player sent
-    to room one, and the room came out described once."""
+def test_a_pronoun_stands_for_the_last_noun_named():
+    """And the last means the second when an order named two.  Measured on
+    Los pajaros de Bangkok, which is the one of the four with pronouns:
+    after COGER AGUA BAR, the LO of COGER LO came out as the BAR."""
+    ddb = adventure(
+        lpcs=[["PUSH", 2], ["NOUN"], ["IF"], ["PUSH", 100], ["MESS"], ["END"]],
+        messages={"100": "EL SEGUNDO"},
+    )
+    ddb["nouns"] = {"PIEDRA": 1, "PALO": 2}
+    ddb["pronouns"] = ["LO"]
+    said = played(ddb, orders=["MIRA PIEDRA PALO", "MIRA LO"])
+    assert sum("EL SEGUNDO" in line for line in said) == 2, said
+
+
+@needs_tools
+def test_an_adventure_that_looks_says_its_first_room_once():
+    """A game opens by describing the room it starts in, and MegaCorp
+    describes it again from its own high priority table; on the screen it
+    comes out once, because describing wipes the text window first.  Measured
+    on the original, whose table was replaced by IF ( AT 1 ) LOOK END."""
     lines = played(adventure(hpcs=[["LOOK"], ["END"]]))
     said = sum(line.count("UN CUARTO") for line in lines)
     assert said == 1, f"the room was described {said} times: {lines}"
+
+
+@needs_tools
+def test_a_description_is_written_over_the_line_it_starts_on():
+    """Measured on the original in its password room, whose description is
+    one line long: with a message printed just before the LOOK, what is left
+    on the screen is the description with the tail of the message showing
+    past the end of it -- INTRODUZCA LA CLAVEsa... where El tiempo pasa...
+    was.  Nothing is wiped and the line is not ended first.  In TEXT mode its
+    DESC skips that part, and there the description simply follows the
+    message along the same line, measured too."""
+    say = {"100": "XXXXXXXXXXXX"}
+    probe = [["LF"], ["PUSH", 100], ["MESS"], ["LOOK"], ["END"]]
+    over = played(adventure(hpcs=probe, messages=say))
+    assert any("UN CUARTOXXX" in line for line in over), (
+        f"the description did not start at the left of the line: {over}")
+    kept = played(adventure(hpcs=[["TEXT"]] + probe, messages=say))
+    assert any("XXXXXXXXXXXXUN CUARTO" in line for line in kept), (
+        f"in TEXT mode it follows the message along the line: {kept}")
 
 
 @needs_tools

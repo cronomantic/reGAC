@@ -136,6 +136,16 @@ def test_a_short_word_is_swallowed_by_a_longer_one():
 
 
 @needs_tools
+def test_a_mark_of_punctuation_parts_words():
+    """Parting words is all the original uses the adventure's own table of
+    punctuation for -- what ends an order is a comma, a full stop, a
+    semicolon or an exclamation mark, and nothing else -- so COGE-LLAVE is
+    two words and means what COGE LLAVE means."""
+    state = parse("COGE-LLAVE")
+    assert (state["vm_verb"], state["vm_noun1"]) == (5, 3)
+
+
+@needs_tools
 def test_a_second_noun():
     state = parse("COGE LLAVE PUERTA")
     assert (state["vm_noun1"], state["vm_noun2"]) == (3, 4)

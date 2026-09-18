@@ -145,12 +145,15 @@ def test_an_adventure_plays_with_the_music_on():
         assert any(prompt in line for line in asking if line), (
             f"it never asked for an order with the music on: {asking}"
         )
+        # Where the tune is just before the parser is given something to do,
+        # so that what is compared is one turn of it and not a whole game: the
+        # track loops, and over long enough it comes back to where it started.
+        was = word(session, where["PLY_AKM_Track1_PtTrack"])
         session.type("XYZZY" + ENTER)
         answered = wait_screen(session, glyphs, puzzled[:10], timeout=60.0)
         assert any(puzzled[:10] in line for line in answered if line), (
             f"the parser stopped answering with the music on: {answered}"
         )
-        was = at
         deadline = time.time() + 5.0
         while time.time() < deadline:
             at = word(session, where["PLY_AKM_Track1_PtTrack"])

@@ -2242,23 +2242,99 @@ al principio del bucle, **sin pasar por la tabla local ni por la baja**.
 Medido: con un `MESS` puesto encima de la tabla baja, `COGE` lo saca y
 `NORTE` no.
 
-**Y no hay ninguna descripción «a deber».** Describe quien mueve --`LOOK`,
-`DESC`, `GOTO`, `FIND`, la salida-- y el arranque de la partida, que acaba en
-un `LOOK` (`$7B75`). Lo que hacía que MegaCorp no dijera dos veces su primera
-sala, con el `LOOK` del arranque y el de su propia tabla alta, es otra cosa:
-**describir borra la ventana de texto**. Medido: `MESS 89 LOOK` deja la
-pantalla sin el mensaje. En modo `TEXT` no lo borra --su `DESC` se salta ahí
-toda la parte de la ventana-- y el mensaje sobrevive, medido también.
+**Y no hay ninguna descripción «a deber»**, que era todo un mecanismo nuestro
+de menos. Describe quien mueve --`LOOK`, `DESC`, `GOTO`, `FIND`, la salida
+que la orden nombra-- y el arranque de la partida, que acaba en un `LOOK`
+(`$7B75`).
 
-**Eso último es lo que queda por hacer**, y es de por sí: cambiar nuestro
-modelo de la descripción --marca `vm_new_room` y deuda al principio del
-turno-- por el suyo, describir al mover y borrar la ventana al describir, que
-toca las cinco máquinas. Como lo que se ve en pantalla sale igual en modo
-lámina, no corre prisa, pero es una diferencia de fondo y está apuntada.
+**Entonces, ¿por qué MegaCorp no dice dos veces su primera sala**, si miran el
+arranque y su propia tabla alta? **Porque una descripción vuelve a la columna
+cero de la línea en la que está y escribe encima**, sin borrar ni terminar la
+línea antes. La segunda cae sobre la primera y no se ve.
 
-**Lo que queda por leer**: el parser --ya se sabe que llena dos nombres, que
-se salta las palabras que no conoce y que el `$FF` es el pronombre, que toma
-el último nombre dicho-- y el dibujo.
+Esto costó una medida mal leída y conviene apuntar por qué. La primera vez se
+preguntó en la sala 1, cuya descripción son cinco líneas, con `MESS 89 LOOK`
+en la tabla alta: el mensaje no aparecía y pareció que describir **borraba** la
+ventana. No: se había ido por arriba, empujado por las cinco líneas. Repetida
+la pregunta en la sala de la clave, que es de una línea, el mensaje sigue ahí
+y lo que queda en pantalla es
+
+    INTRODUZCA LA CLAVEsa...
+
+que es la descripción escrita sobre `El tiempo pasa...`, con su cola asomando.
+Y en modo `TEXT` ni siquiera eso --su `DESC` se salta esa parte entera-- y la
+descripción sale seguida del mensaje en la misma línea, medido también.
+**La lección: una medida sobre una sala de cinco líneas no dice nada de lo que
+pasa con la ventana.**
+
+**Ya es lo que hacemos.** `play` describe la sala de salida antes del primer
+turno, `follow_exit` describe al pasar por la salida y marca el turno servido,
+`play_turn` ya no debe nada a nadie, y `describe_location` pone la columna a
+cero cuando no se está en modo `TEXT`. La bandera `vm_new_room` se llama ahora
+`vm_moved` y sólo dice una cosa: que la orden se fue por una salida, y que ahí
+se acaba el turno.
+
+**Lo que queda de esto, sin medir**: su `DESC` de una sala **sin lámina** pone
+la ventana en toda la pantalla (`$7601`) en vez de en las filas de abajo. Hace
+falta preguntárselo a una de las tres aventuras que tienen salas sin lámina
+--el Quijote, Bangkok y Vajillas-- antes de tocar nada.
+
+### El parser, leído y medido
+
+Su parser son tres rutinas cortas. Una prueba una palabra contra una lista
+(`$79E3`), otra la prueba contra las tres listas por orden (`$7A53`), y otra
+recorre la línea (`$7A64`).
+
+**Cómo reparte una palabra** (`$7A53`): la prueba como **verbo** si el verbo
+está vacío, luego como **adverbio** si el adverbio está vacío, y luego como
+**nombre**, que va al primer hueco --el nombre uno si está vacío, si no el
+dos--. Una palabra que no está en ninguna lista se pasa por alto sin más.
+Nosotros probábamos el nombre antes que el adverbio; ahora es su orden.
+
+**Cómo compara** (`$79E3`): letra a letra hasta que **la palabra tecleada**
+se acaba, no la del vocabulario, que es por lo que `EX` encuentra `EXAMINA`
+y `EXAMINAR` no encuentra nada. Pasa las minúsculas a mayúsculas por el
+camino. Eso ya lo teníamos igual, medido en su día.
+
+**Qué parte una orden de la siguiente** (`$7A64`): la coma, el punto, el
+punto y coma y la admiración, y las palabras `AND` y `THEN`. Y nada más: la
+tabla de puntuación de la aventura le sirve sólo para **partir palabras**.
+Medido escribiendo dos verbos en una línea con cada marca entre ellos:
+
+| línea | órdenes |
+|---|---|
+| `COGE MATA` | una |
+| `COGE,MATA` | **dos** |
+| `COGE.MATA` | **dos** |
+| `COGE-MATA` | una |
+| `COGE?MATA` | una |
+| `COGE:MATA` | una |
+| `COGE AND MATA`, `COGE THEN MATA` | **dos** |
+
+Nosotros tomábamos por fin de orden **toda** la tabla de puntuación, que en
+MegaCorp trae también el `-`, el `?` y el `:`. Ahora `ends_statement` son esas
+cuatro marcas y `parts_word` es el espacio más la tabla, que es además lo que
+ya usaba el ajuste de líneas para no partir `Salidas:Sur.` por la mitad.
+
+**El pronombre** (`$7BA4` y `$7C16`): al empezar cada orden guarda el
+**último** nombre de la anterior --el segundo cuando dijo dos-- y deja la
+palabra marcada con un `$FF` que cambia por él en cuanto la línea está
+leída. Medido en *Los pájaros de Bangkok*, que es la única de las cuatro con
+pronombres: después de `COGER AGUA BAR`, el `LO` de `COGER LO` sale valiendo
+87, que es el BAR. Nosotros guardábamos el primero, y el pronombre sólo valía
+para el primer hueco.
+
+**Y una prueba del parser destapó un fallo del teclado.** Al escribir
+`ESPERA?SALIR` en el Spectrum llegaba `ESPERA?CSALI`: la interrogación es
+símbolo+C, y nuestro `next_key` decidía si una tecla era nueva **comparando el
+carácter**. Como las dos teclas nunca se sueltan en la misma trama, en cuanto
+el símbolo se suelta la misma pulsación pasa a decir `C`, que es otro carácter
+y por tanto otra tecla; y la letra que venía detrás se perdía mientras eso
+pasaba. El ROM guarda **la tecla**, no lo que dice. Ahora se compara
+`key_found`, que es lo que el explorado de cada máquina deja antes de aplicar
+ningún shift, y `A?B`, `A.B`, `A:B` y `A-B` llegan enteras.
+
+**Lo que queda por leer**: el dibujo.
 
 ## Cosas menores
 

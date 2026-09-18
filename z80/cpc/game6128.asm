@@ -122,8 +122,6 @@ start_up:
                 inc     hl
                 ld      d, (hl)
                 ld      (vm_location), de
-                ld      a, 1
-                ld      (vm_new_room), a
                 call    play
                 ld      a, $FF
                 ld      (done_flag), a

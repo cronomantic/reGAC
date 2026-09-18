@@ -133,18 +133,16 @@ follow_exit:
                 inc     hl
                 ld      d, (hl)
                 ld      (vm_location), de
-                ld      a, 1
-                ld      (vm_new_room), a
+                ex      de, hl
+                call    describe_location       ; their way out goes through
+                ld      a, 1                    ; the same code as GOTO
+                ld      (vm_moved), a
                 ret
 
 ; One turn.  Comes back with the game over flag set when it is time to stop.
 ; Corrupts: everything
-; The high priority conditions come first, and only then the description a
-; new room is owed.  That way round because a LOOK in them stands in for it:
-; measured on the original, whose table was replaced by IF ( AT 1 ) LOOK END
-; and then sent to room one, and the room came out described once.  With the
-; description first, as this had it, MegaCorp -- which describes the room it
-; opens in from its own high priority condition -- said its first room twice.
+; No description is owed to anybody here: whoever moves describes, which is
+; how the original does it, and this only runs the tables and asks.
 play_turn:
                 xor     a                       ; the high priority conditions
                 call    cond_table
@@ -152,15 +150,7 @@ play_turn:
                 ld      a, (vm_over)
                 or      a
                 ret     nz
-                ld      a, (vm_new_room)
-                or      a
-                jr      z, .no_description
-                ld      hl, (vm_location)
-                call    describe_location
-                xor     a
-                ld      (vm_new_room), a
-.no_description:
-                ; And only now the turn is counted.  It matters which side of
+                ; The turn is counted here.  It matters which side of
                 ; the table this falls: MegaCorp sets its whole game up in a
                 ; condition guarded by the count still being zero, and with
                 ; the turn counted first that condition never runs and the
@@ -168,9 +158,6 @@ play_turn:
                 ; on the original -- see doc/pendiente.md.
                 call    bump_turn
                 ld      a, (vm_over)
-                or      a
-                ret     nz
-                ld      a, (vm_new_room)
                 or      a
                 ret     nz
 
@@ -198,9 +185,17 @@ play_turn:
                 call    parse_sentence
                 ld      (vm_understood), a
                 push    af
+                xor     a
+                ld      (vm_moved), a
                 call    follow_exit
                 pop     af
-                ld      a, (vm_new_room)
+                ; An order that names a way out of the room has been served
+                ; by the moving, and the turn ends there: the original goes
+                ; straight back to the top of its loop without looking at
+                ; the table of the room or at the low priority one.  Measured
+                ; on it with a message written over its low priority table,
+                ; which COGE printed and NORTE did not.
+                ld      a, (vm_moved)
                 or      a
                 ret     nz
 
@@ -215,9 +210,6 @@ play_turn:
                 ld      a, (vm_over)
                 or      a
                 ret     nz
-                ld      a, (vm_new_room)
-                or      a
-                ret     nz
                 ld      a, (vm_done)
                 or      a
                 ret     nz
@@ -230,9 +222,6 @@ play_turn:
                 or      (hl)
                 ld      (hl), a
                 ld      a, (vm_over)
-                or      a
-                ret     nz
-                ld      a, (vm_new_room)
                 or      a
                 ret     nz
                 ld      a, (vm_done)
@@ -286,10 +275,16 @@ tell_the_score:
 
 ; Play until the adventure says to stop.
 play:
+                ; The room a game opens in is described before anything else,
+                ; which is the last thing the original does when it sets a
+                ; game up: it ends in a LOOK and then falls into the loop.
+                ld      hl, (vm_location)
+                call    describe_location
+.each_turn:
                 call    play_turn
                 ld      a, (vm_over)
                 or      a
-                jr      z, play
+                jr      z, .each_turn
                 jp      tell_the_score
 
 cond_section:   dw      0

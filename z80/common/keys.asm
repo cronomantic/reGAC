@@ -22,7 +22,8 @@
 ;   - a key held is typed again after thirty five frames, and then every five.
 ;
 ; The machine's scan_keyboard gives the key in A, zero for none, and leaves in
-; key_count how many keys that are not shifts it saw.  A frame is
+; key_count how many keys that are not shifts it saw and in key_found the key
+; it read before any shift was applied to it.  A frame is
 ; LOOKS_A_FRAME looks at the keyboard, as it is for the wait in HOLD, while
 ; the last look found nothing, and LOOKS_HELD while it found a key: a look
 ; that finds one costs more, and counted in the other it made a key held on a
@@ -53,6 +54,16 @@ next_key:
                 ld      a, c
                 or      a
                 jr      z, .keep_looking
+                ; What decides whether this is a new key is **which key** it
+                ; is and not what it says, which is what the ROM keeps.  A
+                ; mark typed with a shift held says one thing while both are
+                ; down and another the moment the shift is let go -- and the
+                ; two are never let go in the same frame -- so comparing the
+                ; character made one press of symbol shift and C put a ? into
+                ; the line and then a C, and the letter typed next was lost
+                ; while that went on.  Every machine's scan_keyboard leaves
+                ; the key itself in key_found, before any shift is applied.
+                ld      a, (key_found)
                 ld      hl, held_key
                 cp      (hl)
                 jr      z, .still_held

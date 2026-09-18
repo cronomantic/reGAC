@@ -54,6 +54,9 @@ ADVENTURE = os.path.join(ROOT, "snapshots", "megacorp2.json")
 
 TEXT_THIRD = 0x5000
 ENTER = chr(13)
+# Its own code, which is in its own vocabulary: room 5000 takes verb 29,
+# and verb 29 of MegaCorp is REBECA.
+PASSWORD = "REBECA"
 NOT_UNDERSTOOD = "242"  # the message GAC prints when a word means nothing
 
 if pytest is not None:
@@ -136,6 +139,13 @@ def test_it_describes_asks_and_answers():
             f"the interpreter never asked: {opening}"
         )
 
+        # Past its own code first.  While the game is still asking for it,
+        # its high priority table looks at every turn, and a description is
+        # written over the line it starts on, so the complaint below would be
+        # covered as soon as it is printed -- which is what the original does
+        # there too, watched on it.
+        session.type(PASSWORD + ENTER)
+        wait_screen(session, glyphs, ddb["locations"]["1"]["desc"][:12], timeout=30.0)
         # A word the adventure does not know, so it has to say so.
         session.type("XYZZY" + ENTER)
         answered = wait_screen(session, glyphs, puzzled[:10], timeout=20.0)

@@ -69,8 +69,8 @@ next_statement:
                 ld      a, c
                 call    ends_statement
                 jr      z, .a_mark
-                ld      a, SPACE_CODE
-                cp      c
+                ld      a, c
+                call    word_ends_at            ; punctuation parts words now
                 jr      z, .a_space
                 ld      hl, word_len            ; it belongs to the word
                 inc     (hl)
@@ -246,6 +246,20 @@ vocab_find:
 ; Sets the verb, the nouns and the adverb; carry set if anything was understood.
 ; Corrupts: everything
 parse_sentence:
+                ; What a pronoun in this order will stand for: the last noun
+                ; the order before named, which is the second when it named
+                ; two.  The original works it out here as well, just before
+                ; it clears the slots, and leaves what it had when nothing
+                ; was named.
+                ld      a, (vm_noun2)
+                or      a
+                jr      nz, .remember
+                ld      a, (vm_noun1)
+                or      a
+                jr      z, .nothing_named
+.remember:
+                ld      (vm_old_noun), a
+.nothing_named:
                 xor     a
                 ld      (vm_verb), a
                 ld      (vm_noun1), a
@@ -261,8 +275,8 @@ parse_sentence:
                 ld      a, b
                 or      c
                 jr      z, .finished
-                ld      a, SPACE_CODE
-                cp      (hl)
+                ld      a, (hl)
+                call    word_ends_at
                 jr      nz, .word_start
                 inc     hl
                 dec     bc
@@ -275,8 +289,8 @@ parse_sentence:
                 ld      a, b
                 or      c
                 jr      z, .measured
-                ld      a, SPACE_CODE
-                cp      (hl)
+                ld      a, (hl)
+                call    word_ends_at
                 jr      z, .measured
                 inc     hl
                 dec     bc
@@ -310,59 +324,61 @@ parse_sentence:
 
 ; Try the word at parse_ptr against each kind, filling the first empty slot.
 ; Corrupts: everything
+; A word of the order, tried as each kind in turn, and the first slot that
+; is empty takes it.  The order is the original's: the verb, then the
+; adverb, then the nouns -- read in its code, where a word is looked for in
+; the verbs, then in the adverbs, then in the nouns, and a noun goes into
+; the first slot or the second according to which is empty.  A word it knows
+; of no kind is passed over.
 try_word:
                 ld      a, (vm_verb)
                 or      a
-                jr      nz, .try_noun
+                jr      nz, .try_adverb
                 ld      a, WORD_VERB
                 call    look_up
                 or      a
-                jr      z, .try_noun
-                ld      (vm_verb), a
-                ret
-.try_noun:
-                ld      a, (vm_noun1)
-                or      a
-                jr      nz, .try_adverb
-                ld      a, WORD_NOUN
-                call    look_up
-                or      a
-                jr      nz, .got_noun
-                ; not a noun; a pronoun stands for the last one named
-                ld      a, WORD_PRONOUN
-                call    look_up
-                or      a
                 jr      z, .try_adverb
-                ld      a, (vm_old_noun)
-                or      a
-                ret     z
-                ld      (vm_noun1), a
-                ret
-.got_noun:
-                ld      (vm_noun1), a
-                ld      (vm_old_noun), a
+                ld      (vm_verb), a
                 ret
 .try_adverb:
                 ld      a, (vm_adverb)
                 or      a
-                jr      nz, .try_noun2
+                jr      nz, .a_noun
                 ld      a, WORD_ADVERB
                 call    look_up
                 or      a
-                jr      z, .try_noun2
+                jr      z, .a_noun
                 ld      (vm_adverb), a
                 ret
-.try_noun2:
+.a_noun:
                 ld      a, (vm_noun2)
                 or      a
-                ret     nz
-                ld      a, (vm_noun1)
-                or      a
-                ret     z                       ; no first noun, no second
+                ret     nz                      ; both named already
                 ld      a, WORD_NOUN
                 call    look_up
                 or      a
+                jr      nz, .found
+                ; not a noun; a pronoun stands for the last one named, which
+                ; is what the original puts in its place once the order is
+                ; read.  Measured on Los pajaros de Bangkok, the one of the
+                ; four that has pronouns: after COGER AGUA BAR, the LO of
+                ; COGER LO came out as the BAR and not as the AGUA.
+                ld      a, WORD_PRONOUN
+                call    look_up
+                or      a
                 ret     z
+                ld      a, (vm_old_noun)
+                or      a
+                ret     z
+.found:
+                ld      b, a
+                ld      a, (vm_noun1)
+                or      a
+                ld      a, b
+                jr      nz, .the_second
+                ld      (vm_noun1), a
+                ret
+.the_second:
                 ld      (vm_noun2), a
                 ret
 

@@ -61,6 +61,9 @@ def parse(sentence):
     it = object.__new__(game)
     it.verbs, it.nouns, it.adverbs = VERBS, NOUNS, ADVERBS
     it.pronouns, it.old_noun = ["LO"], 0
+    # what the order before left behind, which is where a pronoun of this one
+    # would take its meaning from
+    it.noun1 = it.noun2 = 0
     game.__dict__["_GAC_Interpreter__parse_input"](it, sentence)
     return it.verb, it.noun1, it.noun2, it.adverb
 
@@ -107,6 +110,22 @@ def test_the_second_noun_needs_a_first():
     assert (noun1, noun2) == (3, 4)
 
 
+def test_a_pronoun_stands_for_the_last_noun_named():
+    """The last, which is the second when the order before named two.  Read
+    in the original and measured on Los pajaros de Bangkok: after COGER AGUA
+    BAR, the LO of COGER LO came out as the BAR."""
+    game = interpreter()
+    it = object.__new__(game)
+    it.verbs, it.nouns, it.adverbs = VERBS, NOUNS, ADVERBS
+    it.pronouns, it.old_noun = ["LO"], 0
+    it.noun1 = it.noun2 = 0
+    parse_input = game.__dict__["_GAC_Interpreter__parse_input"]
+    parse_input(it, "COGE LLAVE PUERTA")
+    assert (it.noun1, it.noun2) == (3, 4)
+    parse_input(it, "COGE LO")
+    assert it.noun1 == 4, "the pronoun took the first noun, not the last"
+
+
 def cut(line, named=()):
     """One typed line into the orders it holds."""
     game = interpreter()
@@ -118,6 +137,16 @@ def cut(line, named=()):
 
 def test_a_mark_of_punctuation_parts_two_orders():
     assert cut("XYZY.SUR") == ["XYZY", "SUR"]
+    assert cut("XYZY,SUR") == ["XYZY", "SUR"]
+
+
+def test_the_other_marks_part_words_and_not_orders():
+    """Only four marks cut an order in two, and the adventure's own table of
+    punctuation is what parts words.  Measured on the original: COGE-MATA is
+    one order, where COGE,MATA is two."""
+    assert cut("XYZY-SUR") == ["XYZY SUR"]
+    assert cut("XYZY?SUR") == ["XYZY SUR"]
+    assert cut("XYZY:SUR") == ["XYZY SUR"]
 
 
 ORIGINALS = ["THEN", "AND"]                     # what the decompiler writes

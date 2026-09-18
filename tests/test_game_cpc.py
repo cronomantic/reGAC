@@ -55,6 +55,9 @@ ADVENTURE = os.path.join(ROOT, "snapshots", "megacorp2.json")
 LOADS_AT = 0x4000
 SCREEN = 0xC000
 ENTER = chr(13)
+# Its own code, which is in its own vocabulary: room 5000 takes verb 29,
+# and verb 29 of MegaCorp is REBECA.
+PASSWORD = "REBECA"
 NOT_UNDERSTOOD = "242"  # the message GAC prints when a word means nothing
 
 if pytest is not None:
@@ -120,11 +123,21 @@ def test_it_asks_and_answers_on_an_amstrad():
     try:
         time.sleep(3.0)
         start(session)
-        opening = wait_screen(session, glyphs, prompt.strip()[:3])
+        # Loading from its tape is the longest wait in the suite, and a
+        # machine that is running four emulators at once takes longer
+        # still, so this one is given room.
+        opening = wait_screen(session, glyphs, prompt.strip()[:3], timeout=180.0)
         assert any(prompt.strip()[:3] in line for line in opening if line), (
             f"the interpreter never asked: {opening}"
         )
 
+        # Past its own code first.  While the game is still asking for it,
+        # its high priority table looks at every turn, and a description is
+        # written over the line it starts on, so the complaint below would be
+        # covered as soon as it is printed -- which is what the original does
+        # there too, watched on it.
+        session.type_keys(PASSWORD + ENTER)
+        wait_screen(session, glyphs, ddb["locations"]["1"]["desc"][:12], timeout=30.0)
         # A word the adventure does not know, so it has to say so.
         session.type_keys("XYZZY" + ENTER)
         answered = wait_screen(session, glyphs, puzzled[:6], timeout=30.0)

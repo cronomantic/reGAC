@@ -63,7 +63,7 @@ vm_init:
                 ld      (vm_skip), a
                 ld      (vm_done), a
                 ld      (vm_over), a
-                ld      (vm_new_room), a
+                ld      (vm_moved), a
                 ld      a, MARK_LIT             ; a game starts in the light
                 ld      (vm_flags), a
                 ld      a, 1
@@ -354,7 +354,7 @@ vm_skip:        db      0
 vm_if_true:     db      0                       ; some IF came out true
 vm_done:        db      0                       ; the turn is over
 vm_over:        db      0                       ; the game is over
-vm_new_room:    db      0                       ; the room wants describing
+vm_moved:       db      0                       ; a way out was followed
 vm_graphics:    db      1
 vm_verb:        db      0
 vm_noun1:       db      0

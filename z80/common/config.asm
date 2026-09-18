@@ -49,15 +49,30 @@ config_init:
                 ld      (nothing_at), de
                 ret
 
-; Whether the code in A is a mark that ends one order and starts the next.
-; A space is not one of them: it only parts words.
-; Zero flag set when it is.
-; Corrupts: AF, BC, HL
+; Whether the code in A ends one order and starts the next.  The original
+; has these four written into it and nothing else, and uses the adventure's
+; own table of punctuation only to part words: measured on it, a comma or a
+; full stop make two orders out of one line, and the -, the ? and the : that
+; MegaCorp's table holds do not.
+; Zero flag set when it does.
+; Corrupts: AF
 ends_statement:
+                cp      ','
+                ret     z
+                cp      '.'
+                ret     z
+                cp      ';'
+                ret     z
+                cp      '!'
+                ret
+
+; Whether the code in A parts one word from the next: a space, or any of the
+; marks of punctuation this adventure knows.  Zero flag set when it does.
+; Corrupts: AF, BC, HL
+parts_word:
+                cp      SPACE_CODE
+                ret     z
                 ld      c, a
-                ld      a, SPACE_CODE
-                cp      c
-                jr      z, .no
                 ld      a, (punct_count)
                 or      a
                 jr      z, .no
@@ -74,12 +89,12 @@ ends_statement:
                 ret
 
 ; The same question, asked from the middle of a loop that is using the
-; registers: whether the code in A ends a word.  Zero flag set when it does.
+; registers: whether the code in A parts a word.  Zero flag set when it does.
 ; Keeps BC, DE and HL.
 word_ends_at:
                 push    bc
                 push    hl
-                call    ends_statement
+                call    parts_word
                 pop     hl
                 pop     bc
                 ret

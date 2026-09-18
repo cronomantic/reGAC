@@ -117,6 +117,26 @@ describe_location:
                 and     MARK_LIT | MARK_LAMP
                 jr      z, .in_the_dark
                 ld      (list_room), hl         ; which room, to name its things
+                ; A description starts at the left of the line the cursor is
+                ; on and is written over whatever is there -- nothing is
+                ; wiped, and the line is not ended first.  Measured on the
+                ; original in its password room, whose description is one
+                ; line long: with a message printed just before it, what is
+                ; left on the screen is INTRODUZCA LA CLAVEsa..., the tail of
+                ; El tiempo pasa... showing past the end of it.  It is also
+                ; why an adventure that looks from its own high priority
+                ; table says its first room once and not twice: a description
+                ; ends without a new line, so the next one lands on top of
+                ; it.  In TEXT mode not even this happens -- their DESC skips
+                ; that whole part -- and there the description follows the
+                ; message along the same line, measured as well.
+                ld      a, (vm_graphics)
+                or      a
+                jr      z, .where_it_is
+                xor     a
+                ld      (cursor_x), a
+.where_it_is:
+                ld      hl, (list_room)
                 call    obj_find_location
                 ret     c
                 push    hl
@@ -517,8 +537,6 @@ op_desc:
 op_look:
                 ld      hl, (vm_location)
                 call    describe_location
-                xor     a
-                ld      (vm_new_room), a
                 jp      vm_loop
 
 op_mess:

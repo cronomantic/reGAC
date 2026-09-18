@@ -176,6 +176,22 @@ def test_a_full_stop_parts_two_orders():
 
 
 @needs_tools
+def test_a_comma_parts_them_and_the_other_marks_do_not():
+    """Measured on the original: of the marks its own table of punctuation
+    holds, the comma and the full stop part two orders, and the -, the ?
+    and the : do not -- those only part words.  COGE-MATA at MegaCorp was
+    one order and did what COGE alone does."""
+    wanted = FRAMES / 50
+    took = how_long("ESPERA,SALIR")
+    assert took is not None, "a comma did not part the two orders"
+    assert wanted * 0.8 < took < wanted * 1.4, (
+        f"both orders should have run, taking about {wanted}s, and it took {took:.2f}s"
+    )
+    assert how_long("ESPERA-SALIR") is None, "a dash parts no order"
+    assert how_long("ESPERA?SALIR") is None, "nor does a question mark"
+
+
+@needs_tools
 def test_a_word_parts_them_when_the_adventure_names_one():
     took = how_long("ESPERA Y SALIR", separators=["Y"])
     wanted = FRAMES / 50

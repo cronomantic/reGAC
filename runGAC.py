@@ -462,35 +462,45 @@ class GAC_Interpreter:
                     self.print(str_exits)
 
     def __parse_input(self, input_string):
+        """A word is tried as a verb, then as an adverb, then as a noun, and
+        a noun goes into whichever slot is empty.  That order is the
+        original's, read in its code; a word of no kind at all is passed
+        over.  A pronoun stands for the last noun the order before named --
+        the second when it named two -- which is worked out here, just before
+        the slots are cleared, as the original does it.
+        """
+        if self.noun2 != 0:
+            self.old_noun = self.noun2
+        elif self.noun1 != 0:
+            self.old_noun = self.noun1
         self.verb = 0
         self.adverb = 0
         self.noun1 = 0
         self.noun2 = 0
-        input_string = input_string.upper()
-        words = input_string.split()
+        words = input_string.upper().split()
         while len(words) > 0:
             word = words.pop(0)
-            matched = False
             if word == "*QUIT":
                 return (True, True)
-            if self.verb == 0 and not matched:
+            if self.verb == 0:
                 self.verb = self.__find_word(self.verbs, word)
-                matched = self.verb != 0
-            # check noun1 in case the word is duplicated in adverbs and nouns
-            if self.noun1 == 0 and not matched:
-                self.noun1 = self.__find_word(self.nouns, word)
-                # Check if it is a pronoun
-                if self.noun1 != 0:
-                    self.old_noun = self.noun1
-                elif word in self.pronouns:
-                    self.noun1 = self.old_noun
-                matched = self.noun1 != 0
-            if self.adverb == 0 and not matched:
+                if self.verb != 0:
+                    continue
+            if self.adverb == 0:
                 self.adverb = self.__find_word(self.adverbs, word)
-                matched = self.adverb != 0
-            if self.noun2 == 0 and self.noun1 != 0 and not matched:
-                self.noun2 = self.__find_word(self.nouns, word)
-                matched = self.noun2 != 0
+                if self.adverb != 0:
+                    continue
+            if self.noun2 != 0:
+                continue                        # both of them named already
+            found = self.__find_word(self.nouns, word)
+            if found == 0 and word in self.pronouns:
+                found = self.old_noun
+            if found == 0:
+                continue
+            if self.noun1 == 0:
+                self.noun1 = found
+            else:
+                self.noun2 = found
         return (self.verb != 0 or self.noun1 != 0, False)
 
     def __perfom_conditions(self, cond_list, exit_if_done):
@@ -919,7 +929,6 @@ class GAC_Interpreter:
                     return self.finished
             # Separate statements
             self.statements = self.__cut_into_orders(input_str)
-            self.old_noun = 0  # Delete after new text input
 
         # Process player input
         while len(self.statements) > 0:
@@ -966,17 +975,24 @@ class GAC_Interpreter:
     def __cut_into_orders(self, line):
         """One typed line into the orders it holds.
 
-        The original cuts at a mark of punctuation and at two words, THEN and
-        AND: XYZZY THEN SUR makes MegaCorp complain about the first word and
-        then walk south, where XYZZY SUR simply walks south.  Those two live
-        in the original's interpreter; here they live in the database, put
-        there by the decompiler, so that the words belong to the adventure and
-        its author rather than to us.  They are matched whole, so ANDAR is not
-        a joining word with a tail.
+        The original cuts at four marks -- a comma, a full stop, a semicolon
+        and an exclamation mark -- and at two words, THEN and AND: XYZZY THEN
+        SUR makes MegaCorp complain about the first word and then walk south,
+        where XYZZY SUR simply walks south.  Those two live in the original's
+        interpreter; here they live in the database, put there by the
+        decompiler, so that the words belong to the adventure and its author
+        rather than to us.  They are matched whole, so ANDAR is not a joining
+        word with a tail.
+
+        The adventure's own table of punctuation is not what cuts: the
+        original uses it to part words, and nothing else.  Measured on it,
+        COGE-MATA is one order where COGE,MATA is two.
         """
         for mark in self.punctuation:
-            if mark not in (" ", ""):
-                line = line.replace(mark, ".")
+            if mark not in (" ", "") and mark not in ",.;!":
+                line = line.replace(mark, " ")
+        for mark in ",;!":
+            line = line.replace(mark, ".")
         parting = {w.upper() for w in self.separators}
         orders = []
         for piece in line.split("."):

@@ -68,6 +68,9 @@ TEXT_ROWS = 8
 COLUMNS = 32
 ROW_BYTES = 256
 ENTER = chr(13)
+# Its own code, which is in its own vocabulary: room 5000 takes verb 29,
+# and verb 29 of MegaCorp is REBECA.
+PASSWORD = "REBECA"
 NOT_UNDERSTOOD = "242"  # the message GAC prints when a word means nothing
 
 if pytest is not None:
@@ -178,13 +181,23 @@ def test_it_asks_and_answers_on_an_msx():
             f"the interpreter never asked: {opening}"
         )
 
+        # The picture is the one of the room it opens in, so it is looked
+        # at before the code takes the player out of that room.
+        room = ddb["locations"][str(ddb["init_loc"])]["graphic_id"]
+        drawn = (bytes(session.read(MSX_PATTERNS, MSX_PICTURE_BYTES, zone=VRAM)),
+                 bytes(session.read(MSX_COLOURS, MSX_PICTURE_BYTES, zone=VRAM)))
+
+        # Past its own code first.  While the game is still asking for it,
+        # its high priority table looks at every turn, and a description is
+        # written over the line it starts on, so the complaint below would be
+        # covered as soon as it is printed -- which is what the original does
+        # there too, watched on it.
+        type_them(session, PASSWORD + ENTER)
+        wait_screen(session, glyphs, ddb["locations"]["1"]["desc"][:12], timeout=30.0)
         # A word the adventure does not know, so it has to say so.
         type_them(session, "XYZZY" + ENTER)
         answered = wait_screen(session, glyphs, puzzled[:6], timeout=30.0)
 
-        room = ddb["locations"][str(ddb["init_loc"])]["graphic_id"]
-        drawn = (bytes(session.read(MSX_PATTERNS, MSX_PICTURE_BYTES, zone=VRAM)),
-                 bytes(session.read(MSX_COLOURS, MSX_PICTURE_BYTES, zone=VRAM)))
     finally:
         session.close()
 

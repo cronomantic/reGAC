@@ -60,6 +60,9 @@ EFFECTS = os.path.join(ROOT, "music", "effects.asm")
 MUSIC_CEILING = 0x5C00          # where the music's own room ends
 
 ENTER = chr(13)
+# Its own code, which is in its own vocabulary: room 5000 takes verb 29,
+# and verb 29 of MegaCorp is REBECA.
+PASSWORD = "REBECA"
 NOT_UNDERSTOOD = "242"
 A_FLAG = 250                    # one this adventure does not use
 
@@ -129,12 +132,23 @@ def test_an_adventure_plays_with_the_music_on():
             f" ${at:04X}"
         )
 
+        # Past its own code first.  While the game is still asking for it,
+        # its high priority table looks at every turn, and a description is
+        # written over the line it starts on, so the complaint below would be
+        # covered as soon as it is printed -- which is what the original does
+        # there too, watched on it.
+        session.type(PASSWORD + ENTER)
+        wait_screen(session, glyphs, ddb["locations"]["1"]["desc"][:12], timeout=30.0)
+        # Where the tune is just before the parser is given something to do,
+        # so that what is compared is one turn of it and not a whole game: the
+        # track loops, and over long enough it comes back to where it started.
+        was = word(session, where["PLY_AKM_Track1_PtTrack"])
         session.type("XYZZY" + ENTER)
         answered = wait_screen(session, glyphs, puzzled[:6], timeout=30.0)
         assert any(puzzled[:6] in line for line in answered), (
             f"the parser stopped answering with the music on: {answered}"
         )
-        assert word(session, where["PLY_AKM_Track1_PtTrack"]) != at, (
+        assert word(session, where["PLY_AKM_Track1_PtTrack"]) != was, (
             "the tune stopped while the adventure was played"
         )
         assert session.read(where["music_playing"], 1)[0] == 1
