@@ -121,7 +121,10 @@ def test_the_disk_carries_the_music_in_its_one_file(tmp_path):
         f.write(plus3_banked_disk(boot, code, banks, music=(player, tunes)))
 
     glyphs = glyph_table(Database(ddb, machine="spectrum128", page_bits=14))
-    described = ddb["locations"][str(ddb["init_loc"])]["desc"].strip()[-16:]
+    # What it says when it opens, which is its own doing: the room it starts
+    # in is never described, because the high priority conditions are looked
+    # at before a new room is paid its description.  See doc/pendiente.md.
+    described = "FABIAN"
 
     session = emulator.Session(
         machine=MACHINE, extra=["--enable-dsk", "--dsk-file", path]

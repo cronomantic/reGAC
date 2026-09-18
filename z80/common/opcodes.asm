@@ -460,9 +460,15 @@ op_desc:
                 call    describe_location
                 jp      vm_loop
 
+; LOOK describes where the player is, and with that the room owes no
+; description of its own: a high priority condition that looks is how an
+; adventure opens on a room of its choosing, and the interpreter must not say
+; it again afterwards.
 op_look:
                 ld      hl, (vm_location)
                 call    describe_location
+                xor     a
+                ld      (vm_new_room), a
                 jp      vm_loop
 
 op_mess:

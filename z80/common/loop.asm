@@ -139,7 +139,19 @@ follow_exit:
 
 ; One turn.  Comes back with the game over flag set when it is time to stop.
 ; Corrupts: everything
+; The high priority conditions come first, and only then the description a
+; new room is owed.  That way round because a LOOK in them stands in for it:
+; measured on the original, whose table was replaced by IF ( AT 1 ) LOOK END
+; and then sent to room one, and the room came out described once.  With the
+; description first, as this had it, MegaCorp -- which describes the room it
+; opens in from its own high priority condition -- said its first room twice.
 play_turn:
+                xor     a                       ; the high priority conditions
+                call    cond_table
+                call    run_table
+                ld      a, (vm_over)
+                or      a
+                ret     nz
                 ld      a, (vm_new_room)
                 or      a
                 jr      z, .no_description
@@ -148,9 +160,6 @@ play_turn:
                 xor     a
                 ld      (vm_new_room), a
 .no_description:
-                xor     a                       ; the high priority conditions
-                call    cond_table
-                call    run_table
                 ; And only now the turn is counted.  It matters which side of
                 ; the table this falls: MegaCorp sets its whole game up in a
                 ; condition guarded by the count still being zero, and with

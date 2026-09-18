@@ -100,15 +100,19 @@ def test_the_tape_carries_the_tunes_to_their_page():
              for name in ("music_playing", "music_buffer", "start",
                           "PLY_AKM_Track1_PtTrack")}
     glyphs = glyph_table(Database(ddb, machine="spectrum128", page_bits=14))
-    described = ddb["locations"][str(ddb["init_loc"])]["desc"].strip()
+    # What this adventure says when it opens, which is its own doing: the room
+    # it starts in is never described, because the high priority conditions
+    # are looked at before a new room is paid its description.  See
+    # doc/pendiente.md.
+    opens_with = "FABIAN"
 
     session = emulator.Session(machine="128k", extra=TAPE_FLAGS)
     try:
         session.load(TAPE)
         # The end of the description and not the start: this one is long
         # enough that its first lines have scrolled off by then.
-        arrived = wait_screen(session, glyphs, described[-16:], timeout=180.0)
-        assert any(described[-16:] in line for line in arrived), (
+        arrived = wait_screen(session, glyphs, opens_with, timeout=180.0)
+        assert any(opens_with in line for line in arrived), (
             f"the tape never got as far as playing: {arrived}"
         )
 

@@ -2076,28 +2076,32 @@ nada que arreglar.
 **Y esa misma comparación destapó dos diferencias más**, de las cuales una
 está arreglada y la otra medida y no:
 
-**La apertura de MegaCorp: ellos dicen su sala una vez y nosotros dos.**
-Medido y **sin arreglar**, y lo que hay medido no encaja del todo, que es
-justo lo que hay que dejar escrito para no repetirlo.
+**La apertura de MegaCorp: decían su sala una vez y nosotros dos.**
+Arreglado, y lo que costó fue el orden de dos cosas dentro del turno.
 
 Su primera condición de alta prioridad es `IF ( AT 5000 ) SET 3 LOOK END`, y
-lo que se sabe es esto:
+lo medido fue esto:
 
 | pregunta | cómo se midió | respuesta |
 |---|---|---|
-| ¿abre diciendo su sala una vez o dos? | cargando el original de su propia cinta, que es la única forma de verlo empezar: las instantáneas están tomadas con la partida ya en marcha | **una** |
-| ¿se mira esa tabla antes de la primera pregunta? | cambiándola por `IF ( SET? 3 ) MESS 89 END` y tecleando algo: si la bandera está puesta, es que la suya corrió | **sí** |
-| ¿un `LOOK` en esa tabla describe todos los turnos? | poniéndole `IF ( AT 1 ) LOOK END` y jugando dos turnos | **sí** |
-| ¿describe el intérprete la sala inicial por su cuenta? | el Quijote no tiene ningún `LOOK` en ninguna tabla y su pantalla de título es la descripción de su sala inicial | **debería** |
+| ¿abre diciendo su sala una vez o dos? | cargando el original de su cinta, que es la única forma de verlo empezar, y mirando la pantalla cuatro veces por segundo | **una**, y nada la borra |
+| ¿se mira esa tabla antes de la primera pregunta? | cambiándola por `IF ( SET? 3 ) MESS 89 END`: si su bandera está puesta, es que la suya corrió | **sí** |
+| ¿un `LOOK` ahí describe todos los turnos? | poniéndole `IF ( AT 1 ) LOOK END` y jugando dos turnos | **sí** |
+| ¿la pantalla de título viene dibujada en la cinta? | decodificando los 6912 bytes de pantalla que trae su bloque de 48K con la tipografía de la aventura | **es dibujo, no texto**: la descripción la imprime el intérprete |
+| ¿un `LOOK` paga la descripción que una sala nueva debe? | tabla cambiada por `IF ( AT 1 ) LOOK END` y luego la clave, que lleva a la sala uno | **sí**: descrita una vez |
 
-Las cuatro juntas no pueden ser: si la tabla corre y su `LOOK` describe, y
-además el intérprete describe, la apertura tendría que decirlo dos veces. Algo
-de lo medido está tomado de una manera que engaña, y lo más sospechoso es la
-primera vuelta con la cinta: falta repetirla parando la máquina nada más
-cargar y mirando la pantalla paso a paso. Lo que **no** vale es lo que se
-intentó primero --no mirar esa tabla antes de la primera pregunta--: cuadraba
-la apertura y dejaba sin sonar la música de las aventuras que la arrancan ahí,
-que son ocho pruebas de la suite, y va contra la bandera 3.
+Con la última encaja todo: **la tabla de alta prioridad va antes de la
+descripción que una sala nueva debe, y un `LOOK` en ella la da por pagada**.
+Así una aventura abre en la sala que quiera describiéndola ella misma, y el
+intérprete no la repite. Nosotros describíamos primero y mirábamos la tabla
+después, de modo que MegaCorp decía su primera sala dos veces.
+
+Ahora `play_turn` mira la tabla y luego describe lo que quede debiéndose, y
+`LOOK` borra esa deuda. La apertura de MegaCorp sale ya idéntica a la del
+original, línea por línea. La prueba está en `test_markers_z80.py`, y las que
+usan esa tabla como sonda escriben ahora una orden antes: en la primera vuelta
+la tabla se mira cuando todavía no se ha descrito nada, que es lo que hace el
+original.
 
 **Lo de «Perdón?» no era lo que parecía, y queda a medias.** El original
 también lo dice: lo que pasaba es que en la sala de la clave no lo decía, y

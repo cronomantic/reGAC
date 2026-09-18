@@ -139,6 +139,13 @@ def ends(ddb, within=6.0):
     session = emulator.Session()
     try:
         session.load(SNAPSHOT)
+        # An order is typed first: these probes sit in the high priority
+        # table, which is looked at before the description a new room is owed,
+        # so on the opening pass there is nothing described for them to find.
+        # The word is one the adventure does not know, so that nothing but the
+        # asking happens because of it.
+        time.sleep(2.0)
+        session.type("X" + ENTER)
         deadline = time.time() + within
         while time.time() < deadline:
             time.sleep(0.1)
@@ -168,6 +175,19 @@ def played(ddb, orders=(), settle=3.0):
 # The condition that stops the game the moment marker zero is set, which is
 # the interpreter saying it has just described a room.
 STOPS_ON_DESCRIBED = [["PUSH", 0], ["SET?"], ["IF"], ["EXIT"], ["END"]]
+
+
+@needs_tools
+def test_a_look_pays_what_a_new_room_is_owed():
+    """An adventure that opens by looking from its own high priority table --
+    which is what MegaCorp does -- has its first room described once and not
+    twice.  The high priority conditions are looked at before the description
+    a new room is owed, so a LOOK there stands in for it.  Measured on the
+    original: its table replaced by IF ( AT 1 ) LOOK END and the player sent
+    to room one, and the room came out described once."""
+    lines = played(adventure(hpcs=[["LOOK"], ["END"]]))
+    said = sum(line.count("UN CUARTO") for line in lines)
+    assert said == 1, f"the room was described {said} times: {lines}"
 
 
 @needs_tools

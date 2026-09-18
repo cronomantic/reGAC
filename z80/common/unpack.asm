@@ -145,8 +145,22 @@ pair_count:     db      0
 
 ; The place in the store of message number A, in DE.  Carry set if there is no
 ; such message.
+;
+; The lookup it reads lives in the text, which on a machine with banks is one
+; of them, so the bank goes in first.  It used to trust whoever had gone
+; before -- which was the room's description, and worked only because that
+; always came first.  The day the high priority conditions moved ahead of the
+; description, the opening message of a banked adventure came out of whatever
+; bank happened to be in the window: Bangkok, which says who wrote it before
+; anything else, said a line about a waiter instead.
 ; Corrupts: AF, HL
 message_index:
+                push    de
+                ld      d, a                    ; the message, while paging
+                ld      a, SECTION_TEXT
+                call    db_bank_in
+                ld      a, d
+                pop     de
                 ld      hl, (message_lookup)
                 ld      e, a
                 ld      d, 0

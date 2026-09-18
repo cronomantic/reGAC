@@ -64,6 +64,7 @@ DATABASE = os.path.join(CPC, "game.rgac")
 BINARY = os.path.join(CPC, "game.bin")
 LISTING = os.path.join(CPC, "game.lst")
 ADVENTURE = os.path.join(ROOT, "snapshots", "quijote1.json")
+LANDS_ROOM = 1                  # where its own condition sends the player
 
 if pytest is not None:
     needs_tools = pytest.mark.skipif(
@@ -122,23 +123,25 @@ def test_it_plays_with_the_interpreter_under_the_database():
     )
     assert len(data) <= CPC_LOW_ROOM
     glyphs = glyph_table(Database(ddb))
-    where = ddb["locations"][str(ddb["init_loc"])]["desc"]
+    # The room it opens in is its title, and that one is never described: its
+    # own high priority condition waits for a key there and sends the player
+    # to the library, which is the room to look for.  The interpreter looks at
+    # that table before paying a new room its description, the way the
+    # original does -- see doc/pendiente.md.
+    where = ddb["locations"][str(LANDS_ROOM)]["desc"].split()[0]
 
     session = emulator.Session(machine="CPC464")
     try:
         time.sleep(3.0)
         started(session, code, data)
-        # this one opens on a presentation that waits for a key
-        wait_screen(session, glyphs, ddb["messages"]["240"].strip()[:3],
-                    timeout=120.0)
         for _ in range(4):
             session.type_keys(" ")
             time.sleep(2.0)
-        lines = wait_screen(session, glyphs, where.split()[0], timeout=90.0)
+        lines = wait_screen(session, glyphs, where, timeout=120.0)
     finally:
         session.close()
-    assert any(where.split()[0] in line for line in lines if line), (
-        f"the room it starts in was never described: {lines}"
+    assert any(where in line for line in lines if line), (
+        f"the room it opens into was never described: {lines}"
     )
 
 

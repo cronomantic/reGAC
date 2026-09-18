@@ -63,6 +63,12 @@ ADVENTURE = os.path.join(ROOT, "snapshots", "Bangkok1.json")
 
 ENTER = chr(13)
 NOT_UNDERSTOOD = "242"
+# What this adventure does when it opens, which is its own doing: it says who
+# wrote it, waits for a key and goes to the airport.  The room it starts in is
+# never described -- see played() below.
+OPENS_WITH = "FABIAN"
+LANDS_ROOM = 15
+LANDS_IN = "aeropuerto"
 PICTURE_ROWS = 128
 BYTES_ACROSS = 32
 ATTRIBUTES = 0x5800
@@ -140,35 +146,39 @@ def build(source, database, machine, source_asm, listing, banks=None, defs=None,
     return emulator.assemble(source_asm, listing=listing, defines=defines)
 
 
-def played(tape, ddb, glyphs, machine):
-    """Load the tape as a person would, let it get as far as describing where
-    the player is, and then talk to it.  Gives back the screen it drew.
+def played(tape, ddb, glyphs, machine, opens_with, lands_in):
+    """Load the tape as a person would, let it get as far as asking for an
+    order, and then talk to it.  Gives back the screen it drew.
 
-    This adventure opens on its title, which is a room like any other: it
-    draws its picture, says its piece and waits for a key.  So what says it
-    has arrived is the description and not the prompt, which that room never
-    gives.
+    What this adventure does when it opens is its own business and not the
+    interpreter's: from its high priority table it says its piece, waits for a
+    key and goes elsewhere.  The room it opens in is never described, because
+    the interpreter looks at that table before paying what a new room is owed
+    -- which is how the original does it, measured, and what MegaCorp relies on
+    to describe the room it opens in from its own condition.  So what says it
+    has arrived is the adventure's own line, and the picture to look at is the
+    one of the room its condition sends the player to.
     """
-    room = str(ddb["init_loc"])
-    described = ddb["locations"][room]["desc"].strip()
     prompt = ddb["messages"]["240"].strip()[:3]
     puzzled = ddb["messages"][NOT_UNDERSTOOD]
     session = emulator.Session(machine=machine, extra=TAPE_FLAGS)
     try:
         session.load(tape)
-        # The end of the description and not the start: this one is long
-        # enough that its first lines have scrolled off by then.
-        opening = wait_screen(session, glyphs, described[-16:], timeout=120.0)
-        assert any(described[-16:] in line for line in opening), (
-            f"the room was never described: {opening}"
+        opening = wait_screen(session, glyphs, opens_with, timeout=120.0)
+        assert any(opens_with in line for line in opening), (
+            f"the adventure never said its piece: {opening}"
+        )
+
+        # A key gets past the title and into the adventure proper, which is a
+        # room drawn and a description printed.
+        session.type(ENTER)
+        wait_change(session, glyphs, opening, timeout=60.0)
+        asking = wait_screen(session, glyphs, lands_in, timeout=60.0)
+        assert any(lands_in in line for line in asking), (
+            f"it never got to the room it opens into: {asking}"
         )
         bitmap = session.read(0x4000, 6144)
         attributes = session.read(ATTRIBUTES, 512)
-
-        # A key gets past the title and into the adventure proper, which is
-        # another room drawn and another description printed.
-        session.type(ENTER)
-        wait_change(session, glyphs, opening, timeout=60.0)
         asking = wait_screen(session, glyphs, prompt, timeout=60.0)
         assert any(prompt in line for line in asking), (
             f"it never asked for an order: {asking}"
@@ -282,7 +292,8 @@ def test_the_48_tape_loads_and_plays():
         os.path.join(SPECTRUM, "game.lst"),
     )
     glyphs = glyph_table(Database(ddb))
-    played(os.path.join(SPECTRUM, "game.tap"), ddb, glyphs, "48k")
+    played(os.path.join(SPECTRUM, "game.tap"), ddb, glyphs, "48k",
+           OPENS_WITH, LANDS_IN)
 
 
 @needs_tools
@@ -305,10 +316,11 @@ def test_the_128_tape_carries_its_banks_to_their_pages():
     )
     glyphs = glyph_table(Database(ddb))
     bitmap, attributes = played(
-        os.path.join(SPECTRUM, "game128.tap"), ddb, glyphs, "128k"
+        os.path.join(SPECTRUM, "game128.tap"), ddb, glyphs, "128k",
+        OPENS_WITH, LANDS_IN
     )
-    picture = ddb["locations"][str(ddb["init_loc"])]["graphic_id"]
-    assert picture, "the first room of this adventure is supposed to show one"
+    picture = ddb["locations"][str(LANDS_ROOM)]["graphic_id"]
+    assert picture, "the room this adventure opens into is supposed to show one"
     wrong = same_picture(ddb, bitmap, attributes, picture)
     assert not wrong, f"{wrong} bytes of the picture differ from the reference"
 

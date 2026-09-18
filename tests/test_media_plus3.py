@@ -56,6 +56,15 @@ LISTING = os.path.join(SPECTRUM, "game.lst")
 ADVENTURE = os.path.join(ROOT, "snapshots", "Bangkok1.json")
 MACHINE = "P341"                # a +3 with the last of its ROMs
 ENTER = chr(13)
+# What this adventure does when it opens, which is its own doing and not the
+# interpreter's: it says who wrote it, waits for a key and goes to the
+# airport.  The room it starts in is never described -- the high priority
+# conditions are looked at before a new room is paid its description, and a
+# LOOK there stands in for it.  Measured on the original; see
+# doc/pendiente.md.
+OPENS_WITH = "FABIAN"
+LANDS_ROOM = 15
+LANDS_IN = "aeropuerto"
 
 if pytest is not None:
     needs_tools = pytest.mark.skipif(
@@ -88,9 +97,6 @@ def test_the_disk_starts_from_the_menu(tmp_path):
     with open(path, "wb") as f:
         f.write(plus3_disk(built()))
     glyphs = glyph_table(Database(ddb))
-    # The end of the description and not the start: this one is long enough
-    # that its first lines have scrolled off by the time it asks.
-    described = ddb["locations"][str(ddb["init_loc"])]["desc"].strip()[-16:]
 
     session = emulator.Session(
         machine=MACHINE, extra=["--enable-dsk", "--dsk-file", path]
@@ -98,10 +104,10 @@ def test_the_disk_starts_from_the_menu(tmp_path):
     try:
         time.sleep(5.0)
         session.type(ENTER)                     # Loader, the first entry
-        screen = wait_screen(session, glyphs, described, timeout=90.0)
+        screen = wait_screen(session, glyphs, OPENS_WITH, timeout=90.0)
     finally:
         session.close()
-    assert any(described in line for line in screen), (
+    assert any(OPENS_WITH in line for line in screen), (
         f"the adventure never got going: {screen}"
     )
 
@@ -170,9 +176,7 @@ def test_a_banked_disk_puts_each_bank_in_its_page(tmp_path):
         f.write(plus3_banked_disk(boot, code, banks))
 
     glyphs = glyph_table(Database(ddb))
-    room = str(ddb["init_loc"])
-    described = ddb["locations"][room]["desc"].strip()[-16:]
-    picture = ddb["locations"][room]["graphic_id"]
+    picture = ddb["locations"][str(LANDS_ROOM)]["graphic_id"]
 
     session = emulator.Session(
         machine=MACHINE, extra=["--enable-dsk", "--dsk-file", path]
@@ -180,12 +184,14 @@ def test_a_banked_disk_puts_each_bank_in_its_page(tmp_path):
     try:
         time.sleep(5.0)
         session.type(ENTER)
-        screen = wait_screen(session, glyphs, described, timeout=120.0)
+        wait_screen(session, glyphs, OPENS_WITH, timeout=120.0)
+        session.type(ENTER)                     # past the title it waits on
+        screen = wait_screen(session, glyphs, LANDS_IN, timeout=120.0)
         bitmap = session.read(0x4000, 6144)
         attributes = session.read(ATTRIBUTES, 512)
     finally:
         session.close()
-    assert any(described in line for line in screen), (
+    assert any(LANDS_IN in line for line in screen), (
         f"the adventure never got going: {screen}"
     )
     wrong = same_picture(ddb, bitmap, attributes, picture)
