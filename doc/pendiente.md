@@ -2073,19 +2073,49 @@ espacio suelto al principio del tercer renglón incluido. O sea que una marca
 de puntuación se imprime donde cae, sin preguntar si cabe, en los dos. No hay
 nada que arreglar.
 
-**Y esa misma comparación destapó dos diferencias nuevas**, medidas y sin
-arreglar:
+**Y esa misma comparación destapó dos diferencias más**, de las cuales una
+está arreglada y la otra medida y no:
 
-1. **Nosotros describimos la sala inicial y el original no.** En el original,
-   la primera pantalla de MegaCorp es su propia condición de alta prioridad
-   --`IF ( AT 5000 ) SET 3 LOOK END`-- la que la describe, una sola vez.
-   Nuestro arranque pone `vm_new_room` y describe, y luego esa condición
-   describe otra vez: sale dos veces. Falta ver qué hace el original con una
-   aventura cuya primera sala no la describe ninguna condición.
-2. **Ante una palabra que no conoce, el original calla.** Tecleada una `X` en
-   esa sala, el original contesta con la descripción del turno siguiente y
-   nada más; el nuestro dice antes «Perdón?», que es el mensaje 242. Falta
-   ver cuándo lo dice el original, que alguna vez lo dice.
+**La apertura de MegaCorp: ellos dicen su sala una vez y nosotros dos.**
+Medido y **sin arreglar**, y lo que hay medido no encaja del todo, que es
+justo lo que hay que dejar escrito para no repetirlo.
+
+Su primera condición de alta prioridad es `IF ( AT 5000 ) SET 3 LOOK END`, y
+lo que se sabe es esto:
+
+| pregunta | cómo se midió | respuesta |
+|---|---|---|
+| ¿abre diciendo su sala una vez o dos? | cargando el original de su propia cinta, que es la única forma de verlo empezar: las instantáneas están tomadas con la partida ya en marcha | **una** |
+| ¿se mira esa tabla antes de la primera pregunta? | cambiándola por `IF ( SET? 3 ) MESS 89 END` y tecleando algo: si la bandera está puesta, es que la suya corrió | **sí** |
+| ¿un `LOOK` en esa tabla describe todos los turnos? | poniéndole `IF ( AT 1 ) LOOK END` y jugando dos turnos | **sí** |
+| ¿describe el intérprete la sala inicial por su cuenta? | el Quijote no tiene ningún `LOOK` en ninguna tabla y su pantalla de título es la descripción de su sala inicial | **debería** |
+
+Las cuatro juntas no pueden ser: si la tabla corre y su `LOOK` describe, y
+además el intérprete describe, la apertura tendría que decirlo dos veces. Algo
+de lo medido está tomado de una manera que engaña, y lo más sospechoso es la
+primera vuelta con la cinta: falta repetirla parando la máquina nada más
+cargar y mirando la pantalla paso a paso. Lo que **no** vale es lo que se
+intentó primero --no mirar esa tabla antes de la primera pregunta--: cuadraba
+la apertura y dejaba sin sonar la música de las aventuras que la arrancan ahí,
+que son ocho pruebas de la suite, y va contra la bandera 3.
+
+**Lo de «Perdón?» no era lo que parecía, y queda a medias.** El original
+también lo dice: lo que pasaba es que en la sala de la clave no lo decía, y
+ahí está lo que falta por entender. Medido con tres tablas de alta prioridad
+distintas, tecleando la misma palabra desconocida en esa sala:
+
+| lo que hace su condición | qué contesta |
+|---|---|
+| `LOOK`, que es la que trae | la sala, y **ninguna queja** |
+| `MESS 89` | «Perdon?» y luego el mensaje |
+| nada | «Perdon?» |
+
+O sea que **una descripción dentro del turno calla la queja** y un mensaje no.
+Nosotros nos quejamos igual, porque lo único que miramos es si alguna condición
+de la tabla local o de la baja se cumplió. Falta decidir qué cuenta
+exactamente como que algo pasó --describir la sala, imprimir, las dos-- antes
+de tocarlo, que es de esas cosas que se arreglan en diez minutos y se eligen
+mal en uno.
 
 ## Cosas menores
 
