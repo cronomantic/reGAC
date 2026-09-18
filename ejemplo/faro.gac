@@ -270,10 +270,11 @@ en el centro.
 
 ; -- lo que vale en cualquier sala -------------------------------------------
 ;
-; Las condiciones de una tabla se prueban todas: un WAIT acaba el turno, pero
-; no impide que las de más abajo de la misma tabla se cumplan también.  Por eso
-; las que dicen dos cosas distintas del mismo verbo se excluyen entre sí --
-; NOT CARR LA_LLAVE frente a CARR LA_LLAVE-- en lugar de fiarse del orden.
+; Un WAIT acaba el turno y con él la tabla en la que está: lo que venga
+; debajo en la misma tabla ni se mira.  Aun así, las condiciones que dicen dos
+; cosas distintas del mismo verbo se escriben aquí excluyéndose entre sí --
+; NOT CARR LA_LLAVE frente a CARR LA_LLAVE--, que se lee mejor que fiarlo todo
+; al orden.
 
 /LOW
 ; GAC no tiene precedencia y evalúa de izquierda a derecha, así que el

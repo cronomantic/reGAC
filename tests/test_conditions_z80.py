@@ -195,6 +195,21 @@ def test_objects():
 
 
 @needs_tools
+def test_a_wait_ends_the_table_it_is_in():
+    """Measured on the original: two conditions the same verb satisfies, one
+    after the other, and only the first ever speaks.  It was asked in its high
+    priority table and in its low one, by writing conditions of ours over the
+    start of MegaCorp's, and both times the second was passed over.  This used
+    to run the rest of the table, which showed up as an adventure saying two
+    contradictory things in one breath."""
+    state = run(["SET 10 WAIT END", "SET 11 END"])
+    assert 10 in state["flags"], "the first condition did not run"
+    assert 11 not in state["flags"], (
+        "the table carried on after a WAIT, and the original does not"
+    )
+
+
+@needs_tools
 def test_swap_moves_both_of_them():
     """Both, and not one: object two is carried and object three is in room
     seven, so after the swap the player has the third and the second is in

@@ -860,7 +860,10 @@ class GAC_Interpreter:
             self.new_room = False
 
         # High priority conditions
-        self.finished, done, if_true = self.__perfom_conditions(self.hpcs, False)
+        # The high priority table stops at a WAIT like the others: measured
+        # on the original, two conditions of our own written over the start of
+        # MegaCorp's, of which only the first ever spoke.
+        self.finished, done, if_true = self.__perfom_conditions(self.hpcs, True)
 
         # And only now the turn is counted.  Which side of the table this
         # falls on matters: MegaCorp sets its whole game up in a condition

@@ -2042,23 +2042,50 @@ Spectrum.
    cuesta un rato descubrirla: **el número de un nombre del vocabulario y el
    del objeto que nombra son el mismo**, ya que coger es `GET NO1`.
 
-**Dos cosas que quedan de esto**, apuntadas y sin hacer:
+**Las dos cosas que quedaron pendientes de esto ya están medidas**, y para
+medirlas hubo que aprender a jugar al original:
 
-- **`WAIT` no significa lo mismo en los dos intérpretes.** En el Z80 acaba el
-  turno pero no la tabla: las condiciones que vengan detrás en la misma tabla
-  se prueban igual. En [`runGAC.py`](../runGAC.py) la tabla local y la de baja
-  prioridad se cortan en el primer `WAIT`, y la de alta no. Uno de los dos se
-  parece al original y el otro no, y **medirlo pide pasar la protección de
-  MegaCorp**, que arranca pidiendo su clave: se intentó escribiendo condiciones
-  propias encima de su tabla de baja prioridad —que está donde se creía, se
-  encontró por el contenido— y nada de lo que se teclea llega al juego hasta
-  que se dé la clave. Mientras tanto, las condiciones de la aventura de
-  ejemplo se excluyen entre sí, que es lo que hacen las de 1986 y vale con
-  cualquiera de los dos comportamientos.
-- **Una coma puede quedar sola al principio de una línea.** «La lente, enorme»
-  partió como «La lente» y «, enorme» al llegar al borde. No siempre: en otro
-  mensaje la coma se quedó pegada a su palabra. Falta mirar si el signo viaja
-  a veces separado de la palabra que lo precede.
+- **Su protección no era un muro.** MegaCorp arranca en su sala 5000 pidiendo
+  la clave, y la clave está en la propia aventura: esa sala acepta el verbo 29,
+  que en su vocabulario es **REBECA**. Con eso el original se juega desde una
+  instantánea sin saber nada de su manual.
+- **Y su pantalla se lee con su tipografía.** El juego de caracteres sale de
+  su base de datos y la primera casilla es el código cero. Lo que costaba era
+  otra cosa: **las ocho líneas de píxel de un renglón están a 256 bytes una de
+  otra y no a 32**, porque esta máquina las entrelaza, y leerlas seguidas
+  deja las letras cortadas en tiras. Está en `original.py` del scratchpad de
+  aquella sesión, y el método es el de siempre: escribir condiciones propias
+  encima del principio de una de sus tablas, que se encuentra buscando en su
+  memoria los bytes que compila `regac`.
+
+**`WAIT` acaba la tabla en la que está, y no sólo el turno.** Medido dos
+veces: dos condiciones que el mismo verbo satisface, una detrás de otra, en su
+tabla de alta prioridad y en la de baja; las dos veces habló sólo la primera.
+Para asegurarlo, un control: la segunda, puesta sola, sí habla. El Z80 corría
+la tabla entera --de ahí que la aventura de ejemplo dijera «la puerta se abre»
+y «no tienes con qué abrirla» de una sentada-- y `runGAC.py` cortaba la tabla
+local y la baja pero no la alta. Las dos arregladas, con prueba en
+`test_conditions_z80.py`.
+
+**La coma al principio de una línea es del original.** Comparadas línea por
+línea la primera sala de MegaCorp en el original y en el nuestro: **idénticas**,
+espacio suelto al principio del tercer renglón incluido. O sea que una marca
+de puntuación se imprime donde cae, sin preguntar si cabe, en los dos. No hay
+nada que arreglar.
+
+**Y esa misma comparación destapó dos diferencias nuevas**, medidas y sin
+arreglar:
+
+1. **Nosotros describimos la sala inicial y el original no.** En el original,
+   la primera pantalla de MegaCorp es su propia condición de alta prioridad
+   --`IF ( AT 5000 ) SET 3 LOOK END`-- la que la describe, una sola vez.
+   Nuestro arranque pone `vm_new_room` y describe, y luego esa condición
+   describe otra vez: sale dos veces. Falta ver qué hace el original con una
+   aventura cuya primera sala no la describe ninguna condición.
+2. **Ante una palabra que no conoce, el original calla.** Tecleada una `X` en
+   esa sala, el original contesta con la descripción del turno siguiente y
+   nada más; el nuestro dice antes «Perdón?», que es el mensaje 242. Falta
+   ver cuándo lo dice el original, que alguna vez lo dice.
 
 ## Cosas menores
 

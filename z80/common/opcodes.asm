@@ -724,17 +724,25 @@ op_in:
 op_nop:
                 jp      vm_loop
 
+; Both of these end the turn, and with it the table they are in: the
+; conditions below them in the same table are not even looked at.  That is
+; measured on the original, which was asked twice over with two conditions
+; the same verb satisfies, in its high priority table and in its low one:
+; only the first of the two ever spoke.  This used to run the rest of the
+; table, which is why the example adventure said both "the door opens" and
+; "you have nothing to open it with" in one breath.  A ret here goes back to
+; whoever called the table, which is what the end of a table does too.
 op_okay:
                 ld      a, MSG_OKAY
                 call    print_message
                 ld      a, 1
                 ld      (vm_done), a
-                jp      vm_loop
+                ret
 
 op_wait:
                 ld      a, 1
                 ld      (vm_done), a
-                jp      vm_loop
+                ret
 
 ; QUIT asks first and only stops if the answer is yes; EXIT just stops.
 op_quit:
