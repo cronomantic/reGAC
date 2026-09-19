@@ -156,7 +156,12 @@ word_print:
                 jr      nz, .print_it
                 ld      a, (cursor_x)
                 add     a, e
-                cp      SCREEN_COLS + 1
+                ; A word has to end before the last column, not on it: the
+                ; original leaves that one empty.  Found by playing MegaCorp
+                ; on both at once -- its street in Nyhmir has a "razas" that
+                ; ends exactly at the edge, and the original puts it on the
+                ; next line while this kept it.
+                cp      SCREEN_COLS
                 jr      c, .print_it
                 ld      a, (cursor_x)
                 or      a

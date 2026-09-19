@@ -2400,6 +2400,47 @@ Dos detalles que costaron su rato y evitan repetirlos:
 es lo único suyo donde no hemos preguntado por casos raros --rellenos que se
 escapan por un hueco de un píxel--, y eso se pregunta con el mismo guión.
 
+## El espejo: la misma aventura jugada dos veces a la vez
+
+Todas las diferencias de estos días aparecieron porque alguien tropezó con
+ellas: `SWAP` que no intercambiaba, `WAIT` que no cortaba la tabla, `CARR` y
+`AVAIL` cambiados. **Esto va a buscarlas.** MegaCorp en el intérprete original
+y MegaCorp decompilado y construido con el nuestro, uno al lado del otro en dos
+emuladores, las mismas órdenes tecleadas en los dos y la ventana de texto leída
+después de cada turno con la tipografía de la propia aventura. Comparten
+pantalla y tipografía, así que un solo lector vale para los dos.
+
+Está en `tests/test_mirror_z80.py`, con un paseo de veinticinco órdenes: andar,
+chocar con paredes, coger lo que ya se lleva, soltar, coger lo que no está, un
+nombre suelto, un verbo que no entiende, subir y bajar.
+
+**Encontró algo en su primer paseo en condiciones**: una palabra que acaba
+justo en la última columna. La calle de Nyhmir dice «Paseantes de varias
+razas», y el `razas` termina exactamente en el borde: el original lo baja a la
+línea siguiente y nosotros lo dejábamos. O sea que **una palabra tiene que
+acabar antes de la última columna, no en ella**. Un byte en `textout.asm`
+--`cp SCREEN_COLS` en vez de `cp SCREEN_COLS + 1`-- y las veinticinco órdenes
+vuelven a salir idénticas. El modelo del ajuste que usan las pruebas de texto
+(`emulator.wrapped`) llevaba el mismo error.
+
+**Tres cosas del arnés**, cada una de las cuales costó una vuelta:
+
+- **Las máquinas se turnan.** Dos emuladores a la vez hacen un anfitrión
+  ocupado, un anfitrión ocupado pierde letras, y una letra perdida no es una
+  diferencia entre intérpretes: es otra orden. Mientras se teclea en una, la
+  otra se tiene quieta.
+- **Una pantalla quieta no quiere decir turno terminado.** Mientras se dibuja
+  la lámina --que son segundos-- la ventana está parada con la orden todavía
+  en eco. Lo que dice que el turno acabó es que la última línea sea el prompt
+  sin nada escrito detrás.
+- **El eco se mira antes de dar al enter**, porque en cuanto corre el turno la
+  descripción cae encima de esa misma línea: su `DESC` vuelve a la columna cero
+  y escribe encima. Eso, que ayer se midió, aquí se ve en vivo.
+
+Las dos ventanas se alinean **por abajo**: en qué fila cae una línea es historia
+de la máquina --la instantánea del original se tomó con su título ya
+desplazado-- y no cosa del intérprete.
+
 ## Cosas menores
 
 `deGAC` ya lee las tres máquinas. Reconoce por sí solo una instantánea de

@@ -55,6 +55,8 @@ import pytest
 GROUPS = {
     "spectrum-game": [
         "test_example", "test_game_z80", "test_markers_z80", "test_opcodes_z80",
+        # it builds the same game and plays it beside the original's own
+        "test_mirror_z80",
         "test_statements_z80", "test_latin", "test_spectrum",
         "test_media_plus3", "test_media_music_plus3", "test_tape_z80",
         "test_tape_music_z80", "test_textmode_z80", "test_game_music_z80",
@@ -112,6 +114,9 @@ SERIAL_MODULES = {
     # were the only two that kept falling over in a parallel run while
     # passing on their own
     "test_game_cpc", "test_game_music_cpc", "test_tape_z80",
+    # two emulators at once, typed at in turn: it holds one machine while it
+    # types at the other, and a busy host would drop the letters anyway
+    "test_mirror_z80",
 }
 SERIAL_TESTS = {"test_it_keeps_up_with_quick_typing_and_repeats_a_held_key"}
 

@@ -150,6 +150,12 @@ def wrapped(texts, width, marks=WORD_MARKS):
     mark or space that ended it follows it wherever it went.  A line that
     fills itself exactly ends there and is not ended again.
 
+    A word has to end **before** the last column and not on it: the original
+    leaves that one empty.  Found by playing MegaCorp on the original and on
+    ours at once, in test_mirror_z80: its street in Nyhmir says "Paseantes de
+    varias razas", where the razas ends exactly at the edge, and the original
+    puts it on the next line.
+
     Each text is a message of its own and the build that prints them ends a
     line after each one.
     """
@@ -164,7 +170,7 @@ def wrapped(texts, width, marks=WORD_MARKS):
 
     def word(run):
         nonlocal line
-        if run and line and len(line) + len(run) > width:
+        if run and line and len(line) + len(run) >= width:
             lines.append(line)
             line = ""
         for char in run:
