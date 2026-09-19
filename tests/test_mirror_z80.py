@@ -107,6 +107,20 @@ WALKS = {
         "XYZZY", "AGUA", "ENTRAR",
         "SUBIR", "BAJATE", "REDESCRIBIR",
     ],
+    # El Quijote II waits, and not because anything about it is unknown: its
+    # title centres itself with runs of spaces, the original's rule for
+    # breaking a line inside one of those is read and written down in
+    # doc/pendiente.md, and the branch ajuste-de-lineas has it built and
+    # playing this adventure line for line.  What keeps that branch out of
+    # here is sixty six bytes the CPC 464 has not got.  Its walk is there
+    # too, and its code is HIDALGO INGENIOSO -- verb eighty and noun eighty,
+    # in that order -- with a single try: anything else prints message 100
+    # and stops the game.
+    # Las vajillas is not here yet either, and for something small that is
+    # written down in doc/pendiente.md: its prompt is twenty five characters
+    # long, and where the echo of a short order goes after it is not what we
+    # do.  Its code, for when that is settled, is SPIELBERG -- a noun, not a
+    # verb: naming it takes the player to room 21.
 }
 
 def both_halves(name):
@@ -217,14 +231,17 @@ def typed_whole(session, glyphs, order, prompt, tries=3):
 
     The line has to be the prompt and the order and nothing else.  Asking
     only whether the order is somewhere in it lets a stray letter through:
-    ISUBIR holds SUBIR.
+    ISUBIR holds SUBIR.  The two last lines are joined before looking,
+    because a long prompt carries the order over the edge -- Las vajillas
+    asks with twenty five characters, and an order of any length lands
+    across two of them.
     """
     wanted = (prompt + order).casefold()
     for attempt in range(tries):
         session.type(order, hold_for=0.2)
         time.sleep(emulator.longer(0.6))        # let the machine catch up
         written = said(screen(session, glyphs))
-        if written and written[-1].strip().casefold() == wanted:
+        if "".join(written[-2:]).casefold().endswith(wanted):
             return
         rubbed_out(session, SCREEN_COLS)        # the whole line, and start again
         time.sleep(emulator.longer(0.4))
