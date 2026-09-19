@@ -121,9 +121,22 @@ SERIAL_MODULES = {
 SERIAL_TESTS = {"test_it_keeps_up_with_quick_typing_and_repeats_a_held_key"}
 
 
+# The mirror plays whole adventures on two machines at once and takes a
+# quarter of an hour, and its work is finding rather than watching: it goes
+# looking for differences with the original where the rest of the suite
+# watches for what is already known.  So it is not part of the gate.  Run it
+# when the interpreter has been touched, which is when it can find anything:
+#
+#     pytest -m mirror
+MIRROR_MODULES = {"test_mirror_z80"}
+
+
 def pytest_configure(config):
     config.addinivalue_line(
         "markers", "serial: measures time, so it runs on its own"
+    )
+    config.addinivalue_line(
+        "markers", "mirror: plays a whole adventure beside the original's"
     )
 
 
@@ -136,3 +149,5 @@ def pytest_collection_modifyitems(items):
             item.add_marker(pytest.mark.xdist_group(group))
         if module in SERIAL_MODULES or item.name in SERIAL_TESTS:
             item.add_marker(pytest.mark.serial)
+        if module in MIRROR_MODULES:
+            item.add_marker(pytest.mark.mirror)

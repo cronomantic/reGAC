@@ -251,7 +251,6 @@ done_flag:      db      0
                 include "../common/opcodes.asm"
                 include "../common/parser.asm"
                 include "../common/loop.asm"
-                include "../common/picture.asm"
 
 last:
                 ; Not past the mask.  This was the Next's "wall at $A000", which
@@ -263,6 +262,32 @@ last:
                 ; one at $B300 is still there.
                 ASSERT  last <= MASK            ; or the first picture wipes it
                 ASSERT  last < STACK_AT         ; or the stack would land in it
+
+; Above the mask there is room that nothing touches, and for a long time it
+; went unused because the wall at $A000 looked like the end of the machine.
+; It is not: gfx_clear wipes MASK for MASK_BYTES and stops there, and the
+; stack comes down from STACK_AT, so between the end of one and the foot of
+; the other there are nearly four kilobytes going spare.  They travel in the
+; file already -- SAVENEX BANK 2 carries the whole of $8000 to $BFFF -- so a
+; module put here costs nothing and leaves that much more room under the wall.
+;
+; The first kilobyte of it is spoken for, though: with music the mode two
+; table is at $B000 and its routine just above, at $B1B1 -- see
+; interrupt.asm, which says why they are as far from the stack as they can
+; be.  So what goes here starts clear of both.
+;
+; What goes here has to be code that does not care where it is, and it is
+; taken from the end of the list so that nothing before it changes order.
+ABOVE_MASK      equ $B200
+                ORG     ABOVE_MASK
+above_mask:
+                include "../common/picture.asm"
+past_mask:
+                ; Clear of the stack, with room for it to come down: a turn of
+                ; the interpreter does not go deep, but the tape routines call
+                ; the ROM and the ROM has its own ideas.
+STACK_ROOM      equ 512
+                ASSERT  past_mask <= STACK_AT - STACK_ROOM
 
 ; A loading screen, if the build says there is one.  It is put where layer 2
 ; keeps its own memory and the file carries it in front of everything else, so

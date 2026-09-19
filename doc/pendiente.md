@@ -353,6 +353,15 @@ nada ha puesto las variables que las rutinas de cinta leen, y la última de
 ellas manda la máquina al BASIC en lugar de devolverla. La prueba usa
 `--tbblue-fast-boot-mode`, que es como el emulador da una máquina ya arrancada.
 
+**El presupuesto de bytes está agotado.** `ASSERT last <= MASK` mide lo que
+hay entre el final del intérprete y la máscara de los rellenos, y desde que el
+ajuste de líneas aprendió a guardarse el separador la cuenta sale **clavada**:
+`last` vale `$A000`, que es la máscara. No es holgura, es el tope. Lo próximo
+que crezca en `z80/common/` lo va a romper, y entonces hay dos salidas: apretar
+lo que haya crecido --así se resolvió ésta, juntando `word_out` y `word_piece`,
+midiendo con `add a,a` en vez de `and`, y metiendo dos banderas en un byte-- o
+mover algo a un banco. El aviso salta al compilar, no en la máquina.
+
 **Lo que queda de esta máquina**: nada urgente. Guardar en fichero por el API
 de NextZXOS, si alguna vez se quiere en vez de la cinta. El sonido ya está, por
 el AY compatible y con la interrupción en modo 2.
@@ -2480,8 +2489,120 @@ próxima vez**: `$5C6A`, bit 3.
 - Tras teclear hay que **darle a la máquina un respiro** antes de leer el eco,
   o se lee la pantalla antes de que le haya llegado la última letra.
 
-**Lo que queda del espejo**: el Quijote y Vajillas piden clave, como MegaCorp,
-y hay que sacársela igual --mirando qué verbo acepta la sala de salida--.
+### Las claves de las cuatro
+
+Las cuatro aventuras se abren ya sin tocar nada:
+
+| aventura | cómo se entra |
+|---|---|
+| MegaCorp | `REBECA` --su sala 5000 acepta el verbo 29-- |
+| Los pájaros de Bangkok | ninguna: sólo hay que pasar la portada con una tecla |
+| El Quijote II | `HIDALGO INGENIOSO` --verbo 80 y nombre 80, en ese orden--, **y hay un solo intento**: cualquier otra cosa imprime el mensaje 100 y se acabó |
+| Las vajillas | `SPIELBERG` --un **nombre**, no un verbo: nombrarlo lleva a la sala 21-- |
+
+El espejo juega hoy tres de las cuatro. La que falta es Las vajillas, y por
+qué está más abajo.
+
+De paso, la condición de la tabla alta del Quijote que pide un adverbio número
+80 es **madera muerta**: sus adverbios son cuatro palabras todas con el número
+1, y así está también en el original --comprobado leyendo su lista en memoria--.
+
+### Cómo corta las líneas el original, leído en su propio código
+
+Las dos diferencias que quedaban --el título del Quijote y el eco de
+Vajillas-- eran la misma rutina, y las dos se cerraron leyendo, no midiendo.
+La rutina es **`$778A`**, por la que pasa cada carácter de un mensaje:
+
+```
+$778A  CALL $631E      ; imprime el carácter
+       CALL $864B      ; ¿es separador?  (Z si lo es)
+       RET NZ          ; no -> nada que decidir
+       CALL $6321      ; H = columna donde caerá el siguiente, empezando en 1
+       LD B,H
+       POP HL
+loop:  INC HL          ; cuenta lo que viene hasta el próximo separador
+       LD A,(HL)
+       INC B
+       CALL $864B
+       JR Z,fin
+       CP $FF
+       JR NZ,loop
+fin:   LD A,B
+       CP $21          ; 33
+       CALL NC,$754F   ; a partir de ahí, salto de línea
+```
+
+`$864B` da los separadores: fin de texto, espacio, `.`, `,`, `-`, `!`, `?` y
+`:` --los mismos que ya teníamos--. Y hay dos detalles en ese bucle que
+explican todo lo que no cuadraba:
+
+**Uno: el conteo empieza una letra más allá.** Cuando `$886C` llama a `$778A`,
+HL ya ha pasado del carácter que se está imprimiendo, y el bucle hace otro
+`INC HL` antes de mirar. O sea que de lo que viene **se salta el primer
+carácter**. Haciendo la cuenta, para una palabra de n letras que empezaría en
+la columna x, corta cuando `x + n >= 32`: **exactamente la regla que ya
+teníamos**. Bien.
+
+**Dos: pregunta después de cada separador, no antes de cada palabra.** Y como
+se salta un carácter, lo que mide después de un espacio que va seguido de otro
+espacio es el trecho **que empieza en el tercero**. De ahí salen dos cosas que
+no teníamos:
+
+- Un separador en mitad de una tirada, con otro detrás y otro más, mide un
+  trecho de uno: desde la penúltima columna ya no le cabe, y corta.
+- Cuando la palabra que viene no cabe, el que pregunta primero y corta es el
+  separador **anterior** al que la precede --si lo hay--, porque su cuenta da
+  lo mismo. Así que **un espacio salido de una tirada baja con la palabra** y
+  se ve al principio de la línea, mientras que **un espacio que cierra una
+  palabra se queda donde está** y la palabra baja sola.
+
+Esas dos son las que faltaban, y con ellas la apertura del Quijote sale
+carácter por carácter como la del original:
+
+```
+           DON QUIJOTE
+             PART II
+         PROGRAMA: EGROJ
+    GRAFICOS: PABLO Y EGROJ
+COPYRIGHT DINAMIC SOFTWARE 1987
+ Si en esta parte quieres jugar
+la clave tendras que teclear.
+```
+
+Fíjese en las dos últimas: `COPYRIGHT` empieza en la columna cero --el espacio
+que lo precede cerraba `EGROJ` y se quedó arriba-- y ` Si` empieza en la uno
+--ese espacio venía de una tirada de treinta y bajó con la palabra--. La
+línea de `COPYRIGHT` mide 31 caracteres, y la de `DON QUIJOTE` también.
+
+Está escrito en `word_over` y `word_print` de `z80/common/textout.asm`, con un
+par de bytes de estado nuevos --`held_sep`, lo que cerró la última palabra, y
+`sep_in_run`, si venía detrás de otro--; en `wrapped()` de `tests/emulator.py`,
+que es el oráculo de las pruebas de texto; y en `runGAC.py`, que hacía lo de
+las palabras bien sin saberlo y no sabía nada de lo demás.
+
+### El eco de Vajillas: el original se pasa del terminador
+
+La misma mirada hacia delante **no se para en el `$FF`**. El bucle hace
+`INC HL` y mira, y si el carácter siguiente al separador era el terminador ya
+se ha pasado de él: sigue contando bytes del buffer de desempaquetado
+--`$5E18`-- que son las sobras del mensaje anterior.
+
+Por eso el prompt de Las vajillas, `QUE VAS A HACER AHORA?...`, unas veces
+deja el eco detrás y otras lo manda a la línea siguiente: acaba en punto, que
+es separador, en la columna 24, y lo que decide es lo que quedara en el buffer
+pasado el terminador. Turno a turno es distinto.
+
+**Eso no se copia.** Depender de basura de un buffer no es una conducta del
+intérprete sino un accidente de su memoria, y reproducirlo exigiría imitar
+también el desempaquetado byte a byte. Las vajillas se queda, por eso, fuera
+del espejo, y su clave --`SPIELBERG`, un nombre, no un verbo: nombrarlo lleva
+a la sala 21-- queda apuntada aquí para cuando haga falta.
+
+De paso: **`runGAC.py` ya hacía lo mismo para las palabras** sin saberlo --mide
+la palabra junto con el separador que la cierra, que sale la misma cuenta-- y
+se le ha añadido la regla de la tirada de espacios. El espejo no lo mira,
+porque escribe en un terminal de verdad y no en una pantalla de 32 columnas,
+pero el principio es que todos los intérpretes hagan lo mismo.
 
 ## Cosas menores
 

@@ -12,8 +12,17 @@ Esperar es justo lo que se puede hacer de varios en varios.
 
 ```
 pytest -n 4 --dist loadgroup -m "not serial"     # el grueso, en paralelo
-pytest -m serial                                 # y estas a solas
+pytest -m serial -m "not mirror"                 # las que miden tiempo
+pytest -m mirror                                 # el espejo, a mano
 ```
+
+Las dos primeras son la puerta: unos doce minutos y otros catorce. **El espejo
+no está en la puerta**: juega tres aventuras enteras --MegaCorp, Los pájaros de
+Bangkok y El Quijote II-- en dos máquinas a la vez, tarda un cuarto de hora
+largo, y su trabajo es **buscar** y no vigilar. Se lanza cuando se ha tocado
+el intérprete, que es cuando puede encontrar algo --y encuentra: el ajuste de
+líneas, el `GET` de un objeto que no existe y la regla de cómo se parten las
+tiradas de espacios salieron de ahí--.
 
 Cuatro y no seis, aunque la máquina tenga ocho núcleos: con seis emuladores a
 la vez el grueso baja a nueve minutos pero empiezan a fallar pruebas **distintas

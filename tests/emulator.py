@@ -156,6 +156,12 @@ def wrapped(texts, width, marks=WORD_MARKS):
     varias razas", where the razas ends exactly at the edge, and the original
     puts it on the next line.
 
+    And what ends a word is held back until it is known whether the next one
+    fits: if it does not, the separator goes down with it, so a line that has
+    been broken begins with the space that was in front of the word.  That is
+    what centres text in the original, and it is what its own code does --
+    see doc/pendiente.md for the reading of it.
+
     Each text is a message of its own and the build that prints them ends a
     line after each one.
     """
@@ -168,24 +174,45 @@ def wrapped(texts, width, marks=WORD_MARKS):
             lines.append(line)
             line = ""
 
-    def word(run):
+    def end_line():
         nonlocal line
-        if run and line and len(line) + len(run) >= width:
-            lines.append(line)
-            line = ""
-        for char in run:
+        lines.append(line)
+        line = ""
+
+    def word(sep, run, in_run):
+        nonlocal line
+        crowded = len(line) + len(sep) + len(run) >= width
+        if sep and not in_run:
+            put(sep)                    # one that ends a word stays put
+            sep = ""
+        if crowded and line:
+            end_line()
+        for char in sep + run:          # one out of a run goes down with it
             put(char)
 
     for text in texts:
-        run = ""
+        run, sep, in_run = "", "", False
         for char in text:
             if char != " " and char not in marks:
                 run += char
                 continue
-            word(run)
-            run = ""
-            put(char)
-        word(run)
+            if run:
+                word(sep, run, in_run)
+                run, in_run = "", False
+            elif sep:
+                # two separators running: the one held goes out now, and from
+                # the column before last it takes the line with it
+                put(sep)
+                if len(line) == width - 1:
+                    end_line()
+                in_run = True
+            else:
+                in_run = False
+            sep = char
+        if run:
+            word(sep, run, in_run)
+        elif sep:
+            put(sep)
         lines.append(line)              # the new line after each message
         line = ""
     return [one.rstrip() for one in lines if one.strip()]

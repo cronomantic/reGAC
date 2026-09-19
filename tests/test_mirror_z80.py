@@ -107,6 +107,25 @@ WALKS = {
         "XYZZY", "AGUA", "ENTRAR",
         "SUBIR", "BAJATE", "REDESCRIBIR",
     ],
+    # Its title centres itself with runs of spaces, which is what found the
+    # original's rule for breaking a line inside one of those runs, and its
+    # code is HIDALGO INGENIOSO -- verb eighty and noun eighty, in that order
+    # -- with a single try: anything else prints message 100 and stops the
+    # game, so the order has to reach the keyboard whole before it is sent.
+    "quijote2": [
+        "HIDALGO INGENIOSO",
+        "MIRAR", "INVENTARIO",
+        "NORTE", "SUR", "ESTE", "OESTE",
+        "COGER ESPADA", "COGER LLAVE", "DEJAR ESPADA",
+        "EXAMINAR ESPEJO", "LEER CARTEL",
+        "XYZZY", "ESPADA", "ABRIR PUERTA", "IDIOTA",
+        "ARRIBA", "ABAJO", "MIRAR",
+    ],
+    # Las vajillas is not here yet either, and for something small that is
+    # written down in doc/pendiente.md: its prompt is twenty five characters
+    # long, and where the echo of a short order goes after it is not what we
+    # do.  Its code, for when that is settled, is SPIELBERG -- a noun, not a
+    # verb: naming it takes the player to room 21.
 }
 
 def both_halves(name):
@@ -219,12 +238,18 @@ def typed_whole(session, glyphs, order, prompt, tries=3):
     only whether the order is somewhere in it lets a stray letter through:
     ISUBIR holds SUBIR.
     """
+    # The prompt and the order, which is what the line has to hold and
+    # nothing else: asking only whether the order is somewhere in it lets a
+    # stray letter through, because ISUBIR holds SUBIR.  The two last lines
+    # are joined before looking, because a long prompt carries the order over
+    # the edge: Las vajillas asks with twenty five characters and SPIELBERG
+    # ends up split across two of them.
     wanted = (prompt + order).casefold()
     for attempt in range(tries):
         session.type(order, hold_for=0.2)
         time.sleep(emulator.longer(0.6))        # let the machine catch up
         written = said(screen(session, glyphs))
-        if written and written[-1].strip().casefold() == wanted:
+        if "".join(written[-2:]).casefold().endswith(wanted):
             return
         rubbed_out(session, SCREEN_COLS)        # the whole line, and start again
         time.sleep(emulator.longer(0.4))
