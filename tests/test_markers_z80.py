@@ -263,6 +263,54 @@ def test_a_pronoun_stands_for_the_last_noun_named():
     assert sum("EL SEGUNDO" in line for line in said) == 2, said
 
 
+def top_of_the_window(ddb, orders=()):
+    """How far up the screen the text may go, after each order: the
+    interpreter keeps it in text_top, and nought means the whole screen."""
+    database, listing = build(ddb)
+    glyphs = glyph_table(database)
+    where = emulator.label_address(listing, "text_top")
+    session = emulator.Session()
+    out = []
+    try:
+        session.load(SNAPSHOT)
+        asked = 1
+        asked_again(session, glyphs, asked)
+        out.append(session.read(where, 1)[0])
+        for order in orders:
+            session.type(order + ENTER)
+            asked += 1
+            asked_again(session, glyphs, asked)
+            out.append(session.read(where, 1)[0])
+        return out
+    finally:
+        session.close()
+
+
+@needs_tools
+def test_a_room_with_no_picture_gives_the_text_the_whole_screen():
+    """Their DESC gives a room without a picture the window their TEXT would
+    -- the whole screen -- and wipes nothing, so the last picture stays where
+    it was until the text scrolls over it.  Measured on Los pajaros de
+    Bangkok, which has rooms of both kinds: arriving at one without a picture,
+    the text took the row that was the boundary.  A picture drawn later takes
+    its rows back."""
+    ddb = adventure(
+        lpcs=[["PUSH", LOOK_VERB], ["VERB"], ["IF"], ["PUSH", 2], ["GOTO"],
+              ["END"],
+              ["PUSH", QUIT_VERB], ["VERB"], ["IF"], ["PUSH", 1], ["GOTO"],
+              ["END"]],
+        rooms={
+            "1": {"graphic_id": 1, "exits": [], "desc": "UN CUARTO"},
+            "2": {"graphic_id": 0, "exits": [], "desc": "EL OTRO CUARTO"},
+        },
+    )
+    ddb["gfx"] = {"1": [["PAPER", 0], ["RECT", 40, 60, 200, 150]]}
+    under, whole, under_again = top_of_the_window(ddb, orders=["MIRA", "SALIR"])
+    assert under > 0, "a room with a picture keeps the text under it"
+    assert whole == 0, "and one without gives the text the whole screen"
+    assert under_again == under, "and a picture drawn again takes its rows back"
+
+
 @needs_tools
 def test_an_adventure_that_looks_says_its_first_room_once():
     """A game opens by describing the room it starts in, and MegaCorp

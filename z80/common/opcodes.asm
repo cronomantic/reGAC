@@ -147,13 +147,24 @@ describe_location:
                 ld      d, (hl)                 ; the picture this room shows
                 ld      a, d
                 or      e
-                jr      z, .no_picture          ; a room may have none
+                jr      z, .without_a_picture   ; a room may have none
                 ld      a, (vm_graphics)
                 or      a
-                jr      z, .no_picture          ; and TEXT says to draw none
+                jr      z, .said                ; and TEXT says to draw none
                 ex      de, hl
                 call    draw_picture
-.no_picture:
+                jr      .said
+.without_a_picture:
+                ; The text takes the whole screen, which is the same call
+                ; their TEXT makes: their DESC gives a room with no picture
+                ; the window their TEXT would.  Nothing is wiped, so the last
+                ; picture stays where it was until the text scrolls over it --
+                ; measured on Los pajaros de Bangkok, which has rooms of both
+                ; kinds.  A picture drawn later takes its rows back.
+                ld      a, (vm_graphics)
+                or      a
+                call    nz, text_window_all
+.said:
                 pop     hl
                 ld      de, 4
                 add     hl, de

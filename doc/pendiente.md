@@ -2274,10 +2274,17 @@ cero cuando no se está en modo `TEXT`. La bandera `vm_new_room` se llama ahora
 `vm_moved` y sólo dice una cosa: que la orden se fue por una salida, y que ahí
 se acaba el turno.
 
-**Lo que queda de esto, sin medir**: su `DESC` de una sala **sin lámina** pone
-la ventana en toda la pantalla (`$7601`) en vez de en las filas de abajo. Hace
-falta preguntárselo a una de las tres aventuras que tienen salas sin lámina
---el Quijote, Bangkok y Vajillas-- antes de tocar nada.
+**Y la sala sin lámina, medida** en *Los pájaros de Bangkok*, que tiene salas
+de los dos tipos. Su `DESC` reparte (`$75F2`): la que tiene lámina se lleva la
+ventana debajo y el dibujo; la que no, `CALL 72C0`, que es la misma llamada que
+hace `TEXT` --toda la pantalla--. Y **no borra nada**: al llegar a una sala sin
+lámina, la lámina anterior sigue donde estaba y el texto gana la fila que antes
+era el borde, hasta que a fuerza de líneas se le va escribiendo encima. Una
+lámina posterior vuelve a quedarse con sus filas.
+
+Ya lo hacemos, y la prueba lo mira donde de verdad se ve: en `text_top`, que es
+el alto de la ventana --bajo la lámina en una sala con dibujo, cero en una sin
+él, y otra vez abajo al dibujar la siguiente--.
 
 ### El parser, leído y medido
 

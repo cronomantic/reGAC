@@ -77,12 +77,19 @@ def watching():
     with open(BINARY, "rb") as f:
         blob = f.read()
     session = emulator.Session(machine="CPC6128")
-    time.sleep(3.0)
-    for at in range(0, len(blob), 512):
-        session.command(f"write-memory-raw {LOADS_AT + at} " + blob[at:at + 512].hex().upper())
-    session.jump(LOADS_AT)
-    time.sleep(1.0)
-    assert session.read(where["ready_flag"], 1)[0] == 1, "the build never started"
+    try:
+        time.sleep(emulator.longer(3.0))
+        for at in range(0, len(blob), 512):
+            session.command(f"write-memory-raw {LOADS_AT + at} "
+                            + blob[at:at + 512].hex().upper())
+        session.jump(LOADS_AT)
+        time.sleep(emulator.longer(1.0))
+        assert session.read(where["ready_flag"], 1)[0] == 1, (
+            "the build never started"
+        )
+    except BaseException:
+        session.close()                 # or it holds the port for good
+        raise
     return session, where
 
 

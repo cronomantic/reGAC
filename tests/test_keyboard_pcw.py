@@ -85,10 +85,17 @@ def watching():
     with open(BINARY, "rb") as f:
         blob = f.read()
     session = emulator.Session(machine="PCW8256")
-    time.sleep(4.0)
-    started = session.start_code(blob, LOADS_AT, where["ready_flag"], wanted=1,
-                                 timeout=5.0)
-    assert started, "the build never started"
+    try:
+        time.sleep(emulator.longer(4.0))
+        started = session.start_code(blob, LOADS_AT, where["ready_flag"],
+                                     wanted=1, timeout=5.0)
+        assert started, "the build never started"
+    except BaseException:
+        # Whatever goes wrong here, the machine is this function's to close:
+        # the caller has not got it yet, and one left running holds the port
+        # and takes every test after it down with it.
+        session.close()
+        raise
     return session, where
 
 

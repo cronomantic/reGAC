@@ -94,10 +94,14 @@ def watching():
     with open(BINARY, "rb") as f:
         blob = f.read()
     session = emulator.Session(machine="MSX1")
-    time.sleep(7.0)
-    started = session.start_code(blob, LOADS_AT, where["ready_flag"], wanted=1,
-                                 timeout=20.0)
-    assert started, "the build never started"
+    try:
+        time.sleep(emulator.longer(7.0))
+        started = session.start_code(blob, LOADS_AT, where["ready_flag"],
+                                     wanted=1, timeout=20.0)
+        assert started, "the build never started"
+    except BaseException:
+        session.close()                 # or it holds the port for good
+        raise
     return session, where
 
 

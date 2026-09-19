@@ -107,9 +107,11 @@ GROUP_OF = {module: group for group, modules in GROUPS.items()
 SERIAL_MODULES = {
     "test_statements_z80", "test_keyboard_cpc", "test_keyboard_msx",
     "test_keyboard_pcw",
-    # this one loads its game from an Amstrad tape, which happens in the
-    # machine's own time and not in ours: shared four ways it never got there
-    "test_game_cpc",
+    # these load their game from a tape, which happens in the machine's own
+    # time and not in ours: shared four ways they never get there, and they
+    # were the only two that kept falling over in a parallel run while
+    # passing on their own
+    "test_game_cpc", "test_game_music_cpc", "test_tape_z80",
 }
 SERIAL_TESTS = {"test_it_keeps_up_with_quick_typing_and_repeats_a_held_key"}
 
