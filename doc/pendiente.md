@@ -2441,6 +2441,48 @@ Las dos ventanas se alinean **por abajo**: en qué fila cae una línea es histor
 de la máquina --la instantánea del original se tomó con su título ya
 desplazado-- y no cosa del intérprete.
 
+### Alargado: dos aventuras, y lo que encontró
+
+Ahora juega **MegaCorp** (treinta y tres órdenes) y **Los pájaros de Bangkok**
+(dieciocho), que es la única de las cuatro con pronombres. Doce minutos y medio
+las dos.
+
+**Lo que encontró en Bangkok, y es gordo**: su tabla baja acaba con un cajón de
+sastre, `IF ( VERB COGER ) GET NO1 OKAY END`. Así que `COGER AGUA` es un `GET`
+del **objeto 56**, y la aventura tiene catorce objetos. El original no pregunta
+si existe: lee más allá del final de su tabla, lo que encuentra no es esta sala,
+dice «no veo uno de esos por aquí» y acaba el turno. Nosotros lo pasábamos por
+alto en silencio y el `OKAY` de detrás contestaba «Vale». Eso pasa con **casi
+cualquier nombre que no sea un objeto**, o sea todo el rato.
+
+Arreglado en `GET` y en `DROP`, que son los dos que hablan, con prueba en
+`test_conditions_z80.py`.
+
+**Y una falsa alarma que enseñó algo**: en Bangkok el original repetía lo
+tecleado en minúsculas y nosotros en mayúsculas. No es del intérprete: es el
+**bloqueo de mayúsculas de la ROM**, y las instantáneas no se toman igual
+--MegaCorp y Vajillas lo tienen puesto, Bangkok y el Quijote no--. El espejo lo
+enciende antes de jugar, como ya nivelaba el desplazamiento de la ventana. Se
+llegó a cambiar los cinco teclados para conservar la caja de lo tecleado y se
+revirtió entero al ver la causa; lo que sí queda es saber **dónde mirar la
+próxima vez**: `$5C6A`, bit 3.
+
+**Tres cosas más del arnés**, por si hay que tocarlo:
+
+- Una letra perdida se arregla **antes de dar al enter**: se borra la línea y se
+  escribe otra vez, que así las dos máquinas siguen en el mismo turno. Y la
+  línea tiene que ser el prompt y la orden y nada más: preguntar si la orden
+  está *dentro* de la línea deja pasar una letra suelta, porque `ISUBIR`
+  contiene `SUBIR`.
+- El prompt se compara **quitando espacios por los dos lados**: el de Bangkok
+  lleva uno delante. Con `rstrip` no fallaba nada --se esperaba el plazo entero
+  en cada turno, y el paseo pasaba de cinco minutos a media hora.
+- Tras teclear hay que **darle a la máquina un respiro** antes de leer el eco,
+  o se lee la pantalla antes de que le haya llegado la última letra.
+
+**Lo que queda del espejo**: el Quijote y Vajillas piden clave, como MegaCorp,
+y hay que sacársela igual --mirando qué verbo acepta la sala de salida--.
+
 ## Cosas menores
 
 `deGAC` ya lee las tres máquinas. Reconoce por sí solo una instantánea de

@@ -211,6 +211,24 @@ def test_what_get_refuses():
 
 
 @needs_tools
+def test_getting_something_the_adventure_does_not_have():
+    """An object that is not in the table is not here, and saying so ends the
+    turn like the other refusals.
+
+    The original does not ask whether it exists: it reads past the end of its
+    own object table, and what it finds there is not this room.  Found by the
+    mirror on Los pajaros de Bangkok, whose low priority table ends with
+    IF ( VERB COGER ) GET NO1 OKAY END -- so COGER AGUA is a GET of object 56
+    and the adventure has fourteen.  Ours passed it over in silence and the
+    OKAY after it answered "Vale."
+    """
+    state = run(["SET 19 GET 99 SET 20 END", "SET 21 END"])
+    assert state["flags"] == {19}, "no such object: not here, and the turn ends"
+    state = run(["SET 19 DROP 99 SET 20 END", "SET 21 END"])
+    assert state["flags"] == {19}, "and it is not in the hand either"
+
+
+@needs_tools
 def test_what_can_be_carried_at_once():
     """The strength is the total it refuses at and not the last it allows:
     with a strength of three, two things of weight one go into the hand and

@@ -321,7 +321,7 @@ op_get:
                 call    vm_pop
                 ld      (vm_arg), hl
                 call    obj_location            ; DE = where it is
-                jp      c, vm_loop
+                jr      c, .not_here            ; no such object: not here
                 ld      hl, CARRIED
                 or      a
                 sbc     hl, de
@@ -354,11 +354,19 @@ op_get:
                 call    print_message
                 jp      end_turn
 
+                ; An object the adventure does not have is not here and not
+                ; in the hand either.  The original does not ask whether it
+                ; exists: it reads past the end of its own table and what it
+                ; finds is not this room, so it says so and ends the turn.
+                ; Found by the mirror on Los pajaros de Bangkok, whose low
+                ; priority table ends with IF ( VERB COGER ) GET NO1 OKAY END
+                ; -- so COGER AGUA is a GET of object 56, and it has
+                ; fourteen.  Ours passed it over in silence and said "Vale."
 op_drop:
                 call    vm_pop
                 ld      (vm_arg), hl
                 call    obj_location
-                jp      c, vm_loop
+                jr      c, .not_carried
                 ld      hl, CARRIED
                 or      a
                 sbc     hl, de

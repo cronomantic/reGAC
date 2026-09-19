@@ -86,9 +86,16 @@ def watching():
         blob = f.read()
     session = emulator.Session(machine="PCW8256")
     try:
-        time.sleep(emulator.longer(4.0))
+        # A Joyce with no disk in it is still busy with the loader its
+        # keyboard gave it, and what is written into it while that goes on
+        # gets trodden on.  Eight seconds and not four: the failure it saves
+        # is the clock's, not the build's.
+        time.sleep(emulator.longer(8.0))
+        # Fifteen seconds and not five: what this waits for takes well under
+        # one, and the only thing a short plazo buys is a failure that is the
+        # clock's and not the build's.
         started = session.start_code(blob, LOADS_AT, where["ready_flag"],
-                                     wanted=1, timeout=5.0)
+                                     wanted=1, timeout=15.0)
         assert started, "the build never started"
     except BaseException:
         # Whatever goes wrong here, the machine is this function's to close:
