@@ -121,7 +121,7 @@ def pointer_moves(session, address, was=None, timeout=3.0, every=0.1):
     gives back where it got to -- still `was` if it never moved, and it is the
     caller who says what that means.
     """
-    deadline = time.time() + timeout
+    deadline = time.time() + emulator.longer(timeout)
     while True:
         at = word(session, address)
         if at and at != was:

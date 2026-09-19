@@ -90,7 +90,7 @@ else:
 
 def wait_change(session, glyphs, before, timeout=30.0):
     """Let it play until the screen is not what it was."""
-    deadline = time.time() + timeout
+    deadline = time.time() + emulator.longer(timeout)
     while time.time() < deadline:
         time.sleep(0.5)
         now = [line for line in screen(session, glyphs)]

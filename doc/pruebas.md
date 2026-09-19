@@ -21,14 +21,35 @@ en cada vuelta**, que es la peor clase de fallo. Lo que se les queda corto es el
 plazo de espera, no el intérprete. Con cuatro son once minutos y salen siempre
 igual, y once minutos ciertos valen más que nueve dudosos.
 
-De ahí salen otras dos cosas, las dos en `emulator.py`:
+### Los plazos, que es lo que de verdad fallaba
 
-- **Arrancar tarda más cuando la máquina está repartida.** Un instantáneo que
-  llega antes de que la ROM haya terminado no entra, y lo que se lee después no
-  es un fallo de la prueba sino de la espera. El plazo crece con el número de
-  trabajadores, que xdist dice.
-- **Cargar de cinta es la espera más larga de la suite**, y la del Amstrad tiene
-  su propio margen por eso.
+Lo primero que hicieron cuatro trabajadores fue tirar cuatro pruebas por
+vuelta, **distintas cada vez**, que es la peor clase de fallo: parece el
+intérprete y es el reloj. Antes de alargar plazos a ojo se midió cuánto corre
+de verdad una máquina emulada aquí, preguntándole su propio contador de ciclos:
+
+| emuladores a la vez | velocidad |
+|---|---|
+| uno | 0,96 veces un Spectrum de verdad |
+| dos | 0,71 |
+| cuatro | 0,58 |
+
+O sea que con cuatro **todo tarda 1,7 veces más**, no cuatro. Un trabajo de
+quince segundos pide veintiséis, y el plazo de veinticinco que tenía esperar a
+que el PCW acabara de dibujar era una moneda al aire.
+
+Así que **todo plazo de espera se estira con la compañía que tenga la
+máquina**: `emulator.longer()` lo hace, y por ahí pasan el arranque, el
+`wait_for` de `emulator.py` --y con él `start_code`-- y el `wait_screen` de los
+doce módulos que miran la pantalla. Reproducir el fallo a propósito --los
+cuatro módulos peores, cuatro máquinas distintas a la vez-- cuesta tres minutos
+y medio en vez de doce, y es lo que hay que hacer antes de tocar un plazo.
+
+Dos esperas siguen siendo del reloj nuestro porque no hay nada que mirar:
+arrancar una ROM y pedirle el disco a un PCW. Las dos crecen igual.
+
+Y una cosa que no se arregla con plazos: **cargar de cinta pasa en el tiempo de
+la máquina**, así que la del Amstrad se va con las que miden tiempo.
 
 La primera es la de todos los días. La segunda son las que **miden tiempo**
 --cuánto tarda una tecla en repetirse, cuánto aguanta una orden la máquina-- y
@@ -62,6 +83,19 @@ pytest tests/test_parser_z80.py -n 2 --dist loadgroup -v | grep -o "gw[0-9]" | s
 
 Ocho en uno solo está bien; seis y siete repartidos es que el grupo no se está
 aplicando.
+
+## La regla: un fallo en paralelo no se cree hasta repetirlo a solas
+
+Con los plazos estirados quedan una o dos pruebas por vuelta que fallan por la
+compañía y no por el código, y no siempre las mismas. Así que:
+
+```
+pytest tests/la_que_fallo.py -q        # a solas, un minuto
+```
+
+Si pasa, era la compañía. Si falla, es de verdad y hay algo que arreglar. Un
+minuto de comprobación vale más que subir un plazo a ojo, y mucho más que
+creerse un fallo que no existe --o, peor, no creerse uno que sí--.
 
 ## Si una vuelta se corta a medias
 

@@ -251,7 +251,7 @@ def comes_to(session, at, wanted, glyphs, prompt, timeout):
     it but the cursor.  The line the order was typed on starts with the same
     question, and taking that for an answer is how it failed the second time.
     """
-    deadline = time.time() + timeout
+    deadline = time.time() + emulator.longer(timeout)
     while time.time() < deadline:
         if room(session, at) == wanted:
             lines = [line for line in screen(session, glyphs)

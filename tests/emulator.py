@@ -370,8 +370,12 @@ class Session:
     def wait_for(self, address, wanted, timeout=20.0, every=0.4):
         """Run until a byte in memory takes a value, and say whether it did.
         Look often when what happens after the wait is being measured, because
-        whatever runs between the end and the next look is counted too."""
-        deadline = time.time() + timeout
+        whatever runs between the end and the next look is counted too.
+
+        The wait is in seconds of ours, and what it is waiting for happens in
+        the machine's, which are not the same length when several emulators
+        are sharing one processor: see `longer`."""
+        deadline = time.time() + longer(timeout)
         while time.time() < deadline:
             time.sleep(every)
             if self.pc() and self.read(address, 1)[0] == wanted:

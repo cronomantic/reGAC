@@ -163,7 +163,7 @@ def asked_again(session, glyphs, times, timeout=30.0):
     the screen comes back empty and the test fails for nothing of its own.
     The prompt is the adventure's own message 240, a ">" here.
     """
-    deadline = time.time() + timeout
+    deadline = time.time() + emulator.longer(timeout)
     lines = []
     while time.time() < deadline:
         lines = [line for line in screen(session, glyphs) if line]

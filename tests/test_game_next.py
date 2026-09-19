@@ -136,7 +136,7 @@ def screen(session, glyphs):
 
 def wait_screen(session, glyphs, wanted, timeout=90.0):
     """Let it play until those letters show up, and give back the screen."""
-    deadline = time.time() + timeout
+    deadline = time.time() + emulator.longer(timeout)
     lines = screen(session, glyphs)
     while time.time() < deadline:
         lines = screen(session, glyphs)

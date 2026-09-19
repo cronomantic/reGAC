@@ -112,7 +112,7 @@ def wait_screen(session, glyphs, wanted, timeout=60.0):
     A room draws its picture before it says anything, and a picture is
     seconds, so waiting a fixed while is waiting either too little or too
     long."""
-    deadline = time.time() + timeout
+    deadline = time.time() + emulator.longer(timeout)
     lines = screen(session, glyphs)
     while time.time() < deadline:
         lines = screen(session, glyphs)

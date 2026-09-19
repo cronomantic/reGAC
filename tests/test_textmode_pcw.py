@@ -140,7 +140,7 @@ def waited_for_the_prompt(session, glyphs, timeout=90.0):
 
     A key pressed before the machine is asking is a key lost, and the order
     it began is then a word nobody knows: a fixed wait was sometimes that."""
-    deadline = time.time() + timeout
+    deadline = time.time() + emulator.longer(timeout)
     while time.time() < deadline:
         # a blank cell is paper, which is no glyph, so it reads as a "?"
         lines = [line.rstrip("?") for line in decode_screen(

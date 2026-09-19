@@ -115,7 +115,7 @@ def wait_for_screen(session, wanted, timeout=SCREEN_TIMEOUT):
     back what it held.  Looking is the only way: the screen goes in while the
     tape is still running and the adventure paints over it when it starts, so
     a fixed wait would be too early or too late."""
-    deadline = time.time() + timeout
+    deadline = time.time() + emulator.longer(timeout)
     while True:
         shown = bytes(session.read(0, MSX_SCREEN_BYTES, zone=VRAM))
         if shown == wanted or time.time() > deadline:

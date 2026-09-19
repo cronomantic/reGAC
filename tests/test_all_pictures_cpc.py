@@ -116,7 +116,7 @@ def finished_after(session, flag, timeout=120.0):
     ten cycles.  Looked at every hundredth of a second instead, what is added
     is about that and no more.
     """
-    deadline = time.time() + timeout
+    deadline = time.time() + emulator.longer(timeout)
     while time.time() < deadline:
         if session.read(flag, 1)[0] == 0xFF:
             reply = session.command("get-tstates-partial")
