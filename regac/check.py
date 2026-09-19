@@ -39,6 +39,7 @@ that has no message 240 has nothing to ask the player with, and neither the
 compiler nor the machine will say so.
 """
 
+from .gfx import PICTURE_BOTTOM, PICTURE_TOP
 from .opcodes import ADVERB, BY_NAME, CTR, FLAG, MSG, NOUN, OBJ, ROOM, VERB
 from .text import typed
 
@@ -80,6 +81,24 @@ class Problem:
     def __str__(self):
         mark = "" if self.fault else "warning: "
         return f"{mark}{self.where}: {self.message}"
+
+
+def ys_of(command):
+    """The y of every point a drawing order names that has to be in the frame.
+
+    Not every number that looks like a y is one: the second pair of an
+    ELLIPSE is where its radii come from and not a place, so it falls outside
+    the frame as a matter of course -- the example adventure's own lighthouse
+    does it five times over, which is how this was found.  A fill is left out
+    too, because what the original does with a seed outside has not been
+    asked of it.
+    """
+    name = command[0]
+    if name == "PLOT":
+        return command[2:3]
+    if name in ("LINE", "RECT"):
+        return command[2:3] + command[4:5]
+    return []
 
 
 def numbered(table):
@@ -222,6 +241,24 @@ def problems_of(ddb):
                 found.append(Problem(
                     f"picture {pid}", f"it calls picture {command[1]}, which "
                                       f"is not there"))
+
+    # A picture that draws outside the frame.  Ours draws what fits; the
+    # original stopped drawing that picture there and left the rest of it
+    # out, which was asked of it with pictures written over one of
+    # MegaCorp's -- see doc/pendiente.md.  No picture of the four adventures
+    # does it, so this is for the ones being written now.
+    for pid, drawing in (ddb.get("gfx") or {}).items():
+        for number, command in enumerate(drawing, start=1):
+            outside = [y for y in ys_of(command)
+                       if not PICTURE_BOTTOM <= y <= PICTURE_TOP]
+            if outside:
+                found.append(Problem(
+                    f"picture {pid}",
+                    f"its order {number}, {command[0]}, goes to y={outside[0]},"
+                    f" outside the frame ({PICTURE_BOTTOM} to {PICTURE_TOP}):"
+                    f" this draws what fits, where the original would have"
+                    f" stopped drawing the picture there",
+                    fault=False))
 
     # What the interpreter says for itself.
     for number, what in NEEDED.items():

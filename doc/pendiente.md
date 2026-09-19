@@ -2341,7 +2341,64 @@ pasaba. El ROM guarda **la tecla**, no lo que dice. Ahora se compara
 `key_found`, que es lo que el explorado de cada máquina deja antes de aplicar
 ningún shift, y `A?B`, `A.B`, `A:B` y `A-B` llegan enteras.
 
-**Lo que queda por leer**: el dibujo.
+### El dibujo, y el original como juez
+
+Las 44 láminas de las cuatro aventuras salen punto por punto como las dibuja
+la referencia, así que el camino corriente está comprobado. Lo que no lo
+estaba es **lo que una aventura nueva sí puede dibujar y esas cuatro nunca
+dibujaron**: una línea que se sale, un punto fuera del marco, un rectángulo
+más grande que la pantalla. Ahí la referencia es sólo nuestra opinión.
+
+Así que se le preguntó al original, y se puede preguntar cuanto haga falta:
+**sus láminas son una tabla de registros** --id, longitud, cuántas órdenes, y
+las órdenes--, que es como las lee `deGAC`, así que se le escribe una lámina
+nuestra encima de una suya y se le manda describir esa sala. Lo que dibuje es
+la respuesta. El guión está en el scratchpad (`draw_oracle.py`), fuera del
+repositorio.
+
+**Su marco**: las órdenes se escriben en un espacio de 256 de ancho por 176 de
+alto con la **y contando hacia arriba**, y la lámina son las dieciséis filas de
+arriba de la pantalla: y=175 es la fila de píxeles de arriba y y=48 la última
+de la lámina. Su `$643C` sujeta la x a 0..255 y la y a 48..175 antes de pasarle
+la línea a la ROM (`$24BA`), que es la que dibuja: GAC no escribió la suya.
+
+**Lo medido**, con láminas nuestras escritas en su memoria:
+
+| caso | el original |
+|---|---|
+| `PLOT` fuera del marco | **lo salta**, y la lámina sigue |
+| `LINE` con el segundo punto fuera | lo trae al borde y la dibuja |
+| `LINE` con el **primer** punto fuera | **deja de dibujar la lámina**, y lo que venga detrás tampoco sale |
+| `RECT` con cualquier esquina fuera | lo mismo: nada, ni la parte de dentro |
+| `ELLIPSE` mayor que el marco, líneas que se salen por los cuatro lados, rellenos en las esquinas | **iguales que los nuestros** |
+
+Lo de dejar de dibujar viene de la ROM: el primer punto lo pone su `PLOT`, que
+da error fuera de rango. **Ninguna lámina de las ocho bases se sale del marco**,
+así que esto sólo toca a las aventuras que se escriban ahora.
+
+**Lo que hemos hecho con ello**: el `PLOT` fuera del marco ya no se dibuja
+--era un fallo nuestro claro, pintábamos un punto pegado al borde que el
+original no pinta-- y hay prueba en las cinco máquinas. Lo de abortar la lámina
+**no** se copia: se dibuja lo que cabe y `regac check` avisa, diciendo qué orden
+se sale y qué habría hecho el original. Ninguna aventura original depende de
+ello, y un autor nuevo prefiere ver su dibujo a ver una pantalla en blanco.
+
+Dos detalles que costaron su rato y evitan repetirlos:
+
+- **El aviso es sólo para `PLOT`, `LINE` y `RECT`.** El segundo par de una
+  `ELLIPSE` no es un sitio: es de donde salen los radios, por la distancia al
+  centro, así que cae fuera del marco como cosa corriente --el faro de la
+  aventura de ejemplo lo hace cinco veces--. Eso lo encontró el propio aviso
+  saltando sobre nuestra aventura. De los rellenos no se ha preguntado qué
+  hace con una semilla fuera, así que tampoco avisan.
+- **Al Next no le sobran bytes.** La comprobación se escribió primero en
+  dieciséis y no cabía bajo su máscara; queda en doce aprovechando que el
+  marco son ciento veintiocho filas justas: se le resta el fondo y basta una
+  comparación, porque lo que está por debajo se envuelve y falla igual.
+
+**Lo que queda por leer**: nada del intérprete original. Queda el relleno, que
+es lo único suyo donde no hemos preguntado por casos raros --rellenos que se
+escapan por un hueco de un píxel--, y eso se pregunta con el mismo guión.
 
 ## Cosas menores
 

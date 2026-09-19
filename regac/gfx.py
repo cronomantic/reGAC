@@ -331,7 +331,12 @@ class Renderer:
                 setattr(self, name.lower(), args[0])
                 self.__push_colours()
             elif name == "PLOT":
-                self.plot(*point(args[0], args[1]))
+                # A point outside the picture is not drawn, where a line's
+                # far end is brought to the edge: measured on the original,
+                # whose ROM refuses to plot out of range.  See
+                # doc/pendiente.md.
+                if PICTURE_BOTTOM <= args[1] <= PICTURE_TOP:
+                    self.plot(*point(args[0], args[1]))
             elif name == "LINE":
                 self.line(*point(args[0], args[1]), *point(args[2], args[3]))
             elif name == "RECT":

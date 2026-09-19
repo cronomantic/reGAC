@@ -78,6 +78,13 @@ if pytest is not None:
             ("a line the other way", [["LINE", 60, 120, 10, 60]]),
             ("a rectangle", [["RECT", 20, 60, 100, 120]]),
             ("a single point", [["PLOT", 40, 100]]),
+            # A point outside the picture is not drawn at all, and
+            # what comes after it still is: asked of the original
+            # with pictures of our own written over one of
+            # MegaCorp's.  A line's far end is brought to the edge
+            # instead, which is the other half of the same answer.
+            ("a point outside the picture",
+             [["PLOT", 40, 20], ["PLOT", 60, 200], ["PLOT", 80, 100]]),
             ("a small ellipse", [["ELLIPSE", 60, 100, 70, 110]]),
             ("a larger ellipse", [["ELLIPSE", 128, 100, 168, 130]]),
             ("a fill", [["RECT", 20, 60, 100, 120], ["PENS", 2, 2], ["FILL", 60, 90]]),

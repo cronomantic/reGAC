@@ -19,6 +19,10 @@
 
 GFX_MAX_DEPTH   equ 8                   ; a picture may call others
 
+; PICTURE_BOTTOM and PICTURE_TOP -- the rows a picture may use, in the
+; coordinates the commands are written in -- come from each machine's own
+; fill.asm, which needs them for the same reason.
+
 CMD_BORDER      equ $01
 CMD_PLOT        equ $02
 CMD_ELLIPSE     equ $03
@@ -260,7 +264,20 @@ run_picture:
                 ld      a, c
                 cp      CMD_PLOT
                 jr      nz, .a_fill
-                call    gfx_plot
+                ; A point outside the picture is not drawn at all, and the
+                ; picture carries on: their ROM refuses to plot out of range,
+                ; where a line's far end is brought to the edge instead.
+                ; Asked of the original with pictures of our own written over
+                ; one of MegaCorp's -- see doc/pendiente.md.
+                ; The two ends in one test, because the Next has no bytes
+                ; to spare here: the rows a picture may use are a hundred and
+                ; twenty eight of them, so taking the bottom off leaves one
+                ; comparison to make -- and anything below it wraps past the
+                ; top and fails the same test.
+                ld      a, (gfx_y0)
+                sub     PICTURE_BOTTOM
+                cp      PICTURE_TOP - PICTURE_BOTTOM + 1
+                call    c, gfx_plot
                 jr      .resume
 .a_fill:
                 ld      b, FILL_INK
