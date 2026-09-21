@@ -2740,14 +2740,65 @@ tres bucles y de los tiempos publicados del 8088. Lo que la hace fiable es
 que los dos bucles que deciden son de una instrucción y no dependen del
 prefetch; lo que la hace una estimación y no otra cosa es que el tercero sí.
 
-### El paso dos, si se sigue
+### El paso dos, hecho: la cadena entera funciona
 
-Una cala con el emulador: montar un `.EXE` con `NASM -f bin` y la cabecera MZ
-escrita por `regac` --28 bytes, y sin reubicaciones si los segmentos se
-calculan en marcha desde `CS`--, apuntarle `CS:IP`, correr y leer `B800` desde
-un guion. Si eso sale, el resto es trabajo conocido: `CgaDevice` y la
-comparación de láminas antes de que exista intérprete, que es como se hicieron
-las otras cinco.
+Probada de punta a punta, y **sin descargar nada**: NASM y DOSBox-X ya
+estaban en la máquina.
+
+```
+spike.asm --nasm -f bin--> spike.com --DOSBox-X (machine=cga)--> SCREEN.BIN --> Python
+```
+
+El programa pone el modo 4, pinta diez filas con `rep stosb` --la instrucción
+de la que depende toda la estimación-- y vuelca los 16384 bytes de `B800` a un
+fichero. Lo que volvió:
+
+| | |
+|---|---|
+| tamaño | 16384 |
+| lo pintado | todo a `FF`, diez filas de ochenta bytes |
+| detrás de eso | a cero |
+| banco impar | a cero, que es lo correcto: las filas pares viven en el banco 0 |
+
+Exacto, hasta el entrelazado de bancos.
+
+**Y aquí está lo que hace fácil este target**, que no se ve hasta que se
+prueba: un DOS tiene sistema de ficheros, así que **el programa entrega su
+propia pantalla como fichero**. Ni protocolo remoto, ni escribir en la memoria
+de una máquina en marcha, ni apuntarle el contador --que es justo la parte del
+arnés que más guerra ha dado en las cinco máquinas Z80--. La prueba se reduce
+a: ensamblar, correr, leer un fichero.
+
+**La pega, que costó encontrarla:** DOSBox-X se cuelga si se lanza sin
+`-fastlaunch`. Con `-conf`, `-fastlaunch` y `-exit` corre, hace lo suyo y se
+va solo.
+
+```
+[dosbox]
+machine=cga
+[cpu]
+cycles=fixed 315
+[autoexec]
+mount c .
+c:
+spike.com
+exit
+```
+
+**Lo que falta para un target de verdad**, por orden:
+
+1. La **cabecera MZ** para el `.EXE`, que son 28 bytes escritos por `regac`
+   --sin reubicaciones si los segmentos se calculan en marcha desde `CS`--.
+2. Un **`CgaDevice`** en `regac/devices.py` y la comparación de láminas
+   contra la referencia, antes de que exista intérprete: es como se hicieron
+   las otras cinco.
+3. Sólo entonces, el intérprete en 8086.
+
+**Y un emulador con reloj fiel, si alguna vez se quiere verificar la
+estimación de tiempos** y no sólo que las láminas salen bien. DOSBox-X con
+`cycles=fixed 315` se parece a un XT pero no es exacto al ciclo; para eso
+harían falta **86Box** o **MartyPC**, que no están instalados. Para la
+corrección, DOSBox-X sobra.
 
 ## Cosas menores
 
