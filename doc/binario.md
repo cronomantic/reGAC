@@ -17,8 +17,8 @@ reescribir nada de lo que tiene dentro.
 | 4 | versión del formato |
 | 5 | máquina |
 | 6 | bits de página: 14 para bancos de 16K, 13 para 8K, 0 para sin bancos |
-| 7 | modo de música |
-| 8 | tamaño del buffer de música, en bytes |
+| 7 | reservado, a cero: fue el modo de música |
+| 8 | reservado, a cero: fue el tamaño del buffer de música |
 | 10 | número de bancos |
 | 11 | número de secciones |
 | 12 | directorio, cinco bytes por sección: banco, desplazamiento, tamaño |
@@ -27,8 +27,9 @@ Un banco 0xFF quiere decir que la sección es residente.
 
 ## Secciones
 
-`config`, `vocabulary`, `objects`, `locations`, `conditions`, `text`, `font`,
-`graphics` y `music`.
+`config`, `vocabulary`, `objects`, `locations`, `conditions`, `text`, `font` y
+`graphics`. La octava, `music`, ya no se escribe: su número se deja libre para
+que las siete de delante conserven el suyo.
 
 Los textos de toda la aventura van a un solo almacén, así que una pareja de
 códigos encontrada en un mensaje sirve también para la descripción de una
@@ -53,8 +54,7 @@ cualquier otra cosa es su opcode en un byte. Un cero termina la tabla.
 
 Residente es lo que el intérprete toca en cualquier momento y sin aviso: el
 vocabulario, las tablas de objetos y localidades, las condiciones y la fuente.
-A bancos van el texto, los gráficos y la música, que se consultan en momentos
-conocidos.
+A bancos van el texto y los gráficos, que se consultan en momentos conocidos.
 
 Una sección nunca se parte entre dos bancos, de modo que traer una a memoria
 jamás necesita dos páginas mapeadas a la vez.
@@ -68,7 +68,7 @@ Medido sobre las ocho aventuras, que ocupan entre 16 y 21 KB enteras:
 
 O sea que para estas aventuras los bancos son previsión y no necesidad: caben de
 sobra en un Spectrum de 48K sin paginar nada. Hacen falta para aventuras nuevas
-más grandes, y para la música.
+más grandes.
 
 ## Cómo se pagina, ya en la máquina
 
@@ -406,40 +406,22 @@ Un aviso de andar por casa: los medios de todas las máquinas se llaman igual
 (`juego.dsk`, `juego.cdt`), así que cada una quiere su propia carpeta de
 salida. Dos `release` seguidos en la misma se pisan.
 
-## La música con AY, que es lo que condiciona el diseño
+## Los dos huecos de la cabecera, y por qué siguen ahí
 
-El reproductor de AY corre desde la interrupción, cincuenta veces por segundo.
-De ahí sale la única regla que de verdad importa en todo esto:
+Los bytes 7 y 8 y la sección 8 fueron de la música. Hubo un reproductor de
+Arkos que sonaba de verdad en cinco máquinas, y se quitó: lo que contaba en
+memoria y en mantenimiento no lo pagaba una aventura conversacional, y el GAC
+de 1986 no tenía música. Está contado en [`pendiente.md`](pendiente.md).
 
-**El reproductor no puede leer nunca a través de una ventana de paginación que
-el código principal pueda cambiar por debajo.**
+Lo que queda son tres huecos a cero, y **se dejan a propósito**: quitarlos
+correría los números de todo lo demás y obligaría a subir la versión del
+formato, que es un precio mucho mayor que tres bytes. Una base de datos escrita
+antes de esto se lee hoy tal cual.
 
-Si la melodía vive en un banco y el programa pagina otro banco distinto para
-sacar un texto, la siguiente interrupción lee basura y la música se rompe. Es el
-fallo clásico de este tipo de intérpretes y hay que evitarlo por diseño, no
-por cuidado.
-
-La máquina que aprieta es el Spectrum de 128K, porque tiene una sola ventana
-paginable, la de 0xC000. Amstrad, MSX, Sam Coupé y Next tienen varias ranuras y
-pueden dedicar una a la música.
-
-Por eso el formato lleva un campo de modo de música en la cabecera, con dos
-valores:
-
-**Copia a residente.** Al empezar una melodía se copia a un buffer residente, y
-a partir de ahí el reproductor sólo lee memoria que no se pagina. El buffer se
-declara en la cabecera para que el montador compruebe que cabe. Esto tiene una
-ventaja que no se ve a primera vista: como la interrupción nunca toca la ventana
-paginada, paginar no necesita deshabilitar interrupciones, y la música no da
-ningún tirón al cambiar de localidad.
-
-**Ranura propia.** La melodía se queda en su banco, mapeado en una ranura que el
-código principal no usa nunca. Sale gratis en memoria pero sólo vale en las
-máquinas con varias ranuras.
-
-La sección de música está vacía todavía, pero con su forma ya fijada: una
-cuenta, y para cada melodía dónde empieza y cuánto ocupa. Añadir melodías
-después no moverá ninguna otra sección.
+El reparto de bancos que hay ahora lo decidió aquella previsión, y se queda
+como está porque es bueno por sí mismo: una sección nunca se parte entre dos
+bancos, de modo que traer una a memoria jamás necesita dos páginas mapeadas a
+la vez.
 
 ## Verificarlo
 

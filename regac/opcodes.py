@@ -138,7 +138,9 @@ OPS = [
     Op("END",      0x3F, CTRL),
     # Not the original's.  A byte with bit seven set is a number, so the
     # language has room from here up to $7F.
-    Op("MUSIC",    0x40, PREFIX,  (NUM,)),
+    # $40 was MUSIC, and there is no tune player any more.  The number is
+    # left unused rather than given to something else, so that a database
+    # from before this reads as an opcode that does nothing.
     Op("SOUND",    0x41, PREFIX,  (NUM,)),
     Op("QUIET",    0x42, NULLARY),
 ]

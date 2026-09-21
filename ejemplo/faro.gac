@@ -365,9 +365,8 @@ IF ( VERB VERBO_FIN ) QUIT END
 
 ; -- los ruidos --------------------------------------------------------------
 ;
-; Para las máquinas sin chip que toque los efectos de un tracker: el altavoz
-; de un bit del Spectrum, el Next y el MSX, y el chip del Amstrad cuando la
-; versión no lleva música.
+; El altavoz de un bit del Spectrum, el Next y el MSX, y el chip del Amstrad,
+; que toca la misma tabla por un puerto. El PCW no tiene con qué sonar.
 ;
 ; tono  pasos  paso
 /SOUND

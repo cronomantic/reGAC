@@ -374,10 +374,10 @@ vm_location:    dw      0
 vm_max_weight:  db      250
 vm_weight:      db      0
 vm_seed:        dw      $A55A
-; What the music was doing, which is part of a game and not of the machine: a
-; nought for silence, and otherwise the tune plus one.  It is a byte of every
-; build, with music or without, so that a game saved on one machine is the
-; same shape as a game saved on another.
+; A byte that was what the music was doing, back when there was a tune player.
+; Nothing writes it now, and it stays because it is saved and loaded with the
+; rest: taking it out would make every game saved before this unreadable, and
+; one byte is not worth that.  See doc/pendiente.md.
 vm_music:       db      0
 vm_stack:       ds      VM_STACK_DEPTH * 2
 vm_flags:       ds      FLAG_BYTES

@@ -1,6 +1,6 @@
 ; MIT License, Copyright (c) 2025 Cronomantic
 ;
-; The noises of an Amstrad that has no music, which are the same noises every
+; The noises of an Amstrad, which are the same noises every
 ; other machine makes and are made another way.
 ;
 ; This machine has no speaker of its own: the only thing here that can make a
@@ -15,10 +15,6 @@
 ; machine's chip counts a period of sixteen of its own million a second, which
 ; is the same note at half the number -- a pitch of two hundred is a period of
 ; a hundred.
-;
-; A build with music uses none of this.  There the effects are the tracker's,
-; played from the interrupt, and writing to the chip behind its back would
-; only fight it.
 
                 IFNDEF WITH_NOISES
                 DEFINE WITH_NOISES 1
@@ -62,8 +58,8 @@ ay_quiet:
                 ld      de, AY_VOLUME_A << 8
                 jp      ay_write
 
-; Effect A, counting from one as the tracker's own effects do and as the one
-; bit engine counts them: the same table and the same numbers.  A number the
+; Effect A, counting from one as the one bit engine counts them: the same
+; table and the same numbers.  A number the
 ; build has not got makes no noise rather than reading past the table.
 ; Corrupts: everything
 beep_sound:

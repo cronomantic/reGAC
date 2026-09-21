@@ -48,22 +48,9 @@ llaman `spectrum48`, `spectrum128`, `plus3`, `cpc`, `msx`, `next` y `pcw`.
 | `banks` | tamaño de banco: `none`, `8k` o `16k` | lo que esa máquina suele usar |
 | `screen` | el volcado de pantalla que se ve mientras carga | ninguna |
 | `scale` | a cuántos píxeles de la máquina sale un punto de la lámina | 1, y 2 en el PCW |
-| `music-buffer` | bytes reservados para la melodía que suena | 0 |
 
-Y dos que van arriba del todo, porque no son de una máquina sino de la
-aventura entera:
-
-| clave | qué dice | por defecto |
-|---|---|---|
-| `effects` | el banco de efectos que exportó el tracker | ninguno |
-| `music-tool` | la orden que convierte el fichero del tracker en ensamblador | `SongToAkm` de `tools/` |
-
-**Qué melodías hay no se dice aquí**, sino en la sección `/MUSIC` de la propia
-aventura: son de ella y no de la construcción. Con eso, `regac make` hace todo
-lo demás —escribe el fuentecillo que el ensamblador incluye, le pasa las
-palabras que hacen falta, y en el Amstrad mete la música como fichero aparte en
-el disco y en la cinta—. Una máquina sin chip de sonido lo dice y construye
-igual.
+Las tres son de una máquina. Arriba del todo, del proyecto entero, sólo van
+`name`, `source`, `output` y `targets`.
 
 Un nombre que no esté en esa lista es un error y se dice, en vez de construir
 otra cosa en silencio; lo mismo con una máquina que no existe, o con una escala

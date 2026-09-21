@@ -4,7 +4,7 @@
 ;
 ; What changes is only where the database is.  What the interpreter touches at
 ; any moment without warning stays resident, next to the code in page two;
-; the text, the pictures and the music go to pages of their own and are
+; the text and the pictures go to pages of their own and are
 ; brought into the window at $C000 when they are wanted.  Which pages those
 ; are is said here, because it is the machine's business, and the table the
 ; paging routine walks is built from the same names.
@@ -19,18 +19,6 @@
                 DEVICE  ZXSPECTRUM128
 
                 include "banks.inc"
-
-; A build with music is told so with -DWITH_MUSIC, and one with sound effects
-; as well with -DWITH_EFFECTS.  What it then takes in is the author's own
-; music/tunes.asm, which says what tunes there are; doc/pendiente.md has the
-; shape of it.  Without them not a byte of any of this is in the build.
-                IFDEF WITH_MUSIC
-                DEFINE  PLY_AKM_HARDWARE_SPECTRUM 1
-                DEFINE  MUSIC_PAGED 1           ; the tunes live in a page
-                IFDEF WITH_EFFECTS
-                DEFINE  PLY_AKM_MANAGE_SOUND_EFFECTS 1
-                ENDIF
-                ENDIF
 
 ; The machine's own pages, in the order the database numbers its banks.  Two
 ; are spoken for: page two holds the interpreter and page five the screen.
@@ -89,69 +77,6 @@ loading_screen:
                 INCBIN  "screen.bin", 0, SCREEN_BYTES
                 ENDIF
 
-; The music, if there is any, goes below the interpreter and not above it.
-; Above it there is nothing to spare: the interpreter, what is resident of the
-; database and the interrupt's own corner fill the map to $C000.  Below it
-; there is a great deal -- the screen ends at $5B00 and the stack starts at
-; $8000, and the only thing in between is the BASIC line the loader travelled
-; in, which has done its work by the time any of this runs.  So the player
-; goes at $6000, and what is left over from there to $7C00 is the buffer a
-; tune is played out of.
-;
-; The tunes themselves are not here at all: they are in a page of their own,
-; and the one being played is copied down into the buffer when it starts.
-; That way a tune costs nothing of the sixty four kilobytes until it plays,
-; and what a build pays for having twenty of them is the biggest one once.
-;
-; The page they are in is the one after the last the database took.  Six are
-; free on this machine and an adventure that took all six would leave none, so
-; there is an assert to say so rather than a tune played over the text.
-MUSIC_AT        equ $6000
-MUSIC_CEILING   equ $7C00               ; leaving the stack the rest
-MUSIC_PAGE      equ DB_PAGE_5           ; the last of the six
-
-                IFDEF WITH_MUSIC
-                ASSERT  DB_BANK_COUNT <= 5      ; or there is no page for it
-                SLOT    2
-                PAGE    2
-                ORG     MUSIC_AT
-music_at:
-                include "../common/music.asm"
-                include "../arkos/PlayerAkm.asm"
-                include "interrupt.asm"
-                IFDEF PLY_AKM_MANAGE_SOUND_EFFECTS
-; The effects are not paged and not copied: one is asked for in the middle of
-; a turn and has to be there, so the bank lives with the player.
-effects:
-                include "../../music/effects.asm"
-                ENDIF
-; The list of what tunes there are, which is read at any moment and so lives
-; here and not in the page they are in.
-                DEFINE  MUSIC_LIST 1
-                include "../../music/tunes.asm"
-                UNDEFINE MUSIC_LIST
-
-music_buffer:
-MUSIC_BUFFER_BYTES equ MUSIC_CEILING - music_buffer
-music_end:
-MUSIC_BYTES     equ music_end - music_at
-                ASSERT  music_end <= MUSIC_CEILING
-
-; And the tunes, in a page of their own.  It comes after the player because
-; the list is written with a macro the player's own source declares.
-                SLOT    3
-                PAGE    MUSIC_PAGE
-                ORG     $C000
-music_store:
-                DEFINE  MUSIC_STORE 1
-                include "../../music/tunes.asm"
-                UNDEFINE MUSIC_STORE
-music_store_end:
-MUSIC_STORE_BYTES equ music_store_end - music_store
-                SLOT    2
-                PAGE    2
-                ENDIF
-
                 ORG     $8000
 start:
                 di
@@ -166,14 +91,6 @@ start:
                 call    vm_init
                 call    vocab_init
                 call    loop_init
-                IFDEF WITH_MUSIC
-                call    music_init
-                IFDEF PLY_AKM_MANAGE_SOUND_EFFECTS
-                ld      hl, effects
-                call    sound_init
-                ENDIF
-                call    interrupt_init
-                ENDIF
                 ; the player starts where the adventure says
                 ld      a, SECTION_CONFIG
                 call    db_section
@@ -210,9 +127,6 @@ done_flag:      db      0
 database:
                 INCBIN  "game128.rgac", 0, DB_RESIDENT_SIZE
 last:
-                IFDEF WITH_MUSIC
-                ASSERT  last <= IM2_TABLE       ; or it would run into the
-                ENDIF                           ; interrupt's own corner
 
                 SAVESNA "game128.sna", start
 
@@ -228,14 +142,6 @@ last:
                 SLOT    2
                 PAGE    2
                 SAVETAP "game128.tap", HEADLESS, start, last - start
-                IFDEF WITH_MUSIC
-                SLOT    1
-                PAGE    5                       ; where $6000 always is
-                SAVETAP "game128.tap", HEADLESS, MUSIC_AT, MUSIC_BYTES
-                SLOT    3
-                PAGE    MUSIC_PAGE              ; and the tunes, in theirs
-                SAVETAP "game128.tap", HEADLESS, DB_WINDOW, MUSIC_STORE_BYTES
-                ENDIF
                 SLOT    3
                 IF DB_BANK_COUNT > 0
                 PAGE    DB_PAGE_0

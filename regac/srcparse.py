@@ -125,11 +125,11 @@ def text_of(line):
 # What is only for some machines
 # ---------------------------------------------------------------------------
 
-# An adventure is one source and five machines, and now and then the five do
+# An adventure is one source and eight machines, and now and then the eight do
 # not want the same thing: a Spectrum of 48K may have to do without the
 # pictures that fit everywhere else, an Amstrad's colours are four pens rather
-# than sixteen colours, and a machine with no sound chip has no use for the
-# line that starts a tune.  So a source may keep lines back:
+# than sixteen colours, and the PCW is monochrome and has nothing to sound
+# with.  So a source may keep lines back:
 #
 #       .if cpc msx
 #       El mando hace un ruido seco.
@@ -433,7 +433,6 @@ class Parser:
             "/LOW": lambda: self.conds("lpcs"),
             "/GFX": self.gfx,
             "/FONT": self.font,
-            "/MUSIC": self.music,
             "/SOUND": self.sound,
         }
         while True:
@@ -688,41 +687,9 @@ class Parser:
                                       for p in parts[1:]])
             self.ddb["gfx"][gid] = insts
 
-    def music(self):
-        """The tunes this adventure has, one to a line, in the order MUSIC
-        counts them: the file the tracker exported and which of its subsongs
-        to play, which is nought unless it says otherwise.
-
-            /MUSIC
-            menu.akm.asm     0
-            menu.akm.asm     1
-            cueva.akm.asm
-
-        The file is relative to this source, and is not read here: it is
-        assembly, and what reads it is the assembler.  `regac build` writes
-        the little source that includes them all in the right shape.
-        """
-        tunes = self.ddb.setdefault("music", [])
-        while not self.eof() and not self.cur().lstrip().startswith("/"):
-            raw, lineno = self.cur(), self.i + 1
-            line = strip_comment(raw).strip()
-            self.i += 1
-            if not line:
-                continue
-            pieces = line.split()
-            subsong = 0
-            if len(pieces) > 1:
-                if not pieces[-1].isdigit():
-                    self.fail(f"a tune is a file and a subsong: {line!r}")
-                subsong = self.number(pieces[-1], "a subsong",
-                                      lineno, raw)
-                pieces = pieces[:-1]
-            tunes.append({"file": " ".join(pieces), "subsong": subsong})
-
     def sound(self):
-        """The noises this adventure asks for, where there is no sound chip
-        to play the tracker's own: one to a line, in the order SOUND counts
-        them from one.
+        """The noises this adventure asks for: one to a line, in the order
+        SOUND counts them from one.
 
             /SOUND
             ; pitch  steps  step

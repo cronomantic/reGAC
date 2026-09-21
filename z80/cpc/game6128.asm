@@ -9,8 +9,7 @@
 ;
 ;   $0100-$02FF  free: below it are the restarts and the BASIC line that
 ;                 loaded us, and neither is worth stepping on
-;   $0300-$1FFF  the music, when there is any, as on a 464
-;   $2000-$3FFF  what is resident of the database, or from $0300 with no music
+;   $0300-$3FFF  what is resident of the database, nearly sixteen kilobytes
 ;   $4000-$7FFF  the window, one of four banks at a time
 ;   $8000-$BEFF  the interpreter, with the stack on top of it
 ;   $C000-$FFFF  the screen
@@ -42,36 +41,13 @@ DB_PAGE_2       equ $C6
 DB_PAGE_3       equ $C7
                 ASSERT DB_BANK_COUNT <= 4
 
-; A build with music is told so with -DWITH_MUSIC, and one with sound effects
-; as well with -DWITH_EFFECTS.  The music lives where it does on a 464 and
-; travels the same way, in a file of its own with a mover in front of it: the
-; loader brings it in at $4000, calls it, and it carries itself down.
-                IFDEF WITH_MUSIC
-                DEFINE  PLY_AKM_HARDWARE_CPC 1
-                DEFINE  MUSIC_RATE 300          ; this one interrupts that often
-                IFDEF WITH_EFFECTS
-                DEFINE  PLY_AKM_MANAGE_SOUND_EFFECTS 1
-                ENDIF
-                ENDIF
-
-MUSIC_AT        equ $0300               ; above the BASIC line that loads us
-MUSIC_CEILING   equ $2000               ; and below what the database wants
-MUSIC_LOADS_AT  equ $4000               ; where its file comes in, to be moved
+DATABASE_AT     equ $0300   ; above the BASIC line that loads us
 
 ; Where the resident half of the database ends up, and where the loader has
 ; left it: it comes in through the window, in the bank that is there when
 ; nothing has been paged, and none of the four ever covers that one.
 ;
-; Music costs it room, because both live in the sixteen kilobytes under the
-; window: with a tune there are eight kilobytes for what stays resident and
-; without one there are nearly sixteen.  Which is a thing to know before
-; giving an adventure music on this machine, and the assert below says so at
-; build time rather than in play.
-                IFDEF WITH_MUSIC
-database        equ MUSIC_CEILING
-                ELSE
-database        equ MUSIC_AT
-                ENDIF
+database        equ DATABASE_AT
 RESIDENT_LOADS  equ $4000
                 ASSERT  database + DB_RESIDENT_SIZE <= RESIDENT_LOADS
 
@@ -107,14 +83,6 @@ start_up:
                 call    vm_init
                 call    vocab_init
                 call    loop_init
-                IFDEF WITH_MUSIC
-                call    music_init
-                IFDEF PLY_AKM_MANAGE_SOUND_EFFECTS
-                ld      hl, effects
-                call    sound_init
-                ENDIF
-                call    interrupt_init
-                ENDIF
                 ; the player starts where the adventure says
                 ld      a, SECTION_CONFIG
                 call    db_section
@@ -137,10 +105,8 @@ done_flag:      db      0
                 include "screen.asm"
                 include "../common/textout.asm"
                 include "keyboard.asm"
-                IFNDEF WITH_MUSIC
                 IFDEF NOISES
                 include "ay.asm"
-                ENDIF
                 ENDIF
                 include "disc.asm"
                 include "draw.asm"
@@ -159,36 +125,3 @@ last:
 
                 SAVEBIN "game6128.bin", start, last - start
 
-; And the music, as a file of its own, exactly as on a 464: assembled for
-; $0300 and stored behind a mover that is put where the loader brings it in.
-                IFDEF WITH_MUSIC
-                ORG     MUSIC_LOADS_AT
-music_mover:
-                ld      hl, music_image
-                ld      de, MUSIC_AT
-                ld      bc, MUSIC_BYTES
-                ldir
-                ret
-
-music_image:
-                DISP    MUSIC_AT
-music_at:
-                include "../common/music.asm"
-                include "../arkos/PlayerAkm.asm"
-                include "interrupt.asm"
-                IFDEF PLY_AKM_MANAGE_SOUND_EFFECTS
-effects:
-                include "../../music/effects.asm"
-                ENDIF
-                DEFINE  MUSIC_LIST 1
-                DEFINE  MUSIC_STORE 1
-                include "../../music/tunes.asm"
-                UNDEFINE MUSIC_LIST
-                UNDEFINE MUSIC_STORE
-music_end:
-MUSIC_BYTES     equ music_end - music_at
-                ASSERT  music_end <= MUSIC_CEILING
-                ENT
-music_image_end:
-                SAVEBIN "game6128_music.bin", music_mover, music_image_end - music_mover
-                ENDIF

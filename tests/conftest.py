@@ -58,41 +58,33 @@ GROUPS = {
         # it builds the same game and plays it beside the original's own
         "test_mirror_z80",
         "test_statements_z80", "test_latin", "test_spectrum",
-        "test_media_plus3", "test_media_music_plus3", "test_tape_z80",
-        "test_tape_music_z80", "test_textmode_z80", "test_game_music_z80",
-        "test_music_source_z80",
+        "test_media_plus3", "test_tape_z80",
+        "test_textmode_z80",
         # it lays text out through test_markers_z80's own game
         "test_wrapping_z80",
     ],
     "spectrum-conditions": ["test_conditions_z80", "test_ink_z80"],
-    "spectrum-conditions-music": ["test_music_ops_z80"],
     "spectrum-picture": ["test_all_pictures", "test_graphics_z80"],
     "spectrum-parser": ["test_parser_z80"],
     "spectrum-beep": ["test_beep_z80"],
-    "spectrum-music": ["test_music_z80"],
-    "spectrum-sound": ["test_sound_z80"],
-    "spectrum-tunes": ["test_tunes_z80"],
     "spectrum-tape": ["test_save_z80"],
     "cpc-game": [
-        "test_game_cpc", "test_game_music_cpc", "test_low_cpc",
-        "test_textmode_cpc", "test_media_cpc", "test_media_music_cpc",
+        "test_game_cpc", "test_low_cpc",
+        "test_textmode_cpc", "test_media_cpc",
         # it saves and loads from the 6128 build, which test_media_cpc makes
         "test_save_cpc",
     ],
     "cpc-picture": ["test_all_pictures_cpc", "test_graphics_cpc"],
     "cpc-text": ["test_keyboard_cpc", "test_tape_cpc", "test_text_cpc"],
     "cpc-sound": ["test_sound_cpc"],
-    "cpc-music": ["test_music_cpc"],
-    "msx-game": ["test_game_msx", "test_game_music_msx", "test_tape_msx",
+    "msx-game": ["test_game_msx", "test_tape_msx",
                  # it builds its own adventure over the same files
                  "test_textmode_msx"],
     "msx-picture": ["test_all_pictures_msx", "test_graphics_msx"],
     "msx-text": ["test_keyboard_msx"],
     "msx-save": ["test_save_msx"],
-    "msx-music": ["test_music_msx"],
-    "next-game": ["test_game_next", "test_game_music_next", "test_textmode_next"],
+    "next-game": ["test_game_next", "test_textmode_next"],
     "next-picture": ["test_graphics_next"],
-    "next-music": ["test_music_next"],
     "next-save": ["test_save_next"],
     "pcw-game": [
         "test_game_pcw", "test_textmode_pcw", "test_screen_pcw",
@@ -115,7 +107,7 @@ SERIAL_MODULES = {
     # time and not in ours: shared four ways they never get there, and they
     # were the only two that kept falling over in a parallel run while
     # passing on their own
-    "test_game_cpc", "test_game_music_cpc", "test_tape_z80",
+    "test_game_cpc", "test_tape_z80",
     # two emulators at once, typed at in turn: it holds one machine while it
     # types at the other, and a busy host would drop the letters anyway
     "test_mirror_z80",

@@ -20,19 +20,6 @@
 
                 DEVICE  NOSLOT64K
 
-; A build with music is told so with -DWITH_MUSIC, and one with sound effects
-; as well with -DWITH_EFFECTS.  What it then takes in is the author's own
-; music/tunes.asm, which says what tunes there are.  Here the music goes above
-; the interpreter and below the interrupt's corner, where there is room for it:
-; the database is in the bottom half of the map and the top half has the copy
-; of the screen at $C000 and nothing else.
-                IFDEF WITH_MUSIC
-                DEFINE  PLY_AKM_HARDWARE_MSX 1
-                IFDEF WITH_EFFECTS
-                DEFINE  PLY_AKM_MANAGE_SOUND_EFFECTS 1
-                ENDIF
-                ENDIF
-
 STACK_AT        equ $EF00               ; above everything that travels
 database        equ $0000
 
@@ -45,9 +32,6 @@ database        equ $0000
 from_tape:
                 di
                 ld      sp, STACK_AT
-                IFDEF WITH_MUSIC
-                call    interrupt_hertz         ; while there is a BIOS to ask
-                ENDIF
                 call    take_the_machine
                 call    load_database
                 jr      begin
@@ -58,9 +42,6 @@ from_tape:
 start:
                 di
                 ld      sp, STACK_AT
-                IFDEF WITH_MUSIC
-                call    interrupt_hertz
-                ENDIF
                 call    take_the_machine
 .wait_for_it:
                 ld      a, (database_ready)
@@ -78,14 +59,6 @@ begin:
                 call    vm_init
                 call    vocab_init
                 call    loop_init
-                IFDEF WITH_MUSIC
-                call    music_init
-                IFDEF PLY_AKM_MANAGE_SOUND_EFFECTS
-                ld      hl, effects
-                call    sound_init
-                ENDIF
-                call    interrupt_init
-                ENDIF
                 ; the player starts where the adventure says
                 ld      a, SECTION_CONFIG
                 call    db_section
@@ -120,27 +93,8 @@ database_ready: db      1               ; a cassette has it there already
                 include "../common/loop.asm"
                 include "../common/picture.asm"
 
-                IFDEF WITH_MUSIC
-                include "../common/music.asm"
-                include "../arkos/PlayerAkm.asm"
-                include "interrupt.asm"
-                IFDEF PLY_AKM_MANAGE_SOUND_EFFECTS
-; The effects are not paged and not copied: one is asked for in the middle of
-; a turn and has to be there, so the bank lives with the player.
-effects:
-                include "../../music/effects.asm"
-                ENDIF
-                DEFINE  MUSIC_LIST 1    ; no banks here, so the list and
-                DEFINE  MUSIC_STORE 1   ; the tunes live side by side
-                include "../../music/tunes.asm"
-                UNDEFINE MUSIC_LIST
-                UNDEFINE MUSIC_STORE
-                ENDIF
 
 last:
                 ASSERT  last < SHADOW           ; or it would draw over itself
-                IFDEF WITH_MUSIC
-                ASSERT  last <= IM2_TABLE       ; nor into the interrupt's corner
-                ENDIF
 
                 SAVEBIN "game.bin", from_tape, last - from_tape

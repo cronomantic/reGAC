@@ -194,6 +194,37 @@ saliendo se perdían las cuatro --y entonces el juego se quedaba esperando una
 tecla que ya no iba a llegar, hasta agotar los dos minutos de plazo--. Ahora
 espera a la última palabra del título antes de pulsar.
 
+### El teclado del PCW: una tecla que se aguanta un tiempo que no es el suyo
+
+Nueve pruebas, y **entre una y tres fallaban cada vuelta, cambiando de prueba
+cada vez**. A solas pasaban; en fila no. Y la excusa fácil era mentira: el
+binario y el `.rgac` eran idénticos byte a byte a los de la vuelta verde
+anterior, así que no era el build.
+
+Eran tres cosas, todas la misma en el fondo —**adivinar en vez de esperar**—:
+
+1. **Se sabe que arrancó, no que está mirando.** `ready_flag` se pone una vez,
+   y las teclas se mandaban a continuación. El bucle escribe `raw_row` en cada
+   vuelta, así que ahora se le mete un valor nuestro y se espera a que lo
+   quite: eso sí es el bucle contestando. Es `wait_for_change`, el revés de
+   `wait_for`.
+2. **Una tecla aguantada 0,06 s de los nuestros no son 0,06 s de la máquina.**
+   Este emulador no lleva el tiempo del PCW, de modo que con el anfitrión
+   ocupado el mismo `sleep` compra menos ciclos, y una tecla que dura menos de
+   una pasada del teclado **no la ve nadie**. Ahora se cuenta en ciclos suyos,
+   con `get-tstates-partial`, cuatro tramas por tecla.
+3. **Saltar no es haber llegado.** `session.jump(read_a_line)` y teclear
+   0,3 s después tiraba las primeras teclas cuando el salto no había caído.
+   Todo lo que hay por encima de `read_a_line` en el fuente son esas entradas
+   y lo que llaman, y por debajo está el bucle del teclado, así que un
+   contador de programa pasado de esa dirección es el salto ya dado.
+
+Y una cuarta, de las de leerse dos veces: el reintento de tres vueltas que
+`test_a_whole_line_is_read_and_shown` ya tenía **no servía para nada**, porque
+el `assert` de «la línea no terminó nunca» estaba dentro del `try` y salía
+disparado del bucle en la primera. Un reintento que sólo cubre el caso bueno
+no es un reintento.
+
 ## Si una vuelta se corta a medias
 
 Un emulador huérfano se queda con el puerto, y la vuelta siguiente falla en

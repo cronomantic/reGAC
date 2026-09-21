@@ -54,8 +54,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import emulator  # noqa: E402
 from regac.binary import Database  # noqa: E402
 from regac.media import (CPC_LOW_CODE_AT, CPC_LOW_DATABASE_AT,  # noqa: E402
-                         CPC_LOW_ISLAND_AT, CPC_LOW_MUSIC_AT, CPC_LOW_ROOM,
-                         MUSIC_LOADS_AT, cpc_low_tape, low_loader, low_room)
+                         CPC_LOW_ISLAND_AT, CPC_LOW_ROOM, cpc_low_tape,
+                         low_loader)
 from test_game_cpc import glyph_table, wait_screen  # noqa: E402
 
 CPC = os.path.join(ROOT, "z80", "cpc")
@@ -180,47 +180,6 @@ def test_a_database_that_does_not_even_fit_this_way_is_refused():
         assert "fit" in str(complaint)
     else:
         raise AssertionError("a database too big for this layout was allowed")
-
-
-@needs_tools
-def test_the_music_goes_up_under_the_island_and_the_loader_carries_it():
-    """A low build may have music, which the interpreter's own place forbade
-    for a long time: the music used to live at $0300 and that is where the
-    interpreter is in a build of this shape.
-
-    It goes to the other end instead, into the five kilobytes under the
-    island, so what it costs comes off the end of the database rather than out
-    of the room the interpreter has to grow into.  Above the interpreter was
-    tried first and left a hundred and eighty three bytes between the two.
-    See the map at the top of z80/cpc/game.asm."""
-    assert CPC_LOW_MUSIC_AT < CPC_LOW_ISLAND_AT, (
-        "the music would land on the island"
-    )
-    assert low_room(b"tune") < low_room() == CPC_LOW_ROOM, (
-        "the database was not told that the music is now above it"
-    )
-
-    lines = low_loader("!", None, "!")
-    for number in (22, 24):
-        assert bytes([number, 0]) in lines, (
-            f"no line {number} in the loader: the music is never brought in"
-        )
-    assert bytes([0x1C]) + MUSIC_LOADS_AT.to_bytes(2, "little") in lines, (
-        "the loader never calls the mover that carries the music up"
-    )
-    # And it is asked for before the database is loaded over $4000, which is
-    # where both movers read from.
-    assert lines.index(bytes([24, 0])) < lines.index(bytes([50, 0]))
-
-    # The database that fits is smaller by exactly what the music was given.
-    tape = cpc_low_tape(b"code", bytes(low_room(b"tune")), music=b"tune")
-    assert tape
-    try:
-        cpc_low_tape(b"code", bytes(low_room(b"tune") + 1), music=b"tune")
-    except ValueError as complaint:
-        assert "music" in str(complaint)
-    else:
-        raise AssertionError("a database that reaches the music was allowed")
 
 
 @is_slow

@@ -504,6 +504,19 @@ class Session:
                 return True
         return False
 
+    def wait_for_change(self, address, was, timeout=20.0, every=0.05):
+        """The other way round from `wait_for`: run until a byte stops being
+        what it was, and say whether it did.  What it is for is proving that
+        something is still running rather than waiting for it to arrive at an
+        answer -- put a value of one's own where the machine writes every time
+        round its loop, and the loop itself takes it away."""
+        deadline = time.time() + longer(timeout)
+        while time.time() < deadline:
+            time.sleep(every)
+            if self.pc() and self.read(address, 1)[0] != was:
+                return True
+        return False
+
     # Where each key sits in the Spectrum matrix: which half row, which bit.
     KEY_MATRIX = {}
     for _row, _keys in enumerate([

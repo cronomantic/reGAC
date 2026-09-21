@@ -76,8 +76,7 @@ lámina. El cambio dura hasta el siguiente, no hasta el final del mensaje.
 | `/LOW`   | Condiciones de baja prioridad                               |
 | `/GFX`   | Gráficos vectoriales                                        |
 | `/FONT`  | Fuente redefinida                                           |
-| `/MUSIC` | Las melodías que tiene la aventura                          |
-| `/SOUND` | Los ruidos que pide, donde no hay chip que toque los del tracker |
+| `/SOUND` | Los ruidos que pide                                         |
 
 ### `/CTL`
 
@@ -139,28 +138,6 @@ identificador. El tipo es `verb`, `noun` o `adverb`.
 En `/CONN` la dirección es un verbo, igual que en GAC, y se escribe con la
 palabra en lugar del número.
 
-### `/MUSIC`
-
-Una melodía por línea, en el orden en que `MUSIC` las cuenta desde cero: el
-fichero que exportó el tracker y qué subcanción tocar de él, que es la cero si
-no se dice otra cosa.
-
-    /MUSIC
-    menu.akm.asm     0
-    menu.akm.asm     1
-    cueva.akm.asm
-
-El fichero es relativo al fuente y no se lee aquí: es ensamblador, y quien lo
-lee es el ensamblador. También vale nombrar el `.aks` del propio tracker, y
-entonces la construcción lo exporta antes —con el exportador de Arkos Tracker,
-que se busca en `tools/` o se dice en el proyecto con `music-tool`—; si no está,
-la construcción lo dice y explica qué hacer en vez de pasarle al ensamblador un
-fichero que no sabe leer. `regac build --music-defs music/tunes.asm` escribe el
-fuentecillo que los incluye a todos con la forma que cada máquina necesita —la
-lista por un lado y las melodías por otro, cada una en su `MODULE` y ensamblada
-para el buffer—, y un fichero nombrado dos veces se incluye una sola vez y se
-apunta dos: para eso son las subcanciones.
-
 ### `/SOUND`
 
 Un ruido por línea, en el orden en que `SOUND` los cuenta desde uno:
@@ -176,11 +153,10 @@ los **pasos** son cuántas veces se repite, y el **paso** es lo que se le suma a
 tono en cada uno: un paso que baja el tono sube la nota. Los tres son números
 como cualquier otro, así que valen los nombres de `.def`.
 
-Esto es para las máquinas **sin chip que toque los efectos del tracker**: el
-altavoz de un bit del Spectrum, el Next y el MSX, y el AY del Amstrad cuando la
-versión no lleva música. Donde sí hay reproductor, `SOUND n` toca el efecto n
-del banco que el autor exportó de Arkos y nombró en el proyecto. Una aventura
-que no diga nada aquí se queda con los cinco que trae el intérprete.
+Los hace el altavoz de un bit del Spectrum, el Next y el MSX, y el AY del
+Amstrad, que toca la misma tabla por un puerto. El PCW no tiene con qué, y allí
+`SOUND` no hace nada. Una aventura que no diga nada aquí se queda con los cinco
+que trae el intérprete.
 
 ### `/HIGH`, `/LOW`, `/LOCAL`
 

@@ -80,7 +80,8 @@ def watching():
     listing = emulator.assemble(SOURCE, listing=LISTING)
     where = {
         name: emulator.label_address(listing, name)
-        for name in ("ready_flag", "last_seen", "seen_count", "raw_row")
+        for name in ("ready_flag", "last_seen", "seen_count", "raw_row",
+                     "scan_result")
     }
     with open(BINARY, "rb") as f:
         blob = f.read()
@@ -97,6 +98,16 @@ def watching():
         started = session.start_code(blob, LOADS_AT, where["ready_flag"],
                                      wanted=1, timeout=15.0)
         assert started, "the build never started"
+        # And that the loop is turning, not just that it set its flag once.
+        # The look writes raw_row every time round, so a byte put there that
+        # comes back changed is the loop answering.  Without this the first
+        # key of a test can be sent into a machine that is not yet scanning,
+        # and then it is simply lost -- which is what this file used to fail
+        # on, a different test each run.
+        session.command(f"write-memory {where['raw_row']} 170")
+        assert session.wait_for_change(where["raw_row"], 170, timeout=10.0), (
+            "the build started but never scanned"
+        )
     except BaseException:
         # Whatever goes wrong here, the machine is this function's to close:
         # the caller has not got it yet, and one left running holds the port
@@ -107,27 +118,66 @@ def watching():
 
 
 def pressed(session, where, char, held=0.1):
-    """Press one key and say what the scanning made of it."""
+    """Press one key and say what the scanning made of it.  The key is let go
+    when the scan has seen it and not when a sleep runs out, and the next
+    press does not start until the keyboard has come back to rest: a press
+    that begins while the last one is still down is a different test."""
     session.command(f"write-memory {where['last_seen']} 0")
     code = EVENTS.get(char, ord(char.lower()))
     session.command(f"send-keys-event {code} 1")
-    time.sleep(held)
+    session.wait_for_change(where["last_seen"], 0, timeout=10.0)
+    seen = session.read(where["last_seen"], 1)[0]
     session.command(f"send-keys-event {code} 0")
-    time.sleep(0.05)
-    return chr(session.read(where["last_seen"], 1)[0])
+    session.wait_for(where["scan_result"], 0, timeout=10.0, every=0.05)
+    return chr(seen)
 
 
-def type_them(session, text, hold_for=0.06):
+def machine_frames(session, how_many):
+    """Let the machine run for a number of its own frames.
+
+    Holding a key for a tenth of a second of ours is not holding it for a
+    tenth of a second of the machine's: this emulator does not keep the
+    machine's time, and when the host has other work the same sleep buys
+    fewer cycles.  A key held for less than one look at the keyboard is a key
+    nobody sees, and that is how this file used to lose one -- a different
+    test every run, which looked like the build's fault and was the clock's.
+    So the waiting here is counted in the processor's own cycles."""
+    wanted = FRAME_CYCLES * how_many
+    session.command("reset-tstates-partial")
+    deadline = time.time() + emulator.longer(10.0)
+    while time.time() < deadline:
+        spent = int(session.command("get-tstates-partial").split(NEWLINE)[0].strip())
+        if spent >= wanted:
+            return
+        time.sleep(0.01)
+
+
+def type_them(session, text, hold_frames=4):
     last = None
     for char in text:
         code = EVENTS.get(char, ord(char.lower()))
         if code == last:
             time.sleep(emulator.Session.SAME_KEY_GAP)
         session.command(f"send-keys-event {code} 1")
-        time.sleep(hold_for)
+        machine_frames(session, hold_frames)
         session.command(f"send-keys-event {code} 0")
         last = code
-        time.sleep(hold_for)
+        machine_frames(session, hold_frames)
+
+
+def jumped(session, at, where):
+    """Point the processor at one of the build's other entries and wait until
+    it is really there.  Everything above `read_a_line` in the source is those
+    entries and what they call, and everything below is the loop that watches
+    the keyboard, so a program counter past that address is the jump having
+    landed.  Typing before it lands throws the first keys away."""
+    session.jump(at)
+    deadline = time.time() + emulator.longer(10.0)
+    while time.time() < deadline:
+        if session.pc() >= where:
+            return True
+        time.sleep(0.02)
+    return False
 
 
 @needs_tools
@@ -166,11 +216,12 @@ def test_a_bit_is_high_while_its_key_is_held():
             time.sleep(0.2)
         assert rest == bytes(13), f"something is held with nothing pressed: {rest.hex()}"
         session.command("send-keys-event 97 1")  # the letter A
-        time.sleep(0.1)
-        assert session.read(where["raw_row"], 1)[0] == 0b00100000
+        assert session.wait_for(where["raw_row"], 0b00100000, timeout=10.0,
+                                every=0.05), "the row never showed the key"
         session.command("send-keys-event 97 0")
-        time.sleep(0.1)
-        assert session.read(where["raw_row"], 1)[0] == 0
+        assert session.wait_for(where["raw_row"], 0, timeout=10.0, every=0.05), (
+            "the row never came clear again"
+        )
     finally:
         session.close()
 
@@ -183,8 +234,10 @@ def test_every_key_of_a_word_arrives():
     try:
         session.command(f"write-memory {where['seen_count']} 0")
         type_them(session, "MIRAR")
-        time.sleep(0.3)
-        assert session.read(where["seen_count"], 1)[0] == 5
+        assert session.wait_for(where["seen_count"], 5, timeout=10.0,
+                                every=0.05), (
+            f"{session.read(where['seen_count'], 1)[0]} keys were counted, not 5"
+        )
         assert chr(session.read(where["last_seen"], 1)[0]) == "R"
     finally:
         session.close()
@@ -201,9 +254,12 @@ def test_a_whole_line_is_read_and_shown():
 
     # Three goes at it: a key held while the machine stalls repeats, as it
     # does on the original, so a host busy enough can turn one letter into
-    # two.  What is being tested is the reading of a line, not the emulator's
-    # sense of time, so a line that did not arrive as it was sent is typed
-    # again.
+    # two, or drop one altogether and leave the line never finished.  What is
+    # being tested is the reading of a line, not the emulator's sense of
+    # time, so a line that did not arrive as it was sent is typed again --
+    # and **that includes one that never arrived at all**, which used to
+    # break straight out of this loop and waste the two goes left.
+    length, typed, why = (0,), b"", None
     for attempt in range(3):
         session, where = watching()
         at = {
@@ -212,18 +268,22 @@ def test_a_whole_line_is_read_and_shown():
         }
         try:
             session.command(f"write-memory {at['line_done']} 0")
-            session.jump(at['read_a_line'])
-            time.sleep(0.2)
+            if not jumped(session, at["read_a_line"], at["read_a_line"]):
+                why = "the jump into read_line never landed"
+                continue
             type_them(session, "MIRARX" + chr(8) + chr(13))
-            assert session.wait_for(at["line_done"], 0xFF, timeout=10.0, every=0.2), (
-                "the line was never finished"
-            )
+            if not session.wait_for(at["line_done"], 0xFF, timeout=10.0,
+                                    every=0.2):
+                why = "the line was never finished"
+                continue
+            why = None
             length = session.read(at["line_seen"], 2)
             typed = session.read(at["input_buffer"], length[0])
         finally:
             session.close()
-        if length[0] == 5:
+        if why is None and length[0] == 5:
             break
+    assert why is None, f"{why}, three times over"
 
     with open(os.path.join(ROOT, "snapshots", "megacorp2.json"), encoding="utf-8") as f:
         chars = Database(json.load(f), machine="pcw").store.charset.chars
@@ -239,23 +299,34 @@ def line_typed(steps, machine, events):
 
     from regac.binary import Database
 
-    session, where = watching()
-    at = {
-        name: emulator.label_address(LISTING, name)
-        for name in ("read_a_line", "line_done", "line_seen", "input_buffer")
-    }
-    try:
-        session.command(f"write-memory-raw {at['line_done']} 00")
-        session.jump(at["read_a_line"])
-        time.sleep(0.3)
-        keystrokes.play(session, steps, events)
-        assert session.wait_for(at["line_done"], 0xFF, timeout=10.0, every=0.2), (
-            "the line was never finished"
-        )
-        length = session.read(at["line_seen"], 2)[0]
-        typed = session.read(at["input_buffer"], length)
-    finally:
-        session.close()
+    # Three goes, for the reason the test above gives: what is being tested
+    # is what the reading makes of the keys, not whether a busy host got all
+    # of them into the machine.
+    typed, why = b"", None
+    for attempt in range(3):
+        session, where = watching()
+        at = {
+            name: emulator.label_address(LISTING, name)
+            for name in ("read_a_line", "line_done", "line_seen", "input_buffer")
+        }
+        try:
+            session.command(f"write-memory-raw {at['line_done']} 00")
+            if not jumped(session, at["read_a_line"], at["read_a_line"]):
+                why = "the jump into read_line never landed"
+                continue
+            keystrokes.play(session, steps, events)
+            if not session.wait_for(at["line_done"], 0xFF, timeout=10.0,
+                                    every=0.2):
+                why = "the line was never finished"
+                continue
+            why = None
+            length = session.read(at["line_seen"], 2)[0]
+            typed = session.read(at["input_buffer"], length)
+        finally:
+            session.close()
+        if why is None:
+            break
+    assert why is None, f"{why}, three times over"
 
     with open(os.path.join(ROOT, "snapshots", "megacorp2.json"), encoding="utf-8") as f:
         chars = Database(json.load(f), machine=machine).store.charset.chars
@@ -321,8 +392,9 @@ def test_a_held_key_repeats_in_frames_as_long_as_frames():
           for name in ("read_a_line", "key_repeat")}
     code = EVENTS.get("R", ord("r"))
     try:
-        session.jump(at["read_a_line"])
-        time.sleep(0.3)
+        assert jumped(session, at["read_a_line"], at["read_a_line"]), (
+            "the jump into read_line never landed"
+        )
         session.command(f"send-keys-event {code} 1")
         time.sleep(0.05)
         session.command("reset-tstates-partial")

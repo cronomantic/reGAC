@@ -882,7 +882,7 @@ class GAC_Interpreter:
                 elif cmd == "LOAD":
                     # TODO
                     pass
-                elif cmd in ("MUSIC", "SOUND"):
+                elif cmd == "SOUND":
                     # There is no sound here, but the number they were given
                     # has to come off the stack whether anybody plays it or
                     # not: an adventure has the same shape on every machine,

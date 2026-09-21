@@ -292,9 +292,9 @@ fill_run:
                 ; Laid one at a time.  Eight at a time is a fifth quicker
                 ; on the runs long enough to pay for the splitting, and it was
                 ; written and measured and handed back: it costs forty odd
-                ; bytes, and on this machine the tape build with music ends
-                ; fifty three bytes below the firmware's variables.  If room
-                ; ever turns up, see doc/pendiente.md.
+                ; bytes, and on this machine the tape build had none to spare.
+                ; There is room now that the tune player has gone; see
+                ; doc/pendiente.md.
                 ld      hl, (fill_from)
                 inc     hl
                 ld      a, (fill_byte)

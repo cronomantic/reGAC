@@ -218,14 +218,12 @@ sitio **cuando se dibuja la lámina siguiente**. Medido en el original.
 
 | | |
 |---|---|
-| `MUSIC n` | toca la melodía n |
 | `SOUND n` | hace el ruido n |
 | `QUIET` | silencio |
 
-Estos tres son añadidos de este proyecto, no de GAC. Una construcción sin
-música los lee, se come el argumento y no hace nada más, de modo que **la
-misma aventura vale para todas las máquinas** aunque alguna no tenga con qué
-sonar.
+Estos dos son añadidos de este proyecto, no de GAC. Una máquina que no tenga
+con qué sonar —el PCW— los lee y no hace nada, de modo que **la misma aventura
+vale para todas las máquinas**.
 
 ### Fin del turno y de la partida
 
@@ -386,7 +384,7 @@ contesta a una palabra que no conoce, en qué orden mira las tablas. Lo añadido
 está encima y no cambia lo de debajo:
 
 - **acentos y eñes**, que el original no tenía;
-- **música y ruidos**, con los tres opcodes nuevos;
+- **ruidos**, con `SOUND` y `QUIET`, que son los dos opcodes nuevos;
 - **ocho máquinas**;
 - **un fuente de texto** que se guarda en un control de versiones, en lugar de
   teclear la aventura dentro de la máquina.

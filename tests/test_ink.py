@@ -81,7 +81,7 @@ def test_a_colour_there_is_not_is_refused():
             with_error = str(e)
         assert with_error and "colour" in with_error, bad
     try:
-        expand(r"\music 2")
+        expand(r"\trompeta 2")
     except ValueError as e:
         assert "not a text command" in str(e)
     else:

@@ -23,10 +23,10 @@ compiles.
 
 A source that compiles can still be wrong in the way that matters: it can say
 MESS 99 where there is no message ninety nine, send the player to a room that
-was never written, give an object to a place that is not there, or ask for the
-third tune of an adventure that has two.  None of that stops a build.  All of
-it stops a game, and on a real machine what the player sees is a blank, a
-locked room or silence -- with nothing to say why.
+was never written, give an object to a place that is not there, or make a
+noise the adventure never described.  None of that stops a build.  All of it
+stops a game, and on a real machine what the player sees is a blank, a locked
+room or silence -- with nothing to say why.
 
 So this reads the adventure and follows every number that points at something,
 which is most of them: the opcode table already says what each one means, so
@@ -149,7 +149,6 @@ def follow(problems, where, code, ddb):
         NOUN: set(ddb.get("nouns", {}).values()),
         ADVERB: set(ddb.get("adverbs", {}).values()),
     }
-    tunes = len(ddb.get("music") or [])
     noises = len(ddb.get("sounds") or [])
 
     for op, taken in walked(code):
@@ -178,11 +177,6 @@ def follow(problems, where, code, ddb):
                 problems.append(Problem(
                     where, f"{op.name} {value}, and no word of the vocabulary"
                            f" has that number", fault=False))
-        if op.name == "MUSIC" and taken[0] is not None and taken[0] >= tunes:
-            problems.append(Problem(
-                where,
-                f"MUSIC {taken[0]}, and this adventure has "
-                + (f"{tunes} tunes" if tunes else "no music at all")))
         if op.name == "SOUND" and taken[0] is not None:
             if taken[0] < 1:
                 problems.append(Problem(

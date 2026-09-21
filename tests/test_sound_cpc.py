@@ -22,8 +22,7 @@
 
 This machine has no speaker of one bit, so what every other machine does by
 flipping a port it does by asking the chip for a note -- the same table of
-effects, the same numbers, the same lengths.  A build with music does not use
-any of this: there the effects are the tracker's.
+effects, the same numbers, the same lengths.
 
 What is listened to is the recording the emulator will write of everything it
 plays, because a chip's output cannot be watched at a port the way a flipped

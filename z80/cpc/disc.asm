@@ -19,8 +19,9 @@
 ; after it, the motor at $FA7E -- so every one is spoken to through C.  The
 ; sectors of a data disk are numbered $C1 to $C9.  And the interrupts go off
 ; while it works: in the middle of a sector the controller hands over a byte
-; every thirty two millionths of a second and does not wait, and the tune's
-; three hundred interrupts a second would lose some.
+; every thirty two millionths of a second and does not wait, so anything that
+; interrupted would lose some.  Nothing does -- the interpreter runs with them
+; off -- and this says why they may not come back.
 ;
 ; Unlike the PCW's, this one listens to what the controller says when it is
 ; done.  A disk with its tab over, or a sector that will not read, comes back
@@ -164,9 +165,6 @@ stop_the_motor:
                 ld      bc, FDC_MOTOR
                 xor     a
                 out     (c), a
-                IFDEF WITH_MUSIC
-                ei                              ; the tune's, back
-                ENDIF
                 ret
 
 ; One sector between HL and the track and record the disc_ bytes say, moving

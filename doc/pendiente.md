@@ -1590,213 +1590,63 @@ recursivas, contra el 57% de Huffman y el 84% de las abreviaturas al estilo
 PAW—, ahora entre el 50% y el 55%, y gasta las 128 parejas siempre: lo que la
 limita es el byte y no el texto.
 
-## La música, que ya suena
+## La música, que sonaba y se quitó
 
-Suena en las cuatro máquinas que tienen AY —Spectrum 128, Amstrad, MSX y
-Next—, tocada desde la interrupción mientras el bucle principal no hace nada
-con ella. Lo que se toca es de **Arkos Tracker 3**, que es lo que usa hoy
-cualquiera que componga para estas máquinas, y su reproductor es MIT como todo
-lo de `z80/`.
+**Decisión tomada: fuera el reproductor de Arkos y fuera el opcode `MUSIC`.**
+Los efectos se quedan, con `SOUND` y `QUIET`, y los hace el motor que ya
+teníamos: el altavoz de un bit donde lo hay y el chip de sonido en el Amstrad,
+que no tiene altavoz, **leyendo la misma tabla y con los mismos números**.
 
-**El reproductor viene convertido, no copiado a mano.** Los fuentes de Arkos
-están escritos para RASM y tienen tres cosas que son de RASM y no del Z80:
-las marcas `(void)` de Disark, macros que fabrican etiquetas con su argumento,
-y banderas que se asignan con `=` pero se preguntan con `IFDEF`. `arkos.py`,
-en la raíz junto a `disk.py` y `grab.py`, las quita sin tocar un solo byte de
-lo que ensambla; cuando salga una versión nueva de Arkos se vuelve a pasar. El
-AKM ocupa 1602 bytes y cuesta entre el 4 % y el 5 % de un frame de Spectrum,
-con picos del 7 % en los compases más cargados.
+Lo que se quitó, contado para que se sepa qué había:
 
-**La interrupción, máquina por máquina.** Tres van en modo 2, porque el $0038
-es la rutina de la ROM —o directamente la base de datos, en las máquinas que
-se quedan con toda la memoria—, y el Amstrad se queda en modo 1, porque con
-las dos ROM fuera el $0038 es RAM nuestra. Cada máquina dice dónde caben la
-tabla y la rutina, en la parte de su mapa que no se mueve:
-
-| máquina | tabla | rutina | notas |
-|---|---|---|---|
-| Spectrum 128 | $BE00 | $BDBD | entre el intérprete y la ventana |
-| MSX | $BE00 | $BDBD | en la mitad alta, donde la BIOS no vuelve |
-| Next | $B000 | $B1B1 | encima de la máscara y debajo de la pila |
-| Amstrad | — | modo 1 en $0038 | RAM, con las dos ROM fuera |
-
-Ni la tabla ni la rutina viajan en el fichero. Están en un rincón al que el
-intérprete no llega, y llevarlas allí obligaría a llevar también los kilobytes
-de en medio —un minuto de nada en una cinta—, así que la rutina se ensambla
-donde va a correr, se guarda con el código y se pone en su sitio al encender
-las interrupciones.
-
-**El ritmo es un reloj y no una cuenta.** Una melodía quiere sonar cincuenta
-veces por segundo; el Amstrad interrumpe trescientas, el Spectrum y el Next
-cincuenta, y el MSX las que refresque su televisión: cincuenta en Europa y
-sesenta en Japón y América, y eso no se sabe hasta que arranca. Así que cada
-interrupción suma cincuenta a un reloj y, cuando el reloj tiene tanto como
-interrupciones da la máquina en un segundo, se le resta y se toca. Cincuenta
-entre cincuenta toca siempre, cincuenta entre trescientas una de cada seis, y
-cincuenta entre sesenta cinco de cada seis, repartidas lo mejor que permiten
-las interrupciones enteras. El MSX lee de qué televisión es en el bit 7 del
-$002B **antes** de quedarse con la máquina, que es cuando todavía hay BIOS a
-la que preguntar; la prueba lo compara con lo que dice la ROM del emulador.
-
-**Varias melodías.** El build dice las que tiene en una lista, una línea por
-melodía, y arrancar una es un número y nada más:
-
-    music_tunes:
-            MUSIC_TUNE  menu, 0
-            MUSIC_TUNE  menu, 1
-            MUSIC_TUNE  cueva, 0
-    music_tunes_end:
-
-Una melodía es una dirección y qué subcanción tocar de ella, porque **un export
-de Arkos puede llevar varias subcanciones** y comparten instrumentos y tablas:
-es con mucho la forma más barata de tener más de una. Dos exports distintos
-también valen, sólo que cuestan lo que ocupan. `music_start` recibe el número
-contando desde cero y, si el build no tiene esa melodía, no hace nada —una
-aventura puede nombrar una que se perdió, y leer la dirección que no está sería
-tocar basura—. La cuenta sale sola de la longitud de la lista, así que añadir
-una melodía se hace en un sitio.
-
-Un detalle que costó descubrir: el tracker **nombra las etiquetas de un export
-con el título de la canción**, y una canción sin título se exporta como
-`Untitled`. Dos de esas en un mismo build son la misma etiqueta dos veces y el
-ensamblador para en seco, así que cada melodía va envuelta en su `MODULE`, que
-le pone prefijo a todas, con la etiqueta de la dirección fuera.
-
-**Y los ruidos son del autor en los dos lados.** Con chip, `SOUND n` toca el
-efecto n del banco que exportó del tracker. Sin chip —o con uno que no está
-tocando nada—, toca el n de la sección `/SOUND` de la propia aventura: tono,
-pasos y paso, los mismos tres números que tienen los cinco que trae el
-intérprete, que ahora son un valor por defecto y no una regla. `regac build` lo
-escribe donde el ensamblador lo lee, como hace con las melodías, y de paso
-`regac check` ya puede decir «`SOUND 3` y esta aventura dice tener dos».
-
-**Los efectos de sonido, puestos.** Un efecto de Arkos es un instrumento suelto
-que el reproductor superpone a uno de los tres canales la próxima vez que la
-interrupción lo llama: pedirlo escribe cinco bytes y vuelve, la melodía sigue
-por debajo con un canal menos, y cuando el efecto se acaba el canal vuelve a la
-melodía. Va al canal tercero, porque las melodías de estas máquinas suelen
-llevar la voz en el primero y el bajo en el segundo.
-
-**Ya se pide desde la aventura.** Tres opcodes nuevos, los primeros que no son
-del GAC original —había sitio de sobra: un byte con el bit 7 puesto es un
-número, así que del $40 al $7F estaba libre—:
-
-| opcode | qué hace |
+| | |
 |---|---|
-| `MUSIC n` | toca la melodía n de la lista, contando desde cero |
-| `SOUND n` | hace el efecto n del banco, contando desde uno |
-| `QUIET` | calla la música |
+| el reproductor | 2892 líneas de Z80 de terceros, en `z80/arkos/` |
+| lo nuestro alrededor | `common/music.asm`, `common/im2.asm`, `common/ticker.asm` y las cuatro `interrupt.asm` |
+| pruebas | 16 módulos |
+| herramientas | `arkos.py`, el exportador, `music-tool`, `--music-defs` |
+| del lenguaje | `MUSIC`, el bloque `/MUSIC` y `music-buffer` |
 
-Una versión **sin música** —el PCW, que no tiene chip; un Spectrum de 48K;
-cualquier máquina antes de que el autor componga nada— lee los tres igual, se
-come el argumento y sigue. Eso es lo que permite que una misma aventura se
-compile para cinco máquinas sin escribirla cinco veces, y es la prueba que más
-dolería perder.
+Lo que se queda: `common/beep.asm`, `common/effects.asm`, `cpc/ay.asm` y sus
+tres pruebas. **309 líneas contra 2892.**
 
-**Dónde cabe la música, máquina por máquina.** Esta fue la sorpresa. Encima del
-intérprete no hay sitio en ninguna parte: en el 128 el código, lo residente de
-la base de datos y el rincón de la interrupción llegan juntos a $C000, y de las
-ocho aventuras descompiladas **sólo una** dejaba hueco para reproductor y
-melodía —y por treinta y dos bytes—. Así que cada máquina la pone donde puede:
+**Por qué.** No era fidelidad —el GAC de 1986 no tenía música— sino una
+función añadida, y su coste era continuo: dos vías de sonido en lugar de una,
+un exportador que **nunca se había corrido con su binario de verdad**,
+dieciséis módulos de prueba, páginas y bancos reservados en cuatro máquinas, y
+el clic de tecla del Amstrad atascado precisamente porque el reproductor era
+dueño del AY. Eso último se arregla solo al quitarlo.
 
-| máquina | reproductor y buffer | las melodías | cuánto hay |
-|---|---|---|---|
-| Spectrum 128 | $6000, debajo del intérprete | una página propia, la siguiente a las de la base de datos | 5 KB de buffer |
-| Spectrum +3 | lo mismo | la última de las cuatro que tiene libres | 5 KB de buffer |
-| Next | **$4000**, en la página de lo residente | dos páginas propias, de los cientos que le sobran | 4,7 KB de buffer |
-| Amstrad | **$0300**, debajo de las dos ROM | ahí mismo | 15 KB |
-| MSX | encima del código | ahí mismo | 7,4 KB |
+**Lo que no se tocó a propósito:** el formato binario. Su sección `music` ya
+estaba vacía —las melodías eran fuente de ensamblador, nunca datos— y dos
+bytes de su cabecera quedan siempre a cero. Cambiarlo obligaría a romper la
+versión del formato, y eso merece ir solo y no dentro de este cambio.
 
-Lo del Next es lo más bonito: esta máquina dibuja en layer 2, así que los
-dieciséis kilobytes donde un Spectrum tiene la pantalla están vacíos.
+**Y el hueco del opcode.** `$40` era `MUSIC`. Se deja apuntando a `op_nop` en
+vez de renumerar `SOUND` y `QUIET`, porque renumerar rompería en silencio
+cualquier `.rgac` construido antes: así, una base de datos vieja lee ahí un
+opcode que no hace nada y deja su argumento en la pila, que la condición
+siguiente vacía de todos modos.
 
-**Las melodías en una página, y copiadas al tocarlas.** Una melodía ensamblada
-con el intérprete cuesta su tamaño para siempre, suene o no. En las máquinas
-con bancos ahora viven en una página que no usa nadie más y la que se pide se
-copia a un buffer al arrancarla: una versión paga la melodía más gorda una vez,
-lleve las que lleve, y nada hasta que suene la primera. Lo que lo hace posible
-es que la melodía se **ensambla para el buffer y se guarda donde se guarda**,
-que es para lo que está `DISP` —el mismo truco con el que viaja la rutina de
-la interrupción—. La lista es lo único que se queda residente, porque se lee en
-cualquier momento.
+**Lo que costó quitarlo, apuntado para la próxima.** Los bloques `IFDEF
+WITH_MUSIC` se cortaron con índices sobre el texto, y en
+`spectrum/test_conditions.asm` el corte se llevó por delante el `DEVICE` del
+principio y el `SAVESNA` del final, que estaban en la rama `ELSE` del mismo
+condicional. **El fichero seguía ensamblando** —no escribía nada— y las
+pruebas corrieron contra la instantánea vieja: ocho fallos que no tenían nada
+que ver con el opcode. La comprobación que lo encontró, y que vale la pena
+repetir en cualquier poda de condicionales, es contar las directivas del
+ensamblador antes y después:
 
-**El +3 es el 128 con otro reparto de páginas y otro medio.** +3DOS se queda
-dos de las ocho, así que la página de las melodías sale de las cuatro que la
-base de datos podía usar: una aventura de tres bancos tiene música ahí y una de
-cuatro no, y lo dice el `ASSERT` al construir. Y nada viaja en bloques de cinta:
-el cargador es código máquina —BASIC no sabe paginar— y lo que lee es un solo
-fichero con las piezas seguidas, así que la música son dos piezas más de ese
-fichero **en el orden exacto en que la tabla las pide**. Una pieza fuera de
-orden no es una melodía que suene mal: es un banco de la base de datos cargado
-encima del reproductor.
+    for f in $(git diff --name-only -- 'z80/*.asm'); do
+      for d in DEVICE SAVESNA SAVETAP SAVEBIN ORG ASSERT ENT PAGE SLOT; do
+        a=$(git show HEAD:$f | grep -c "^\s*$d")
+        b=$(grep -c "^\s*$d" $f)
+        [ "$a" != "$b" ] && echo "$f  $d: HEAD=$a ahora=$b"
+      done
+    done
 
-En el 128 las melodías viajan en **un bloque propio**, y en la tabla del
-cargador va *después* del bloque del intérprete y no antes: el propio cargador
-está ahí abajo, dentro de la línea BASIC en la que viajó, y un bloque que fuese
-primero le caería encima de la tabla que todavía está recorriendo. En el Next
-van en un banco nombrado en el `.nex` —un banco que nadie nombra es un banco
-que el fichero no lleva, y lo que sale de eso es un reproductor leyendo un
-buffer lleno de ceros—.
-
-**El Amstrad, que era el que no cabía**, se arregló con veinte instrucciones. La
-música no se puede cargar donde va a vivir: vive debajo de $4000 y la línea
-BASIC que carga el juego está en el $0170. Así que viaja como **fichero aparte
-con un movedor delante**: el cargador la trae al $4000, donde todavía no hay
-nada, la llama, y esas veinte instrucciones la bajan al $0300 —a salvo de la
-línea BASIC— y vuelven. Después se carga el intérprete encima y arranca, y se
-la encuentra puesta. De ser la máquina más apretada pasa a ser la que más sitio
-tiene para melodías: quince kilobytes que no quiere nadie.
-
-**Tres decisiones tomadas**, por si se vuelven a discutir:
-
-- **`MUSIC n` arranca esa melodía siempre**, aunque ya esté sonando. Es lo
-  simple y lo predecible; una aventura que no quiera cortarla se guarda una
-  bandera, que es lo que ya hace para todo lo demás.
-- **La partida guarda qué sonaba**, porque la música es del juego y no de la
-  máquina: un byte junto a las banderas y los contadores —cero si silencio, y
-  si no la melodía más uno—, el mismo byte en todas las versiones, con música o
-  sin ella, para que una partida tenga la misma forma en todas partes. `LOAD`
-  lo obedece; si la carga falla, vuelve lo que sonaba antes.
-- **Lo del autor es una línea por melodía y `regac make`.** La aventura dice
-  las suyas en `/MUSIC`, el proyecto dice cuál es el banco de efectos, y de ahí
-  en adelante no hay que escribir ensamblador ni pasar opciones.
-
-**Lo que falta:**
-
-- **El PCW no entra en nada de esto**: no tiene AY, sólo un zumbador. Sí
-  existió periférico —el de DK'tronics, que era mando y sonido, y del que
-  nuestro emulador emula el mando y no el sonido—, así que hoy no hay manera
-  de probar aquí nada que se escribiera para él. Si algún día se quiere: el
-  reproductor ya sabe hablarle a un AY, o sea que sería decirle los dos
-  puertos, montarle la interrupción a esta máquina —que no la tiene— y buscar
-  sitio en su mapa.
-- **La sección `music` del formato binario sigue vacía.** Hoy las melodías son
-  fuente de ensamblador y las coloca el ensamblador, que es quien puede; la
-  sección queda para el día en que una melodía sea dato y no fuente.
-- **El exportador de Arkos no lo hemos probado de verdad.** El gancho está
-  —`music-tool`, o `SongToAkm` en `tools/`— y se prueba con un doble, pero
-  nadie ha corrido aquí el binario real ni ha comprobado que sus argumentos
-  sean `entrada salida`. Si no lo son, se dice en `music-tool` y ya está.
-
-**Dos cosas que la música se lleva por delante, ya resueltas.** Grabar y cargar
-la callan y la vuelven a poner alrededor de la cinta —el temporizado de un byte
-se cuenta en ciclos y una interrupción en mitad de uno es un byte perdido—, y
-en el Amstrad el barrido del teclado lleva las interrupciones quitadas mientras
-dura, porque el AY está detrás del mismo 8255 y una interrupción en mitad del
-baile deja el chip apuntando al registro de otro. Son treinta microsegundos; la
-música no se entera.
-
-**Y el autor no escribe ensamblador.** La aventura dice qué música tiene en su
-propio fuente, en una sección `/MUSIC`, una línea por melodía: el fichero que
-exportó del tracker y qué subcanción tocar de él. `regac build --music-defs
-music/tunes.asm` escribe el fuentecillo que el ensamblador incluye, con la
-lista por un lado y las melodías por otro, cada una en su `MODULE` y ensamblada
-para el buffer; un fichero nombrado dos veces se incluye una vez y se apunta
-dos, que es para lo que están las subcanciones.
-
-Las melodías no están en el repositorio, que no son nuestras: las pruebas piden
-una en `music/` y se apartan si no hay. Una versión con música se ensambla con
-`-DWITH_MUSIC`, y con efectos además con `-DWITH_EFFECTS`.
+Y luego mirar una por una las que bajaron: unas son la música y otras no.
 
 ## El zumbador, y el clic que hacía el original
 
@@ -1865,11 +1715,12 @@ es inevitable: son sonidos distintos hechos con cosas distintas.
   baile del 8255 que ya hacía el teclado, y lee **la misma tabla** que el
   motor de un bit —las notas, las duraciones y los números son de la aventura y
   no de la máquina—: un tono de la tabla es medio periodo del chip, así que
-  `SOUND 2` suena a lo mismo aquí. Una versión con música no lo usa, que ahí
-  los efectos son del tracker.
-- **El clic con música puesta.** En el Spectrum y el MSX el altavoz es otro
-  aparato y no molesta al AY, así que suenan a la vez sin más. En el Amstrad
-  no podría ser, que es el mismo chip.
+  `SOUND 2` suena a lo mismo aquí.
+- **El clic de tecla del Amstrad**, que queda pendiente y ahora es fácil:
+  nadie disputa el AY. El chip es del intérprete de cabo a rabo, el teclado ya
+  habla con el 8255 y `ay.asm` ya sabe pedir una nota, así que el clic es
+  pedir la de PIP y callar. Lo que hay que decidir es si va siempre o sólo
+  cuando la aventura pide ruidos, porque `ay.asm` sólo viaja con `NOISES`.
 
 ## El color de la letra, que ya se cambia
 

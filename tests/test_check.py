@@ -22,7 +22,7 @@
 
 `MESS 99` compiles perfectly whether or not there is a message ninety nine.
 So does a way out to a room nobody wrote, an object that starts in a place
-that is not there, or the third tune of an adventure with two.  What the
+that is not there, or a noise the adventure never described.  What the
 player gets is a blank, a locked room or silence, with nothing to say why --
 and that is what this looks for.
 
@@ -139,18 +139,6 @@ def test_a_picture_that_is_not_there():
     ddb = of()
     ddb["gfx"] = {"1": [["CALL", 5]]}
     assert any("calls picture 5" in s for s in faults(ddb))
-
-
-def test_a_tune_the_adventure_has_not_got():
-    ddb = of(["MUSIC 2 END"])
-    ddb["music"] = [{"file": "una.asm", "subsong": 0}]
-    assert any("MUSIC 2" in s and "1 tunes" in s for s in faults(ddb))
-    ddb["music"] = [{"file": "una.asm", "subsong": 0},
-                    {"file": "otra.asm", "subsong": 0},
-                    {"file": "tercera.asm", "subsong": 0}]
-    assert not faults(ddb)
-    # And an adventure with no music at all saying MUSIC anything.
-    assert any("no music at all" in s for s in faults(of(["MUSIC 0 END"])))
 
 
 def test_a_noise_the_adventure_has_not_got():

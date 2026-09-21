@@ -73,7 +73,7 @@ def test_the_interpreter_here_knows_every_opcode():
 
     It is a big chain of names, so an opcode nobody added to it falls through
     to the end and prints INVALID OPCODE in the middle of somebody's
-    adventure -- which is what MUSIC and SOUND did until this was written.
+    adventure -- which is what SOUND did until this was written.
     The two that do nothing anywhere are the two the original left empty.
     """
     with open(os.path.join(ROOT, "runGAC.py"), encoding="utf-8") as f:

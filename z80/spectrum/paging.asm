@@ -47,30 +47,3 @@ db_page:
 
 db_paged:       db      $FF             ; nothing has been asked for yet
 
-                IFDEF MUSIC_PAGED
-; The page the tunes live in, into the window and out again.
-;
-; Whatever was in the window comes back afterwards, because the interpreter
-; keeps a pointer into it -- the text or the pictures, whichever asked last --
-; and would go on reading from where it thought it was.  db_paged is what it
-; thought, so putting that back is the whole of it.
-; Corrupts: AF
-music_store_in:
-                push    bc
-                ld      a, MUSIC_PAGE | PAGE_FIXED
-                ld      bc, PAGE_PORT
-                out     (c), a
-                pop     bc
-                ret
-
-music_store_out:
-                push    bc
-                ld      a, (db_paged)
-                cp      $FF
-                jr      z, .never_asked         ; nothing to put back
-                ld      bc, PAGE_PORT
-                out     (c), a
-.never_asked:
-                pop     bc
-                ret
-                ENDIF

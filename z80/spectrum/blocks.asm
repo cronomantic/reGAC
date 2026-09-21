@@ -20,23 +20,6 @@ load_table:
                 IFDEF BANKED
                 db      2               ; the interpreter's own page, always in
                 ENDIF
-                IFDEF WITH_MUSIC
-                ; The music, which lives below the interpreter.  It comes
-                ; after it and not before, because the loader itself is down
-                ; there in the BASIC line it travelled in and the block would
-                ; land on top of it while it was still walking this table.
-                dw      MUSIC_AT
-                dw      MUSIC_BYTES
-                IFDEF BANKED
-                db      5               ; the page $6000 is always in
-                ENDIF
-                IFDEF MUSIC_PAGED
-                ; and the tunes, which live in a page of their own
-                dw      DB_WINDOW
-                dw      MUSIC_STORE_BYTES
-                db      MUSIC_PAGE
-                ENDIF
-                ENDIF
                 IFDEF BANKED
                 IF DB_BANK_COUNT > 0
                 dw      DB_WINDOW

@@ -239,19 +239,6 @@ están en [`gac.md`](gac.md).
 
 Entera, con `file`, o letra a letra.
 
-### `/MUSIC` — las melodías
-
-Una por línea, en el orden en que `MUSIC` las cuenta **desde cero**: el fichero
-que exportó el tracker y qué subcanción tocar, que es la cero si no se dice.
-
-    /MUSIC
-    menu.akm.asm     0
-    menu.akm.asm     1
-    cueva.akm.asm
-
-La ruta es relativa al fuente. También vale nombrar el `.aks` del propio Arkos
-Tracker, y entonces la construcción lo exporta antes.
-
 ### `/SOUND` — los ruidos
 
 Uno por línea, en el orden en que `SOUND` los cuenta **desde uno**:
@@ -263,9 +250,11 @@ Uno por línea, en el orden en que `SOUND` los cuenta **desde uno**:
 
 El **tono** es lo que dura medio ciclo —más grande, nota más grave—, los
 **pasos** son cuántas veces se repite y el **paso** lo que se suma al tono en
-cada uno. Es para las máquinas sin chip que toque los efectos del tracker.
-Donde sí lo hay, `SOUND n` toca el efecto n del banco exportado de Arkos. Una
-aventura que no diga nada aquí se queda con los cinco que trae el intérprete.
+cada uno. Suenan por el altavoz de un bit donde lo hay, y por el chip de
+sonido en el Amstrad, que no tiene altavoz — **la misma tabla y los mismos
+números en las dos**. Una aventura que no diga nada aquí se queda con los
+cinco que trae el intérprete, y el PCW, que no tiene con qué sonar, lee la
+orden y sigue.
 
 ---
 
@@ -317,7 +306,8 @@ máquina y escribe lo que dejó en memoria.
 
 ## 9. Las máquinas, y lo que cada una tiene de suyo
 
-- **Spectrum 48 y 128.** El 128 guarda la música en una página propia.
+- **Spectrum 48 y 128.** El 128 reparte el texto y las láminas en páginas
+  propias, y así le caben aventuras que no caben en el 48.
 - **Spectrum +3.** Disco, con el cargador en el menú de la máquina.
 - **Amstrad CPC 464.** El más justo: sin bancos, y la base de datos en un
   trozo seguido. Si una aventura no cabe de la manera normal, `regac` **la

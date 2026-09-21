@@ -207,119 +207,6 @@ SCREEN_BYTES = {"cpc464": 0x4000, "cpc6128": 0x4000, "plus3": 6912,
                 "pcw": PCW_SCREEN_BYTES, "msx": MSX_SCREEN_BYTES}
 
 
-# What Arkos Tracker's own exporter is called, for an author who would rather
-# name their tracker's file than export it by hand.  It is looked for in
-# tools/, where this project keeps the things it did not write -- the
-# assembler and the emulator are there too -- and a project may name another
-# command instead.
-AKS_EXPORTER = "SongToAkm"
-
-
-def exporter(root, tree, named=None):
-    """The command that turns a tracker's own file into assembly, or None."""
-    if named:
-        return shlex.split(named)
-    for folder in (os.path.join(root, "tools"), os.path.join(tree, "tools")):
-        for suffix in (".exe", ""):
-            path = os.path.join(folder, AKS_EXPORTER + suffix)
-            if os.path.exists(path):
-                return [path]
-    return None
-
-
-def exported(name, folder, out, tool):
-    """Where the assembly for one tune is.
-
-    A file the tracker has already exported is used where it stands.  The
-    tracker's own file is converted first, which is the whole of what an
-    author has to do by hand otherwise, and needs Arkos Tracker's exporter:
-    without it the build says so and says what to do instead, rather than
-    failing somewhere further on with a file the assembler cannot read.
-    """
-    if not name.lower().endswith(".aks"):
-        return os.path.join(folder, name)
-    if tool is None:
-        raise ProjectError(
-            f"{name} is a tracker's own file, and turning one into assembly "
-            f"needs Arkos Tracker's exporter: put {AKS_EXPORTER} in tools/, or "
-            f"say music-tool in the project, or export the song from the "
-            f"tracker yourself and name the .asm in /MUSIC"
-        )
-    made = os.path.join(out, os.path.splitext(os.path.basename(name))[0] + ".asm")
-    done = subprocess.run(tool + [os.path.join(folder, name), made],
-                          capture_output=True, text=True)
-    if done.returncode or not os.path.exists(made):
-        raise ProjectError(
-            f"{' '.join(tool)} could not export {name}:\n"
-            + (done.stderr or done.stdout).strip()
-        )
-    return made
-
-
-def music_source(tunes, folder, out, tool=None):
-    """The little source that says what tunes a build has, written from the
-    adventure's own /MUSIC.
-
-    It comes in two halves because the two live in different places: the list
-    is read at any moment and stays with the player, and the tunes themselves
-    go wherever that machine has room -- a page of their own, or under $4000,
-    or beside the player on a machine with memory to spare.  The build says
-    which half it wants where.
-
-    A file named twice is included once and pointed at twice, because that is
-    what subsongs are for: two tunes out of one export share its instruments
-    and cost a few hundred bytes instead of a few thousand.
-    """
-    where = os.path.dirname(os.path.abspath(out))
-    labels, seen = [], {}
-    for tune in tunes:
-        name = tune["file"]
-        if name not in seen:
-            seen[name] = (f"tune_{len(seen)}",
-                          exported(name, folder, where, tool))
-        labels.append(seen[name][0])
-
-    lines = [
-        "; Written by regac build from the adventure's own /MUSIC.  Run it",
-        "; again rather than editing this: what it does and why is in",
-        "; doc/pendiente.md and in z80/common/music.asm.",
-        "",
-        "                IFDEF MUSIC_LIST",
-        "music_tunes:",
-    ]
-    for label, tune in zip(labels, tunes):
-        lines.append(f"                MUSIC_TUNE {label}, {label}_end,"
-                     f" {tune.get('subsong', 0)}")
-    lines += ["music_tunes_end:", "                ENDIF", "",
-              "                IFDEF MUSIC_STORE"]
-    for label, whole in seen.values():
-        try:
-            path = os.path.relpath(whole, where)
-        except ValueError:      # different drives, so nothing relative to say
-            path = whole
-        path = path.replace("\\", "/")
-        lines += [
-            f"{label}:",
-            "                IFDEF MUSIC_PAGED",
-            "                DISP    music_buffer",
-            "                ENDIF",
-            # The tracker names an export's labels after the song, and a song
-            # nobody named is exported as Untitled: two of those in one build
-            # would be the same label twice.
-            f"                MODULE  {label}_song",
-            f'                include "{path}"',
-            "                ENDMODULE",
-            "                IFDEF MUSIC_PAGED",
-            "                ENT",
-            "                ENDIF",
-            f"{label}_end:",
-        ]
-    lines += ["                ENDIF", ""]
-    with open(out, "w", encoding="utf-8") as f:
-        f.write("\n".join(lines))
-    return seen
-
-
 def noises_source(noises, out):
     """The three bytes a noise is, written where the interpreter reads them.
 
@@ -344,31 +231,15 @@ def cmd_build(args):
         ddb,
         machine=args.machine,
         page_bits=BANK_SIZES[args.banks],
-        music_buffer=args.music_buffer,
     )
     image = database.build()
     with open(args.output, "wb") as f:
         f.write(image)
     noises = ddb.get("sounds") or []
-    if noises and args.music_defs:
-        # Beside the tunes, because they are the same kind of thing: what the
-        # adventure asks for, written where the assembler looks.
-        where = os.path.join(os.path.dirname(os.path.abspath(args.music_defs)),
-                             "noises.asm")
-        noises_source(noises, where)
-        print(f"{args.input} -> {where}")
+    if noises and args.noises:
+        noises_source(noises, args.noises)
+        print(f"{args.input} -> {args.noises}")
         print(f"  noises      {len(noises)}")
-    tunes = ddb.get("music") or []
-    if args.music_defs:
-        root = os.path.dirname(os.path.abspath(args.input))
-        tree = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        try:
-            songs = music_source(tunes, root, args.music_defs,
-                                 exporter(root, tree, args.music_tool))
-        except ProjectError as e:
-            sys.exit(f"ERROR: {e}")
-        print(f"{args.input} -> {args.music_defs}")
-        print(f"  tunes       {len(tunes)}, out of {len(songs)} exported")
     if args.defs:
         # What an assembler needs to cut the image up: where the banks start
         # and how many there are.  Which of the machine's own pages they go
@@ -397,7 +268,7 @@ def cmd_build(args):
 
 
 def write_media(machine, code, where, name, load, entry, screen=None,
-                boot=None, banks=None, database=None, music=None):
+                boot=None, banks=None, database=None):
     """Put an assembled interpreter on the medium its machine loads from, and
     say what was written and how a person starts it."""
     written = []
@@ -432,11 +303,9 @@ def write_media(machine, code, where, name, load, entry, screen=None,
         path = os.path.join(where, name.lower() + ".dsk")
         with open(path, "wb") as f:
             f.write(cpc6128_disk(code, resident, banks or [], name, screen,
-                                 music))
+                                 ))
         written.append(path)
         how = f'RUN"{name}" on the disk, with {len(banks or [])} banks behind it'
-        if music:
-            how += f", and {len(music)} bytes of music"
     elif machine == "cpc464":
         # A tape and sixty four kilobytes: the loader is in BASIC, and what
         # it runs is whatever comes first, so RUN and nothing else.
@@ -447,25 +316,22 @@ def write_media(machine, code, where, name, load, entry, screen=None,
                 # above $4000: the interpreter is carried under it and the
                 # database is a file of its own.
                 f.write(cpc_low_tape(code, database or b"", name, screen,
-                                     music))
+                                     ))
             else:
-                f.write(cpc_tape(code, name, load, entry, screen, music))
+                f.write(cpc_tape(code, name, load, entry, screen))
         written.append(path)
         how = 'RUN"" on the tape'
         if entry == CPC_LOW_CODE_AT:
             how += ", with the interpreter under the database"
-        if music:
-            how += f", with {len(music)} bytes of music in front of it"
     else:
         path = os.path.join(where, name.lower() + ".dsk")
         with open(path, "wb") as f:
             if boot is not None:
                 # A banked one: the loader is machine code, because paging is
                 # not something BASIC can do, and the database follows the
-                # interpreter in one file -- with the music between them, when
-                # there is any, because that is where its table asks for it.
+                # interpreter in one file.
                 f.write(plus3_banked_disk(boot, code, banks or [], screen,
-                                          music or ()))
+                                          ))
                 how = f"the Loader entry of its menu, and {len(banks or [])} banks"
             else:
                 f.write(plus3_disk(code, load, screen))
@@ -494,10 +360,6 @@ def cmd_release(args):
         if len(screen) != wanted:
             sys.exit(f"ERROR: a {args.machine} screen is {wanted} bytes and "
                      f"{args.screen} is {len(screen)}")
-    music = None
-    if args.music:
-        with open(args.music, "rb") as f:
-            music = f.read()
     boot = banks = database = None
     if args.boot:
         with open(args.boot, "rb") as f:
@@ -508,17 +370,17 @@ def cmd_release(args):
         banks = banks_of(database)
     written, how = write_media(args.machine, code, args.output, name, load,
                                args.entry or load, screen, boot, banks,
-                               database, music)
+                               database)
     print(f"{args.input} -> " + ", ".join(written))
     print(f"  loads at    ${load:04X}, {len(code)} bytes")
     print(f"  starts with {how}")
 
 
-def write_database(ddb, path, machine, banks, music_buffer=0, defs=None):
+def write_database(ddb, path, machine, banks, defs=None):
     """The binary database one machine reads, and the include an assembler
     needs to cut it up."""
     database = Database(ddb, machine=machine, page_bits=BANK_SIZES[banks],
-                        music_buffer=music_buffer)
+                        )
     with open(path, "wb") as f:
         f.write(database.build())
     if defs:
@@ -585,44 +447,27 @@ def cmd_make(args):
             except SourceError as e:
                 sys.exit(f"ERROR: {e}")
         try:
-            music = make_music(ddb, root, tree, project.get("effects"),
-                               project.get("music-tool"))
+            noises = make_noises(ddb, tree)
             written = make_one(TARGETS[which], settings, ddb, name, root, output,
-                               tree, music)
+                               tree, noises)
         except ProjectError as e:
             sys.exit(f"ERROR: {which}: {e}")
         print(f"{which:12} -> " + ", ".join(
             os.path.relpath(path, output) for path in written))
 
 
-def make_music(ddb, root, where_regac_is, effects=None, tool=None):
-    """Put what the adventure says about its music where the assembler looks.
-
-    The author's part is a line a tune in the adventure's own /MUSIC and the
-    files the tracker exported; the rest is written here.  Nothing is copied
-    but the bank of effects, which is small and has a fixed name in the
-    builds: the tunes stay where the author keeps them and are named by path.
-    """
-    tunes = ddb.get("music") or []
+def make_noises(ddb, where_regac_is):
+    """Put what the adventure says about its noises where the assembler
+    looks.  There is no music to put: the tracker player was taken out, and
+    a noise of one's own is not music -- it is played by the speaker, or by
+    the sound chip with nothing else going on."""
     noises = ddb.get("sounds") or []
-    folder = os.path.join(where_regac_is, "music")
-    if noises:
-        os.makedirs(folder, exist_ok=True)
-        noises_source(noises, os.path.join(folder, "noises.asm"))
-    if not tunes:
-        # Noises of one's own are not music: they are played by the speaker,
-        # or by the sound chip with nothing else going on, so they go in
-        # whether or not there is a tune.
-        return ["WITH_OWN_NOISES"] if noises else []
+    if not noises:
+        return []
+    folder = os.path.join(where_regac_is, "music")  # where the assembler looks
     os.makedirs(folder, exist_ok=True)
-    music_source(tunes, root, os.path.join(folder, "tunes.asm"),
-                 exporter(root, where_regac_is, tool))
-    defines = ["WITH_MUSIC"] + (["WITH_OWN_NOISES"] if noises else [])
-    if effects:
-        shutil.copyfile(os.path.join(root, effects),
-                        os.path.join(folder, "effects.asm"))
-        defines.append("WITH_EFFECTS")
-    return defines
+    noises_source(noises, os.path.join(folder, "noises.asm"))
+    return ["WITH_OWN_NOISES"]
 
 
 def makes_a_noise(ddb):
@@ -631,7 +476,7 @@ def makes_a_noise(ddb):
     The interpreter that can make one costs the Amstrad a hundred and sixty
     three bytes, and that machine counts every one of them.  None of the eight
     adventures of 1986 asks: SOUND and QUIET are opcodes of ours and nothing
-    written then could use them.  The same rule as the music, which the
+    written then could use them.  The same rule as the noises, which the
     project set long ago -- what an adventure does not do does not travel
     with it.
     """
@@ -642,26 +487,19 @@ def makes_a_noise(ddb):
 
 
 def make_one(target, settings, ddb, name, root, output, where_regac_is,
-             music=()):
+             noises=()):
     """One machine, end to end: its database, its interpreter, its medium."""
     tree = os.path.join(where_regac_is, target.folder)
     database = write_database(
         ddb, os.path.join(tree, target.database),
         machine=target.machine,
         banks=settings.get("banks", target.banks),
-        music_buffer=settings.get("music-buffer", 0),
         defs=os.path.join(tree, target.defs) if target.defs else None,
     )
     screen = None
-    # A machine with no sound chip gets no tunes, but noises of the
-    # adventure's own are not tunes: they are played by a speaker, and every
-    # machine but the PCW has one.
-    defines = [word for word in music
-               if target.music is not None or word == "WITH_OWN_NOISES"]
+    defines = list(noises)
     if makes_a_noise(ddb):
         defines.append("NOISES")
-    if music and target.music is None and (ddb.get("music") or []):
-        print(f"  {target.machine:12} carries no music: it is left out")
     if settings.get("screen"):
         screen = screen_for(target, settings["screen"], root)
         if target.screen_when == "assembly":
@@ -711,25 +549,12 @@ def make_one(target, settings, ddb, name, root, output, where_regac_is,
         image = f.read()
     banks = banks_of(image) if target.defs else None
     load = LOADS_AT[target.release]
-    tunes = None
-    if defines and target.music:
-        # A machine whose music does not travel inside the interpreter: the
-        # Amstrad, where it is a file of its own with a mover in front, and
-        # the +3, where it is two more pieces of the one file the loader
-        # reads.  One name or several, in the order they are wanted.
-        names = ([target.music] if isinstance(target.music, str)
-                 else list(target.music))
-        pieces = []
-        for named in names:
-            with open(os.path.join(tree, named), "rb") as f:
-                pieces.append(f.read())
-        tunes = pieces[0] if len(pieces) == 1 else pieces
     if low:
         load = entry = CPC_LOW_CODE_AT
     else:
         entry = load
     written, _ = write_media(target.release, code, where, name, load, entry,
-                             screen, boot, banks, image, tunes)
+                             screen, boot, banks, image)
     return written
 
 
@@ -789,18 +614,9 @@ def main():
         choices=sorted(BANK_SIZES),
         help="size of a memory bank, or none to keep everything resident",
     )
-    p.add_argument("--music-tool",
-                   help="the command that turns a tracker's own file into "
-                        "assembly, if the tunes are named as .aks")
-    p.add_argument("--music-defs",
-                   help="write the source that says what tunes there are, for "
-                        "the assembler to include")
-    p.add_argument(
-        "--music-buffer",
-        type=int,
-        default=0,
-        help="bytes to reserve for the tune being played (see doc/binario.md)",
-    )
+    p.add_argument("--noises",
+                   help="write the source that says what noises there are, "
+                        "for the assembler to include")
     p.add_argument(
         "--defs",
         help="write an assembler include saying where the banks start",
@@ -820,8 +636,6 @@ def main():
     p.add_argument("--database", help="the built database the banks come from")
     p.add_argument("--screen", help="a dump of the machine's screen, to show "
                                     "while the rest loads")
-    p.add_argument("--music", help="the assembled music, for a machine that "
-                                   "loads it as a file of its own")
     p.set_defaults(func=cmd_release)
 
     p = sub.add_parser("make", help="build an adventure for every machine a "

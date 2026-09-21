@@ -83,7 +83,7 @@ El principio.
 
 /HIGH
 .if next
-MUSIC 0 END
+QUIET END
 .end
 LOOK END
 """

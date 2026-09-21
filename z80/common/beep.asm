@@ -65,7 +65,7 @@ beep_click:
                 ld      b, CLICK_FLIPS
                 jr      beep_note
 
-; Effect A, counting from one as the tracker's own effects do.  A number the
+; Effect A, counting from one.  A number the
 ; build has not got makes no noise rather than reading past the table.
 ;
 ; Each is three bytes: the pitch it starts at, how many flips it lasts, and

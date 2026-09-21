@@ -37,16 +37,12 @@ LOOKS_HELD      equ 11                  ; a look with a key held, about 6960
 ; A, which has to be turned round for the read and back again afterwards.
 ; Doing less than this once left it reading somebody else register.
 ;
-; In a build with music the interrupts go off while this lasts.  The music is
-; written to the same chip through the same 8255, so an interrupt half way
-; through this dance would leave the chip pointed at somebody else's register
-; and the row would come back wrong.  It is thirty microseconds; the music
-; does not notice.
+; Nothing may interrupt this dance, because anything else that spoke to the
+; sound chip would leave it pointed at somebody else's register and the row
+; would come back wrong.  The interpreter runs with the interrupts off from
+; the first line of game.asm, so nothing does.
 ; Corrupts: AF, BC
 read_row:
-                IFDEF WITH_MUSIC
-                di
-                ENDIF
                 ld      (row_wanted), a
                 ld      bc, $F782
                 out     (c), c                  ; port A outwards
@@ -69,9 +65,6 @@ read_row:
                 ld      bc, $F782
                 out     (c), c                  ; port A outwards again
                 pop     af
-                IFDEF WITH_MUSIC
-                ei
-                ENDIF
                 ret
 
 row_wanted:     db      0

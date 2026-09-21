@@ -7,8 +7,8 @@
 ;     4  version
 ;     5  machine
 ;     6  page bits
-;     7  music mode
-;     8  music buffer size
+;     7  reserved, nought: it was the music mode
+;     8  reserved, nought: it was the music buffer size
 ;    10  number of banks
 ;    11  number of sections
 ;    12  directory, five bytes a section: bank, offset, size
@@ -27,7 +27,8 @@ SECTION_CONDITIONS  equ 4
 SECTION_TEXT        equ 5
 SECTION_FONT        equ 6
 SECTION_GRAPHICS    equ 7
-SECTION_MUSIC       equ 8
+; Section eight was the music, and nothing writes or reads one now.  The
+; number is left standing so that the sections before it keep theirs.
 
 NO_MESSAGE          equ $FF   ; no message carries that number
 NOT_BANKED          equ $FF   ; the bank of a section that is resident

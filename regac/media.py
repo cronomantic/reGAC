@@ -76,28 +76,18 @@ def quoted(text):
 
 SCREEN_AT = 0xC000              # where an Amstrad keeps what it is showing
 SCREEN_BYTES = 0x4000
-MUSIC_LOADS_AT = 0x4000         # where the music comes in to be moved down
 
 
-def loader(wanted, keep=CODE_AT - 1, entry=CODE_AT, screen=None, music=None):
+def loader(wanted, keep=CODE_AT - 1, entry=CODE_AT, screen=None):
     """The lines: keep out of the memory the interpreter wants, put up the
-    loading screen if there is one, bring the music down under $4000 if there
-    is any, bring the interpreter in and go.  `wanted` is the name to load,
-    which on tape is the shout that means the next file and no fuss about it.
-
-    The music is the odd one.  It cannot be loaded where it is going to live,
-    because where it lives is under $4000 and this very program is down there
-    at $0170; so it comes in at $4000, where nothing is yet, and is called.
-    What answers is twenty instructions in front of it that carry it down and
-    come back, and then $4000 is free again for the interpreter.
+    loading screen if there is one, bring the interpreter in and go.
+    `wanted` is the name to load, which on tape is the shout that means the
+    next file and no fuss about it.
     """
     out = basic_line(10, [MEMORY, SPACE] + list(hex_number(keep)))
     if screen is not None:
         out += basic_line(20, [LOAD, SPACE] + list(quoted(screen))
                           + [ord(",")] + list(hex_number(SCREEN_AT)))
-    if music is not None:
-        out += basic_line(25, [LOAD, SPACE] + list(quoted(music)))
-        out += basic_line(26, [CALL, SPACE] + list(hex_number(MUSIC_LOADS_AT)))
     out += basic_line(30, [LOAD, SPACE] + list(quoted(wanted)))
     out += basic_line(40, [CALL, SPACE] + list(hex_number(entry)))
     return out + bytes(2)
@@ -219,20 +209,19 @@ def plus3_disk(code, load=PLUS3_CODE_AT, screen=None):
     return disk.image()
 
 
-def plus3_banked_disk(boot, code, banks, screen=None, music=()):
+def plus3_banked_disk(boot, code, banks, screen=None):
     """A +3 disk for an adventure whose database lives in banks.
 
     The loader is not BASIC any more -- BASIC cannot page -- so what goes in
     the file the menu runs is the one in loader3.asm, already assembled, with
     its BASIC around it.  The rest is one file with no header: the
-    interpreter, the music if there is any, and then each bank end to end --
+    interpreter and then each bank end to end --
     in the order the loader asks for them, which is the order of the table it
     walks and not any order of ours.
     """
     disk = Disk("plus3")
     disk.add(PLUS3_LOADER, plus3_file(FILE_BASIC, boot, 10, len(boot)))
     pieces = ([bytes(screen)] if screen else []) + [bytes(code)]
-    pieces += [bytes(piece) for piece in music]
     pieces += [bytes(b) for b in banks]
     disk.add(PLUS3_GAME, b"".join(pieces))
     return disk.image()
@@ -339,30 +328,11 @@ CPC_LOW_DATABASE_AT = 0x4000    # and where the database is loaded
 CPC_LOW_ISLAND_AT = 0xAB00      # up to the island, which is the interpreter's
 CPC_LOW_ROOM = CPC_LOW_ISLAND_AT - CPC_LOW_DATABASE_AT
 
-# And when there is music, it goes in the five kilobytes under the island
-# rather than at $0300, because $0300 is where the interpreter is in a build
-# of this shape.  What it costs comes off the end of the database, which even
-# so is left with more than it has the usual way round.  See the map at the
-# top of z80/cpc/game.asm.
-CPC_LOW_MUSIC_ROOM = 0x1400
-CPC_LOW_MUSIC_AT = CPC_LOW_ISLAND_AT - CPC_LOW_MUSIC_ROOM
-
-
-def low_room(music=None):
-    """How much database fits under the island, with the music or without."""
-    return CPC_LOW_ROOM - (CPC_LOW_MUSIC_ROOM if music else 0)
-
-
-def low_loader(wanted, screen=None, music=None):
+def low_loader(wanted, screen=None):
     """The lines for that one: keep BASIC out of everything from $4000 up,
     bring the interpreter in there, call the mover in front of it that carries
     it down to $0400 and comes back, load the database over where it was, and
     go.
-
-    The music, when there is any, comes in the same way and before all of it:
-    its own file at $4000 with its own mover in front, which carries it up
-    under the island instead of down.  It has to be in and moved before the
-    database is loaded over $4000, which is where both movers read from.
 
     What is called at the end is not the interpreter but the starter the mover
     left at the island: with the lower ROM still in, $0400 is ROM and not the
@@ -376,9 +346,6 @@ def low_loader(wanted, screen=None, music=None):
     if screen is not None:
         out += basic_line(20, [LOAD, SPACE] + list(quoted(screen))
                           + [ord(",")] + list(hex_number(SCREEN_AT)))
-    if music is not None:
-        out += basic_line(22, [LOAD, SPACE] + list(quoted(music)))
-        out += basic_line(24, [CALL, SPACE] + list(hex_number(MUSIC_LOADS_AT)))
     out += basic_line(30, [LOAD, SPACE] + list(quoted(wanted)))
     out += basic_line(40, [CALL, SPACE] + list(hex_number(CPC_LOW_DATABASE_AT)))
     out += basic_line(50, [LOAD, SPACE] + list(quoted(wanted)))
@@ -386,42 +353,37 @@ def low_loader(wanted, screen=None, music=None):
     return out + bytes(2)
 
 
-def cpc_low_tape(code, database, name=NAME, screen=None, music=None):
-    """A tape of that shape: the loader, the screen if there is one, the music
-    with its mover in front, the interpreter with its own, and the database as
-    a file of its own."""
-    room = low_room(music)
+def cpc_low_tape(code, database, name=NAME, screen=None):
+    """A tape of that shape: the loader, the screen if there is one, the
+    interpreter with its mover in front, and the database as a file of its
+    own."""
+    room = CPC_LOW_ROOM
     if len(database) > room:
         raise ValueError(
             f"the database is {len(database)} bytes and {room} fit under the "
-            + ("music, which is under the island" if music else "island")
+            + "island"
             + ", even with the interpreter out of the way"
         )
     files = [File(name, low_loader("!", "!" if screen else None,
-                                   "!" if music else None),
+                                   ),
                   kind=BASIC, load=BASIC_AT)]
     if screen:
         files.append(File(name, screen, kind=BINARY, load=SCREEN_AT))
-    if music:
-        files.append(File(name, music, kind=BINARY, load=MUSIC_LOADS_AT))
     files.append(File(name, code, kind=BINARY, load=CPC_LOW_DATABASE_AT))
     files.append(File(name, database, kind=BINARY, load=CPC_LOW_DATABASE_AT))
     return tape(files)
 
 
-def cpc_tape(code, name=NAME, load=CODE_AT, entry=CODE_AT, screen=None,
-             music=None):
+def cpc_tape(code, name=NAME, load=CODE_AT, entry=CODE_AT, screen=None):
     """A tape with the same, which a machine starts with RUN and nothing else
     because what it runs is whatever comes first.  A shouted name means the
     next file along, so the pieces only have to be in the order they are
-    wanted: the loader, the screen, the music and the interpreter."""
+    wanted: the loader, the screen and the interpreter."""
     files = [File(name, loader("!", load - 1, entry,
-                               "!" if screen else None, "!" if music else None),
+                               "!" if screen else None),
                   kind=BASIC, load=BASIC_AT)]
     if screen:
         files.append(File(name, screen, kind=BINARY, load=SCREEN_AT))
-    if music:
-        files.append(File(name, music, kind=BINARY, load=MUSIC_LOADS_AT))
     files.append(File(name, code, kind=BINARY, load=load, entry=entry))
     return tape(files)
 
@@ -449,9 +411,9 @@ CPC6128_SAVE_WHERE = 2          # where in the binary the three bytes go
 CPC6128_SECTOR = 512
 
 
-def cpc6128_loader(binary, resident, banks, screen=None, music=None):
+def cpc6128_loader(binary, resident, banks, screen=None):
     """The lines a 6128 needs, which are the 464's with the paging in the
-    middle: protect the memory, put up the screen, bring the music down, lay
+    middle: protect the memory, put up the screen, lay
     the resident half of the database in the window -- in the bank that is
     there when nothing has been paged, which none of the four ever covers --
     then each bank in turn through the window, put the machine back and go.
@@ -460,9 +422,6 @@ def cpc6128_loader(binary, resident, banks, screen=None, music=None):
     if screen is not None:
         out += basic_line(20, [LOAD, SPACE] + list(quoted(screen))
                           + [ord(",")] + list(hex_number(SCREEN_AT)))
-    if music is not None:
-        out += basic_line(25, [LOAD, SPACE] + list(quoted(music)))
-        out += basic_line(26, [CALL, SPACE] + list(hex_number(MUSIC_LOADS_AT)))
     out += basic_line(30, [LOAD, SPACE] + list(quoted(resident)))
     for number, named in enumerate(banks):
         out += basic_line(40 + number,
@@ -476,7 +435,7 @@ def cpc6128_loader(binary, resident, banks, screen=None, music=None):
     return out + bytes(2)
 
 
-def cpc6128_disk(code, resident, banks, name=NAME, screen=None, music=None):
+def cpc6128_disk(code, resident, banks, name=NAME, screen=None):
     """A disk a 6128 starts with RUN and the name.
 
     Every piece is a file of its own with its own AMSDOS header, which is what
@@ -497,17 +456,14 @@ def cpc6128_disk(code, resident, banks, name=NAME, screen=None, music=None):
     binary = f"{name}.BIN"
     held = f"{name}.RES"
     picture = f"{name}.SCR" if screen else None
-    tunes = f"{name}.MUS" if music else None
     named = [f"{name}.B{n}" for n in range(len(banks))]
     disk = Disk("cpc-data")
     disk.add(f"{name}.BAS",
              amsdos(f"{name}.BAS",
-                    cpc6128_loader(binary, held, named, picture, tunes),
+                    cpc6128_loader(binary, held, named, picture),
                     kind=0, load=BASIC_AT))
     if screen:
         disk.add(picture, amsdos(picture, screen, load=SCREEN_AT))
-    if music:
-        disk.add(tunes, amsdos(tunes, music, load=MUSIC_LOADS_AT))
     disk.add(held, amsdos(held, resident, load=CPC6128_WINDOW))
     for piece, what in zip(named, banks):
         disk.add(piece, amsdos(piece, bytes(what), load=CPC6128_WINDOW))
