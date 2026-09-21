@@ -1339,7 +1339,7 @@ lo que hay veinte bytes más allá, de modo que no depende de una dirección
 fija. De las versiones de Amstrad y de Commodore no se sabe dónde está; si no
 aparece, se queda en `Nothing` y se dice.
 
-### `TEXT` y `PICT`, medidos y sin hacer
+### `TEXT` y `PICT`, medidos y hechos en las cinco
 
 Se escriben en `vm_graphics` y no los lee nadie. Ya está medido qué hacen, y
 resultó más sencillo de lo que parecía.
@@ -1371,15 +1371,15 @@ al modo lámina»: **`TEXT` pone la ventana en cero y dibujar una lámina la
 devuelve a la altura de la lámina**. `PICT` no es más que la bandera que
 permite volver a dibujarlas, que es justo lo que `vm_graphics` ya es.
 
-**Y está hecho a medias, que es lo honesto de contar.** La mitad que es común
-—con `TEXT` no se dibuja lámina— vale en las cinco máquinas: la decide
-`describe_location` mirando `vm_graphics`, que se escribía desde el principio
-y no leía nadie. La otra mitad, la ventana, está ya en las cinco:
+**Y está hecho, las dos mitades y las cinco máquinas.** La mitad común —con
+`TEXT` no se dibuja lámina— la decide `describe_location` mirando
+`vm_graphics`, que antes se escribía y no leía nadie. La otra mitad, la
+ventana, es de cada máquina:
 
 | máquina | la ventana | por qué |
 |---|---|---|
 | Spectrum | **sí** | |
-| MSX | **sí** | |
+| MSX | **sí** | dos bytes, el primer renglón y cuántos se mueven. Le faltaba lo otro: **era la única de las cinco sin prueba**, que es lo mismo que no saberlo. Ya la tiene, `test_textmode_msx.py`, y comprobado que sirve: capando `text_window_all` falla |
 | Amstrad | **sí** | tardó por falta de sitio: el intérprete acababa a 38 bytes de un escalón de página. El escalón se quitó y el texto palabra a palabra devolvió el búfer; la ventana costó 65 bytes |
 | Next | **sí** | tardó por una pared en `$A000` que resultó ser la máscara del relleno: ver «La pared del Next». Costó 54 bytes y cabe debajo de la máscara |
 | PCW | **sí** | sus dos mitades viven en bancos distintos y sólo una está en el mapa; el renglón que cruza de una a otra pasa por un búfer. Costó 49 bytes |

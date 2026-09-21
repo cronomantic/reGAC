@@ -83,7 +83,9 @@ GROUPS = {
     "cpc-text": ["test_keyboard_cpc", "test_tape_cpc", "test_text_cpc"],
     "cpc-sound": ["test_sound_cpc"],
     "cpc-music": ["test_music_cpc"],
-    "msx-game": ["test_game_msx", "test_game_music_msx", "test_tape_msx"],
+    "msx-game": ["test_game_msx", "test_game_music_msx", "test_tape_msx",
+                 # it builds its own adventure over the same files
+                 "test_textmode_msx"],
     "msx-picture": ["test_all_pictures_msx", "test_graphics_msx"],
     "msx-text": ["test_keyboard_msx"],
     "msx-save": ["test_save_msx"],
