@@ -268,6 +268,9 @@ line_ptr:       dw      0
 line_length:    db      0
 input_buffer:   ds      INPUT_MAX
 
-                include "beep.asm"
+; Every MSX has a sound chip, so the speaker of one bit is not used for
+; noises here: it is the better instrument and it leaves the cassette motor
+; and the caps lamp, which share the speaker's port, alone.
+                include "ay.asm"
 
                 include "../common/keys.asm"

@@ -168,6 +168,9 @@ done_flag:      db      0
 ; a byte, so it is 255, and a frame here is five per cent short.
                 DEFINE  NEXT_LOOKS_A_FRAME 255
                 DEFINE  NEXT_LOOKS_HELD 247     ; a look with a key held, 2260
+; This machine has a sound chip, so the noises and the key click go through
+; it rather than through the speaker: see spectrum/keyboard.asm.
+                DEFINE  WITH_AY 1
                 include "../spectrum/keyboard.asm"
                 include "tape.asm"
                 include "draw.asm"

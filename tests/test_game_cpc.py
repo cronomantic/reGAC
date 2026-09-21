@@ -90,13 +90,22 @@ def assembled(defines=()):
 
 
 def build():
+    """The adventure and the interpreter, and **whether it went the other way
+    round**, which the caller has to know: the two are started differently.
+
+    This used to throw that away, and the day the interpreter grew by a
+    hundred bytes megacorp2 -- which had fourteen to spare -- tipped over into
+    the low build and was still started as though it had not.  What the test
+    saw was a blank screen and an interpreter that never asked; what was
+    really happening was the database being run as code, with the processor
+    up in the firmware.  A flag that is returned and not used is a trap."""
     subprocess.run(
         [sys.executable, "-m", "regac", "build", ADVENTURE, DATABASE, "-m", "cpc"],
         cwd=ROOT,
         check=True,
         capture_output=True,
     )
-    return assembled()[0]
+    return assembled()
 
 
 def put(session, blob, at):
@@ -151,7 +160,7 @@ def wait_screen(session, glyphs, wanted, timeout=60.0):
 def test_it_asks_and_answers_on_an_amstrad():
     with open(ADVENTURE, encoding="utf-8") as f:
         ddb = json.load(f)
-    build()
+    _, low = build()
     database = Database(ddb)
     glyphs = glyph_table(database)
     prompt = ddb["messages"]["240"]
@@ -160,7 +169,7 @@ def test_it_asks_and_answers_on_an_amstrad():
     session = emulator.Session(machine="CPC6128")
     try:
         time.sleep(emulator.longer(3.0))
-        start(session)
+        start(session, low)
         # Loading from its tape is the longest wait in the suite, and a
         # machine that is running four emulators at once takes longer
         # still, so this one is given room.

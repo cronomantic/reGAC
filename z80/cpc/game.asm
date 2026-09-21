@@ -106,15 +106,14 @@ done_flag:      db      0
                 include "screen.asm"
                 include "../common/textout.asm"
                 include "keyboard.asm"
-; This machine's only speaker is its sound chip: ay.asm makes the same noises
-; the others make with a bit of a port.  It comes in before the opcodes, which
-; ask whether there is anything here that can make one.  It stays out when the
-; adventure never asks for a noise, which the build says with NOISES and which
-; none of the eight of 1986 does: SOUND and QUIET are opcodes of ours.  A
-; hundred and sixty three bytes on a machine that counts them one by one.
-                IFDEF NOISES
-                include "ay.asm"
-                ENDIF
+; This machine's only speaker is its sound chip, so ay.asm is what clicks and
+; what makes a noise here.  It is not included from this file: it comes in
+; with keyboard.asm above, because the click is the keyboard's business.  What
+; it carries is not all of a piece -- the chip access and one flat note are
+; forty odd bytes and travel always, because the original clicked at every
+; key; the table of effects and the player that walks a pitch are another
+; hundred and four and travel only with -DNOISES, which none of the eight of
+; 1986 needs, since SOUND and QUIET are opcodes of ours.
                 include "tape.asm"
                 include "draw.asm"
                 include "shapes.asm"

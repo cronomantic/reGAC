@@ -153,10 +153,13 @@ los **pasos** son cuántas veces se repite, y el **paso** es lo que se le suma a
 tono en cada uno: un paso que baja el tono sube la nota. Los tres son números
 como cualquier otro, así que valen los nombres de `.def`.
 
-Los hace el altavoz de un bit del Spectrum, el Next y el MSX, y el AY del
-Amstrad, que toca la misma tabla por un puerto. El PCW no tiene con qué, y allí
-`SOUND` no hace nada. Una aventura que no diga nada aquí se queda con los cinco
-que trae el intérprete.
+Los hace **el chip de sonido en las seis máquinas que lo tienen** —128, +3,
+Amstrad, MSX y Next— y el altavoz de un bit en el Spectrum 48, que es la única
+sin chip. Una sola tabla y dos motores: un tono es medio ciclo del altavoz y la
+mitad de eso como periodo del chip, de modo que el mismo número dura lo mismo y
+suena a lo mismo en las siete. El PCW no tiene con qué, y allí `SOUND` no hace
+nada. Una aventura que no diga nada aquí se queda con los cinco que trae el
+intérprete.
 
 ### `/HIGH`, `/LOW`, `/LOCAL`
 

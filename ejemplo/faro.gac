@@ -365,8 +365,9 @@ IF ( VERB VERBO_FIN ) QUIT END
 
 ; -- los ruidos --------------------------------------------------------------
 ;
-; El altavoz de un bit del Spectrum, el Next y el MSX, y el chip del Amstrad,
-; que toca la misma tabla por un puerto. El PCW no tiene con qué sonar.
+; El chip de sonido donde lo hay —128, +3, Amstrad, MSX y Next— y el altavoz
+; de un bit en el Spectrum 48. La misma tabla en los dos. El PCW no tiene con
+; qué sonar.
 ;
 ; tono  pasos  paso
 /SOUND

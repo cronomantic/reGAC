@@ -67,6 +67,9 @@ GROUPS = {
     "spectrum-picture": ["test_all_pictures", "test_graphics_z80"],
     "spectrum-parser": ["test_parser_z80"],
     "spectrum-beep": ["test_beep_z80"],
+    # the three machines that have a chip as well as a speaker, all built the
+    # same way and listened to the same way, so they share a worker
+    "ay-sound": ["test_sound_ay"],
     "spectrum-tape": ["test_save_z80"],
     "cpc-game": [
         "test_game_cpc", "test_low_cpc",

@@ -26,6 +26,10 @@ CLICK_FLIPS     equ 20
 ;
 ; A bigger pitch is a lower note, so a step that takes it down takes the note
 ; up.  All five are between a twentieth and a tenth of a second.
+; The table itself is only in a build that has SOUND to play, which on the
+; Amstrad is a build that asked for it: see common/ay.asm.  The click above is
+; in every build, because the original clicked in every one.
+                IFDEF WITH_NOISES
 beep_effects:
                 IFDEF WITH_OWN_NOISES
                 include "../../music/noises.asm"
@@ -37,3 +41,4 @@ beep_effects:
                 db      60, 200, 0              ; 5: alarm, high and hard
                 ENDIF
 BEEP_SOUNDS     equ ($ - beep_effects) / 3
+                ENDIF

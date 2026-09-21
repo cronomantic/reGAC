@@ -165,14 +165,14 @@ def test_it_reads_a_block_off_a_tape(tmp_path):
 
     session = emulator.Session(extra=["--tape", path])
     try:
-        # Not grown for the company, although everything else here is: this
-        # one has a tape inserted and running, and a tape does not wait for a
-        # machine that is sharing a processor with three others.  Waiting
-        # longer leaves the block already gone past, and then the routine
-        # looks as though it could not read one.  Measured: scaling these
-        # three -- and only these three, never one that just writes -- failed
-        # both rounds of the suite.
-        time.sleep(3.0)
+        # Waited for by looking and not by sleeping, which matters here more
+        # than anywhere: a tape starts rolling when the emulator starts and
+        # does not wait, so every tenth of a second spent not looking is tape
+        # gone past -- and a block that has gone past leaves the ROM waiting
+        # for a leader that is never coming back, which reads as a routine
+        # that could not load one.  $1200 to $16FF is the 48's command loop,
+        # which is where it ends up when it has finished booting.
+        assert session.wait_in(0x1200, 0x16FF), "the ROM never finished booting"
         started(session)
         assert ran(session, where, READING), "nothing ever came off the tape"
         assert session.read(where["carry_seen"], 1)[0] == 1, "it says it did not read"
@@ -200,14 +200,14 @@ def test_what_it_saved_is_what_it_loads(tmp_path):
 
     session = emulator.Session(extra=["--tape", path])
     try:
-        # Not grown for the company, although everything else here is: this
-        # one has a tape inserted and running, and a tape does not wait for a
-        # machine that is sharing a processor with three others.  Waiting
-        # longer leaves the block already gone past, and then the routine
-        # looks as though it could not read one.  Measured: scaling these
-        # three -- and only these three, never one that just writes -- failed
-        # both rounds of the suite.
-        time.sleep(3.0)
+        # Waited for by looking and not by sleeping, which matters here more
+        # than anywhere: a tape starts rolling when the emulator starts and
+        # does not wait, so every tenth of a second spent not looking is tape
+        # gone past -- and a block that has gone past leaves the ROM waiting
+        # for a leader that is never coming back, which reads as a routine
+        # that could not load one.  $1200 to $16FF is the 48's command loop,
+        # which is where it ends up when it has finished booting.
+        assert session.wait_in(0x1200, 0x16FF), "the ROM never finished booting"
         started(session)
         assert ran(session, where, READING), "nothing ever came off the tape"
         assert session.read(where["carry_seen"], 1)[0] == 1, "it says it did not read"

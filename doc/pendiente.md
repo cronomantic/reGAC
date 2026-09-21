@@ -1670,6 +1670,12 @@ tocar, así que cada máquina dice tres cosas: `BEEP_BIT`, `BEEP_BASE` y
 | Amstrad | no tiene: el sonido es el AY | — |
 | PCW | tiene zumbador, pero no sabemos aún cómo se toca | — |
 
+De esa tabla **sólo queda en uso la primera fila, y sólo en el 48**: donde hay
+chip suena el chip, que es `common/ay.asm`. El altavoz del MSX estuvo escrito
+y funcionando en `z80/msx/beep.asm`, y se quitó al pasar esa máquina al PSG;
+la fila se queda aquí porque el bit y lo que comparte son lo que costaba
+averiguar, y el fichero está en el historial si alguna vez hiciera falta.
+
 Como el puerto del Spectrum no se puede leer, el borde que se puso la última
 vez se guarda en `gfx_border` y sale otra vez con cada vuelta del altavoz; si
 no, un clic dejaría el borde negro.
@@ -1716,11 +1722,117 @@ es inevitable: son sonidos distintos hechos con cosas distintas.
   motor de un bit —las notas, las duraciones y los números son de la aventura y
   no de la máquina—: un tono de la tabla es medio periodo del chip, así que
   `SOUND 2` suena a lo mismo aquí.
-- **El clic de tecla del Amstrad**, que queda pendiente y ahora es fácil:
-  nadie disputa el AY. El chip es del intérprete de cabo a rabo, el teclado ya
-  habla con el 8255 y `ay.asm` ya sabe pedir una nota, así que el clic es
-  pedir la de PIP y callar. Lo que hay que decidir es si va siempre o sólo
-  cuando la aventura pide ruidos, porque `ay.asm` sólo viaja con `NOISES`.
+- ~~El clic de tecla del Amstrad~~, **hecho**, y con él el chip en todas las
+  máquinas que lo tienen: ver la entrada de abajo.
+
+## El chip de sonido en las seis máquinas que lo tienen
+
+Quitado el reproductor de Arkos, el AY se quedó sin dueño y **ocioso en tres
+máquinas**: el 128, el +3, el MSX y el Next tenían chip y seguían haciendo los
+ruidos meneando un bit. Ahora no: donde hay chip suena el chip, y el altavoz
+de un bit queda para el Spectrum 48, que es la única sin uno.
+
+**Lo que se hizo.** El motor del Amstrad —que ya existía, ya estaba probado y
+ya leía la misma tabla— salió a `common/ay.asm`, y cada máquina dice sólo lo
+que la diferencia, igual que `beep.asm` pide `BEEP_BIT`/`BEEP_BASE`/`BEEP_OUT`:
+
+| máquina | cómo se llega al chip |
+|---|---|
+| 128, +3 y Next | `$FFFD` elige registro, `$BFFD` le da valor |
+| MSX | `$A0` elige registro, `$A1` le da valor |
+| Amstrad | el baile del 8255 que ya hace el teclado |
+
+Y una cosa más que cada una dice, `AY_MIXER_KEEP`, que es lo único que no se
+ve venir: **en el MSX el registro siete no es sólo el mezclador**. Sus dos bits
+de arriba dicen hacia dónde miran los puertos del propio chip, que ahí son los
+joysticks, y escribir el mezclador sin conservar el bit siete los daría la
+vuelta. En el Amstrad pasa lo mismo con el bit seis, que ha de quedar a cero
+porque el puerto A es la fila del teclado —ahí ya lo estaba—.
+
+**El clic, que es lo que empezó esto.** En el Amstrad el único altavoz es el
+chip, y `ay.asm` sólo viajaba con `NOISES`, que ninguna de las ocho del 86
+pide: la máquina no clicaba. Ahora el fichero está partido por la mitad —no
+son dos motores, es un `IFDEF`— y lo que viaja siempre es el acceso al chip y
+una nota plana; la tabla y el reproductor que camina el tono siguen detrás de
+`NOISES`.
+
+**Lo que cuesta, medido sobre las ocho aventuras en un 464 de cinta**, libres
+hasta `$B100`:
+
+| | antes | ahora |
+|---|---|---|
+| megacorp1 | 1385 | 1282 |
+| **megacorp2** | **14** | no cabe arriba |
+| Bangkok1 / 2 | 2258 / 1378 | 2155 / 1275 |
+| vajillas1 / 2 | 3260 / 3411 | 3157 / 3308 |
+
+**103 bytes**, y megacorp2 —que tenía catorce— deja de caber de la manera
+normal. No es un problema: `regac` lo construye del revés solo, como ya hacía
+con los dos Quijotes, y ahí el intérprete tiene 6949 bytes libres y la base de
+datos pasa de 20572 a 27392. **Salir del build alto da más sitio, no menos.**
+
+**Cómo se comprueba.** Con el mismo oráculo que el Amstrad: el `--aofile` de
+ZEsarUX y contar cuántos valores distintos de byte tiene la grabación. Y una
+cosa que había que aprender: **cuánto se mueve el silencio es de cada
+máquina**, tres formas en el Spectrum y el Next y una en el MSX, contra cinco
+y tres con un efecto sonando. El dos que valía para el Amstrad estaba mal para
+las tres, así que cada prueba mide su propio silencio primero y pide que todo
+ruido lo supere. Está en `tests/test_sound_ay.py`, y en
+`tests/test_sound_cpc.py` hay además la que importa de verdad aquí: que un
+build **sin** `NOISES` —el que reciben las ocho del 86— sigue clicando.
+
+Dos tropiezos que merecen quedarse escritos:
+
+- **`IFNDEF` no ve un `equ`.** `common/ay.asm` daba un `AY_MIXER_KEEP` por
+  defecto detrás de un `IFNDEF`, y sjasmplus mira los `DEFINE`, no las
+  etiquetas: salió «Duplicate label». Ahora cada máquina lo dice y no hay
+  valor por defecto, que además es mejor —no hay forma de olvidarlo—.
+- **Un `IFDEF` se lee donde está.** El build de prueba del Amstrad ponía
+  `IFDEF WITH_NOISES` sobre datos que están **antes** del `include` que define
+  esa palabra, y salió silencio con la tabla pedida. Lo que hay que mirar ahí
+  es `NOISES`, que la da la línea de órdenes y se conoce desde el principio.
+- Y uno del MSX: la pila del build de prueba estaba en `$7FF0`, que en un
+  Spectrum es RAM y ahí es la ROM del BIOS. Arrancaba, ponía su bandera y se
+  moría en el primer `call`.
+
+**Y un fallo que llevaba ahí desde que se escribió el motor del Amstrad**, que
+salió al leerlo para sacarlo a `common/`: `ay_write` se carga BC, y en B está
+**cuántas ondas dura el efecto**. Las tres escrituras que preparan el chip van
+después de cargar B, de modo que lo que se descontaba no era la tabla sino lo
+que la última de ellas dejara ahí —siempre el mismo número, para los cinco—.
+O sea que en el Amstrad la promesa de que **la misma tabla dura lo mismo en
+todas partes** no era cierta, y nadie se enteró: sonaba algo, la máquina
+volvía, y eso era todo lo que las pruebas pedían.
+
+La prueba que lo caza está en `test_sound_cpc.py` y merece contarse, porque
+medir esto no es obvio. Lo que cuesta un efecto son dos cosas: lo que se tarda
+en hablarle al chip, igual en cada onda, más dieciséis ciclos por cada vuelta
+del bucle de espera, que es lo que cuenta el tono. Dos incógnitas, así que se
+despejan con **dos** de los efectos —los dos menos parecidos de forma— y los
+otros tres tienen que caer en su sitio. Con el arreglo caen dentro del 3 %;
+con el fallo, **lo que cuesta una onda sale negativo**, que no es una cosa que
+pueda ser, y los demás se van al 69 %.
+
+Y un detalle de la medida que costó un rato: mirar `done_flag` cada cincuenta
+milésimas deja hasta una veinteava de segundo de máquina girando en su bucle
+de parada, y eso son doscientos mil ciclos que entran en la cuenta —del mismo tamaño que las
+diferencias que se buscaban—. Por eso el build toca cada efecto **dieciséis
+veces**: el hueco deja de pesar.
+
+**Lo que queda de esto**, y es el paso dos: **un cuarto byte en la tabla que
+diga canal** —tono, ruido o los dos—. Tres de los cinco efectos de serie no
+son notas: una puerta, una caída y un aviso son ruido, y un altavoz de un bit
+sólo puede fingirlos barriendo el tono mientras el generador de ruido del AY
+los hace de verdad. Por defecto cero, o sea tono, de modo que ninguna aventura
+de ahora cambia. Toca `/SOUND`, el comprobador y los documentos.
+
+**Lo que se decidió no hacer**: usar la envolvente por hardware para que el
+ruido no pare el turno. Se puede —se escriben los registros y se vuelve, y el
+chip termina solo— pero se llevaría por delante la única promesa escrita en
+`effects.asm`, que `SOUND 2` suene a lo mismo en todas partes, porque el paso
+del tono desaparecería donde hay chip. Y lo que compra es poco: estos blips
+duran entre una vigésima y una décima de segundo. Además volvería `SOUND`
+indeterminado en el tiempo, que es lo que la batería peor lleva.
 
 ## El color de la letra, que ya se cambia
 

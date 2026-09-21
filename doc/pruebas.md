@@ -153,11 +153,26 @@ en firme --las dos vueltas, no una-- exactamente las tres que arrancan con una
 **cinta metida y corriendo**: dos de `test_save_z80` y una de
 `test_save_next`. Ninguna de las que sólo graban. Una espera que crece no le
 da más tiempo a la máquina si lo que hay al otro lado es una cinta: **la cinta
-no espera**, y el bloque ya ha pasado cuando por fin se mira. Así que ésas tres
-se quedan como estaban, con el motivo al lado. La regla, dicha entera:
+no espera**, y el bloque ya ha pasado cuando por fin se mira. La regla, dicha
+entera:
 
 > una espera crece con la compañía cuando lo que espera es que **la máquina**
 > esté lista; no crece cuando lo que corre al otro lado va por su cuenta.
+
+**Y luego resultó que esas tres no tenían que esperar por el reloj en
+absoluto.** Se quedaron como estaban, con un `sleep(3.0)` a pelo, y siguieron
+cayendo de vez en cuando --en una vuelta, las tres a la vez-- con el mismo
+«nothing ever came off the tape». Lo que esperaban era que la ROM acabara de
+arrancar, y eso **sí** se puede mirar: el 48 termina en su bucle de órdenes,
+entre `$1200` y `$16FF`, y el Next acaba en el mismo sitio. Medido, arrancar
+lleva entre **2,35 y 2,71 segundos** contra un salto de tres, y los tres se
+gastaban tanto si habían hecho falta dos como cuatro.
+
+Aquí cada décima cuenta doble, porque es cinta pasando: ocho vueltas de cada
+manera dieron **siete de ocho durmiendo y ocho de ocho mirando**, y la prueba
+entera bajó de setenta segundos a veintidós. Es `Session.wait_in`, y la
+moraleja es la de siempre dicha del revés: si una espera no se puede escalar,
+lo que hay que preguntarse no es cuánto dormir sino **qué mirar**.
 
 **Y una instantánea puede no entrar.** `test_wrapping_z80` salía con la
 pantalla **en blanco** en tres vueltas enteras de cada cuatro, un texto

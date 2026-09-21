@@ -1,7 +1,14 @@
 ; MIT License, Copyright (c) 2025 Cronomantic
 ;
 ; Noises out of a one bit speaker: the click a key makes and a handful of
-; effects for machines with no sound chip, or with one that nothing is playing.
+; effects, for the one machine that has nothing better.
+;
+; That machine is the Spectrum 48.  Every other one this project builds for
+; has a sound chip -- even the Amstrad, which has a chip and no speaker -- and
+; where there is a chip the chip is what sounds, out of common/ay.asm: a
+; cleaner note, and it leaves alone whatever else shares the speaker's port.
+; The two read the same table and last the same time, so an adventure that
+; says SOUND 2 gets the same noise either way.
 ;
 ; The original did this too, and it is worth saying where that was found,
 ; because the manual never mentions sound at all.  Every GAC snapshot of the
@@ -14,16 +21,16 @@
 ; A speaker of one bit makes a note the same way everywhere: flip it, wait,
 ; flip it back, wait, as many times as the note is to last.  What differs is
 ; which bit of which port, and what else is in that port that must not be
-; disturbed -- the border on a Spectrum, the keyboard row and the cassette
-; motor on an MSX -- so each machine says:
+; disturbed -- the border on a Spectrum -- so each machine says:
 ;
 ;   BEEP_BIT        the bit that moves the speaker
 ;   BEEP_BASE       a macro putting the rest of that port in A, speaker clear
 ;   BEEP_OUT        a macro writing A to it
 ;
 ; This file says WITH_NOISES, which is how the rest of the interpreter knows
-; there is something here that can make one -- a machine whose only speaker is
-; its sound chip says the same thing from cpc/ay.asm.
+; there is something here that can make one; common/ay.asm says the same when
+; its build asked for the table.  A speaker costs nothing to have, so this
+; one always brings the effects with it.
 ;
 ; The pitch is how long a half wave lasts and the length is how many of them
 ; there are, so a note of a given number of flips is shorter the higher it is,

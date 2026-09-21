@@ -109,13 +109,15 @@ def started(session, where, wanted):
     loading anything over an inserted tape leaves the tape where the ROM can
     no longer read it, which looks exactly like a routine that does not work.
     """
-    # Not grown for the company, although everything else is: one of the two
-    # tests this serves has a tape inserted and running, and a tape does not
-    # wait for a machine that is sharing a processor with three others.
-    # Waiting longer leaves the block already gone past, and then the routine
-    # looks as though it could not read one.  Measured: scaling it failed both
-    # rounds of the suite.
-    time.sleep(3.0)
+    # Waited for by looking and not by sleeping, which matters here because
+    # one of the two tests this serves has a tape inserted and running: a
+    # tape starts rolling when the emulator starts and does not wait, so
+    # every tenth of a second spent not looking is tape gone past -- and a
+    # block that has gone past leaves the ROM waiting for a leader that is
+    # never coming back.  This machine ends up in the same command loop a 48
+    # does, at about two and a half seconds; in between it is at $0038 doing
+    # its interrupt, which a look or two later has been and gone.
+    assert session.wait_in(0x1200, 0x16FF), "the ROM never finished booting"
     with open(BINARY, "rb") as f:
         blob = f.read()
     for at in range(0, len(blob), 512):

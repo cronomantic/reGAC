@@ -170,8 +170,21 @@ to_shifted:
 ; Wait for a key to be typed and give it back in A.  What counts as typing one
 ; is the ROM's rules, in common/keys.asm.
 ; Corrupts: everything
+; What clicks, which on this machine is the sound chip: it is the only thing
+; here that can make a noise at all.  It comes in here and not from game.asm,
+; as it does on the Spectrum and the MSX, because the click is the keyboard's
+; business and a build that reads keys needs it whether or not it is a whole
+; interpreter -- test_keyboard.asm is one of those.
+                include "ay.asm"
+
+; Wait for a key to be typed and give it back in A.
+; Corrupts: everything
 read_key:
-                jp      next_key
+                call    next_key
+                push    af                      ; the original clicked at every
+                call    beep_click              ; key, and so does this
+                pop     af
+                ret
 
 ; Wait for a key, or for HL fiftieths of a second, whichever comes first.
 ;

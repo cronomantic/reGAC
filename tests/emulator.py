@@ -504,6 +504,30 @@ class Session:
                 return True
         return False
 
+    def wait_in(self, low, high, timeout=20.0, every=0.02):
+        """Run until the program counter is somewhere between those two, and
+        say whether it got there.
+
+        What this is for is waiting for a ROM to finish booting.  The usual
+        way was to sleep for as long as it usually takes, and that is a guess
+        with a machine on the other end of it: measured on a 48, the boot
+        takes between 2,35 and 2,71 seconds against a sleep of three, and the
+        three are spent whether it took two or four.
+
+        Where it matters is the tape tests.  A tape starts rolling when the
+        emulator starts and does not wait, so every tenth of a second spent
+        not looking is tape gone past, and a block that has gone past leaves
+        the ROM waiting for a leader that is never coming back -- which reads
+        as an interpreter that cannot load.  Eight goes each way: seven of
+        eight asleep, eight of eight looking.
+        """
+        deadline = time.time() + longer(timeout)
+        while time.time() < deadline:
+            if low <= self.pc() <= high:
+                return True
+            time.sleep(every)
+        return False
+
     def wait_for_change(self, address, was, timeout=20.0, every=0.05):
         """The other way round from `wait_for`: run until a byte stops being
         what it was, and say whether it did.  What it is for is proving that

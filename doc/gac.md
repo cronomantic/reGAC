@@ -221,9 +221,11 @@ sitio **cuando se dibuja la lámina siguiente**. Medido en el original.
 | `SOUND n` | hace el ruido n |
 | `QUIET` | silencio |
 
-Estos dos son añadidos de este proyecto, no de GAC. Una máquina que no tenga
-con qué sonar —el PCW— los lee y no hace nada, de modo que **la misma aventura
-vale para todas las máquinas**.
+Estos dos son añadidos de este proyecto, no de GAC. Los hace el chip de sonido
+donde lo hay —128, +3, Amstrad, MSX y Next— y el altavoz de un bit en el
+Spectrum 48; los dos motores leen la misma tabla y duran lo mismo. Una máquina
+que no tenga con qué sonar —el PCW— los lee y no hace nada, de modo que **la
+misma aventura vale para todas las máquinas**.
 
 ### Fin del turno y de la partida
 

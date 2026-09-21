@@ -267,6 +267,14 @@ key_table:
                 db      KEY_ENTER, 'L', 'K', 'J', 'H'
                 db      ' ', 0, 'M', 'N', 'B'
 
+; Which engine makes a noise here.  A 48 has only its speaker; a 128, a +3
+; and a Next have a sound chip as well, and where there is a chip it is the
+; better instrument -- a cleaner note, and the border left alone.  The build
+; says which with WITH_AY.
+                IFDEF WITH_AY
+                include "ay.asm"
+                ELSE
                 include "beep.asm"
+                ENDIF
 
                 include "../common/keys.asm"

@@ -250,11 +250,18 @@ Uno por línea, en el orden en que `SOUND` los cuenta **desde uno**:
 
 El **tono** es lo que dura medio ciclo —más grande, nota más grave—, los
 **pasos** son cuántas veces se repite y el **paso** lo que se suma al tono en
-cada uno. Suenan por el altavoz de un bit donde lo hay, y por el chip de
-sonido en el Amstrad, que no tiene altavoz — **la misma tabla y los mismos
-números en las dos**. Una aventura que no diga nada aquí se queda con los
-cinco que trae el intérprete, y el PCW, que no tiene con qué sonar, lee la
-orden y sigue.
+cada uno.
+
+**Suenan por el chip de sonido en las seis máquinas que lo tienen** —128, +3,
+Amstrad, MSX y Next— y por el altavoz de un bit en el Spectrum 48, que es la
+única sin chip. Son dos motores y **una sola tabla**: un tono es medio ciclo
+del altavoz y la mitad de eso como periodo del chip, así que `SOUND 2` dura lo
+mismo y suena a lo mismo en las siete. Donde hay chip se gana una nota más
+limpia y que no se toque lo que comparte puerto con el altavoz —el borde en el
+Spectrum, el motor del casete y el led de mayúsculas en el MSX—.
+
+Una aventura que no diga nada aquí se queda con los cinco que trae el
+intérprete, y el PCW, que no tiene con qué sonar, lee la orden y sigue.
 
 ---
 
@@ -307,12 +314,16 @@ máquina y escribe lo que dejó en memoria.
 ## 9. Las máquinas, y lo que cada una tiene de suyo
 
 - **Spectrum 48 y 128.** El 128 reparte el texto y las láminas en páginas
-  propias, y así le caben aventuras que no caben en el 48.
+  propias, y así le caben aventuras que no caben en el 48; y tiene chip de
+  sonido, así que los ruidos y el clic de tecla salen por él. El 48 es la
+  única máquina que los hace con el altavoz.
 - **Spectrum +3.** Disco, con el cargador en el menú de la máquina.
 - **Amstrad CPC 464.** El más justo: sin bancos, y la base de datos en un
   trozo seguido. Si una aventura no cabe de la manera normal, `regac` **la
   construye sola del revés** —el intérprete debajo de `$4000` y la base de
-  datos encima— y lo dice al construir.
+  datos encima— y lo dice al construir. Es también la única donde la tabla de
+  ruidos sólo viaja si la aventura pide alguno: son ciento cuatro bytes en la
+  máquina que los cuenta uno a uno. El clic de tecla viaja siempre.
 - **Amstrad CPC 6128.** Disco y bancos: aquí caben las grandes.
 - **Amstrad PCW.** Disco que arranca solo, sin CP/M. Monocromo, 64 columnas.
 - **MSX.** Cinta, y la máquina entera en RAM.

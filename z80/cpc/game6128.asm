@@ -105,9 +105,6 @@ done_flag:      db      0
                 include "screen.asm"
                 include "../common/textout.asm"
                 include "keyboard.asm"
-                IFDEF NOISES
-                include "ay.asm"
-                ENDIF
                 include "disc.asm"
                 include "draw.asm"
                 include "shapes.asm"

@@ -112,6 +112,9 @@ done_flag:      db      0
                 include "../common/unpack.asm"
                 include "screen.asm"
                 include "../common/textout.asm"
+; This machine has a sound chip, so the noises and the key click go through
+; it rather than through the speaker: see spectrum/keyboard.asm.
+                DEFINE  WITH_AY 1
                 include "keyboard.asm"
                 include "tape.asm"
                 include "draw.asm"

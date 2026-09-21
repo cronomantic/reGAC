@@ -28,8 +28,9 @@ Un banco 0xFF quiere decir que la sección es residente.
 ## Secciones
 
 `config`, `vocabulary`, `objects`, `locations`, `conditions`, `text`, `font` y
-`graphics`. La octava, `music`, ya no se escribe: su número se deja libre para
-que las siete de delante conserven el suyo.
+`graphics`, y `music`, que se sigue escribiendo **vacía** —dos bytes, una
+cuenta de cero— para que el directorio no cambie de forma y las siete de
+delante conserven su número.
 
 Los textos de toda la aventura van a un solo almacén, así que una pareja de
 códigos encontrada en un mensaje sirve también para la descripción de una
