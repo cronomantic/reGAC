@@ -131,7 +131,16 @@ def test_an_adventure_plays_with_the_music_on():
             "the adventure asked for a tune and nothing is playing"
         )
         assert session.read(where["music_tune"], 1)[0] == 0
-        at = word(session, where["PLY_AKM_Track1_PtTrack"])
+        # Watched rather than glanced at: the flag above is ours and this
+        # pointer is the player's, and the player only moves it on its first
+        # pass through the interrupt, a frame or so after the flag.  Read at
+        # the wrong instant it is still zero, and then this says the music
+        # never started when it had -- measured, it comes good a quarter of a
+        # second later and then walks the tune.
+        at = emulator.until(
+            lambda: word(session, where["PLY_AKM_Track1_PtTrack"]),
+            lambda seen: where["music_buffer"] <= seen < where["start"],
+            timeout=10.0, every=0.1)
         assert where["music_buffer"] <= at < where["start"], (
             f"the player is not reading the buffer the tune was copied into:"
             f" ${at:04X}"

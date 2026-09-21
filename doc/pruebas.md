@@ -177,6 +177,17 @@ queda esperando por el reloj y no mirando, porque una aventura que se para
 sola puede no preguntar nunca --que es justo lo que esa función comprueba--,
 pero ahora crece con la compañía como todas las demás.
 
+**Y la música sí sonaba.** `test_game_music_z80` fallaba la mitad de las veces
+incluso a solas, diciendo que el reproductor no estaba leyendo su melodía, y
+eso pone en duda una función entera. No era verdad: mirando el puntero del
+reproductor durante diez segundos en vez de una sola vez, en cinco vueltas de
+cinco **acaba dentro del buffer y recorre la melodía** --seis o siete valores
+distintos--, y la única que empezó en cero se puso buena **un cuarto de
+segundo después**. La bandera es nuestra y la pone el intérprete al pedir la
+melodía; el puntero lo mueve el reproductor en su primer paso por la
+interrupción. No son el mismo instante. Las tres pruebas que lo miraban de
+una ojeada --Spectrum, Amstrad y Next-- ahora lo esperan.
+
 La del Quijote en un 464 tenía la misma de otra forma: pulsaba espacio cuatro
 veces nada más arrancar, para pasar la portada, y si la portada aún estaba
 saliendo se perdían las cuatro --y entonces el juego se quedaba esperando una
