@@ -2656,6 +2656,99 @@ del espejo, y su clave --`SPIELBERG`, un nombre, no un verbo: nombrarlo lleva
 a la sala 21-- queda apuntada aquí para cuando haga falta.
 
 
+## PC XT con CGA: el paso uno, que era el que podía matarlo
+
+No está decidido hacerlo. Lo que sigue es lo único que había que saber antes
+de decidir: **si un 8088 a 4,77 MHz puede dibujar nuestras láminas dentro del
+tope de cuatro o cinco segundos**. Sale que sí, y con holgura.
+
+### Por qué el Amstrad es la máquina con la que comparar
+
+CGA en modo 4 es 320 por 200, dos bits por píxel, cuatro colores, ochenta
+bytes por fila. Eso es **exactamente** el modo 1 del Amstrad, hasta el ancho
+de fila. Y hay dos diferencias, las dos a favor:
+
+- **El empaquetado de CGA es más simple.** El Amstrad reparte los dos bits de
+  cada píxel por el byte --los pares 3/7, 2/6, 1/5, 0/4-- y CGA los pone
+  seguidos, de dos en dos.
+- **Cuarenta columnas de texto**, que es lo que tiene el Amstrad, así que la
+  regla de partir líneas vale tal cual.
+
+Y a favor está también lo que ya sabemos: las peores láminas del Amstrad están
+**medidas**, con el contador de ciclos parado en seco, después de la
+optimización que las bajó de cuarenta y cinco segundos: **4,17 s y 4,87 s**.
+
+### La cuenta
+
+Los tres bucles de los que está hecho el dibujo, contados en relojes del Z80
+como el gate array los cobra de verdad --cada instrucción redondeada hacia
+arriba a múltiplo de cuatro-- y contra la instrucción del 8088 que hace lo
+mismo:
+
+| | Amstrad | XT | veces |
+|---|---:|---:|---:|
+| recorrer un tramo, por byte | 9,00 µs | **3,14 µs** | 2,9 |
+| pintar un tramo, por byte | 8,00 µs | **2,10 µs** | 3,8 |
+| un punto suelto | 16,00 µs | 12,58 µs | 1,3 |
+
+Los dos primeros son `cpi`/`cpd` con sus dos saltos y `ld (hl),a` / `inc hl` /
+`djnz`, que es lo que hay en `z80/cpc/fill.asm`; en el 8088 son `repe scasb` y
+`rep stosb`, una instrucción cada uno.
+
+**Y aquí está lo que no esperaba.** La debilidad del 8088 es su bus de ocho
+bits, que le cuesta cuatro relojes de más por cada acceso de dieciséis y le
+mata la cola de prefetch en cada salto. Nuestros dos bucles calientes son
+**instrucciones de cadena de un byte**: no leen palabras, y mientras un `rep`
+corre no se busca ni una instrucción. O sea que caen justo en el único sitio
+donde un 8088 corre a la velocidad de un 8086. El caso peor de esa máquina es
+precisamente el que no le toca.
+
+### Lo que sale
+
+Si una lámina entera fuera tramos, saldría por lo bajo; si fuera toda puntos
+sueltos, por lo alto. La verdad está en medio, y más cerca de lo bajo, porque
+la optimización del Amstrad consistió justamente en que casi todo fueran
+tramos:
+
+| lámina | Amstrad, medido | XT, estimado |
+|---|---:|---|
+| quijote1 #8 | 4,17 s | entre **1,1 y 3,3 s** |
+| megacorp2 #29 | 4,87 s | entre **1,3 y 3,8 s** |
+
+Contra un tope de cuatro o cinco. **Cabe.**
+
+### Los asteriscos, que son dos y uno es gordo
+
+**La nieve de CGA.** Una tarjeta CGA de IBM auténtica no frena al procesador
+cuando se escribe en `B800` mientras el haz pinta: deja escribir a toda
+velocidad y lo que sale es *snow*. La cuenta de arriba vale tal cual **si se
+acepta la nieve**. Si no se acepta, hay que escribir sólo fuera del barrido, y
+eso multiplica por varias veces la parte que toca pantalla y se come la
+holgura entera. Los clónicos no nievan. **Es una decisión, no un detalle**, y
+conviene tomarla antes y no descubrirla con hardware real, porque un emulador
+normalmente no la modela.
+
+**La base de datos en otro segmento.** Un `es:` de más cuesta dos relojes por
+acceso, y nuestra contabilidad interna --la pila de tramos-- es de dieciséis
+bits, que es donde el 8088 sí paga sus cuatro relojes. Eso queda fuera de esta
+cuenta, que mira sólo el dibujo.
+
+### Y qué es esto y qué no es
+
+**No es una medida, es una estimación con la cuenta a la vista**, hecha de
+tres bucles y de los tiempos publicados del 8088. Lo que la hace fiable es
+que los dos bucles que deciden son de una instrucción y no dependen del
+prefetch; lo que la hace una estimación y no otra cosa es que el tercero sí.
+
+### El paso dos, si se sigue
+
+Una cala con el emulador: montar un `.EXE` con `NASM -f bin` y la cabecera MZ
+escrita por `regac` --28 bytes, y sin reubicaciones si los segmentos se
+calculan en marcha desde `CS`--, apuntarle `CS:IP`, correr y leer `B800` desde
+un guion. Si eso sale, el resto es trabajo conocido: `CgaDevice` y la
+comparación de láminas antes de que exista intérprete, que es como se hicieron
+las otras cinco.
+
 ## Cosas menores
 
 `deGAC` ya lee las tres máquinas. Reconoce por sí solo una instantánea de
