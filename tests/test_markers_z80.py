@@ -143,7 +143,13 @@ def ends(ddb, within=6.0):
         # table get a second pass at the state a turn leaves behind.  The word
         # is one the adventure does not know, so that nothing but the asking
         # happens because of it.
-        time.sleep(2.0)
+        #
+        # Waited for by the clock and not by looking, which everything else
+        # here has stopped doing, because an adventure that ends itself may
+        # never ask at all -- that is what this is for.  Grown for the company
+        # the machine is keeping, which it was not, so that four emulators at
+        # once do not get two seconds where they need four.
+        time.sleep(emulator.longer(2.0))
         session.type("X" + ENTER)
         deadline = time.time() + within
         while time.time() < deadline:
@@ -173,15 +179,40 @@ def asked_again(session, glyphs, times, timeout=30.0):
     return lines
 
 
+def got_going(session, glyphs, tries=2):
+    """Put the snapshot in and wait until the adventure is asking, with it put
+    back once if it never got that far.
+
+    A load can fail to take, and what comes of it is a screen with nothing on
+    it: every assert after that is about a machine that was never asked
+    anything, and it reads as though the interpreter had got the answer
+    wrong.  test_wrapping_z80 spent three runs out of four looking like that.
+
+    If it still has not got going, what is said is where the processor was:
+    in the ROM means the snapshot never took, and anywhere above it means the
+    interpreter is running and it is the reading of the screen that is wrong.
+    One number, and it tells the two apart.
+    """
+    for attempt in range(tries):
+        session.load(SNAPSHOT)
+        lines = asked_again(session, glyphs, 1)
+        if any(">" in line for line in lines):
+            return lines
+    raise AssertionError(
+        "the adventure never got going: nothing on the screen that its own "
+        f"font can read, and the processor at {session.pc():#06X} -- under "
+        "$4000 is the ROM, and means the snapshot never took"
+    )
+
+
 def played(ddb, orders=()):
     """The lines on the screen after typing whatever was asked for."""
     database, listing = build(ddb)
     glyphs = glyph_table(database)
     session = emulator.Session()
     try:
-        session.load(SNAPSHOT)
+        lines = got_going(session, glyphs)
         asked = 1
-        lines = asked_again(session, glyphs, asked)
         for order in orders:
             session.type(order + ENTER)
             asked += 1

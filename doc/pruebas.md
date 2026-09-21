@@ -131,6 +131,24 @@ pide ver la misma pantalla **dos veces seguidas** con el prompt al final: una
 vuelta entera del sondeo, que es de sobra para que la máquina pase de lo uno a
 lo otro, y no cuesta nada cuando el prompt ya llevaba ahí un rato.
 
+**Y una instantánea puede no entrar.** `test_wrapping_z80` salía con la
+pantalla **en blanco** en tres vueltas enteras de cada cuatro, un texto
+distinto cada vez, y pasaba a solas y con media carga. Cuando un `smartload`
+no coge, lo que queda es una máquina a la que nunca se le preguntó nada, y
+todo lo que la prueba comprueba después se lee como si el intérprete hubiera
+colocado mal el texto --que es la peor manera de que se lea--. Ahora la
+instantánea **se vuelve a meter** si la aventura no llegó a preguntar, igual
+que un build que no arranca; y si aun así no arranca, lo que se dice es **dónde
+estaba el procesador**, que es el único número que separa las dos mitades: por
+debajo de `$4000` es la ROM, y significa que la carga nunca entró; por encima
+es el intérprete corriendo y entonces lo que está mal es cómo se lee la
+pantalla.
+
+De paso, la espera de dos segundos de `ends()` no estaba escalada. Ésa se
+queda esperando por el reloj y no mirando, porque una aventura que se para
+sola puede no preguntar nunca --que es justo lo que esa función comprueba--,
+pero ahora crece con la compañía como todas las demás.
+
 La del Quijote en un 464 tenía la misma de otra forma: pulsaba espacio cuatro
 veces nada más arrancar, para pasar la portada, y si la portada aún estaba
 saliendo se perdían las cuatro --y entonces el juego se quedaba esperando una
