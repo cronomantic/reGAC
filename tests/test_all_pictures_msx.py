@@ -107,7 +107,7 @@ def draw_them_all(path):
     out = []
     session = emulator.Session(machine="MSX1")
     try:
-        time.sleep(7.0)                 # this one takes its time coming up
+        time.sleep(emulator.longer(7.0))                 # this one takes its time coming up
         assert session.start_code(blob, CODE_AT, where["done_flag"],
                                   timeout=60.0), "the MSX never got going"
         for key in sorted(gfx, key=int):

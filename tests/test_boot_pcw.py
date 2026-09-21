@@ -95,7 +95,7 @@ def test_the_machine_starts_our_disk_by_itself(tmp_path):
         machine="PCW8256", extra=["--enable-dsk", "--dsk-file", path]
     )
     try:
-        time.sleep(12.0)
+        time.sleep(emulator.longer(12.0))
         seen = session.read(MARK_AT, len(MARK))
         arrived = bytes(session.read(PAYLOAD_AT + len(stub), len(filler)))
         where = session.pc()

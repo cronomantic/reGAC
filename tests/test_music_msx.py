@@ -77,7 +77,7 @@ def test_the_interrupt_plays_while_the_loop_only_counts():
 
     session = emulator.Session(machine="MSX1")
     try:
-        time.sleep(7.0)                 # this one takes its time coming up
+        time.sleep(emulator.longer(7.0))                 # this one takes its time coming up
         # What the BIOS says, while the BIOS is still the thing at $002B.
         says = 50 if session.read(ROM_VERSION, 1)[0] & 0x80 else 60
         assert session.start_code(blob, LOADS_AT, where["playing_flag"]), (

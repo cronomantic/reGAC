@@ -175,7 +175,7 @@ def test_the_original_lays_down_what_we_lay_down(mode):
     session = emulator.Session()
     try:
         session.load(SNAPSHOT)
-        time.sleep(2.0)
+        time.sleep(emulator.longer(2.0))
         before, wanted = ours(mode)
         got = theirs(session, before, mode)
     finally:
@@ -199,7 +199,7 @@ def test_the_three_are_three_entries_of_one_routine():
     session = emulator.Session()
     try:
         session.load(SNAPSHOT)
-        time.sleep(2.0)
+        time.sleep(emulator.longer(2.0))
         code = bytes(session.read(0x6364, 16))
     finally:
         session.close()

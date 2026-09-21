@@ -117,7 +117,7 @@ def playing():
     over = emulator.label_address(listing, "done_flag")
     session = emulator.Session()
     session.load(SNAPSHOT)
-    time.sleep(2.0)
+    time.sleep(emulator.longer(2.0))
     return session, over
 
 
@@ -140,17 +140,17 @@ def test_quit_asks_before_it_goes():
     session, over = playing()
     try:
         session.type("SALIR" + ENTER)
-        time.sleep(1.5)
+        time.sleep(emulator.longer(1.5))
         assert session.read(over, 1)[0] != 0xFF, "it went without asking"
 
         session.type("NO" + ENTER)
-        time.sleep(1.5)
+        time.sleep(emulator.longer(1.5))
         assert session.read(over, 1)[0] != 0xFF, "no should have kept it going"
 
         session.type("SALIR" + ENTER)
-        time.sleep(1.5)
+        time.sleep(emulator.longer(1.5))
         session.type("SI" + ENTER)
-        time.sleep(2.0)
+        time.sleep(emulator.longer(2.0))
         assert session.read(over, 1)[0] == 0xFF, "yes should have ended it"
     finally:
         session.close()

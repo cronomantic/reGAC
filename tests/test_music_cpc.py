@@ -71,7 +71,7 @@ def test_the_interrupt_plays_while_the_loop_only_counts():
 
     session = emulator.Session(machine="CPC6128")
     try:
-        time.sleep(3.0)
+        time.sleep(emulator.longer(3.0))
         assert session.start_code(blob, LOADS_AT, where["playing_flag"]), (
             "the build never started"
         )

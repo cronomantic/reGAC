@@ -102,7 +102,7 @@ def test_the_disk_starts_from_the_menu(tmp_path):
         machine=MACHINE, extra=["--enable-dsk", "--dsk-file", path]
     )
     try:
-        time.sleep(5.0)
+        time.sleep(emulator.longer(5.0))
         session.type(ENTER)                     # Loader, the first entry
         screen = wait_screen(session, glyphs, OPENS_WITH, timeout=90.0)
     finally:
@@ -182,7 +182,7 @@ def test_a_banked_disk_puts_each_bank_in_its_page(tmp_path):
         machine=MACHINE, extra=["--enable-dsk", "--dsk-file", path]
     )
     try:
-        time.sleep(5.0)
+        time.sleep(emulator.longer(5.0))
         session.type(ENTER)
         wait_screen(session, glyphs, OPENS_WITH, timeout=120.0)
         # And the rest of the title before pressing anything: the interpreter

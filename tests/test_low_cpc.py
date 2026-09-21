@@ -135,7 +135,7 @@ def test_it_plays_with_the_interpreter_under_the_database():
 
     session = emulator.Session(machine="CPC464")
     try:
-        time.sleep(3.0)
+        time.sleep(emulator.longer(3.0))
         started(session, code, data)
         # Its title has to be all the way out before a key is pressed at it.
         # The interpreter looks at the keyboard only when it stops to ask, so
@@ -147,7 +147,7 @@ def test_it_plays_with_the_interpreter_under_the_database():
                     timeout=60.0)
         for _ in range(4):
             session.type_keys(" ")
-            time.sleep(2.0)
+            time.sleep(emulator.longer(2.0))
         lines = wait_screen(session, glyphs, where, timeout=120.0)
     finally:
         session.close()
@@ -239,13 +239,13 @@ def test_the_tape_starts_the_quijote(tmp_path):
         machine="CPC464", extra=["--fastautoload", "--simulaterealloadfast"]
     )
     try:
-        time.sleep(2.5)
+        time.sleep(emulator.longer(2.5))
         session.command("smartload " + path)
         wait_screen(session, glyphs, ddb["messages"]["240"].strip()[:3],
                     timeout=1200.0)
         for _ in range(4):
             session.type_keys(" ")
-            time.sleep(2.0)
+            time.sleep(emulator.longer(2.0))
         lines = wait_screen(session, glyphs, where.split()[0], timeout=120.0)
     finally:
         session.close()

@@ -119,7 +119,7 @@ def started(session, where, wanted, low=False):
         session.command(f"write-memory-raw {STARTER_AT} " + STARTER.hex().upper())
     session.command(f"write-memory {where['wanted']} {wanted}")
     session.jump(STARTER_AT if low else LOADS_AT)
-    time.sleep(1.0)
+    time.sleep(emulator.longer(1.0))
     assert read(session, where["ready_flag"], 1, low)[0] == 1, "the build never started"
 
 
@@ -135,7 +135,7 @@ def waited(session, where, seconds, low=False):
     """Let the tape take its time, and say whether it finished."""
     deadline = time.time() + seconds
     while time.time() < deadline:
-        time.sleep(1.0)
+        time.sleep(emulator.longer(1.0))
         if read(session, where["done_flag"], 1, low)[0] == 0xFF:
             return True
     return False
@@ -168,7 +168,7 @@ def test_it_writes_a_block():
     where = build()
     session = emulator.Session(machine="CPC6128")
     try:
-        time.sleep(3.5)
+        time.sleep(emulator.longer(3.5))
         started(session, where, 0)
         assert waited(session, where, 45), "the firmware never gave it back"
         assert session.read(where["carry_seen"], 1)[0] == 1, "it says it did not write"
@@ -197,7 +197,7 @@ def test_it_reads_a_block_off_a_real_tape():
             extra=["--realtape", image, "--fastautoload", "--simulaterealloadfast"],
         )
         try:
-            time.sleep(3.5)
+            time.sleep(emulator.longer(3.5))
             started(session, where, 1)
             assert waited(session, where, 75), "nothing ever came off the tape"
             assert session.read(where["carry_seen"], 1)[0] == 1, "it says it did not read"
@@ -218,7 +218,7 @@ def test_it_writes_a_block_with_the_interpreter_under_the_database():
     where = build(low=True)
     session = emulator.Session(machine="CPC6128")
     try:
-        time.sleep(3.5)
+        time.sleep(emulator.longer(3.5))
         started(session, where, 0, low=True)
         assert waited(session, where, 45, low=True), "the firmware never gave it back"
         assert read(session, where["carry_seen"], 1, True)[0] == 1, (

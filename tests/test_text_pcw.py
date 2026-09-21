@@ -127,7 +127,7 @@ def test_the_pcw_prints_what_the_database_holds():
 
     session = emulator.Session(machine="PCW8256")
     try:
-        time.sleep(4.0)  # let the machine ask for a disk
+        time.sleep(emulator.longer(4.0))  # let the machine ask for a disk
         finished = session.start_code(blob, LOADS_AT, done)
         memory = session.read(SCREEN, WINDOW_ROWS * ROW_BYTES)
     finally:

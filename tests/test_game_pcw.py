@@ -118,7 +118,7 @@ def wait_screen(session, glyphs, wanted, timeout=60.0):
         lines = screen(session, glyphs)
         if any(wanted in line for line in lines if line):
             return lines
-        time.sleep(1.0)
+        time.sleep(emulator.longer(1.0))
     return lines
 
 

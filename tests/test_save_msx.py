@@ -95,7 +95,7 @@ def started(session, where, wanted):
         )
     session.command(f"write-memory-raw {where['wanted']} {wanted:02X}")
     session.jump(LOADS_AT)
-    time.sleep(1.0)
+    time.sleep(emulator.longer(1.0))
     assert session.read(where["ready_flag"], 1)[0] == 1, "the build never started"
 
 
@@ -105,7 +105,7 @@ def waited(session, where, seconds):
     seconds of it, one bit at a time, as it would be on a real machine."""
     deadline = time.time() + seconds
     while time.time() < deadline:
-        time.sleep(1.0)
+        time.sleep(emulator.longer(1.0))
         if session.read(where["done_flag"], 1)[0] == 0xFF:
             return True
     return False
@@ -126,7 +126,7 @@ def test_it_writes_a_block():
     where = build()
     session = emulator.Session(machine="MSX1")
     try:
-        time.sleep(7.0)
+        time.sleep(emulator.longer(7.0))
         started(session, where, SAVING)
         assert waited(session, where, 90), "the BIOS never gave it back"
         assert session.read(where["carry_seen"], 1)[0] == 1, "it says it did not write"
@@ -147,7 +147,7 @@ def test_it_reads_a_block_off_a_tape():
 
     session = emulator.Session(machine="MSX1", extra=["--tape", TAPE])
     try:
-        time.sleep(7.0)
+        time.sleep(emulator.longer(7.0))
         started(session, where, LOADING)
         assert waited(session, where, 60), "nothing ever came off the tape"
         assert session.read(where["carry_seen"], 1)[0] == 1, "it says it did not read"

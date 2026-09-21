@@ -117,7 +117,7 @@ def test_the_disk_carries_the_music_under_4000(tmp_path):
         machine="CPC6128", extra=["--enable-dsk", "--dsk-file", path]
     )
     try:
-        time.sleep(4.0)
+        time.sleep(emulator.longer(4.0))
         session.type_keys('run"juego' + chr(13))
         screen = wait_screen(session, glyphs, asking(ddb), timeout=120.0)
         assert any(asking(ddb) in line for line in screen if line), (

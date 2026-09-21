@@ -143,7 +143,7 @@ def draw_them_all(path):
     out = []
     session = emulator.Session(machine="CPC6128")
     try:
-        time.sleep(3.0)
+        time.sleep(emulator.longer(3.0))
         assert session.start_code(blob, LOADS_AT, where["done_flag"],
                                   timeout=20.0), "the Amstrad never got going"
         for key in sorted(gfx, key=int):

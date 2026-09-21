@@ -219,7 +219,7 @@ def test_it_keeps_up_with_quick_typing_and_repeats_a_held_key():
         wait_screen(session, glyphs, prompt)
         keystrokes.play(session, keystrokes.ROLLED, events)
         rolled = wait_screen(session, glyphs, keystrokes.ROLLED_GIVES, timeout=20.0)
-        time.sleep(3.0)
+        time.sleep(emulator.longer(3.0))
         keystrokes.play(session, keystrokes.HELD[:3], events)
         held = screen(session, glyphs)
     finally:

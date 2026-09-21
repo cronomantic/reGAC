@@ -138,7 +138,7 @@ def test_it_can_be_played_to_the_end(tmp_path):
         )
         for order in WALKTHROUGH:
             session.type(order + ENTER)
-            time.sleep(3.0)
+            time.sleep(emulator.longer(3.0))
         end = screen(session, glyphs)
     finally:
         session.close()

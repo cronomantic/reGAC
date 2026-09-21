@@ -127,7 +127,7 @@ def test_the_amstrad_prints_what_the_database_holds():
 
     session = emulator.Session(machine="CPC6128")
     try:
-        time.sleep(3.0)
+        time.sleep(emulator.longer(3.0))
         for at in range(0, len(blob), 512):
             piece = blob[at:at + 512]
             session.command(f"write-memory-raw {LOADS_AT + at} " + piece.hex().upper())

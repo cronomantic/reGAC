@@ -143,7 +143,7 @@ def wait_screen(session, glyphs, wanted, timeout=60.0):
         lines = screen(session, glyphs)
         if any(wanted in line for line in lines if line):
             return lines
-        time.sleep(1.0)
+        time.sleep(emulator.longer(1.0))
     return lines
 
 
@@ -159,7 +159,7 @@ def test_it_asks_and_answers_on_an_amstrad():
 
     session = emulator.Session(machine="CPC6128")
     try:
-        time.sleep(3.0)
+        time.sleep(emulator.longer(3.0))
         start(session)
         # Loading from its tape is the longest wait in the suite, and a
         # machine that is running four emulators at once takes longer

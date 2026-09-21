@@ -158,13 +158,13 @@ def test_an_amstrad_loads_what_we_wrote(tmp_path):
         machine="CPC6128", extra=["--enable-dsk", "--dsk-file", path]
     )
     try:
-        time.sleep(4.0)
+        time.sleep(emulator.longer(4.0))
         # BASIC owns the memory the file wants, so it is told to keep out of
         # it first; otherwise AMSDOS finds the file and then says it is full.
         session.type_keys("memory &3fff" + chr(13))
-        time.sleep(1.0)
+        time.sleep(emulator.longer(1.0))
         session.type_keys('load"prueba.bin' + chr(13))
-        time.sleep(4.0)
+        time.sleep(emulator.longer(4.0))
         loaded = session.read(LOADS_AT, len(blob))
     finally:
         session.close()

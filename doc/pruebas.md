@@ -131,6 +131,34 @@ pide ver la misma pantalla **dos veces seguidas** con el prompt al final: una
 vuelta entera del sondeo, que es de sobra para que la máquina pase de lo uno a
 lo otro, y no cuesta nada cuando el prompt ya llevaba ahí un rato.
 
+### El fondo de todo esto: los plazos crecían y las esperas no
+
+Persiguiendo las de arriba una por una salió el patrón. La batería lleva
+tiempo haciendo crecer sus **plazos** con `emulator.longer` --que es la
+identidad con un trabajador y multiplica por 2,2 con cuatro, que es
+aproximadamente lo que se frenan las máquinas: 0,58 de una máquina para sí--
+pero no sus **esperas**. Y las esperas son las que duelen:
+
+> un plazo que se queda corto sólo hace la prueba más lenta; **una espera que
+> se queda corta significa que a la máquina se le teclea, se le escribe o se
+> le lee antes de estar lista**, y de eso salen una pantalla en blanco, una
+> primera letra perdida o una lámina con un byte torcido.
+
+Eran **71 esperas en 40 ficheros**, todas de la forma «deja que la máquina
+arranque». Ahora crecen con la compañía. A solas no cambia nada; con cuatro,
+la puerta paga algo más de tiempo a cambio de no perseguir fantasmas.
+
+**Menos tres, y el porqué merece quedarse escrito.** Escalarlas todas rompió
+en firme --las dos vueltas, no una-- exactamente las tres que arrancan con una
+**cinta metida y corriendo**: dos de `test_save_z80` y una de
+`test_save_next`. Ninguna de las que sólo graban. Una espera que crece no le
+da más tiempo a la máquina si lo que hay al otro lado es una cinta: **la cinta
+no espera**, y el bloque ya ha pasado cuando por fin se mira. Así que ésas tres
+se quedan como estaban, con el motivo al lado. La regla, dicha entera:
+
+> una espera crece con la compañía cuando lo que espera es que **la máquina**
+> esté lista; no crece cuando lo que corre al otro lado va por su cuenta.
+
 **Y una instantánea puede no entrar.** `test_wrapping_z80` salía con la
 pantalla **en blanco** en tres vueltas enteras de cada cuatro, un texto
 distinto cada vez, y pasaba a solas y con media carga. Cuando un `smartload`

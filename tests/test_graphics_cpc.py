@@ -156,7 +156,7 @@ def draw_on_both(commands):
 
     session = emulator.Session(machine="CPC6128")
     try:
-        time.sleep(3.0)  # let the machine finish coming up
+        time.sleep(emulator.longer(3.0))  # let the machine finish coming up
         finished = session.start_code(blob, LOADS_AT, done, timeout=40.0)
         screen = session.read(SCREEN, 0x4000)
     finally:

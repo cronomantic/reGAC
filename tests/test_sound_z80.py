@@ -96,7 +96,7 @@ def test_an_effect_plays_over_the_tune_and_lets_go():
     session = emulator.Session(machine="128k")
     try:
         session.load(SNAPSHOT)
-        time.sleep(1.0)
+        time.sleep(emulator.longer(1.0))
         assert session.read(where["playing_flag"], 1)[0] == 0xFF, (
             "the build never got past starting the tune"
         )

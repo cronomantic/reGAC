@@ -269,9 +269,9 @@ def test_the_loader_puts_the_screen_up_and_runs_what_follows():
 
     session = emulator.Session(machine="48k")
     try:
-        time.sleep(2.5)
+        time.sleep(emulator.longer(2.5))
         session.command("smartload " + os.path.join(SPECTRUM, "loader.tap"))
-        time.sleep(12.0)
+        time.sleep(emulator.longer(12.0))
         shown = bytes(session.read(0x4000, 6912))
         ran = session.read(0x9000, 1)[0]
     finally:

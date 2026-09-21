@@ -200,7 +200,7 @@ def test_an_adventure_loads_off_a_cassette_and_plays():
         machine="MSX1", extra=["--tape", tape_of(code, database, screen)]
     )
     try:
-        time.sleep(10.0)                # the ROM has its own things to do first
+        time.sleep(emulator.longer(10.0))                # the ROM has its own things to do first
         session.msx_type(BLOAD)
         shown = wait_for_screen(session, screen)
         opening = wait_screen(session, glyphs, prompt, timeout=120.0)

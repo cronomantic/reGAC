@@ -143,7 +143,7 @@ def once(built, order):
     session = emulator.Session()
     try:
         session.load(SNAPSHOT)
-        time.sleep(2.0)
+        time.sleep(emulator.longer(2.0))
         session.type(order + ENTER)
         typed = bytes(session.read(buffer, len(order)))
         session.command("reset-tstates-partial")

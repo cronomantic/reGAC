@@ -154,7 +154,7 @@ def run_the_harness(tmp_path, told=True, protected=False):
         extra.append("--dsk-write-protection")
     session = emulator.Session(machine="CPC6128", extra=extra)
     try:
-        time.sleep(4.0)
+        time.sleep(emulator.longer(4.0))
         assert session.start_code(blob, LOADS_AT, where["started_flag"], 1), (
             "the harness never got going"
         )
@@ -166,7 +166,7 @@ def run_the_harness(tmp_path, told=True, protected=False):
         flags = {name: session.read(at, 1)[0] for name, at in where.items()}
     finally:
         session.close()
-    time.sleep(1.0)                             # for the file to be written
+    time.sleep(emulator.longer(1.0))                             # for the file to be written
     with open(path, "rb") as f:
         return flags, f.read()
 
@@ -285,7 +285,7 @@ def test_a_game_saved_and_loaded_at_the_keyboard(tmp_path):
         extra=["--enable-dsk", "--dsk-file", path, "--dsk-persistent-writes"],
     )
     try:
-        time.sleep(4.0)
+        time.sleep(emulator.longer(4.0))
         session.type_keys('run"juego' + chr(13))
         shown = wait_screen(session, glyphs, asking(ddb), timeout=120.0)
         assert any(asking(ddb) in line for line in shown if line), (
@@ -328,7 +328,7 @@ def test_a_game_saved_and_loaded_at_the_keyboard(tmp_path):
         session.close()
 
     # And the game really is in the file on the disk, the room first.
-    time.sleep(1.0)
+    time.sleep(emulator.longer(1.0))
     with open(path, "rb") as f:
         left = f.read()
     area = reader.data_area(left)

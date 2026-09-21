@@ -120,7 +120,7 @@ def test_an_adventure_plays_with_the_music_on():
 
     session = emulator.Session(machine="CPC6128")
     try:
-        time.sleep(3.0)
+        time.sleep(emulator.longer(3.0))
         # Where the music ends up is read from the listing, so it follows
         # the build: $0300 the usual way round, and up under the island when
         # the interpreter has taken the low memory instead.

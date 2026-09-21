@@ -135,7 +135,7 @@ def wait_screen(session, glyphs, wanted, timeout=90.0):
         lines = screen(session, glyphs)
         if any(wanted in line for line in lines if line):
             return lines
-        time.sleep(1.0)
+        time.sleep(emulator.longer(1.0))
     return lines
 
 
@@ -171,7 +171,7 @@ def test_it_asks_and_answers_on_an_msx():
 
     session = emulator.Session(machine="MSX1")
     try:
-        time.sleep(7.0)
+        time.sleep(emulator.longer(7.0))
         start_playing(session, where, database)
         opening = wait_screen(session, glyphs, prompt)
         assert any(prompt in line for line in opening if line), (

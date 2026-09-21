@@ -69,7 +69,7 @@ def test_the_interrupt_plays_while_the_loop_only_counts():
     session = emulator.Session(machine="TBBlue")
     try:
         session.load(IMAGE)
-        time.sleep(1.5)
+        time.sleep(emulator.longer(1.5))
         plays_while_counting(session, where, "the Next")
     finally:
         session.close()

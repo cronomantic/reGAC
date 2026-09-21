@@ -130,7 +130,7 @@ def test_the_disk_carries_the_music_in_its_one_file(tmp_path):
         machine=MACHINE, extra=["--enable-dsk", "--dsk-file", path]
     )
     try:
-        time.sleep(5.0)
+        time.sleep(emulator.longer(5.0))
         session.type(ENTER)             # the Loader entry of the menu
         screen = wait_screen(session, glyphs, described, timeout=120.0)
         assert any(described in line for line in screen), (

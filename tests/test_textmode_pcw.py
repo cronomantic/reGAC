@@ -148,7 +148,7 @@ def waited_for_the_prompt(session, glyphs, timeout=90.0):
         lines = [line for line in lines if line]
         if lines and lines[-1] == ">":
             return
-        time.sleep(1.0)
+        time.sleep(emulator.longer(1.0))
     raise AssertionError(f"the machine never asked for an order: {lines}")
 
 
@@ -167,7 +167,7 @@ def picture_half_after(orders, scale=2):
             out.append(picture_half(session))
             for order in orders:
                 type_them(session, order + ENTER)
-                time.sleep(2.0)         # for the prompt that is up to go
+                time.sleep(emulator.longer(2.0))         # for the prompt that is up to go
                 waited_for_the_prompt(session, glyphs)
                 out.append(picture_half(session))
         finally:

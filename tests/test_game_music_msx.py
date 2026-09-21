@@ -108,7 +108,7 @@ def test_an_adventure_plays_with_the_music_on():
 
     session = emulator.Session(machine="MSX1")
     try:
-        time.sleep(7.0)
+        time.sleep(emulator.longer(7.0))
         start_playing(session, where, database.build())
         opening = wait_screen(session, glyphs, prompt)
         assert any(prompt in line for line in opening if line), (

@@ -149,7 +149,7 @@ def draw_on_both(commands):
 
     session = emulator.Session(machine="MSX1")
     try:
-        time.sleep(7.0)  # this one takes its time coming up
+        time.sleep(emulator.longer(7.0))  # this one takes its time coming up
         finished = session.start_code(blob, LOADS_AT, done, timeout=30.0)
         patterns = bytes(session.read(MSX_PATTERNS, MSX_PICTURE_BYTES, zone=VRAM))
         colours = bytes(session.read(MSX_COLOURS, MSX_PICTURE_BYTES, zone=VRAM))

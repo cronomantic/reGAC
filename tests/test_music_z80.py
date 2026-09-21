@@ -168,7 +168,7 @@ def test_the_interrupt_plays_while_the_loop_only_counts():
     session = emulator.Session(machine="128k")
     try:
         session.load(SNAPSHOT)
-        time.sleep(1.0)
+        time.sleep(emulator.longer(1.0))
         plays_while_counting(session, where, "the Spectrum")
     finally:
         session.close()

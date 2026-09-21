@@ -187,7 +187,7 @@ def test_the_disk_starts_the_game(tmp_path):
         machine="CPC6128", extra=["--enable-dsk", "--dsk-file", path]
     )
     try:
-        time.sleep(4.0)
+        time.sleep(emulator.longer(4.0))
         session.type_keys('run"juego' + chr(13))
         screen = wait_screen(session, glyphs, asking(ddb), timeout=90.0)
     finally:
@@ -219,7 +219,7 @@ def test_the_disk_puts_up_a_loading_screen(tmp_path):
         machine="CPC6128", extra=["--enable-dsk", "--dsk-file", path]
     )
     try:
-        time.sleep(4.0)
+        time.sleep(emulator.longer(4.0))
         session.type_keys('run"juego' + chr(13))
         deadline, seen = time.time() + 60.0, False
         # Out of the machine's RAM and not through the processor's eyes: at
@@ -255,7 +255,7 @@ def test_the_tape_starts_the_game(tmp_path):
         machine="CPC464", extra=["--fastautoload", "--simulaterealloadfast"]
     )
     try:
-        time.sleep(2.5)
+        time.sleep(emulator.longer(2.5))
         session.command("smartload " + path)
         screen = wait_screen(session, glyphs, asking(ddb), timeout=900.0)
     finally:

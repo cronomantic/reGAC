@@ -109,6 +109,12 @@ def started(session, where, wanted):
     loading anything over an inserted tape leaves the tape where the ROM can
     no longer read it, which looks exactly like a routine that does not work.
     """
+    # Not grown for the company, although everything else is: one of the two
+    # tests this serves has a tape inserted and running, and a tape does not
+    # wait for a machine that is sharing a processor with three others.
+    # Waiting longer leaves the block already gone past, and then the routine
+    # looks as though it could not read one.  Measured: scaling it failed both
+    # rounds of the suite.
     time.sleep(3.0)
     with open(BINARY, "rb") as f:
         blob = f.read()
@@ -118,7 +124,7 @@ def started(session, where, wanted):
         )
     session.command(f"write-memory-raw {where['wanted']} {wanted:02X}")
     session.jump(LOADS_AT)
-    time.sleep(1.0)
+    time.sleep(emulator.longer(1.0))
     assert session.read(where["ready_flag"], 1)[0] == 1, "the build never started"
 
 

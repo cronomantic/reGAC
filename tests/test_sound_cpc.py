@@ -71,7 +71,7 @@ def played(which, where, blob, sound, seconds=2.0):
         os.remove(sound)
     session = emulator.Session(machine="CPC6128", extra=["--aofile", sound])
     try:
-        time.sleep(3.0)
+        time.sleep(emulator.longer(3.0))
         assert session.start_code(blob, LOADS_AT, where["ready_flag"],
                                   timeout=10.0), "the build never started"
         session.command(f"write-memory {where['which']} {which}")

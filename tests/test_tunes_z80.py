@@ -96,7 +96,7 @@ def test_each_tune_of_a_build_can_be_asked_for():
     session = emulator.Session(machine="128k")
     try:
         session.load(SNAPSHOT)
-        time.sleep(1.0)
+        time.sleep(emulator.longer(1.0))
         assert session.read(where["playing_flag"], 1)[0] == 0xFF, (
             "the build never got past starting a tune"
         )
