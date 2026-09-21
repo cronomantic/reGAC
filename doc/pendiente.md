@@ -2506,9 +2506,8 @@ Las cuatro aventuras se abren ya sin tocar nada:
 | El Quijote II | `HIDALGO INGENIOSO` --verbo 80 y nombre 80, en ese orden--, **y hay un solo intento**: cualquier otra cosa imprime el mensaje 100 y se acabó |
 | Las vajillas | `SPIELBERG` --un **nombre**, no un verbo: nombrarlo lleva a la sala 21-- |
 
-El espejo juega hoy dos de las cuatro. El Quijote y Las vajillas esperan, y
-por qué está más abajo: al uno le falta que entre una rama, y la otra no se
-puede copiar.
+El espejo juega hoy tres de las cuatro. La que falta es Las vajillas, y por
+qué está más abajo.
 
 De paso, la condición de la tabla alta del Quijote que pide un adverbio número
 80 es **madera muerta**: sus adverbios son cuatro palabras todas con el número

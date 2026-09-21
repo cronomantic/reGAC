@@ -185,6 +185,14 @@ def test_a_banked_disk_puts_each_bank_in_its_page(tmp_path):
         time.sleep(5.0)
         session.type(ENTER)
         wait_screen(session, glyphs, OPENS_WITH, timeout=120.0)
+        # And the rest of the title before pressing anything: the interpreter
+        # looks at the keyboard only when it stops to ask, so a key pressed
+        # while the title is still going out is a key nobody hears -- and
+        # then it waits for one that never comes.  The last word of the title
+        # is what says it has finished.
+        wait_screen(session, glyphs,
+                    ddb["locations"][str(ddb["init_loc"])]["desc"].split()[-1],
+                    timeout=60.0)
         session.type(ENTER)                     # past the title it waits on
         screen = wait_screen(session, glyphs, LANDS_IN, timeout=120.0)
         bitmap = session.read(0x4000, 6144)

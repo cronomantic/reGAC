@@ -31,6 +31,11 @@ INK_ZERO        equ 48                  ; the colour rides as a character
 ; and the rest of it only has to be printed.
 WORD_ROOM       equ SCREEN_COLS + 1
 
+; In held_sep, the bit that says another separator came just before this one.
+; No character of a text carries it, so the two ride in the one byte, and the
+; mark on its own means "one has just gone out and nothing is waiting".
+AFTER_SEP       equ $80
+
 ; Move to the beginning of the next line, unless nothing has been written on
 ; this one yet.  The original leaves no blank line where a line has just
 ; filled itself: MegaCorp's rule of thirty two asterisks ends exactly at the
@@ -65,7 +70,8 @@ print_text:
 text_end:
                 xor     a
                 ld      (ink_next), a
-                jr      word_out
+                call    word_out
+                jp      put_held_sep
 
 ; One character of a text, in A.
 ; Corrupts: everything
@@ -108,16 +114,26 @@ text_put:
                 ld      (hl), c
                 ret
 .word_over:
-                ; the word goes out, and then what ended it, printed where it
-                ; falls without asking whether it fits
+                ; The word goes out, and what ended it is held back rather
+                ; than printed, because where the line breaks depends on what
+                ; comes after it.  See word_print.
                 push    bc
-                call    word_out
+                call    word_out                ; which may take the held one
+                call    flush_held_sep          ; and if it did not, out it goes
                 pop     bc
                 ld      a, c
-                jp      print_char
+                ld      hl, held_sep
+                or      (hl)                    ; keeping the mark, if any
+                ld      (hl), a
+                ret
 .ink_coming:
                 ; a command ends a word too, and its colour is the code after
                 call    word_out
+                ; and what is held goes out in the colour it was written in,
+                ; not in the one that is coming: a space between two words of
+                ; different colours keeps the first, which is what any machine
+                ; of this kind does
+                call    put_held_sep
                 ld      a, 1
                 ld      (ink_next), a
                 ret
@@ -131,14 +147,14 @@ text_put:
 ; for one too long to hold that is still going on.
 ; Corrupts: everything
 word_out:
-                call    word_print
                 xor     a
-                ld      (held_going_on), a
-                ret
-
+                jr      word_kept
 word_piece:
-                call    word_print
                 ld      a, 1
+word_kept:
+                push    af
+                call    word_print
+                pop     af
                 ld      (held_going_on), a
                 ret
 
@@ -154,13 +170,33 @@ word_print:
                 ld      a, (held_going_on)
                 or      a
                 jr      nz, .print_it
+                ; Where the separator held back goes.  The original asks
+                ; its question after printing a separator, so the break falls
+                ; behind it -- unless another separator came just before, in
+                ; which case that earlier one asked first and got the same
+                ; answer, and the break falls in front.  So one that ends a
+                ; word stays where it is and the word goes down alone, while
+                ; one out of a run of them goes down with the word and shows
+                ; at the head of the line.  That is what centres text in the
+                ; original.
+                ld      a, (held_sep)
+                add     a, a                    ; carry says one came before
+                push    de
+                call    nc, put_held_sep        ; so this one ends a word
+                pop     de
+                ; A word has to end before the last column and not on it, and
+                ; one still waiting in front of it takes a column too: the
+                ; original leaves that last one empty.  Found by playing
+                ; MegaCorp on both at once -- its street in Nyhmir has a
+                ; "razas" that ends exactly at the edge, and the original puts
+                ; it on the next line while this kept it.
+                ld      a, (held_sep)
+                add     a, a                    ; zero when none is waiting
                 ld      a, (cursor_x)
+                jr      z, .no_sep
+                inc     a
+.no_sep:
                 add     a, e
-                ; A word has to end before the last column, not on it: the
-                ; original leaves that one empty.  Found by playing MegaCorp
-                ; on both at once -- its street in Nyhmir has a "razas" that
-                ; ends exactly at the edge, and the original puts it on the
-                ; next line while this kept it.
                 cp      SCREEN_COLS
                 jr      c, .print_it
                 ld      a, (cursor_x)
@@ -170,6 +206,9 @@ word_print:
                 call    new_line                ; this treads on every register
                 pop     de
 .print_it:
+                push    de
+                call    put_held_sep            ; if it is still waiting
+                pop     de
                 ld      hl, held_word
 .each:
                 ld      a, (hl)
@@ -183,9 +222,39 @@ word_print:
                 jr      nz, .each
                 xor     a
                 ld      (held_length), a
+                ld      (held_sep), a           ; what follows a word is alone
                 ret
+
+; What ended the last word goes out at last, wherever the line has ended up,
+; and nothing happens if there is none waiting.  What it leaves behind is the
+; mark on its own, so that the separator that comes next knows one went before
+; it, which is what tells a space out of a run from a space that ends a word.
+; Corrupts: everything
+put_held_sep:
+                ld      a, (held_sep)
+                and     AFTER_SEP - 1
+                ret     z
+                ld      hl, held_sep
+                ld      (hl), AFTER_SEP
+                jp      print_char
+
+; The one held back goes out now, because another separator has come along
+; behind it.  What the original asks of it comes to "does anything at all fit
+; after me", because it measures the stretch that begins one character further
+; on, so from the column before last it takes the line with it.
+; Corrupts: everything
+flush_held_sep:
+                ld      a, (held_sep)
+                add     a, a
+                ret     z
+                call    put_held_sep
+                ld      a, (cursor_x)
+                cp      SCREEN_COLS - 1
+                ret     nz
+                jp      new_line
 
 held_word:      ds      WORD_ROOM               ; one word, or a piece of one
 held_length:    db      0               ; how much of it is in use
+held_sep:       db      0               ; what ended it, not printed yet
 held_going_on:  db      0               ; the rest of a word too long to hold
 ink_next:       db      0               ; the next code is a colour

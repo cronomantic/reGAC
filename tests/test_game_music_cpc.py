@@ -56,7 +56,9 @@ import emulator  # noqa: E402
 from regac.binary import Database  # noqa: E402
 from regac.conds import compile_block  # noqa: E402
 from test_game_cpc import (ADVENTURE, BINARY, DATABASE, LISTING,  # noqa: E402
-                           LOADS_AT, SOURCE, glyph_table, wait_screen)
+                           LOADS_AT, SOURCE, assembled, glyph_table, put,
+                           screen, wait_screen)
+from regac.media import CPC_LOW_ISLAND_AT  # noqa: E402
 from test_music_z80 import TUNE, word  # noqa: E402
 
 MUSIC_BINARY = os.path.join(ROOT, "z80", "cpc", "game_music.bin")
@@ -95,20 +97,13 @@ def build():
     database = Database(ddb, machine="cpc")
     with open(DATABASE, "wb") as f:
         f.write(database.build())
-    listing = emulator.assemble(SOURCE, listing=LISTING,
-                                defines=("WITH_MUSIC", "WITH_EFFECTS"))
-    return ddb, database, listing
-
-
-def put(session, blob, at):
-    for offset in range(0, len(blob), 512):
-        piece = blob[offset:offset + 512]
-        session.command(f"write-memory-raw {at + offset} " + piece.hex().upper())
+    listing, low = assembled(("WITH_MUSIC", "WITH_EFFECTS"))
+    return ddb, database, listing, low
 
 
 @needs_tools
 def test_an_adventure_plays_with_the_music_on():
-    ddb, database, listing = build()
+    ddb, database, listing, low = build()
     glyphs = glyph_table(database)
     where = {name: emulator.label_address(listing, name)
              for name in ("music_playing", "music_tune", "music_at", "music_end",
@@ -126,9 +121,17 @@ def test_an_adventure_plays_with_the_music_on():
     session = emulator.Session(machine="CPC6128")
     try:
         time.sleep(3.0)
+        # Where the music ends up is read from the listing, so it follows
+        # the build: $0300 the usual way round, and up under the island when
+        # the interpreter has taken the low memory instead.
         put(session, music, where["music_at"])
         put(session, game, LOADS_AT)
         session.jump(LOADS_AT)
+        if low:
+            time.sleep(0.5)
+            with open(DATABASE, "rb") as f:
+                put(session, f.read(), LOADS_AT)
+            session.jump(CPC_LOW_ISLAND_AT)
 
         opening = wait_screen(session, glyphs, prompt)
         assert any(prompt in line for line in opening if line), (
@@ -152,6 +155,11 @@ def test_an_adventure_plays_with_the_music_on():
         # there too, watched on it.
         session.type_keys(PASSWORD + ENTER)
         wait_screen(session, glyphs, ddb["locations"]["1"]["desc"][:12], timeout=30.0)
+        # And then until it asks again, because the description is still
+        # going out and a key pressed while it is has nowhere to go.
+        emulator.until(lambda: screen(session, glyphs),
+                       lambda lines: emulator.asking(lines,
+                                                     ddb["messages"]["240"]))
         session.type_keys("XYZZY" + ENTER)
         answered = wait_screen(session, glyphs, puzzled[:6], timeout=30.0)
         assert any(puzzled[:6] in line for line in answered), (

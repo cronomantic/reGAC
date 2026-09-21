@@ -1031,22 +1031,60 @@ class GAC_Interpreter:
         # text: this screen has one colour, so it comes out here the way it is
         # ignored on a machine that cannot colour anything either.
         string = plain(expand(string))
-        # This method replicates the 8bit mechanism. No much python-correctness is expected
+        # This follows what the original's $778A does, the same way the
+        # machines do in z80/common/textout.asm: a word is held until what
+        # ends it arrives, because only then is it known whether it fits, and
+        # what ends it is held in turn, because where the line breaks depends
+        # on whether a separator came before it.  One that ends a word stays
+        # where it is and the word goes down alone; one out of a run of them
+        # goes down with the word, and shows at the head of the line.  That is
+        # what centres text in the original.  See doc/pendiente.md.
         separators = self.punctuation + ["\n"]
-        pos = 0
-        while pos < len(string):
-            pos_w = pos
-            while pos_w < (len(string) - 1) and string[pos_w] not in separators:
-                pos_w += 1
-            substring = string[pos : pos_w + 1]
-            if len(substring) > self.line_remain:
-                sys.stdout.write("\n")
-                self.line_remain = self.width
-            if string[pos_w] == "\n":
-                self.line_remain = self.width
-            self.line_remain -= len(substring)
-            pos = pos_w + 1
-            sys.stdout.write(substring)
+
+        def put(text):
+            for char in text:
+                sys.stdout.write(char)
+                self.line_remain -= 1
+                if self.line_remain <= 0:
+                    self.line_remain = self.width
+
+        def new_line():
+            sys.stdout.write("\n")
+            self.line_remain = self.width
+
+        def word(sep, run, in_run):
+            crowded = len(sep) + len(run) >= self.line_remain
+            if sep and not in_run:
+                put(sep)
+                sep = ""
+            if crowded and self.line_remain != self.width:
+                new_line()
+            put(sep + run)
+
+        run, sep, in_run = "", "", False
+        for char in string:
+            if char not in separators:
+                run += char
+                continue
+            if run:
+                word(sep, run, in_run)
+                run, in_run = "", False
+            elif sep:
+                put(sep)
+                if self.line_remain == 1:
+                    new_line()
+                in_run = True
+            else:
+                in_run = False
+            if char == "\n":
+                sep, in_run = "", False
+                new_line()
+            else:
+                sep = char
+        if run:
+            word(sep, run, in_run)
+        elif sep:
+            put(sep)
 
     def input(self):
         self.line_remain = self.width

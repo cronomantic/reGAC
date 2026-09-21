@@ -156,6 +156,11 @@ def test_it_asks_and_answers_on_a_pcw(tmp_path):
         # there too, watched on it.
         type_them(session, PASSWORD + ENTER)
         wait_screen(session, glyphs, ddb["locations"]["1"]["desc"][:12], timeout=30.0)
+        # And then until it asks again, because the description is still
+        # going out and a key pressed while it is has nowhere to go.
+        emulator.until(lambda: screen(session, glyphs),
+                       lambda lines: emulator.asking(lines,
+                                                     ddb["messages"]["240"]))
         # A word the adventure does not know, so it has to say so.
         type_them(session, "XYZZY" + ENTER)
         answered = wait_screen(session, glyphs, puzzled[:6], timeout=30.0)

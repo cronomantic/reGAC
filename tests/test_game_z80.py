@@ -146,6 +146,11 @@ def test_it_describes_asks_and_answers():
         # there too, watched on it.
         session.type(PASSWORD + ENTER)
         wait_screen(session, glyphs, ddb["locations"]["1"]["desc"][:12], timeout=30.0)
+        # And then until it asks again, because the description is still
+        # going out and a key pressed while it is has nowhere to go.
+        emulator.until(lambda: screen(session, glyphs),
+                       lambda lines: emulator.asking(lines,
+                                                     ddb["messages"]["240"]))
         # A word the adventure does not know, so it has to say so.
         session.type("XYZZY" + ENTER)
         answered = wait_screen(session, glyphs, puzzled[:10], timeout=20.0)

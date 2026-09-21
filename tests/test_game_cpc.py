@@ -42,7 +42,8 @@ sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import emulator  # noqa: E402
-from regac.binary import Database  # noqa: E402
+from regac.binary import Database
+from regac.media import CPC_LOW_ISLAND_AT  # noqa: E402
 from test_text_cpc import decode_screen, glyph_table  # noqa: E402
 
 CPC = os.path.join(ROOT, "z80", "cpc")
@@ -71,6 +72,23 @@ else:
         return func
 
 
+def assembled(defines=()):
+    """The interpreter, the usual way round if it fits and the other way if it
+    does not: (listing, whether it went low).
+
+    This is what `regac release` does for this machine and no other -- a 464
+    has no banks and its database has to sit in one stretch, so when the two
+    together pass the firmware the interpreter goes under $4000 instead and
+    the database has everything above it.  The reason is in z80/cpc/game.asm,
+    and the shape of it is watched in test_low_cpc.py; what matters here is
+    that a test never watches a shape nobody ships."""
+    try:
+        return emulator.assemble(SOURCE, listing=LISTING, defines=defines), False
+    except RuntimeError:
+        return emulator.assemble(SOURCE, listing=LISTING,
+                                 defines=tuple(defines) + ("LOW_CODE",)), True
+
+
 def build():
     subprocess.run(
         [sys.executable, "-m", "regac", "build", ADVENTURE, DATABASE, "-m", "cpc"],
@@ -78,15 +96,33 @@ def build():
         check=True,
         capture_output=True,
     )
-    return emulator.assemble(SOURCE, listing=LISTING)
+    return assembled()[0]
 
 
-def start(session):
+def put(session, blob, at):
+    for offset in range(0, len(blob), 512):
+        piece = blob[offset:offset + 512]
+        session.command(f"write-memory-raw {at + offset} " + piece.hex().upper())
+
+
+def start(session, low=False):
+    """What the loader does, with the pieces put where it would have put them.
+
+    The usual way round that is the one file at $4000 and a jump into it.  The
+    other way it is the interpreter's file there, its mover called -- which
+    carries it down and leaves the starter at the island -- the database over
+    the top of it, and the starter called, because with the lower ROM still in
+    nothing under $4000 can be jumped to."""
     with open(BINARY, "rb") as f:
         blob = f.read()
-    for at in range(0, len(blob), 512):
-        session.command(f"write-memory-raw {LOADS_AT + at} " + blob[at:at + 512].hex().upper())
+    put(session, blob, LOADS_AT)
     session.jump(LOADS_AT)
+    if not low:
+        return
+    time.sleep(0.5)
+    with open(DATABASE, "rb") as f:
+        put(session, f.read(), LOADS_AT)
+    session.jump(CPC_LOW_ISLAND_AT)
 
 
 def screen(session, glyphs):
@@ -138,6 +174,11 @@ def test_it_asks_and_answers_on_an_amstrad():
         # there too, watched on it.
         session.type_keys(PASSWORD + ENTER)
         wait_screen(session, glyphs, ddb["locations"]["1"]["desc"][:12], timeout=30.0)
+        # And then until it asks again, because the description is still
+        # going out and a key pressed while it is has nowhere to go.
+        emulator.until(lambda: screen(session, glyphs),
+                       lambda lines: emulator.asking(lines,
+                                                     ddb["messages"]["240"]))
         # A word the adventure does not know, so it has to say so.
         session.type_keys("XYZZY" + ENTER)
         answered = wait_screen(session, glyphs, puzzled[:6], timeout=30.0)

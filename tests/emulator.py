@@ -136,6 +136,36 @@ def label_address(listing, label):
     raise KeyError(f"no label {label!r} in {listing}")
 
 
+def asking(lines, prompt):
+    """Whether the turn is over and the machine is asking again: the last line
+    with anything on it is the prompt, and nothing has been typed after it."""
+    written = [line for line in lines if line.strip()]
+    return bool(written) and written[-1].strip() == prompt.strip()
+
+
+def until(reader, ready, timeout=30.0, every=0.5):
+    """Let the machine run until what is read is ready, and give that back.
+
+    Reading a screen is each machine's own business, so the reader is handed
+    in.  What this is for is typing: waiting for a description to begin is
+    not waiting for the turn to be over, and a key pressed while the rest of
+    it is still going out has nowhere to go -- the interpreter looks at the
+    keyboard only while it asks, which is what the original does and what a
+    person sees.  Eight tests typed too early and dropped the first letter of
+    an order now and then; whether they did depended on how fast they were
+    polling, so it showed on one machine and not another and looked like the
+    interpreter's fault.
+    """
+    deadline = time.time() + longer(timeout)
+    what = reader()
+    while time.time() < deadline:
+        what = reader()
+        if ready(what):
+            return what
+        time.sleep(every)
+    return what
+
+
 # The eight marks GAC ends a word with, less the space and the end of string
 # marker.  Every one of the adventures we have uses the same table.
 WORD_MARKS = ".,-!?:"
@@ -156,6 +186,12 @@ def wrapped(texts, width, marks=WORD_MARKS):
     varias razas", where the razas ends exactly at the edge, and the original
     puts it on the next line.
 
+    And what ends a word is held back until it is known whether the next one
+    fits: if it does not, the separator goes down with it, so a line that has
+    been broken begins with the space that was in front of the word.  That is
+    what centres text in the original, and it is what its own code does --
+    see doc/pendiente.md for the reading of it.
+
     Each text is a message of its own and the build that prints them ends a
     line after each one.
     """
@@ -168,24 +204,45 @@ def wrapped(texts, width, marks=WORD_MARKS):
             lines.append(line)
             line = ""
 
-    def word(run):
+    def end_line():
         nonlocal line
-        if run and line and len(line) + len(run) >= width:
-            lines.append(line)
-            line = ""
-        for char in run:
+        lines.append(line)
+        line = ""
+
+    def word(sep, run, in_run):
+        nonlocal line
+        crowded = len(line) + len(sep) + len(run) >= width
+        if sep and not in_run:
+            put(sep)                    # one that ends a word stays put
+            sep = ""
+        if crowded and line:
+            end_line()
+        for char in sep + run:          # one out of a run goes down with it
             put(char)
 
     for text in texts:
-        run = ""
+        run, sep, in_run = "", "", False
         for char in text:
             if char != " " and char not in marks:
                 run += char
                 continue
-            word(run)
-            run = ""
-            put(char)
-        word(run)
+            if run:
+                word(sep, run, in_run)
+                run, in_run = "", False
+            elif sep:
+                # two separators running: the one held goes out now, and from
+                # the column before last it takes the line with it
+                put(sep)
+                if len(line) == width - 1:
+                    end_line()
+                in_run = True
+            else:
+                in_run = False
+            sep = char
+        if run:
+            word(sep, run, in_run)
+        elif sep:
+            put(sep)
         lines.append(line)              # the new line after each message
         line = ""
     return [one.rstrip() for one in lines if one.strip()]

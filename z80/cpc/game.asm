@@ -31,8 +31,28 @@
                 ENDIF
 
 FIRMWARE_AT     equ $B100               ; what the firmware keeps for itself
-MUSIC_AT        equ $0300               ; above the BASIC line that loads us
 MUSIC_LOADS_AT  equ $4000               ; where its file comes in, to be moved
+
+; Where the music ends up is not the same in the two builds, so it is named
+; further down, once it is known which one this is.  The usual way round it is
+; $0300, above the BASIC line that loads us and under everything else, where
+; there is nothing else to want the room.
+;
+; In a low build the interpreter is down there, and the music goes to the
+; other end instead: the five kilobytes under the island, which is room the
+; database would otherwise have had.  Above the interpreter would have been
+; less trouble and it was tried, but it left a hundred and eighty three bytes
+; between the two and the interpreter is the thing that grows.  This way it
+; keeps the whole of the low RAM -- some four and a half kilobytes spare --
+; and what the database loses still leaves it bigger than it is the usual way
+; round, where the interpreter is eating into it from below.
+MUSIC_ROOM      equ $1400               ; five kilobytes, and the assert says
+                                        ; so if a set of tunes wants more
+
+; Where BASIC's own is, while it loads: the cassette buffer is the two
+; kilobytes under HIMEM, which the loader sets to $3FFF, and the variables of
+; a six line program grow down from there and want almost nothing.
+BASIC_KEEPS_FROM equ $3700
 
 ; An adventure whose database does not leave room for the interpreter above
 ; $4000 -- the two parts of the Quijote are the ones that do not -- is built
@@ -51,18 +71,19 @@ MUSIC_LOADS_AT  equ $4000               ; where its file comes in, to be moved
 ; It travels like the music does, because the BASIC line that loads it is
 ; itself at $0170: the file comes in at $4000 with a mover in front of it,
 ; the mover carries it down and comes back, and then the database is loaded
-; over where it landed.  Music and this do not go together -- the music lives
-; at $0300 and is seven kilobytes -- and none of the adventures that need
-; this has any.
+; over where it landed.
+;
+; This goes with music, and the two no longer fight over the same bytes,
+; because the music moves: in a low build it is put in the five kilobytes
+; under the island rather than at $0300, which is where the interpreter now
+; is.  So the interpreter has the low RAM to itself and what the music costs
+; comes off the end of the database, which even so is left bigger than it is
+; the usual way round.
                 IFDEF LOW_CODE
 CODE_AT         equ $0400
 CODE_LOADS_AT   equ $4000               ; where its file comes in, to be moved
 DATABASE_AT     equ $4000
 ISLAND_AT       equ $AB00
-                IFDEF WITH_MUSIC
-                DISPLAY "a low build has no room for music: it is at $0300"
-                ASSERT 0
-                ENDIF
 ; The mover, and with it the seven bytes that start the thing.  BASIC cannot
 ; call $0400 itself: at that moment the lower ROM is still in and $0400 is
 ; ROM, not the interpreter.  So what BASIC calls is the starter, up where
@@ -168,7 +189,12 @@ done_flag:      db      0
 ; the mover has carried this down.  How much of it fits is the builder's to
 ; check, because the assembler never sees it.
 last:
-                ASSERT  last <= DATABASE_AT     ; or the database would land on it
+                ; Not up to $4000 but well short of it, because the mover runs
+                ; as a CALL from BASIC and BASIC is still alive underneath:
+                ; with HIMEM at $3FFF the cassette buffer is the two kilobytes
+                ; below it and the loader's variables grow down from there, so
+                ; an LDIR that reached them would come back to nothing.
+                ASSERT  last <= BASIC_KEEPS_FROM
 database        equ DATABASE_AT
 CODE_BYTES      equ last - start
                 ENT                             ; back to where the file loads
@@ -191,6 +217,11 @@ last:
 ; The music itself is assembled for $0300 and stored behind the mover, which
 ; is what DISP is for -- the same way the interrupt's routine travels.
                 IFDEF WITH_MUSIC
+                IFDEF LOW_CODE
+MUSIC_AT        equ ISLAND_AT - MUSIC_ROOM
+                ELSE
+MUSIC_AT        equ $0300
+                ENDIF
                 ORG     MUSIC_LOADS_AT
 music_mover:
                 ld      hl, music_image
@@ -217,8 +248,12 @@ effects:
                 UNDEFINE MUSIC_LIST
                 UNDEFINE MUSIC_STORE
 music_end:
+                IFDEF LOW_CODE
+                ASSERT  music_end <= ISLAND_AT          ; or it would reach the
+                ELSE                                    ; island
                 ASSERT  music_end <= MUSIC_LOADS_AT     ; or it would reach the
-                ENT                                     ; interpreter
+                ENDIF                                   ; interpreter
+                ENT
 MUSIC_BYTES     equ music_end - music_at
 
                 SAVEBIN "game_music.bin", music_mover, $ - music_mover

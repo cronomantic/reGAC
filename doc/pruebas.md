@@ -24,12 +24,12 @@ tiempo sin que fallara nada por ello: sólo tardaba cuarenta y nueve minutos en
 vez de once, repitiendo en serie lo que la primera orden acababa de hacer en
 paralelo. La puerta pasa de una hora larga a poco más de veinte minutos.
 
-**El espejo no está en la puerta**: juega aventuras enteras --MegaCorp y Los
-pájaros de Bangkok, y El Quijote II en cuanto entre el ajuste de líneas-- en
-dos máquinas a la vez, tarda un cuarto de hora, y su trabajo es **buscar** y no
-vigilar. Se lanza cuando se ha tocado el intérprete, que es cuando puede
-encontrar algo --y encuentra: el ajuste de líneas, el `GET` de un objeto que no
-existe y la regla de cómo se parten las tiradas de espacios salieron de ahí--.
+**El espejo no está en la puerta**: juega tres aventuras enteras --MegaCorp,
+Los pájaros de Bangkok y El Quijote II-- en dos máquinas a la vez, tarda un
+cuarto de hora largo, y su trabajo es **buscar** y no vigilar. Se lanza cuando
+se ha tocado el intérprete, que es cuando puede encontrar algo --y encuentra:
+el ajuste de líneas, el `GET` de un objeto que no existe y la regla de cómo se
+parten las tiradas de espacios salieron de ahí--.
 
 Cuatro y no seis, aunque la máquina tenga ocho núcleos: con seis emuladores a
 la vez el grueso baja a nueve minutos pero empiezan a fallar pruebas **distintas
@@ -112,6 +112,23 @@ pytest tests/la_que_fallo.py -q        # a solas, un minuto
 Si pasa, era la compañía. Si falla, es de verdad y hay algo que arreglar. Un
 minuto de comprobación vale más que subir un plazo a ojo, y mucho más que
 creerse un fallo que no existe --o, peor, no creerse uno que sí--.
+
+**Y al revés también cuenta.** Ocho pruebas de partida tecleaban en cuanto
+asomaban los doce primeros caracteres de la descripción, que no es lo mismo
+que esperar a que el turno acabe: el resto de la descripción sigue saliendo, y
+una tecla pulsada mientras tanto no va a ninguna parte, porque el intérprete
+mira el teclado sólo mientras pregunta --que es lo que hace el original y lo
+que ve una persona--. Se perdía la primera letra de la orden, y que se
+perdiera o no dependía de lo deprisa que sondeara la prueba: **en paralelo no
+pasaba nunca y a solas pasaba siempre**, de modo que parecía culpa del
+intérprete de una máquina concreta. Ahora esperan a que vuelva a preguntar,
+con `emulator.until` y `emulator.asking`.
+
+La del Quijote en un 464 tenía la misma de otra forma: pulsaba espacio cuatro
+veces nada más arrancar, para pasar la portada, y si la portada aún estaba
+saliendo se perdían las cuatro --y entonces el juego se quedaba esperando una
+tecla que ya no iba a llegar, hasta agotar los dos minutos de plazo--. Ahora
+espera a la última palabra del título antes de pulsar.
 
 ## Si una vuelta se corta a medias
 

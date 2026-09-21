@@ -52,7 +52,7 @@ from regac.binary import Database  # noqa: E402
 from regac.conds import compile_block  # noqa: E402
 from test_game_msx import (ADVENTURE, BINARY, DATABASE, LISTING,  # noqa: E402
                            SOURCE, glyph_table, start_playing, type_them,
-                           wait_screen)
+                           screen, wait_screen)
 from test_music_z80 import TUNE, word  # noqa: E402
 
 EFFECTS = os.path.join(ROOT, "music", "effects.asm")
@@ -130,6 +130,11 @@ def test_an_adventure_plays_with_the_music_on():
         # there too, watched on it.
         type_them(session, PASSWORD + ENTER)
         wait_screen(session, glyphs, ddb["locations"]["1"]["desc"][:12], timeout=30.0)
+        # And then until it asks again, because the description is still
+        # going out and a key pressed while it is has nowhere to go.
+        emulator.until(lambda: screen(session, glyphs),
+                       lambda lines: emulator.asking(lines,
+                                                     ddb["messages"]["240"]))
         # Where the tune is just before the parser is given something to
         # do, so that what is compared below is one turn of it and not a
         # whole game: the track loops, and over long enough it can come back

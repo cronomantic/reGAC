@@ -446,7 +446,8 @@ def write_media(machine, code, where, name, load, entry, screen=None,
                 # The other way round, because this database leaves no room
                 # above $4000: the interpreter is carried under it and the
                 # database is a file of its own.
-                f.write(cpc_low_tape(code, database or b"", name, screen))
+                f.write(cpc_low_tape(code, database or b"", name, screen,
+                                     music))
             else:
                 f.write(cpc_tape(code, name, load, entry, screen, music))
         written.append(path)
