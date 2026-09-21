@@ -75,9 +75,16 @@ beep_click:
 ; Effect A, counting from one.  A number the
 ; build has not got makes no noise rather than reading past the table.
 ;
-; Each is three bytes: the pitch it starts at, how many flips it lasts, and
-; what to add to the pitch every flip -- which is what makes a blip rise or
-; fall, and is a byte with a sign.
+; Each is four bytes: the pitch it starts at, how many flips it lasts, what
+; to add to the pitch every flip -- which is what makes a blip rise or fall,
+; and is a byte with a sign -- and what it is to come out of.
+;
+; **The fourth is read past and not used here**, and that is not an oversight.
+; It picks between the tone generator and the noise one, and this machine has
+; neither: a speaker of one bit has exactly one thing it can do.  So a noise
+; meant as a hiss comes out as the swept note the pitch describes, which is
+; the nearest thing there is, and the adventure runs the same everywhere.
+; Where there is a chip, common/ay.asm does it properly.
 ; Corrupts: everything
 beep_sound:
                 or      a
@@ -87,10 +94,8 @@ beep_sound:
                 ret     nc
                 ld      l, a
                 ld      h, 0
-                ld      d, h
-                ld      e, l
                 add     hl, hl
-                add     hl, de                  ; three bytes to the effect
+                add     hl, hl                  ; four bytes to the effect
                 ld      de, beep_effects
                 add     hl, de
                 ld      a, (hl)                 ; the pitch

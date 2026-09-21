@@ -39,6 +39,26 @@ FONT_PREFIX = 8 * 32  # deGAC always prefixes the font with 32 blank characters
 
 UNESCAPE = {"0": "\0", "n": "\n", "t": "\t", '"': '"', "\\": "\\"}
 
+# What a noise comes out of.  A sound chip has a tone generator and a noise
+# generator and can use either or both; a speaker of one bit has neither, and
+# what it does with any of the three is flip as fast as the pitch says.  So
+# this changes what is heard where there is a chip and changes nothing where
+# there is not, which is why an adventure may use it freely.
+TONE, NOISE, BOTH = 0, 1, 2
+SOUND_CHANNELS = {"tone": TONE, "noise": NOISE, "both": BOTH}
+SOUND_CHANNEL_NAMES = {number: word for word, number in SOUND_CHANNELS.items()}
+
+
+def a_noise(said):
+    """A noise as it is kept: four numbers, whatever shape it came in.
+
+    Three is how they were written before there was a fourth, and an
+    adventure decompiled or built then still reads: a noise that does not say
+    what it comes out of is a tone."""
+    kept = list(said)
+    return kept + [TONE] * (4 - len(kept))
+
+
 
 class SourceError(Exception):
     pass
@@ -692,14 +712,24 @@ class Parser:
         SOUND counts them from one.
 
             /SOUND
-            ; pitch  steps  step
-                200    150     -1    ; cogido
-                 60    150      1    ; rechazado
+            ; pitch  steps  step  out of
+                200    150     -1          ; cogido
+                250    100      0  both    ; una puerta
+                 30    110      2  noise   ; una caida
 
         A pitch is how long half a wave lasts and a bigger one is a lower
         note; the step is what to add to it every time, so a step that takes
         the pitch down takes the note up.  An adventure that says nothing here
         gets five that come with the interpreter.
+
+        The fourth is what it comes out of, and it may be left off: `tone` is
+        a note, `noise` is the hiss the sound chip makes with no note in it,
+        and `both` is the two together.  A door, a fall and a stab of alarm
+        are not notes, and a chip can say so where a speaker of one bit can
+        only sweep a note and hope.  **The Spectrum 48 has no chip**, and
+        there the word is read and the tone played, so an adventure that uses
+        it still runs everywhere -- it just sounds better where there is
+        something to sound it with.
         """
         noises = self.ddb.setdefault("sounds", [])
         while not self.at_section():
@@ -709,11 +739,20 @@ class Parser:
             if not said:
                 continue
             parts = said.split()
-            if len(parts) != 3:
-                self.fail("a noise is: pitch steps step", lineno=lineno,
+            if not 3 <= len(parts) <= 4:
+                self.fail("a noise is: pitch steps step, and then tone, noise "
+                          "or both, which may be left off", lineno=lineno,
                           line=raw, column=self.starts_at(raw))
+            out_of = TONE
+            if len(parts) == 4:
+                word = parts[3].lower()
+                if word not in SOUND_CHANNELS:
+                    self.fail(f"{parts[3]} is not what a noise comes out of: "
+                              "it is tone, noise or both", lineno=lineno,
+                              line=raw, column=self.starts_at(raw, parts[3]))
+                out_of = SOUND_CHANNELS[word]
             pitch, steps, step = (self.number(p, "a number", lineno, raw)
-                                  for p in parts)
+                                  for p in parts[:3])
             for value, what, low, high in ((pitch, "a pitch", 1, 255),
                                            (steps, "a length", 1, 255),
                                            (step, "a step", -128, 127)):
@@ -721,7 +760,7 @@ class Parser:
                     self.fail(f"{value} is not {what}: they run from {low} to "
                               f"{high}", lineno=lineno, line=raw,
                               column=self.starts_at(raw, str(value)))
-            noises.append([pitch, steps, step])
+            noises.append([pitch, steps, step, out_of])
 
     def font(self):
         """A typeface of the author's own, given whole or a letter at a time.

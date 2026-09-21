@@ -48,7 +48,8 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from regac.srcparse import SourceError, parse  # noqa: E402
+from regac.srcparse import (BOTH, NOISE, TONE, SourceError,  # noqa: E402
+                            parse)
 
 COMMON = """; what the two parts of this adventure share
 .def PUERTA_ABIERTA   5
@@ -199,11 +200,31 @@ def test_a_def_can_be_kept_back_for_a_machine(tmp_path):
 def test_an_adventure_may_say_what_noises_it_wants(tmp_path):
     """The five that come with the interpreter are a default and not a rule:
     an adventure says its own in a section of its own, and they are the same
-    three numbers ours are."""
+    four numbers ours are."""
     ddb = built(tmp_path,
                 "/CTL\nmodel SPECTRUM\n/SOUND\n; pitch steps step\n"
                 "  200   150   -1    ; cogido\n   60   150    1\n", None)
-    assert ddb["sounds"] == [[200, 150, -1], [60, 150, 1]]
+    assert ddb["sounds"] == [[200, 150, -1, TONE], [60, 150, 1, TONE]]
+
+
+def test_a_noise_may_say_what_it_comes_out_of(tmp_path):
+    """A fourth word, which may be left off: a door and a fall are not
+    notes, and where there is a sound chip they need not be played as
+    one."""
+    ddb = built(tmp_path,
+                "/CTL\nmodel SPECTRUM\n/SOUND\n"
+                "  200   150   -1          ; nothing said is a tone\n"
+                "  250   100    0  both\n"
+                "   30   110    2  NOISE\n", None)
+    assert ddb["sounds"] == [[200, 150, -1, TONE], [250, 100, 0, BOTH],
+                             [30, 110, 2, NOISE]]
+
+
+def test_a_noise_that_comes_out_of_nothing_there_is(tmp_path):
+    said = refused(tmp_path,
+                   "/CTL\nmodel SPECTRUM\n/SOUND\n"
+                   "200 150 -1 trumpet\n", None)
+    assert "trumpet is not what a noise comes out of" in said, said
 
 
 def test_a_noise_that_could_not_be_played(tmp_path):
@@ -211,6 +232,8 @@ def test_a_noise_that_could_not_be_played(tmp_path):
         ("/SOUND\n  0  150  -1\n", "not a pitch"),
         ("/SOUND\n200    0  -1\n", "not a length"),
         ("/SOUND\n200  150\n", "a noise is: pitch steps step"),
+        ("/SOUND\n200 150 -1 both extra\n",
+         "a noise is: pitch steps step"),
         ("/SOUND\n200  150  300\n", "not a step"),
     ):
         said = refused(tmp_path, "/CTL\nmodel SPECTRUM\n" + source, None)
@@ -221,7 +244,7 @@ def test_a_noise_may_be_named_like_anything_else(tmp_path):
     ddb = built(tmp_path,
                 "/CTL\nmodel SPECTRUM\n.def GRAVE 250\n"
                 "/SOUND\n GRAVE 100 0\n", None)
-    assert ddb["sounds"] == [[250, 100, 0]]
+    assert ddb["sounds"] == [[250, 100, 0, TONE]]
 
 
 if __name__ == "__main__":

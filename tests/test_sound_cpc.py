@@ -94,18 +94,29 @@ def built(with_noises):
         return f.read(), where
 
 
+# What a noise is written as, in bytes: pitch, waves, step, and what it comes
+# out of.  It was three until the fourth was added, and this is the one place
+# in the tests that has to know.
+A_NOISE = 4
+
+
 def table_of(blob, where, how_many):
-    """The effects as the build carries them: pitch, waves and step."""
+    """The effects as the build carries them."""
     at = where["beep_effects"] - LOADS_AT
-    return [tuple(blob[at + n * 3:at + n * 3 + 3]) for n in range(how_many)]
+    return [tuple(blob[at + n * A_NOISE:at + (n + 1) * A_NOISE])
+            for n in range(how_many)]
 
 
 def waves_of(effect):
     """How long that effect is, counted the way both engines count it: the
     sum of the pitches it goes through, each of which is one wait of that
     many turns round a sixteen cycle loop.  The pitch walks and stops at the
-    ends rather than going round, exactly as the engines do."""
-    pitch, waves, step = effect
+    ends rather than going round, exactly as the engines do.
+
+    What it comes out of does not come into it, and that is on purpose: both
+    periods go out every wave whether or not they are being listened to, so
+    a hiss costs exactly what the same numbers cost as a note."""
+    pitch, waves, step = effect[:3]
     if step > 127:
         step -= 256
     total = 0

@@ -227,6 +227,11 @@ Spectrum 48; los dos motores leen la misma tabla y duran lo mismo. Una máquina
 que no tenga con qué sonar —el PCW— los lee y no hace nada, de modo que **la
 misma aventura vale para todas las máquinas**.
 
+Cada ruido dice además de dónde sale —tono, ruido o los dos—, y eso es lo
+único que no suena igual en todas partes: donde hay chip, una puerta o una
+caída salen del generador de ruido; en el 48, que no lo tiene, salen como el
+tono barrido que el resto de la línea describe. La aventura no cambia.
+
 ### Fin del turno y de la partida
 
 | | |

@@ -44,18 +44,27 @@
 
 AY_TONE_A       equ 0                   ; the low byte of channel A's period
 AY_TONE_A_HIGH  equ 1                   ; and the four bits above it
+AY_NOISE        equ 6                   ; how coarse the hiss is, five bits
 AY_MIXER        equ 7
 AY_VOLUME_A     equ 8
-AY_TONE_ONLY    equ %00111110 | AY_MIXER_KEEP   ; channel A's tone, nothing else
 AY_LOUD         equ 15
+
+; The mixer turns things **off** with a one: bits nought to two are the three
+; channels' tones and bits three to five their noises, so channel A's tone is
+; bit nought and channel A's noise is bit three.  Nothing else of ours plays,
+; so B and C stay off in all three.
+AY_TONE_ONLY    equ %00111110 | AY_MIXER_KEEP
+AY_NOISE_ONLY   equ %00110111 | AY_MIXER_KEEP
+AY_BOTH         equ %00110110 | AY_MIXER_KEEP
 
                 include "effects.asm"
 
-; The chip made ready to sound one note: channel A's tone and nothing else,
-; the top four bits of the period at nought, and the volume up.
+; The chip made ready to sound one thing: whatever the mixer in A says, the
+; top four bits of the tone period at nought, and the volume up.
 ; Corrupts: AF, BC, DE
 ay_start:
-                ld      de, (AY_MIXER << 8) | AY_TONE_ONLY
+                ld      d, AY_MIXER
+                ld      e, a
                 call    ay_write
                 ld      de, AY_TONE_A_HIGH << 8
                 call    ay_write
@@ -78,6 +87,7 @@ ay_quiet:
 ay_note:
                 ld      c, a                    ; the pitch, kept
                 push    bc
+                ld      a, AY_TONE_ONLY         ; a note is a note
                 call    ay_start
                 pop     bc
                 push    bc                      ; ay_write corrupts it too
@@ -105,10 +115,22 @@ beep_click:
 ; table and the same numbers.  A number the build has not got makes no noise
 ; rather than reading past the table.
 ;
-; Each is three bytes: the pitch it starts at, how many half waves it lasts,
-; and what to add to the pitch every one -- which is what makes a blip rise or
-; fall, and is a byte with a sign.  A walking pitch means the period goes out
-; again every wave, which is why this is not ay_note with an argument.
+; Each is four bytes: the pitch it starts at, how many half waves it lasts,
+; what to add to the pitch every one -- which is what makes a blip rise or
+; fall, and is a byte with a sign -- and what it is to come out of.
+;
+; That last one is what this engine can do and a speaker of one bit cannot.
+; A door, a fall and a stab of alarm are not notes; the chip has a generator
+; that makes a hiss, and the mixer lets it play that, the note, or the two
+; together.  The hiss has a coarseness of its own, five bits of it, and it
+; walks with the pitch -- the same number shifted down three -- so a blip
+; that falls in pitch falls in grain as well.
+;
+; **Both periods go out every wave whatever the fourth byte says**, even the
+; one that is not being listened to.  That costs a few cycles on a plain note
+; and buys something worth more: what an effect costs does not depend on what
+; it comes out of, so the table still says how long each one lasts and the
+; test that checks it has one number to solve for and not three.
 ; Corrupts: everything
 beep_sound:
                 or      a
@@ -118,10 +140,8 @@ beep_sound:
                 ret     nc
                 ld      l, a
                 ld      h, 0
-                ld      d, h
-                ld      e, l
                 add     hl, hl
-                add     hl, de                  ; three bytes to the effect
+                add     hl, hl                  ; four bytes to the effect
                 ld      de, beep_effects
                 add     hl, de
                 ld      a, (hl)
@@ -131,6 +151,20 @@ beep_sound:
                 inc     hl
                 ld      a, (hl)
                 ld      (sound_step), a         ; and how the note moves
+                inc     hl
+                ld      a, (hl)                 ; and what it comes out of
+                cp      OUT_OF_NOISE
+                jr      z, .hiss
+                cp      OUT_OF_BOTH
+                jr      z, .both
+                ld      a, AY_TONE_ONLY         ; and anything else is a note
+                jr      .mixer
+.hiss:
+                ld      a, AY_NOISE_ONLY
+                jr      .mixer
+.both:
+                ld      a, AY_BOTH
+.mixer:
                 ; B is how long it lasts and ay_start corrupts BC, so it is
                 ; kept across the call.  **It was not, until this was read
                 ; again**, and on the Amstrad -- the one machine this engine
@@ -148,6 +182,14 @@ beep_sound:
                 ld      a, (sound_pitch)
                 srl     a
                 ld      d, AY_TONE_A
+                ld      e, a
+                call    ay_write
+                ld      a, (sound_pitch)
+                rrca
+                rrca
+                rrca
+                and     %00011111               ; the hiss is five bits
+                ld      d, AY_NOISE
                 ld      e, a
                 call    ay_write
                 ld      a, (sound_pitch)

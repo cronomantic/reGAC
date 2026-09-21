@@ -369,9 +369,15 @@ IF ( VERB VERBO_FIN ) QUIT END
 ; de un bit en el Spectrum 48. La misma tabla en los dos. El PCW no tiene con
 ; qué sonar.
 ;
-; tono  pasos  paso
+; La cuarta columna es de dónde sale, y se puede dejar en blanco: `tone` es
+; una nota, `noise` el silbido que hace el chip sin nota ninguna, y `both`
+; las dos cosas. Una puerta o una cerradura no son notas; el 48 no tiene
+; generador de ruido y ahí se lee la palabra y se toca el tono, así que
+; usarla no deja a nadie fuera.
+;
+; tono  pasos  paso  de dónde
 /SOUND
-   180    120     -1    ; la cerradura
-   240     90      2    ; la puerta al abrirse
-   120     60     -2    ; el fósforo
-    90    200      1    ; el faro encendiéndose
+   180    120     -1  both     ; la cerradura: metal y aire
+   240     90      2  both     ; la puerta al abrirse
+   120     60     -2  noise    ; el fósforo, que es puro siseo
+    90    200      1           ; el faro encendiéndose, y esto sí es una nota

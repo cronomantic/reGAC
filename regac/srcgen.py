@@ -21,7 +21,7 @@
 """Writer for the ReGAC source format: database dictionary -> source text."""
 
 from .conds import render_block
-from .srcparse import directive
+from .srcparse import SOUND_CHANNEL_NAMES, TONE, a_noise, directive
 
 NOWHERE = 0
 CARRIED = 255
@@ -172,13 +172,20 @@ class SourceWriter:
             self.w()
 
     def sound(self):
-        noises = self.ddb.get("sounds") or []
+        noises = [a_noise(one) for one in self.ddb.get("sounds") or []]
         if not noises:
             return
+        # The column is only written when somebody used it: a noise with no
+        # word after it is a tone, and a page of "tone" written out five
+        # times says nothing a reader did not already know.
+        says = any(one[3] != TONE for one in noises)
         self.w("/SOUND")
-        self.w("; pitch  steps  step")
-        for pitch, steps, step in noises:
-            self.w(f"{pitch:7}{steps:7}{step:6}")
+        self.w("; pitch  steps  step" + ("  out of" if says else ""))
+        for pitch, steps, step, out_of in noises:
+            line = f"{pitch:7}{steps:7}{step:6}"
+            if says:
+                line += f"  {SOUND_CHANNEL_NAMES[out_of]}"
+            self.w(line)
         self.w()
 
     def font(self):

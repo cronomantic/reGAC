@@ -244,13 +244,21 @@ Entera, con `file`, o letra a letra.
 Uno por línea, en el orden en que `SOUND` los cuenta **desde uno**:
 
     /SOUND
-    ; tono  pasos  paso
-       200    150     -1    ; cogido
-        60    150      1    ; rechazado
+    ; tono  pasos  paso  de dónde
+       200    150     -1          ; cogido
+       250    100      0  both    ; una puerta
+        30    110      2  noise   ; una caída
 
 El **tono** es lo que dura medio ciclo —más grande, nota más grave—, los
 **pasos** son cuántas veces se repite y el **paso** lo que se suma al tono en
 cada uno.
+
+La cuarta columna es **de dónde sale**, y se puede dejar en blanco: `tone` es
+una nota, `noise` el silbido que hace el chip sin nota ninguna, y `both` las
+dos cosas a la vez. Una puerta, una caída o un aviso no son notas, y un chip
+tiene con qué decirlo. **El Spectrum 48 no**, y allí la palabra se lee y se
+toca el tono —que es lo más parecido que hay—, así que usarla no deja ninguna
+máquina fuera: sólo suena mejor donde hay con qué.
 
 **Suenan por el chip de sonido en las seis máquinas que lo tienen** —128, +3,
 Amstrad, MSX y Next— y por el altavoz de un bit en el Spectrum 48, que es la

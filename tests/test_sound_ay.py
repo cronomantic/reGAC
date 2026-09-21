@@ -67,6 +67,9 @@ NOT_AN_EFFECT = 99
 # the next, which is how the Amstrad's two came to be wrong for these three.
 
 # The three of them, and what the emulator calls each one.
+# What a noise may come out of, as the fourth byte of its four says it.
+TONE, NOISE, BOTH = 0, 1, 2
+
 MACHINES = [
     ("spectrum", "128k"),
     ("msx", "MSX1"),
@@ -90,14 +93,21 @@ def build(folder):
     listing = emulator.assemble(os.path.join(where_it_is, "test_ay.asm"),
                                 listing=os.path.join(where_it_is, "ay.lst"))
     where = {name: emulator.label_address(listing, name)
-             for name in ("ready_flag", "which", "rounds", "how_many")}
+             for name in ("ready_flag", "which", "rounds", "how_many",
+                          "beep_effects")}
     with open(os.path.join(where_it_is, "ay.bin"), "rb") as f:
         return f.read(), where
 
 
-def played(which, where, blob, machine, sound, seconds=2.0):
-    """Play that over and over, and say how much the recording moves and
-    whether the machine came back from it."""
+def played(which, where, blob, machine, sound, seconds=2.0, out_of=None):
+    """Play that over and over, and give back the recording, with whether the
+    machine came back from it.
+
+    With `out_of`, the fourth byte of the **first** effect is written in the
+    machine before it plays, so the same pitch, length and step can be heard
+    as a note, as a hiss and as the two together.  Patching it there rather
+    than building three tables keeps what is being compared honestly equal:
+    only that one byte differs."""
     if os.path.exists(sound):
         os.remove(sound)
     session = emulator.Session(machine=machine, extra=["--aofile", sound])
@@ -105,6 +115,8 @@ def played(which, where, blob, machine, sound, seconds=2.0):
         time.sleep(emulator.longer(3.0))
         assert session.start_code(blob, LOADS_AT, where["ready_flag"],
                                   timeout=10.0), "the build never started"
+        if out_of is not None:
+            session.command(f"write-memory {where['beep_effects'] + 3} {out_of}")
         session.command(f"write-memory {where['which']} {which}")
         time.sleep(0.5)
         was = session.read(where["rounds"], 2)
@@ -115,7 +127,33 @@ def played(which, where, blob, machine, sound, seconds=2.0):
     with open(sound, "rb") as f:
         heard = f.read()
     went_round = (now[1] << 8 | now[0]) != (was[1] << 8 | was[0])
-    return len(set(heard)), went_round
+    return heard, went_round
+
+
+def shapes(heard):
+    """How many different values a recording has, which is what silence is
+    measured by."""
+    return len(set(heard))
+
+
+def runs(heard):
+    """How long each stretch of one value lasts, in a row.
+
+    This is what tells a note from a hiss.  A square wave is the same handful
+    of lengths over and over -- a few more than one, because the pitch walks
+    -- and a hiss is a scatter of them.  Counting the values themselves says
+    nothing: both come out of the same four bit volume, and both measured
+    four or five different ones.
+    """
+    lengths, so_far = [], 1
+    for before, after in zip(heard, heard[1:]):
+        if before == after:
+            so_far += 1
+        else:
+            lengths.append(so_far)
+            so_far = 1
+    lengths.append(so_far)
+    return lengths
 
 
 if pytest is not None:
@@ -133,15 +171,17 @@ def test_the_chip_makes_every_noise_of_the_table(folder, machine, tmp_path):
     blob, where = build(folder)
     sound = str(tmp_path / "heard.raw")
 
-    quiet, went_round = played(0, where, blob, machine, sound)
+    heard, went_round = played(0, where, blob, machine, sound)
+    quiet = shapes(heard)
     assert went_round, "it never came back from playing nothing"
 
     how_many = effects_in(folder)
     assert how_many, "the build has no effects at all"
     for effect in range(1, how_many + 1):
-        shapes, went_round = played(effect, where, blob, machine, sound)
-        assert shapes > quiet, (
-            f"effect {effect} made no noise: {shapes} shapes against "
+        heard, went_round = played(effect, where, blob, machine, sound)
+        many = shapes(heard)
+        assert many > quiet, (
+            f"effect {effect} made no noise: {many} shapes against "
             f"{quiet} for silence"
         )
         assert went_round, (
@@ -149,10 +189,10 @@ def test_the_chip_makes_every_noise_of_the_table(folder, machine, tmp_path):
             f"give the machine back"
         )
 
-    shapes, _ = played(NOT_AN_EFFECT, where, blob, machine, sound)
-    assert shapes <= quiet, (
-        f"an effect the build has not got made a noise: {shapes} shapes "
-        f"against {quiet} for silence"
+    heard, _ = played(NOT_AN_EFFECT, where, blob, machine, sound)
+    assert shapes(heard) <= quiet, (
+        f"an effect the build has not got made a noise: {shapes(heard)} "
+        f"shapes against {quiet} for silence"
     )
 
 
@@ -163,12 +203,54 @@ def test_the_key_click_comes_out_of_the_chip_too(folder, machine, tmp_path):
     the chip's now and not the speaker's."""
     blob, where = build(folder)
     sound = str(tmp_path / "heard.raw")
-    quiet, _ = played(0, where, blob, machine, sound)
-    shapes, went_round = played(CLICK, where, blob, machine, sound)
-    assert shapes > quiet, (
-        f"the click made no noise: {shapes} shapes against {quiet} for silence"
+    heard, _ = played(0, where, blob, machine, sound)
+    quiet = shapes(heard)
+    heard, went_round = played(CLICK, where, blob, machine, sound)
+    assert shapes(heard) > quiet, (
+        f"the click made no noise: {shapes(heard)} shapes against {quiet} "
+        f"for silence"
     )
     assert went_round, "the click started and never finished"
+
+
+@needs_tools
+@every_machine
+def test_a_noise_is_a_hiss_and_not_a_note(folder, machine, tmp_path):
+    """The fourth byte of a noise says what it comes out of -- the tone
+    generator, the noise one, or both -- and this is where it is proved that
+    the word reaches the chip.
+
+    The same effect is played three ways, with only that byte changed in the
+    machine, so nothing else can account for a difference.  What separates
+    them is **how many different run lengths** the recording has: a note is a
+    square wave, the same handful of lengths over and over, and a hiss is a
+    scatter.  Counting the values instead says nothing at all -- both come
+    out of the same four bit volume, and both measure four or five.
+
+    Measured on the three: a note has twelve to nineteen different lengths
+    and a hiss thirty six to forty four, and the two together change value
+    getting on for twice as often as either alone.  The margins asked for
+    below are well inside that.
+    """
+    blob, where = build(folder)
+    sound = str(tmp_path / "heard.raw")
+    told = {}
+    for out_of, name in ((TONE, "tone"), (NOISE, "noise"), (BOTH, "both")):
+        heard, went_round = played(1, where, blob, machine, sound,
+                                   out_of=out_of)
+        assert went_round, f"it never came back from playing {name}"
+        told[name] = (len(set(runs(heard))), len(runs(heard)))
+
+    lengths = {name: how[0] for name, how in told.items()}
+    changes = {name: how[1] for name, how in told.items()}
+    for name in ("noise", "both"):
+        assert lengths[name] > 1.5 * lengths["tone"], (
+            f"{name} came out shaped like a note: {lengths[name]} different "
+            f"run lengths against {lengths['tone']} for the note itself"
+        )
+    assert changes["both"] > 1.3 * max(changes["tone"], changes["noise"]), (
+        f"both together did not come out as the two of them: {changes}"
+    )
 
 
 def effects_in(folder):

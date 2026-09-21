@@ -1819,12 +1819,38 @@ de parada, y eso son doscientos mil ciclos que entran en la cuenta —del mismo 
 diferencias que se buscaban—. Por eso el build toca cada efecto **dieciséis
 veces**: el hueco deja de pesar.
 
-**Lo que queda de esto**, y es el paso dos: **un cuarto byte en la tabla que
-diga canal** —tono, ruido o los dos—. Tres de los cinco efectos de serie no
-son notas: una puerta, una caída y un aviso son ruido, y un altavoz de un bit
-sólo puede fingirlos barriendo el tono mientras el generador de ruido del AY
-los hace de verdad. Por defecto cero, o sea tono, de modo que ninguna aventura
-de ahora cambia. Toca `/SOUND`, el comprobador y los documentos.
+~~**Lo que queda de esto**, y es el paso dos: un cuarto byte que diga canal.~~
+**Hecho**, y así quedó:
+
+La tabla pasa de tres bytes a cuatro y el cuarto dice de dónde sale el ruido:
+`tone`, `noise` o `both`. En el fuente es una cuarta columna que se puede
+dejar en blanco —una línea de tres sigue valéndose y es un tono—, de modo que
+ningún fuente escrito antes cambia. De los cinco de serie, la puerta y el
+aviso pasaron a `both` y la caída a `noise`.
+
+**En el Spectrum 48 el byte se lee y no se usa**, y eso no es un descuido:
+allí no hay ni generador de tono ni de ruido, sólo un bit que se menea, y lo
+más parecido a un siseo que puede hacer es el tono barrido que el resto de la
+línea ya describe. La aventura corre igual en las ocho máquinas.
+
+**Una decisión que parece un desperdicio y no lo es**: los dos periodos —el
+del tono y el del ruido— salen al chip **en cada onda, diga lo que diga el
+cuarto byte**, incluso el que no se está escuchando. Cuesta unos ciclos en una
+nota simple y compra algo que vale más: lo que cuesta un efecto no depende de
+por dónde salga, de modo que la tabla sigue diciendo cuánto dura cada uno y la
+prueba que lo comprueba tiene una incógnita y no tres.
+
+**Cómo se comprueba que la palabra llega al chip**, que era lo difícil: se
+toca el mismo efecto tres veces cambiando **sólo ese byte en la máquina**, de
+modo que nada más puede explicar una diferencia. Contar valores distintos en
+la grabación no sirve —nota y siseo salen del mismo volumen de cuatro bits y
+los dos dan cuatro o cinco—. Lo que sí sirve es **cuántos tramos de longitud
+distinta** tiene: una onda cuadrada es el mismo puñado de longitudes una y
+otra vez y un siseo es un reparto. Medido en las tres máquinas: una nota da
+entre doce y diecinueve longitudes distintas y un siseo entre treinta y seis y
+cuarenta y cuatro, y los dos juntos cambian de valor casi el doble de veces
+que cualquiera por separado. Comprobado también al revés, con el motor sordo
+al cuarto byte: la prueba lo dice.
 
 **Lo que se decidió no hacer**: usar la envolvente por hardware para que el
 ruido no pare el turno. Se puede —se escriben los registros y se vuelve, y el

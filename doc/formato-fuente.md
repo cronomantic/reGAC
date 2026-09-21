@@ -153,6 +153,13 @@ los **pasos** son cuántas veces se repite, y el **paso** es lo que se le suma a
 tono en cada uno: un paso que baja el tono sube la nota. Los tres son números
 como cualquier otro, así que valen los nombres de `.def`.
 
+Y una cuarta columna opcional, que es **de dónde sale**: `tone`, `noise` o
+`both`. Un chip de sonido tiene un generador de tono y otro de ruido y puede
+usar cualquiera de los dos o los dos juntos; un altavoz de un bit no tiene
+ninguno de los dos, y allí la palabra se lee y se toca el tono. Una línea sin
+ella es un tono, de modo que un fuente escrito antes de que esto existiera
+sigue valéndose tal cual.
+
 Los hace **el chip de sonido en las seis máquinas que lo tienen** —128, +3,
 Amstrad, MSX y Next— y el altavoz de un bit en el Spectrum 48, que es la única
 sin chip. Una sola tabla y dos motores: un tono es medio ciclo del altavoz y la

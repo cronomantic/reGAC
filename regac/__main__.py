@@ -42,7 +42,8 @@ from .project import read as read_project
 from .png import save_picture
 from .srcgen import generate
 from .text import TextStore
-from .srcparse import MACHINE_LABELS, SourceError, parse
+from .srcparse import (MACHINE_LABELS, SOUND_CHANNEL_NAMES, SourceError,
+                        a_noise, parse)
 
 VERSION = "0.1.0"
 
@@ -208,20 +209,24 @@ SCREEN_BYTES = {"cpc464": 0x4000, "cpc6128": 0x4000, "plus3": 6912,
 
 
 def noises_source(noises, out):
-    """The three bytes a noise is, written where the interpreter reads them.
+    """The four bytes a noise is, written where the interpreter reads them.
 
-    A pitch, how many steps it lasts and what to add to the pitch every step:
-    the same three the five that come with the interpreter are, because an
-    author's noises are not a different kind of thing from ours.
+    A pitch, how many waves it lasts, what to add to the pitch every one, and
+    what it comes out of: the same four the five that come with the
+    interpreter are, because an author's noises are not a different kind of
+    thing from ours.
     """
     lines = ["; Written by regac build from the adventure's own /SOUND.",
-             "; A bigger pitch is a lower note; the step is what to add to it."]
-    for number, (pitch, steps, step) in enumerate(noises, 1):
-        lines.append(f"                db      {pitch}, {steps}, {step}"
-                     f"{'':<{max(1, 12 - len(str(pitch) + str(steps) + str(step)))}}"
-                     f"; {number}")
+             "; A bigger pitch is a lower note; the step is what to add to it;",
+             "; the last is the tone generator, the noise one, or both."]
+    for number, said in enumerate(noises, 1):
+        pitch, waves, step, out_of = a_noise(said)
+        numbers = f"{pitch}, {waves}, {step}, {out_of}"
+        lines.append(f"                db      {numbers}"
+                     f"{'':<{max(1, 16 - len(numbers))}}"
+                     f"; {number}, {SOUND_CHANNEL_NAMES[out_of]}")
     with open(out, "w", encoding="utf-8") as f:
-        f.write("\n".join(lines) + "\n")
+        f.write(chr(10).join(lines) + chr(10))
 
 
 def cmd_build(args):
