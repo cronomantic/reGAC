@@ -1455,7 +1455,13 @@ original. La prueba es [`test_textmode_z80.py`](../tests/test_textmode_z80.py).
 - ~~**Un mensaje se desempaquetaba en `text_buffer`, que son 256 bytes, y nadie
   comprobaba que cupiera.**~~ **Hecho**, y no como se pensaba aquí: ver «El
   texto, palabra a palabra».
-- **El 464 sigue sin sitio.** El relleno rápido costó unos 300 bytes y se
+- ~~**El 464 sigue sin sitio.**~~ **Resuelto**, y por donde aquí se decía: el
+  código se baja de `$4000` y la base de datos se queda con todo lo de
+  arriba. Ver «El Quijote en un 464, con el mapa del revés», y «Lo que costó,
+  y de dónde salió el sitio» para lo que faltaba, que era que ese mapa
+  admitiera música. Lo que sigue es lo que se hizo antes de eso, y explica
+  por qué MegaCorp II cupo sin cambiar el mapa: el relleno rápido costó unos
+  300 bytes y se
   pagaron rascando: se quitó el `ALIGN 256` de la base de datos, que nada
   necesitaba, y el intérprete de ruidos dejó de viajar cuando la aventura no
   pide ninguno —ninguna de las ocho de 1986 puede pedirlo, porque `SOUND` y
@@ -2580,41 +2586,56 @@ que lo precede cerraba `EGROJ` y se quedó arriba-- y ` Si` empieza en la uno
 --ese espacio venía de una tirada de treinta y bajó con la palabra--. La
 línea de `COPYRIGHT` mide 31 caracteres, y la de `DON QUIJOTE` también.
 
-### Y por qué no está puesto: sesenta y seis bytes
+### Lo que costó, y de dónde salió el sitio
 
-Está escrito, probado y **aparcado en la rama `ajuste-de-lineas`**. Ahí,
-`word_over` y `word_print` de `z80/common/textout.asm` guardan lo que cerró la
-última palabra en vez de imprimirlo, con la marca de si venía detrás de otro
-separador en el bit alto del mismo byte; `wrapped()` de `tests/emulator.py`
-hace lo mismo, y `runGAC.py` también --resulta que lo de las palabras ya lo
-hacía bien sin saberlo--. Con eso el espejo juega **las tres** aventuras y las
-tres salen idénticas al original, el Quijote incluido.
+Está puesto: `word_over` y `word_print` de `z80/common/textout.asm` guardan lo
+que cerró la última palabra en vez de imprimirlo, con la marca de si venía
+detrás de otro separador en el bit alto del mismo byte; `wrapped()` de
+`tests/emulator.py` hace lo mismo, y `runGAC.py` también --resulta que lo de
+las palabras ya lo hacía bien sin saberlo y sólo le faltaba lo de las tiradas--.
 
-Lo que lo deja fuera es que **cuesta 66 bytes de código común, y dos máquinas
-no los tienen**:
+Costó **66 bytes de código común**, y eso destapó que dos máquinas no los
+tenían: al Next con música le quedaban **3** y al CPC 464 con música, **10**.
+Ninguna de las dos estaba corta por este cambio; estaban corta y punto, y lo
+próximo que creciera las habría roto igual.
 
-| máquina | lo que le quedaba |
-|---|---|
-| Spectrum Next, con música | 3 bytes |
-| CPC 464, con música | 10 bytes |
+**El Next**: la pared de `$A000` no era el final de la máquina. `gfx_clear`
+borra la máscara de los rellenos y para ahí, y la pila baja desde `$BF00`, de
+modo que entre las dos hay casi cuatro kilobytes que nadie tocaba y que el
+fichero ya lleva, porque `SAVENEX BANK 2` se lleva entero `$8000`-`$BFFF`.
+`picture.asm` vive ahora en `$B200` --por encima de la tabla del modo dos y de
+su rutina-- y bajo la pared quedan quinientos bytes largos.
 
-Los del Next **ya están resueltos**, y están en main: la pared de `$A000` no
-era el final de la máquina --ahí empieza la máscara de los rellenos, y `last`
-tenía que quedar debajo-- pero por encima de ella, hasta donde baja la pila,
-hay casi cuatro kilobytes que nadie tocaba y que el fichero ya lleva, porque
-`SAVENEX BANK 2` se lleva entero `$8000`-`$BFFF`. `picture.asm` se ha ido a
-vivir allí, a `$B200`, que es por encima de la tabla del modo dos y de su
-rutina. Eso deja quinientos bytes largos libres bajo la pared.
+**El CPC 464**: ahí el código y la base de datos comparten `$4000`-`$B100` y
+no hay más, pero debajo de `$4000` hay dieciséis kilobytes de RAM que el
+intérprete puede usar --corre con las dos ROMs fuera; por eso la música vive
+en `$0300`-- y que sólo estaban esperando a que alguien los cargara. Eso ya
+estaba resuelto para el Quijote, con `LOW_CODE`: un mover baja el intérprete a
+`$0400` y una isla arriba guarda las llamadas de cinta, que necesitan la ROM.
+Lo único que faltaba era que ese build admitiera música, porque la música
+estaba justo donde ahora va el intérprete.
 
-**El CPC 464 con música es el que falta**, y está lleno de verdad: código más
-base de datos llegan a `$B0F6` y el firmware empieza en `$B100`. No hay
-recorte que lo salve --se probaron tres versiones del cambio, y la más apretada
-que sale correcta sigue costando 27 bytes--. Sitio sí tiene: entre donde acaba
-la música, que vive en `$0300` y ocupa siete kilobytes, y el `$4000` donde
-empieza el intérprete hay ocho kilobytes libres. Usarlos pide bajar la
-dirección de carga, y eso toca `LOADS_AT` de `regac/__main__.py`, `cdt.py`,
-`media.py`, las líneas BASIC que escriben y sus pruebas. **Ése es el trabajo
-que hay que hacer para que la rama entre.**
+Ahora la admite, y **la música se va al otro extremo**: los cinco kilobytes
+bajo la isla, que son sitio que habría tenido la base de datos. Se probó
+primero ponerla encima del intérprete, y dejaba 183 bytes entre los dos --un
+apaño, no una solución--. Así el intérprete se queda la RAM baja entera:
+
+| | intérprete | base de datos |
+|---|---|---|
+| como estaba | 10 bytes libres | 20593 como mucho |
+| bajo, con la música arriba | **4586 libres** | 22272 |
+
+Y no hay que elegir a mano: `regac` ya reintentaba con `LOW_CODE` cuando el
+build normal se pasaba del firmware, así que una aventura que no quepa se
+cambia de sitio sola. Las dos pruebas del Amstrad hacen lo mismo.
+
+De paso quedó medido lo que cuesta la música de verdad dentro del intérprete
+del CPC: **53 bytes** --8282 sin ella, 8335 con ella--. Quitarla de las cinco
+máquinas para hacer sitio habría sido pagar una función entera por 53 bytes.
+
+**Lo que queda apretado**: el 464 **sin** música, que se quedó en `$B0F8` con
+ocho bytes por debajo del firmware. No rompe nada --al siguiente byte se
+repliega solo al mapa bajo-- pero conviene saberlo.
 
 ### El eco de Vajillas: el original se pasa del terminador
 
