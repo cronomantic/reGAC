@@ -2417,9 +2417,31 @@ Dos detalles que costaron su rato y evitan repetirlos:
   marco son ciento veintiocho filas justas: se le resta el fondo y basta una
   comparación, porque lo que está por debajo se envuelve y falla igual.
 
-**Lo que queda por leer**: nada del intérprete original. Queda el relleno, que
-es lo único suyo donde no hemos preguntado por casos raros --rellenos que se
-escapan por un hueco de un píxel--, y eso se pregunta con el mismo guión.
+**Lo que queda por leer**: nada del intérprete original, y desde ahora tampoco
+queda nada por preguntarle. Los casos raros del relleno --lo último que
+faltaba-- están preguntados con el mismo guión que los tres modos, y
+`tests/test_fills_original.py` los lleva: seis formas donde un relleno no es
+obvio, metiendo la rutina del original en marcha y comparando los 6144 bytes
+contra el renderizador de referencia. **Las seis salen idénticas.**
+
+| forma | qué hacen los dos |
+|---|---|
+| hueco de un píxel, en el borde de un byte | se escapa |
+| hueco de un píxel, en mitad de un byte | se escapa igual |
+| una diagonal por pared | no pasa: se para en la escalera |
+| un pasillo de un píxel de ancho | sí lo recorre |
+| la semilla encima de la pared | no hace nada en absoluto |
+| una caja abierta contra el marco | se para en el marco |
+
+Y el escape tiene forma, que era lo que no se sabía: **sale un rayo de un
+píxel de alto y no se ensancha**. Medido en la caja del hueco: 135 píxeles
+encendidos fuera de ella, **todos en la misma fila**, desde el agujero hasta
+el borde de la lámina. Ni uno arriba ni uno abajo.
+
+Los dos huecos se probaron a propósito en sitios distintos --uno en `x=120`,
+que es frontera de byte, y otro en `x=124`, dentro de uno-- porque nuestro
+relleno anda por bytes y el del original por columnas, y ésa era la primera
+grieta por donde podían separarse. No se separan.
 
 ## El espejo: la misma aventura jugada dos veces a la vez
 

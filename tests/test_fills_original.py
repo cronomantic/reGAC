@@ -74,6 +74,59 @@ SNAPSHOT = os.path.join(ROOT, "snapshots", "megacorp1.sna")
 BOX = {1: [["RECT", 40, 60, 120, 130]]}
 SEED = (80, 95)
 
+# And the shapes where a fill is not obvious.  Each is the picture and the
+# point the fill starts from; what is being asked of every one of them is not
+# "is this right" -- there is no right -- but "does the original do what we
+# do".  A wall is drawn side by side rather than with RECT so that a pixel can
+# be left out of it.
+LEFT, RIGHT, LOW, HIGH = 40, 120, 60, 130
+
+
+def walls(gap_x, gap_y):
+    """A box whose right wall has one pixel missing."""
+    return [["LINE", LEFT, LOW, RIGHT, LOW],
+            ["LINE", LEFT, HIGH, RIGHT, HIGH],
+            ["LINE", LEFT, LOW, LEFT, HIGH],
+            ["LINE", gap_x, LOW, gap_x, gap_y - 1],
+            ["LINE", gap_x, gap_y + 1, gap_x, HIGH]]
+
+
+AWKWARD = {
+    # x=120 is a multiple of eight, so the hole is exactly where our own walk
+    # steps from one byte to the next: the first place two fills disagree.
+    "un hueco de un pixel en el borde de un byte":
+        ({1: walls(120, 95)}, (80, 95)),
+    # and the same hole with the wall inside a byte
+    "un hueco de un pixel en mitad de un byte":
+        ({1: walls(124, 95)}, (80, 95)),
+    # A staircase for a wall.  A fill that steps sideways and up separately
+    # cannot get through a diagonal; one that steps cornerwise can, and the
+    # two look the same until somebody draws a slope.
+    "una diagonal por pared":
+        ({1: [["LINE", LEFT, LOW, RIGHT, LOW],
+              ["LINE", LEFT, LOW, LEFT, HIGH],
+              ["LINE", LEFT, HIGH, RIGHT, HIGH],
+              ["LINE", RIGHT, HIGH, RIGHT - 60, LOW]]}, (60, 70)),
+    # A corridor one pixel wide, which a fill either walks down or does not.
+    "un pasillo de un pixel de ancho":
+        ({1: [["LINE", LEFT, LOW, LEFT, HIGH],
+              ["LINE", LEFT + 2, LOW, LEFT + 2, HIGH],
+              ["LINE", LEFT, LOW, LEFT + 2, LOW],
+              ["LINE", LEFT, HIGH, LEFT + 2, HIGH]]}, (LEFT + 1, 95)),
+    # The seed standing on the wall itself, which is a question neither of the
+    # two was ever asked.  Both answer it the same way: by doing nothing at
+    # all, because a fill stops on a lit pixel and it is already standing on
+    # one.
+    "la semilla encima de la pared":
+        ({1: [["RECT", LEFT, LOW, RIGHT, HIGH]]}, (LEFT, 95)),
+    # And one that reaches the frame, where the fill has to stop because the
+    # picture does and not because anything was drawn.
+    "una caja abierta contra el marco":
+        ({1: [["LINE", LEFT, LOW, LEFT, 175],
+              ["LINE", RIGHT, LOW, RIGHT, 175],
+              ["LINE", LEFT, LOW, RIGHT, LOW]]}, (80, 100)),
+}
+
 # Where the original keeps things, all read out of the code around $6364.
 SEED_AT = 0x6341  # the x and the y it fills from
 ENTRY = {PAPER: 0x6364, SHADE: 0x6369, INK: 0x636E}
@@ -123,17 +176,18 @@ def to_linear(screen):
     return bytes(out)
 
 
-def ours(mode):
-    """The box before the fill, and the bitmap after it."""
+def ours(mode, picture=None, seed=None):
+    """The picture before the fill, and the bitmap after it."""
     device = SpectrumDevice()
-    render = Renderer(BOX, device)
+    render = Renderer(picture or BOX, device)
     render.run(1)
     before = (bytes(device.pixels[:SCREEN_BYTES]), bytes(device.attrs[:768]))
-    render.flood(SEED[0], SEED[1], mode)
+    at = seed or SEED
+    render.flood(at[0], at[1], mode)
     return before, bytes(device.pixels[:SCREEN_BYTES])
 
 
-def theirs(session, before, mode):
+def theirs(session, before, mode, seed=SEED):
     """The same box, filled by the original's own routine."""
     # All of it with the machine held.  The stack pointer used to be set
     # while the adventure ran, and now and then it returned through the two
@@ -154,7 +208,7 @@ def theirs(session, before, mode):
             )
         session.command(f"write-memory {ATTR_P} {PAPER_ON_BLACK} {PAPER_ON_BLACK}")
         session.command(f"write-memory {ATTR_T} {PAPER_ON_BLACK} 0 0")
-        session.command(f"write-memory {SEED_AT} {SEED[0]} {SEED[1]}")
+        session.command(f"write-memory {SEED_AT} {seed[0]} {seed[1]}")
         # A jump to itself for it to come back to, and a stack that points at it.
         session.command(f"write-memory-raw {STOP_AT} 18FE")
         session.command(f"write-memory {STACK_AT} {STOP_AT & 255} {STOP_AT >> 8}")
@@ -190,6 +244,53 @@ def test_the_original_lays_down_what_we_lay_down(mode):
     if mode is not PAPER:
         # And it really did something, or two blank boxes would agree.
         assert wanted != started, f"{mode} changed nothing at all"
+
+
+# The one that is meant to lay nothing, so that "it changed nothing" is a
+# failure everywhere else.
+LAYS_NOTHING = {"la semilla encima de la pared"}
+
+if pytest is not None:
+    each_shape = pytest.mark.parametrize(
+        "name,picture,seed",
+        [(name, picture, seed) for name, (picture, seed) in AWKWARD.items()])
+else:
+
+    def each_shape(func):
+        return func
+
+
+@needs_tools
+@each_shape
+def test_the_awkward_shapes_fill_the_same(name, picture, seed):
+    """Where a fill is not obvious, asked of the original rather than argued.
+
+    A box proves the easy half.  These are the shapes where two flood fills
+    written from the same description come apart: a wall with a pixel missing,
+    with the hole on a byte boundary and inside one; a staircase, which a fill
+    that steps cornerwise gets through and one that does not cannot; a
+    corridor one pixel wide; a seed standing on the wall; and a shape that
+    reaches the frame, where the fill stops because the picture ends.
+
+    Only the solid fill is asked, because what the three differ in is a
+    sixteen bit constant and that is proved above.
+    """
+    session = emulator.Session()
+    try:
+        session.load(SNAPSHOT)
+        time.sleep(emulator.longer(2.0))
+        before, wanted = ours(INK, picture, seed)
+        got = theirs(session, before, INK, seed)
+    finally:
+        session.close()
+    wrong = [n for n in range(SCREEN_BYTES) if wanted[n] != got[n]]
+    assert not wrong, (
+        f"{name}: {len(wrong)} bytes differ, the first at row "
+        f"{wrong[0] // 32} column {wrong[0] % 32}: ours "
+        f"${wanted[wrong[0]]:02X}, theirs ${got[wrong[0]]:02X}"
+    )
+    if name not in LAYS_NOTHING:
+        assert wanted != before[0], f"{name}: the fill changed nothing at all"
 
 
 @needs_tools

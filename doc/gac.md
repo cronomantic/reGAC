@@ -349,6 +349,17 @@ celda de ocho por ocho, con la limitación de atributos del Spectrum.
 Los tres rellenos se propagan desde un punto y los frenan **los píxeles ya
 encendidos** y los bordes del área de imagen.
 
+Tres cosas que conviene saber al dibujar, medidas en el original:
+
+- **Un hueco de un píxel en una pared deja escapar el relleno**, pero sólo por
+  esa fila: sale un rayo de un píxel de alto hasta el borde de la lámina y no
+  se ensancha. Si una pared tuya tiene un agujero, se va a notar como una
+  raya, no como una mancha.
+- **Un pasillo de un píxel de ancho sí se rellena.**
+- **Una diagonal por pared no deja pasar**: el relleno se para en la escalera.
+- Y si la semilla cae **encima de un píxel encendido**, no pasa nada en
+  absoluto.
+
 `CALL` es como se comparten los fondos: una lámina de marco, y las demás la
 llaman.
 
