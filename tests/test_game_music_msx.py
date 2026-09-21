@@ -128,13 +128,15 @@ def test_an_adventure_plays_with_the_music_on():
         # written over the line it starts on, so the complaint below would be
         # covered as soon as it is printed -- which is what the original does
         # there too, watched on it.
+        # Not a key until it is asking and has been for a look: see
+        # emulator.asked.
+        emulator.asked(lambda: screen(session, glyphs),
+                       ddb["messages"]["240"])
         type_them(session, PASSWORD + ENTER)
         wait_screen(session, glyphs, ddb["locations"]["1"]["desc"][:12], timeout=30.0)
-        # And then until it asks again, because the description is still
-        # going out and a key pressed while it is has nowhere to go.
-        emulator.until(lambda: screen(session, glyphs),
-                       lambda lines: emulator.asking(lines,
-                                                     ddb["messages"]["240"]))
+        # And then until it is asking again, because the description is
+        # still going out and a key pressed while it is has nowhere to go.
+        emulator.asked(lambda: screen(session, glyphs), ddb["messages"]["240"])
         # Where the tune is just before the parser is given something to
         # do, so that what is compared below is one turn of it and not a
         # whole game: the track loops, and over long enough it can come back

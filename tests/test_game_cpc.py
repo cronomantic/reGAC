@@ -100,9 +100,11 @@ def build():
 
 
 def put(session, blob, at):
-    for offset in range(0, len(blob), 512):
-        piece = blob[offset:offset + 512]
-        session.command(f"write-memory-raw {at + offset} " + piece.hex().upper())
+    """Where the loader would have put it, with the machine held while it goes
+    in and what went in read back: see Session.put."""
+    assert session.put(blob, at), (
+        f"what was written at {at:#06x} never landed whole"
+    )
 
 
 def start(session, low=False):
@@ -172,13 +174,15 @@ def test_it_asks_and_answers_on_an_amstrad():
         # written over the line it starts on, so the complaint below would be
         # covered as soon as it is printed -- which is what the original does
         # there too, watched on it.
+        # Not a key until it is asking and has been for a look: see
+        # emulator.asked.
+        emulator.asked(lambda: screen(session, glyphs),
+                       ddb["messages"]["240"])
         session.type_keys(PASSWORD + ENTER)
         wait_screen(session, glyphs, ddb["locations"]["1"]["desc"][:12], timeout=30.0)
-        # And then until it asks again, because the description is still
-        # going out and a key pressed while it is has nowhere to go.
-        emulator.until(lambda: screen(session, glyphs),
-                       lambda lines: emulator.asking(lines,
-                                                     ddb["messages"]["240"]))
+        # And then until it is asking again, because the description is
+        # still going out and a key pressed while it is has nowhere to go.
+        emulator.asked(lambda: screen(session, glyphs), ddb["messages"]["240"])
         # A word the adventure does not know, so it has to say so.
         session.type_keys("XYZZY" + ENTER)
         answered = wait_screen(session, glyphs, puzzled[:6], timeout=30.0)

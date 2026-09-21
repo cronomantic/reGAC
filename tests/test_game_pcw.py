@@ -154,13 +154,15 @@ def test_it_asks_and_answers_on_a_pcw(tmp_path):
         # written over the line it starts on, so the complaint below would be
         # covered as soon as it is printed -- which is what the original does
         # there too, watched on it.
+        # Not a key until it is asking and has been for a look: see
+        # emulator.asked.
+        emulator.asked(lambda: screen(session, glyphs),
+                       ddb["messages"]["240"])
         type_them(session, PASSWORD + ENTER)
         wait_screen(session, glyphs, ddb["locations"]["1"]["desc"][:12], timeout=30.0)
-        # And then until it asks again, because the description is still
-        # going out and a key pressed while it is has nowhere to go.
-        emulator.until(lambda: screen(session, glyphs),
-                       lambda lines: emulator.asking(lines,
-                                                     ddb["messages"]["240"]))
+        # And then until it is asking again, because the description is
+        # still going out and a key pressed while it is has nowhere to go.
+        emulator.asked(lambda: screen(session, glyphs), ddb["messages"]["240"])
         # A word the adventure does not know, so it has to say so.
         type_them(session, "XYZZY" + ENTER)
         answered = wait_screen(session, glyphs, puzzled[:6], timeout=30.0)

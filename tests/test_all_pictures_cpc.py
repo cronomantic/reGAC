@@ -144,20 +144,8 @@ def draw_them_all(path):
     session = emulator.Session(machine="CPC6128")
     try:
         time.sleep(3.0)
-        for at in range(0, len(blob), 512):
-            session.command(f"write-memory-raw {LOADS_AT + at} "
-                            + blob[at:at + 512].hex().upper())
-        # Asked up to three times, which with the machine held while the
-        # counter is written should never be needed; it costs nothing when it
-        # is not.
-        started = False
-        for _ in range(3):
-            session.jump(LOADS_AT)
-            if session.wait_for(where["done_flag"], 0xFF, timeout=20.0,
-                                every=0.1):
-                started = True
-                break
-        assert started, "the Amstrad never got going"
+        assert session.start_code(blob, LOADS_AT, where["done_flag"],
+                                  timeout=20.0), "the Amstrad never got going"
         for key in sorted(gfx, key=int):
             number = int(key)
             session.command(f"write-memory {where['picture_wanted']} "

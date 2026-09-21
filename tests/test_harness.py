@@ -51,6 +51,10 @@ class Machine:
     been pointed somewhere.
     """
 
+    # The real one, working on a machine of paper: start_code leans on it, and
+    # so does everything else that writes a build into a machine.
+    put = emulator.Session.put
+
     def __init__(self, spoils=0):
         self.memory = {}
         self.spoils = spoils
@@ -116,3 +120,19 @@ def test_a_machine_that_never_takes_it_whole_is_given_up_on():
     assert not started(machine, blob, tries=3)
     assert machine.builds == 3, "it did not try as many times as it was told"
     assert machine.starts == 0, "it was started on a build known to be wrong"
+
+
+def test_what_has_to_happen_while_it_is_held_waits_for_the_check():
+    """`then` is for whatever must happen before the machine is let go again,
+    and it only happens once what was written has been read back and found
+    whole -- which is what keeps a processor from being pointed at a build
+    with a byte astray."""
+    blob = bytes(range(256)) * 4
+    seen = []
+    machine = Machine(spoils=1)
+    assert machine.put(blob, AT, then=lambda: seen.append(machine.builds))
+    assert seen == [2], f"it was done on the wrong attempt: {seen}"
+
+    machine = Machine(spoils=99)
+    assert not machine.put(blob, AT, tries=2, then=lambda: seen.append("never"))
+    assert seen == [2], "it was done although the build never landed whole"

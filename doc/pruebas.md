@@ -121,8 +121,15 @@ mira el teclado sólo mientras pregunta --que es lo que hace el original y lo
 que ve una persona--. Se perdía la primera letra de la orden, y que se
 perdiera o no dependía de lo deprisa que sondeara la prueba: **en paralelo no
 pasaba nunca y a solas pasaba siempre**, de modo que parecía culpa del
-intérprete de una máquina concreta. Ahora esperan a que vuelva a preguntar,
-con `emulator.until` y `emulator.asking`.
+intérprete de una máquina concreta.
+
+Y **ver el prompt tampoco es que te estén preguntando**: imprimirlo y ponerse
+a mirar el teclado no son el mismo instante, y una tecla pulsada entre los dos
+no la oye nadie. Eso salía como `>>>EBECA` --la erre de `REBECA` perdida-- en
+la máquina más lenta, dos veces en sendas vueltas. Así que `emulator.asked`
+pide ver la misma pantalla **dos veces seguidas** con el prompt al final: una
+vuelta entera del sondeo, que es de sobra para que la máquina pase de lo uno a
+lo otro, y no cuesta nada cuando el prompt ya llevaba ahí un rato.
 
 La del Quijote en un 464 tenía la misma de otra forma: pulsaba espacio cuatro
 veces nada más arrancar, para pasar la portada, y si la portada aún estaba

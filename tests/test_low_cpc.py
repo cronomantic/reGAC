@@ -101,14 +101,17 @@ def started(session, code, data):
     """What the loader does: the interpreter's file at $4000, its mover
     called, the database over the top of it, and then the starter the mover
     left at the island."""
-    for at in range(0, len(code), 512):
-        session.command(f"write-memory-raw {CPC_LOW_DATABASE_AT + at} "
-                        + code[at:at + 512].hex().upper())
+    assert session.put(code, CPC_LOW_DATABASE_AT), (
+        "the interpreter never landed whole"
+    )
     session.jump(CPC_LOW_DATABASE_AT)
     time.sleep(0.5)
-    for at in range(0, len(data), 512):
-        session.command(f"write-memory-raw {CPC_LOW_DATABASE_AT + at} "
-                        + data[at:at + 512].hex().upper())
+    # The mover has come back to whatever was behind it and the machine is
+    # running that, so this one is written with it held as well -- and read
+    # back, because what it is running could have been anything.
+    assert session.put(data, CPC_LOW_DATABASE_AT), (
+        "the database never landed whole"
+    )
     session.jump(CPC_LOW_ISLAND_AT)
 
 

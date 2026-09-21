@@ -2777,8 +2777,20 @@ Y el mecanismo tiene prueba propia, en `tests/test_harness.py`, contra una
 máquina de papel que pierde un byte del primer build que le dan: comprueba que
 se vuelve a escribir, que **no se arranca nada sin comprobar**, y que una
 máquina que nunca lo coge entero se da por imposible en vez de arrancarla sobre
-algo que se sabe mal. Son tres pruebas y tardan cinco centésimas, que es lo que
-vale poder tocar esto sin montar un emulador.
+algo que se sabe mal. Son cuatro pruebas y tardan seis centésimas, que es lo
+que vale poder tocar esto sin montar un emulador.
+
+**Y lo mismo para todos, por si acaso.** Sólo el PCW había dado la cara, pero
+escribir en una máquina en marcha lo hacían cinco sitios más, y el del Quijote
+bajo era el peor de todos sin que nadie se hubiera fijado: entre el mover y la
+isla, la máquina vuelve del `ret` del mover a lo que hubiera detrás y corre eso
+--cualquier cosa-- mientras se le está escribiendo la base de datos encima. Así
+que la parte de escribir está ahora en `Session.put`, que para la máquina, lo
+escribe, lo relee y sólo entonces hace lo que haya que hacer todavía parada
+--apuntarle el contador, que es lo que `start_code` quiere--. Lo usan las de
+gráficos del Amstrad, la de las 196 láminas, la partida del Amstrad y la del
+MSX, y la del Quijote bajo. Un byte suelto escrito como señal a código que ya
+corre no pasa por ahí: ése está para que lo vean y lo cambien.
 
 ### El indicador del modo paso a paso, que costaba ocho segundos por orden
 

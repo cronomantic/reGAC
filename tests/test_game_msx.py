@@ -144,17 +144,14 @@ def start_playing(session, where, database):
     database once there is somewhere to put it."""
     with open(BINARY, "rb") as f:
         blob = f.read()
-    for at in range(0, len(blob), 512):
-        session.command(
-            f"write-memory-raw {CODE_AT + at} " + blob[at:at + 512].hex().upper()
-        )
+    assert session.put(blob, CODE_AT), "the interpreter never landed whole"
     session.command(f"write-memory-raw {where['database_ready']} 00")
     session.jump(where['start'])
     time.sleep(0.5)  # it switches to all RAM and waits for the word
-    for at in range(0, len(database), 512):
-        piece = database[at:at + 512]
-        session.command(f"write-memory-raw {at} " + piece.hex().upper())
-    assert bytes(session.read(0, 4)) == b"RGAC", "the database never landed"
+    # Held while it goes in, although the interpreter is only spinning on the
+    # word below, and read back whole -- which is more than the four letters
+    # of its header that used to be looked at.
+    assert session.put(database, 0), "the database never landed whole"
     session.command(f"write-memory-raw {where['database_ready']} 01")
 
 
@@ -192,13 +189,15 @@ def test_it_asks_and_answers_on_an_msx():
         # written over the line it starts on, so the complaint below would be
         # covered as soon as it is printed -- which is what the original does
         # there too, watched on it.
+        # Not a key until it is asking and has been for a look: see
+        # emulator.asked.
+        emulator.asked(lambda: screen(session, glyphs),
+                       ddb["messages"]["240"])
         type_them(session, PASSWORD + ENTER)
         wait_screen(session, glyphs, ddb["locations"]["1"]["desc"][:12], timeout=30.0)
-        # And then until it asks again, because the description is still
-        # going out and a key pressed while it is has nowhere to go.
-        emulator.until(lambda: screen(session, glyphs),
-                       lambda lines: emulator.asking(lines,
-                                                     ddb["messages"]["240"]))
+        # And then until it is asking again, because the description is
+        # still going out and a key pressed while it is has nowhere to go.
+        emulator.asked(lambda: screen(session, glyphs), ddb["messages"]["240"])
         # A word the adventure does not know, so it has to say so.
         type_them(session, "XYZZY" + ENTER)
         answered = wait_screen(session, glyphs, puzzled[:6], timeout=30.0)

@@ -143,7 +143,22 @@ def asking(lines, prompt):
     return bool(written) and written[-1].strip() == prompt.strip()
 
 
-def until(reader, ready, timeout=30.0, every=0.5):
+def asked(reader, prompt, timeout=30.0):
+    """Wait until the machine is asking for an order, and has been asking for
+    a whole look, and give back what was read.
+
+    The second half is the point.  Printing the prompt and reading the
+    keyboard are not the same instant, and a key pressed in between is a key
+    nobody hears: the first letter of an order went missing that way, on the
+    slowest machine, twice in a run of the suite.  Waiting to see the same
+    screen twice gives the machine a whole look of the poller to get from one
+    to the other, and costs that look when the prompt was already there.
+    """
+    return until(reader, lambda lines: asking(lines, prompt), timeout=timeout,
+                 steady=True)
+
+
+def until(reader, ready, timeout=30.0, every=0.5, steady=False):
     """Let the machine run until what is read is ready, and give that back.
 
     Reading a screen is each machine's own business, so the reader is handed
@@ -155,12 +170,15 @@ def until(reader, ready, timeout=30.0, every=0.5):
     an order now and then; whether they did depended on how fast they were
     polling, so it showed on one machine and not another and looked like the
     interpreter's fault.
+
+    With `steady`, what is read has to be ready **and the same as the look
+    before it**, for the reason `asked` gives.
     """
     deadline = time.time() + longer(timeout)
     what = reader()
     while time.time() < deadline:
-        what = reader()
-        if ready(what):
+        last, what = what, reader()
+        if ready(what) and (not steady or what == last):
             return what
         time.sleep(every)
     return what
@@ -406,6 +424,31 @@ class Session:
         If the check fails, or the mark never arrives, the whole thing is put
         back and tried again.
         """
+        def start():
+            self.command(f"set-register PC={at:04X}H")
+
+        for attempt in range(tries):
+            if not self.put(blob, at, tries=1, then=start):
+                continue
+            if self.wait_for(flag, wanted, timeout=timeout, every=0.2):
+                return True
+        return False
+
+    def put(self, blob, at, tries=3, then=None):
+        """Write something into the machine and make sure it landed whole.
+
+        The machine is held for the whole of it, so that nothing of its own
+        runs between the first byte and the last, and what was written is
+        read back and compared before the hold is let go.  `then` is anything
+        that has to happen while it is still held -- pointing the processor
+        at what has just arrived, which is what start_code wants -- and it is
+        only done once the check has passed.  Says whether it landed.
+
+        A single byte written as a signal to code that is already running is
+        not this: that one is meant to be seen and changed, so there is
+        nothing to read back and nothing to gain by stopping the machine to
+        write it.
+        """
         for attempt in range(tries):
             with self.held():
                 for offset in range(0, len(blob), 512):
@@ -415,8 +458,8 @@ class Session:
                     )
                 if self.read(at, len(blob)) != blob:
                     continue            # the hold is let go on the way out
-                self.command(f"set-register PC={at:04X}H")
-            if self.wait_for(flag, wanted, timeout=timeout, every=0.2):
+                if then is not None:
+                    then()
                 return True
         return False
 

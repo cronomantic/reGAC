@@ -157,13 +157,7 @@ def draw_on_both(commands):
     session = emulator.Session(machine="CPC6128")
     try:
         time.sleep(3.0)  # let the machine finish coming up
-        for at in range(0, len(blob), 512):
-            piece = blob[at:at + 512]
-            session.command(
-                f"write-memory-raw {LOADS_AT + at} " + piece.hex().upper()
-            )
-        session.jump(LOADS_AT)
-        finished = session.wait_for(done, 0xFF, timeout=40.0, every=0.1)
+        finished = session.start_code(blob, LOADS_AT, done, timeout=40.0)
         screen = session.read(SCREEN, 0x4000)
     finally:
         session.close()
