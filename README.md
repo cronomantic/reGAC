@@ -1,6 +1,22 @@
 # ReGAC
 
-Implementation of a decompiler and simple interpreter for Graphic Adventure Creator games for Spectrum.
+Write a Graphic Adventure Creator adventure as a text file and publish it on
+eight eighties machines with one command -- or rescue one from a 1986 tape and
+read it as source.
+
+## Documentation
+
+Two documents, in Spanish, and between them they are the whole of it:
+
+* **[doc/manual.md](doc/manual.md)** -- the user manual: what to install, how
+  an adventure is written block by block, how it is checked and how it is
+  built for every machine.
+* **[doc/gac.md](doc/gac.md)** -- the GAC language in full: the turn, all
+  sixty seven opcodes, the parser, the reserved markers and messages, and
+  every drawing command.
+
+The rest of `doc/` is the development diary -- what was measured, in what
+order and why. It is not reference material.
 
 ## Components
 
@@ -9,11 +25,7 @@ Implementation of a decompiler and simple interpreter for Graphic Adventure Crea
 * runGAC_pygame.py: The same interpreter behind a Spectrum-like screen.
 * regac: Decompiler and compiler for the editable source format, the renderer
   for the vector graphics, the binary database the 8 bit interpreters read and
-  the media they are shipped on. See [doc/formato-fuente.md](doc/formato-fuente.md)
-  and [doc/graficos.md](doc/graficos.md), plus the text storage described in
-  [doc/textos.md](doc/textos.md), the binary database in
-  [doc/binario.md](doc/binario.md) and the project file that builds an
-  adventure for every machine at once in [doc/proyecto.md](doc/proyecto.md).
+  the media they are shipped on. See [doc/manual.md](doc/manual.md).
 * disk.py: Read a file off an Amstrad disk image, or a whole adventure off one
   that was laid out so that it could not be copied.
 * grab.py: Load a disk, a tape or a snapshot on the machine it belongs to and
