@@ -2752,16 +2752,33 @@ Los reintentos se han quitado.
 ~~Quedan otras pruebas que escriben el PC, pero una sola vez, y ya reintentan.~~
 Ya no queda ninguna: ver lo que sigue.
 
-### Y una que sigue apareciendo, en el PCW
+### Y una que aparecía en el PCW, que era escribir en marcha
 
-`test_graphics_pcw` falló una vez en una vuelta entera de la suite —una lámina
-con puntos distintos de los de la referencia, no una que no acabara— y pasó
-tres veces seguidas al repetirla. Lo que encaja es lo que ya está escrito en
-`start_code`: un PCW sin disquete sigue ocupado con el cargador que le da su
-teclado, y de vez en cuando ese cargador pisa lo que se le acaba de escribir.
-Los reintentos de `start_code` cubren el caso de que no arranque, no el de que
-arranque con un byte cambiado. Si vuelve a salir, el remedio es el mismo que
-en las demás: escribir, volver a leer lo escrito y repetir si no coincide.
+`test_graphics_pcw` fallaba cada pocas vueltas --una lámina con puntos
+distintos de los de la referencia, nunca la misma, y nunca una que no
+acabara-- y pasaba al repetirla a solas. Lo que encaja es lo que ya estaba
+escrito en `start_code`: un PCW sin disquete sigue ocupado con el cargador que
+le da su teclado, y de vez en cuando ese cargador pisa lo que se le acaba de
+escribir.
+
+Los reintentos que había cubrían que **no arrancara**, no que arrancara con un
+byte cambiado: código con un byte distinto puede llegar igual hasta el final y
+poner la marca que iba a poner, de modo que esperar la marca no lo ve. Quien lo
+ve es la pantalla, y para entonces parece un fallo del dibujo.
+
+Ahora `start_code` hace dos cosas. **La máquina se queda parada mientras se
+escribe**, de modo que no corre nada suyo entre el primer byte y el salto y no
+hay momento que pisar; y **se relee lo escrito y se compara** antes de
+apuntarle el contador, que es lo que la parada no puede prometer --un byte que
+se torciera antes de empezar la parada se encontraría de la otra manera--. Si
+la comprobación falla, o la marca no llega, se vuelve a escribir entero.
+
+Y el mecanismo tiene prueba propia, en `tests/test_harness.py`, contra una
+máquina de papel que pierde un byte del primer build que le dan: comprueba que
+se vuelve a escribir, que **no se arranca nada sin comprobar**, y que una
+máquina que nunca lo coge entero se da por imposible en vez de arrancarla sobre
+algo que se sabe mal. Son tres pruebas y tardan cinco centésimas, que es lo que
+vale poder tocar esto sin montar un emulador.
 
 ### El indicador del modo paso a paso, que costaba ocho segundos por orden
 

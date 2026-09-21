@@ -390,16 +390,32 @@ class Session:
         PCW are driven, and on the PCW it is now and then too early: with no
         disk in it that machine is still busy with the loader its keyboard
         gave it, and once in a while that treads on what has just been
-        written.  So this looks at whether the build reached the mark it was
-        going to reach, and puts it back if it did not.
+        written.
+
+        Two things are done about it.  The machine is **held for the whole of
+        the writing**, so that nothing of its own runs between the first byte
+        and the jump and there is no moment to tread in; and what was written
+        is **read back and compared** before the processor is pointed at it.
+        The second is what the first cannot promise: a byte that went astray
+        before the hold began would otherwise be found by the eye instead, as
+        a picture with points the reference has not got -- which is what
+        test_graphics_pcw used to show every few runs, once a run and never
+        the same drawing twice.  Looking at whether it reached its mark does
+        not catch that, because code with a byte changed can still finish.
+
+        If the check fails, or the mark never arrives, the whole thing is put
+        back and tried again.
         """
         for attempt in range(tries):
-            for offset in range(0, len(blob), 512):
-                piece = blob[offset:offset + 512]
-                self.command(
-                    f"write-memory-raw {at + offset} " + piece.hex().upper()
-                )
-            self.jump(at)
+            with self.held():
+                for offset in range(0, len(blob), 512):
+                    piece = blob[offset:offset + 512]
+                    self.command(
+                        f"write-memory-raw {at + offset} " + piece.hex().upper()
+                    )
+                if self.read(at, len(blob)) != blob:
+                    continue            # the hold is let go on the way out
+                self.command(f"set-register PC={at:04X}H")
             if self.wait_for(flag, wanted, timeout=timeout, every=0.2):
                 return True
         return False
