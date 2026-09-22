@@ -1787,12 +1787,34 @@ es inevitable: son sonidos distintos hechos con cosas distintas.
   hace la prueba es [`test_beeper.asm`](../z80/pcw/test_beeper.asm) y se queda
   ahí por si algún día hay con qué escucharlo.
 
-  Las salidas, si alguna vez se quiere: escribirlo a ciegas desde documentación
-  fiable, detrás de un define y sin prueba; o meter otro emulador en las
-  herramientas —Joyce, el de John Elliott— sólo para esto. Lo que sí se sabe es
-  que la máquina tiene interrupción de temporizador, así que el clic de tecla
-  saldría gratis el día que se sepa el puerto, y la música pediría además
-  montarle la interrupción, que hoy no la usa.
+  **Y lo dice el propio emulador**, que es mejor que deducirlo del silencio:
+  su fichero `FEATURES` enumera del PCW los modos de vídeo y el controlador de
+  disquete, y en toda la lista de sonido —AY, Turbosound, los DAC, General
+  Sound, el del ZX80/81, el altavoz del Jupiter Ace, el i8049 del QL— **el PCW
+  no aparece**.
+
+  **Decisión: aparcado.** Tres motivos, de más a menos peso:
+
+  1. **No se puede comprobar.** Lo que escribiéramos no se ejecutaría ni una
+     vez.
+  2. **No se puede escribir bien desde aquí.** No hay documentación del
+     hardware del PCW en el repositorio: lo que hay son manuales de GAC.
+  3. **No es un hueco de fidelidad.** GAC salió para Spectrum, Amstrad CPC,
+     C64 y BBC —de ahí los formatos de fuente que lee `deGAC`—. **El PCW lo
+     añadimos nosotros**, y `SOUND` y `QUIET` son opcodes nuestros; que el PCW
+     los lea y no haga nada está documentado y es coherente.
+
+  Y el que cierra: escribirlo a ciegas sería **un segundo trozo de código
+  nunca ejecutado**, que es exactamente lo que es el C64 de `deGAC` y
+  exactamente por lo que ese se aparca. No se añade el mismo problema en la
+  misma frase en que se decide dejar de tenerlo.
+
+  El camino, si alguna vez se quiere, es en este orden: **Joyce, el emulador
+  de John Elliott, en `tools/`**, y sólo entonces buscar el puerto. Al revés no
+  sirve. Lo que sí se sabe es que la máquina tiene interrupción de
+  temporizador, así que el clic de tecla saldría gratis el día que se sepa el
+  puerto. El build que hace el barrido se queda en
+  [`test_beeper.asm`](../z80/pcw/test_beeper.asm).
 - ~~El Amstrad sin música~~, **hecho**: ahí el único altavoz es el AY, así que
   ahora `SOUND` le pide la nota al chip en vez de menear un bit. Es el mismo
   baile del 8255 que ya hacía el teclado, y lee **la misma tabla** que el
@@ -3038,6 +3060,11 @@ necesita el emulador; las tres salen del disco.
 
 Lo de Commodore está escrito a partir del decompilador de referencia y **no se
 ha probado nunca**, porque no tenemos ningún fichero de C64 a mano.
+**Aparcado definitivamente.** Se queda donde está, sin tocarlo y sin contarlo
+como funcionando: código que no se ha ejecutado una sola vez no es una
+función, es una deuda, y decirlo aquí vale más que dejarlo pareciendo que
+anda. Si algún día aparece un fichero de C64, lo primero es correrlo contra el
+decompilador de referencia; hasta entonces no hay nada que hacer.
 
 Lo de casar palabras por prefijo estaba al revés de como lo habíamos contado.
 El que se equivocaba era el nuestro, no el de Python: al original le tecleas
