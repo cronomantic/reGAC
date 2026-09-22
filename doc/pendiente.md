@@ -452,7 +452,8 @@ nada a la pantalla. Las rutinas de cinta de la BIOS dejan el chip de vídeo
 exactamente como estaba, encendido y con sus registros; está mirado en la
 máquina, con una pantalla puesta y un bloque escrito encima.
 
-**Lo que queda de esta máquina**: una lámina, una sola, que pasa del tope.
+**Lo que queda de esta máquina**: nada. Hubo una lámina, una sola, que pasaba
+del tope, y ya no —sigue leyendo—.
 Están medidas las 196 de las ocho aventuras, con un contador de ciclos parado
 en seco por un punto de ruptura, y **todas salen idénticas a la referencia**;
 la más lenta de cada aventura va de 2,9 a 4,2 segundos, salvo en una: la 28
@@ -461,16 +462,74 @@ de Bangkok2, que cuesta **6,11 s**. Esa misma lámina en un Spectrum cuesta
 que decía antes este párrafo; y lo que la hace cara no es el MSX, es ella: en
 el Spectrum también es la peor con diferencia (la 21 son 1,48 s y la 26, 0,30).
 
-Dónde se van esos seis segundos no se sabe todavía, y conviene decirlo así
-porque los dos modos de mirarlo se contradicen. Mirando el contador de
-programa cada poco, 400 veces, sale `colour_span` 19%, `span_extent` 18% y
-`mark_span` 14,5%. Poniendo un `RET` encima de cada rutina y volviendo a
-dibujar, quitar `gfx_fill` entero ahorra 0,86 s, `gfx_line` 0,28 s y
-`colour_span` 0,02 s. Lo segundo miente por construcción —sin los rellenos la
-lámina ya no es la misma y el resto tiene menos que pintar— y lo primero
-tampoco es exacto, porque preguntar detiene la máquina un instante. Antes de
-decir dónde apretar haría falta un perfil de verdad, instrucción a
-instrucción.
+~~Dónde se van esos seis segundos no se sabe todavía.~~ **Ya se sabe, y la
+lámina baja de 6,11 s a 4,45: dentro del presupuesto, de modo que no queda
+ninguna de las 196 fuera de él en ninguna máquina.**
+
+Los dos modos de mirarlo que había **se contradecían y estaban los dos mal**.
+Muestreando el contador de programa 400 veces salía `colour_span` 19%,
+`span_extent` 18% y `mark_span` 14,5%; poniendo un `RET` encima de cada rutina
+salía que quitar `gfx_fill` ahorraba 0,86 s. Ninguna de las dos se acercaba.
+
+### El perfil de verdad, que el emulador sabía dar
+
+ZEsarUX tiene `cpu-transaction-log`: apunta a un fichero **cada instrucción
+ejecutada**, con su dirección y el reloj. Con `opcode no`, `registers no`,
+`address yes` y `tstates yes` la lámina 28 sale por 30 MB y catorce segundos
+nuestros. El reloj es el de la trama y da la vuelta, así que la diferencia
+entre dos líneas es lo que costó la instrucción, sumándole la trama cuando sale
+negativa. Repartido por la etiqueta global anterior a cada dirección:
+
+| rutina | % |
+|---|---:|
+| `run_picture`, el bucle que lee órdenes | 38,2 |
+| `set_border` | 22,8 |
+| `picture_find` | 14,3 |
+| todo lo que dibuja de verdad | ~25 |
+
+Hay dos acciones de punto de ruptura, `start-transaction-log` y
+`stop-transaction-log`, si alguna vez se quiere acotar más fino.
+
+### Y lo que el perfil descubrió: la lámina casi no dibuja
+
+Siguiendo sus `CALL`, la 28 ejecuta **48.626 órdenes**: 43.821 `BORDER`, 4.726
+`CALL`, y sólo 53 `LINE`, 15 `FILL` y 3 `RECT`. Es **un parpadeo de borde**
+entre el rojo y el negro, hecho con sub-láminas anidadas que se llaman unas a
+otras cuatro niveles. Por eso ningún ajuste del relleno la iba a tocar: el
+relleno no es lo que hace.
+
+Tres cambios, medidos uno a uno:
+
+| | | |
+|---|---:|---|
+| de partida | 6,29 s | |
+| **no reescribir un borde que no cambia** | 5,45 s | de las 43.821, sólo 17.528 piden un color que el borde no esté mostrando ya |
+| **`BORDER` con destino propio en el reparto** | 5,07 s | se comparaba el código dos veces, en `.next` y otra vez en `.one_byte` |
+| **guardar las dos últimas láminas y no una** | 4,45 s | |
+
+**Lo de las dos láminas merece contarse**, porque la caché de una entrada que
+había no estaba mal pensada: falla exactamente al volver de un nivel. Con A
+llamando a B y B llamando a C, la única ranura tiene a C cuando A vuelve a
+pedir B. Simulado en Python sobre las 4.726 llamadas de verdad antes de
+escribir una línea de Z80: **una ranura falla 657 veces, dos fallan 81**, tres
+27 y cuatro 7. Y promocionar la segunda cuando acierta no cambia nada —siguen
+siendo 81—, así que no se hace y el código se queda corto.
+
+Lo que compara la guarda del borde es **el valor sin enmascarar**: cuántos bits
+significan algo es cosa de cada máquina, y el Amstrad pasa el número entero a
+`hardware_ink`. Y la caché se pone a `$FF` al empezar cada lámina, porque
+`gfx_clear` y el `mode_init` de cada máquina pueden haber movido el borde;
+comprobado que fuera de esos dos sitios nadie lo toca, y que ninguno de los dos
+ocurre dentro de una lámina.
+
+**Cuesta 64 bytes** de intérprete, y está en `common/picture.asm`, de modo que
+lo ganan las cinco máquinas —el PCW sólo la parte del reparto, que allí
+`GFX_BORDER` está vacía—.
+
+**Lo comprobado**: las 196 láminas de las ocho aventuras dibujadas en el MSX,
+**todas idénticas a la referencia**, y las más lentas de cada aventura entre
+2,9 y 4,5 s. Más las 66 pruebas de gráficos de las cinco máquinas. **No se han
+vuelto a pasar** las 196 del Spectrum ni las del Amstrad.
 
 La prueba lenta `tests/test_all_pictures_msx.py` guarda el tope de 5 segundos
 para las 196 y lleva esa única lámina apuntada con nombre y con su número en

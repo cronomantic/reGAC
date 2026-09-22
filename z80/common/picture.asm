@@ -53,27 +53,58 @@ picture_init:
                 ld      (gfx_index), hl
                 ld      hl, 0                   ; nothing known yet, and no
                 ld      (gfx_known), hl         ; picture is numbered zero
+                ld      (gfx_behind), hl
                 ret
 
 ; Find picture HL.  Its commands come back in HL with their length in BC;
 ; carry set when there is no such picture.
 ;
-; The last one found is kept, because a picture that calls another calls it
-; over and over: the animations are built as one small picture called a dozen
-; times, from a picture called a dozen times, four deep.  Without this the
-; index is walked from the top for every one of those.
+; **The last two found are kept**, because a picture that calls another calls
+; it over and over: the animations are built as one small picture called a
+; dozen times, from a picture called a dozen times, four deep.  Without any
+; of this the index is walked from the top for every one of them.
+;
+; One was kept before, and one is not enough, because the misses are exactly
+; the moments of coming back up a level: with A calling B and B calling C, the
+; one slot holds C while A asks for B again.  Counted on picture 28 of Los
+; pajaros de Bangkok, which makes 4726 of these calls: **one slot misses 657
+; times and two slots miss 81**.  Three would miss 27 and four 7, and neither
+; is worth its bytes.
+;
+; The second slot is not promoted when it answers -- the front one stays in
+; front -- because that costs code and, counted the same way, changes
+; nothing: still 81.
 ; Corrupts: AF, DE
 picture_find:
                 ld      (gfx_wanted), hl
                 ld      de, (gfx_known)
                 or      a
                 sbc     hl, de
+                jr      z, .the_front
+                ld      hl, (gfx_wanted)
+                ld      de, (gfx_behind)
+                or      a
+                sbc     hl, de
                 jr      nz, .look
+                ld      hl, (gfx_behind_at)
+                ld      bc, (gfx_behind_size)
+                or      a
+                ret
+.the_front:
                 ld      hl, (gfx_known_at)
                 ld      bc, (gfx_known_size)
                 or      a
                 ret
 .look:
+                ; Neither of the two knew it, so the one in front steps back
+                ; and the search will put the new one in its place.  Here and
+                ; not at .found because here is where HL and BC are free.
+                ld      hl, (gfx_known)
+                ld      (gfx_behind), hl
+                ld      hl, (gfx_known_at)
+                ld      (gfx_behind_at), hl
+                ld      hl, (gfx_known_size)
+                ld      (gfx_behind_size), hl
                 ld      hl, (gfx_index)
                 ld      bc, (gfx_count)
 .each:
@@ -121,6 +152,8 @@ draw_picture:
                 call    db_bank_in              ; pictures' bank away
                 xor     a
                 ld      (gfx_depth), a
+                dec     a                       ; $FF, which is no colour
+                ld      (gfx_border_now), a     ; so the first one is written
                 call    gfx_clear
                 pop     hl
                 call    gfx_start_colours       ; what a picture starts in
@@ -142,9 +175,13 @@ run_picture:
                 ld      a, (hl)
                 inc     hl
                 ld      c, a
-                ; one byte commands first
+                ; one byte commands first, and the border before them all:
+                ; it is first because it is the one a picture meets most --
+                ; forty three thousand times in one of them -- and having its
+                ; own landing saves reading the command a second time to find
+                ; out what it was.
                 cp      CMD_BORDER
-                jp      z, .one_byte
+                jp      z, .a_border
                 cp      CMD_INK
                 jp      z, .one_byte
                 cp      CMD_PAPER
@@ -213,18 +250,41 @@ run_picture:
                 ld      (gfx_left), de
                 ret
 
+; The border, which is its own landing because of how often it is met.
+;
+; **The same border as last time is not written again.** These are not a
+; handful: picture 28 of Los pajaros de Bangkok is forty three thousand
+; BORDER commands and fifty three lines -- it is a flashing border built out
+; of one small picture called over and over -- and only seventeen thousand of
+; them ask for a colour the border is not already showing.  The other twenty
+; six thousand wrote the same value to the hardware, which on an MSX is a
+; call, a table and two writes to the video chip.
+;
+; What is compared is the colour as the picture gave it, **not masked**: how
+; many of its bits mean anything is the machine's business, and the Amstrad
+; uses more than three.
+.a_border:
+                ld      a, (hl)                 ; the colour it asks for
+                inc     hl
+                dec     de
+                ld      c, a
+                ld      a, (gfx_border_now)
+                cp      c
+                jp      z, .next
+                ld      a, c
+                ld      (gfx_border_now), a     ; and this leaves A alone
+                GFX_BORDER                      ; the machine knows how
+                jp      .next
+
+; INK, PAPER, BRIGHT and FLASH, which are kept and not acted on.  The border
+; used to come through here too and does not any more, so there is no longer
+; a command to tell apart at the top.
 .one_byte:
                 ld      a, (hl)
                 inc     hl
                 dec     de
                 ld      b, a
                 ld      a, c
-                cp      CMD_BORDER
-                jr      nz, .not_border
-                ld      a, b
-                GFX_BORDER                      ; the machine knows how
-                jp      .next
-.not_border:
                 push    hl
                 ld      hl, gfx_ink
                 cp      CMD_INK
@@ -278,7 +338,8 @@ run_picture:
                 sub     PICTURE_BOTTOM
                 cp      PICTURE_TOP - PICTURE_BOTTOM + 1
                 call    c, gfx_plot
-                jr      .resume
+                jp      .resume                 ; too far for a jr since the
+                                                ; border learned to say no
 .a_fill:
                 ld      b, FILL_INK
                 cp      CMD_FILL
@@ -322,12 +383,21 @@ gfx_section:    dw      0
 gfx_index:      dw      0
 gfx_count:      dw      0
 gfx_wanted:     dw      0
+; The second of the two pictures kept, which is what stops the index being
+; walked every time a call comes back up a level.  See picture_find.
+gfx_behind:      dw     0
+gfx_behind_at:   dw     0
+gfx_behind_size: dw     0
 gfx_known:      dw      0                       ; the last picture looked up
 gfx_known_at:   dw      0
 gfx_known_size: dw      0
 gfx_code:       dw      0
 gfx_left:       dw      0
 gfx_depth:      db      0
+; What the border is showing, so that asking for it again costs nothing.  It
+; is no colour at all between pictures, because gfx_clear and the machines'
+; own mode setting may have moved it.  See .one_byte.
+gfx_border_now: db      $FF
 gfx_x0:         db      0
 gfx_y0:         db      0
 gfx_x1:         db      0
