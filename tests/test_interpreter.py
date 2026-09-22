@@ -27,6 +27,7 @@ letter more than the word it holds, makes it say it does not understand.
 """
 
 import importlib.util
+import json
 import os
 import sys
 
@@ -83,6 +84,77 @@ def test_the_interpreter_here_knows_every_opcode():
                and f'"{op.name}"' not in source
                and f"'{op.name}'" not in source]
     assert not missing, f"runGAC.py has never heard of {missing}"
+
+
+def a_game():
+    """The interpreter with an adventure in it, part way through a game: the
+    state moved off every one of its starting values, so that a save that
+    quietly missed one of them would show."""
+    with open(os.path.join(ROOT, "snapshots", "megacorp1.json"),
+              encoding="utf-8") as f:
+        ddb = json.load(f)
+    game = interpreter()(ddb)
+    game.start_adventure()
+    game.current_loc = 7
+    game.max_weight = 99
+    game.weight = 42
+    game.flags[5] = True
+    game.counters[3] = 11
+    game.stack = [1, 2, 3]
+    game.objects[sorted(game.objects)[0]]["loc"] = 255      # being carried
+    game.print = lambda text: None
+    return game
+
+
+def what_it_amounts_to(game):
+    """Everything a saved game is meant to carry, as this side keeps it."""
+    return (game.current_loc, game.max_weight, game.weight,
+            list(game.flags), list(game.counters), list(game.stack),
+            {k: v["loc"] for k, v in game.objects.items()})
+
+
+def test_a_game_written_down_comes_back_the_same(tmp_path):
+    """SAVE and LOAD, which were two TODOs with a pass in them.
+
+    What a game amounts to is the same on every machine -- where the player
+    is, what can be carried and what is, the flags, the counters, the stack
+    and where every object is -- so this writes it, wrecks all of it, reads
+    it back and asks for the same thing again.
+    """
+    game = a_game()
+    was = what_it_amounts_to(game)
+    path = str(tmp_path / "partida.sav")
+    game.input = lambda: path
+    game.save_game()
+
+    game.current_loc, game.max_weight, game.weight = 1, 250, 0
+    game.flags = [False] * len(game.flags)
+    game.counters = [0] * len(game.counters)
+    game.stack = []
+    for one in game.objects.values():
+        one["loc"] = 0
+    assert what_it_amounts_to(game) != was, "the wrecking wrecked nothing"
+
+    game.load_game()
+    assert what_it_amounts_to(game) == was
+
+
+def test_a_load_that_fails_leaves_the_game_alone(tmp_path):
+    """Which is what the machines do: their LOAD does not look at whether the
+    block came in, it goes on with the condition and the state stays as it
+    was.  Here it says so as well, because a tape says it by not loading and
+    a terminal says nothing at all."""
+    game = a_game()
+    was = what_it_amounts_to(game)
+    said = []
+    game.print = lambda text: said.append(text)
+
+    for name, why in ((str(tmp_path / "no-such-file"), "no such file"),
+                      (__file__, "not a saved game at all")):
+        game.input = lambda name=name: name
+        game.load_game()
+        assert what_it_amounts_to(game) == was, f"{why} changed the game"
+    assert "Could not load" in "".join(said)
 
 
 def test_the_start_of_a_word_is_enough():

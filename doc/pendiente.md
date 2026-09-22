@@ -2943,6 +2943,38 @@ corrección, DOSBox-X sobra.
 
 ## Cosas menores
 
+### `SAVE` y `LOAD` en `runGAC.py`, que eran dos `TODO` con un `pass`
+
+Ya juegan. Lo que se guarda son las mismas cosas que el bloque `vm_state` del
+Z80 —dónde está el jugador, lo que puede llevar y lo que lleva, las banderas,
+los contadores, la pila y dónde está cada objeto— pero en JSON y no como
+volcado de memoria, por dos motivos.
+
+**Dos de las cosas de ese bloque no existen aquí.** `vm_seed` es el generador
+de las máquinas y esto usa el de Python; y `obj_entry` son 512 bytes de
+**direcciones** que apuntan a la base de datos.
+
+Y eso segundo merece quedarse apuntado aunque sea de las máquinas:
+`obj_entry` **lo construye `vm_init` una vez y no vuelve a escribirse nunca**
+—comprobado: las únicas escrituras están en `vm_init`—, o sea que es un tercio
+del bloque viajando para nada. Y como son direcciones, es **lo que impide que
+una partida guardada en una máquina se cargue en otra**. Quitarlo del bloque
+ahorraría 512 bytes de cinta y haría las partidas portables, a cambio de que
+las guardadas hasta hoy dejaran de leerse.
+
+**Lo otro es que un fichero tiene nombre y una cinta no**, así que hay que
+pedirlo; y puestos a preguntar, lo que se escribe puede ser algo que una
+persona sepa leer.
+
+Una carga que falla **deja la partida exactamente como estaba**, que es lo que
+hacen las máquinas: su `LOAD` no mira si el bloque entró, sigue con la
+condición. La diferencia es que aquí lo dice, porque una cinta avisa sola de
+que no ha cargado y un terminal callado parece que fue bien.
+
+Y no describe la sala después, igual que las máquinas: lo que se diga es lo
+que diga la aventura a continuación.
+
+
 `deGAC` ya lee las tres máquinas. Reconoce por sí solo una instantánea de
 Spectrum, una de CPCEMU y una de VICE, y a una imagen plana de memoria, que es
 lo que sale de un disco de Amstrad, hay que decirle de qué máquina viene con

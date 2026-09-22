@@ -127,6 +127,12 @@ Para probar sin arrancar una máquina:
     python runGAC.py faro.json          # en el terminal
     python runGAC_pygame.py faro.json   # con una pantalla como la del Spectrum
 
+Los dos juegan la aventura entera, `SAVE` y `LOAD` incluidos. Una máquina
+guarda en la cinta o en el disco y no pregunta nada; aquí un fichero necesita
+nombre, así que se pide uno, y lo que se escribe es un JSON que se puede
+abrir y mirar. **No es el mismo fichero que guarda una máquina**, ni podría
+serlo: el bloque del Z80 lleva dentro direcciones de su propia memoria.
+
 ---
 
 ## 6. El fuente, bloque por bloque

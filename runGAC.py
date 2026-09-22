@@ -877,11 +877,9 @@ class GAC_Interpreter:
                     self.graphics = False
                     self.clear_picture()
                 elif cmd == "SAVE":
-                    # TODO
-                    pass
+                    self.save_game()
                 elif cmd == "LOAD":
-                    # TODO
-                    pass
+                    self.load_game()
                 elif cmd == "SOUND":
                     # There is no sound here, but the number they were given
                     # has to come off the stack whether anybody plays it or
@@ -1085,6 +1083,94 @@ class GAC_Interpreter:
             word(sep, run, in_run)
         elif sep:
             put(sep)
+
+    # -- a game written down and read back ---------------------------------
+    #
+    # What a game amounts to is the same handful of things on every machine,
+    # and the 8 bit interpreters write it out as the block of memory it lives
+    # in -- see vm_state in z80/common/conditions.asm.  This one writes the
+    # same facts as JSON instead, for two reasons.
+    #
+    # The first is that **two of the things in that block do not exist here**.
+    # vm_seed is the machines' own generator, and this uses Python's; and
+    # obj_entry is 512 bytes of addresses pointing into the database, which
+    # this has no equivalent of at all.  That one is worth knowing about even
+    # on the machines: it is built once by vm_init and never written again, so
+    # it is a third of the block travelling for nothing -- and, because they
+    # are addresses, **it is what stops a game saved on one machine being
+    # loaded on another**.  See doc/pendiente.md.
+    #
+    # The second is that a file has a name and a tape has not, so this has to
+    # ask for one, and once it is asking it may as well write something a
+    # person can read.
+    #
+    # What it does *not* do is describe the room afterwards, and that is on
+    # purpose: LOAD reads the block, keeps its place in the condition and goes
+    # on, and what gets said is whatever the adventure says next.  The
+    # machines do the same; the reason is in doc/pendiente.md.
+
+    SAVE_VERSION = 1
+
+    def save_name(self, what):
+        """The file to write or read.  The machines never ask -- a tape is
+        whatever is in the machine -- but a file has a name."""
+        self.print(what)
+        return self.input().strip()
+
+    def save_game(self):
+        name = self.save_name("Name of the game: ")
+        if not name:
+            return
+        game = {
+            "version": self.SAVE_VERSION,
+            "location": self.current_loc,
+            "max_weight": self.max_weight,
+            "weight": self.weight,
+            "flags": [n for n, on in enumerate(self.flags) if on],
+            "counters": self.counters,
+            "stack": self.stack,
+            "objects": {str(k): v["loc"] for k, v in self.objects.items()},
+        }
+        try:
+            with open(name, "w", encoding="utf-8") as f:
+                json.dump(game, f, indent=1)
+        except OSError as why:
+            # The machines say nothing when a save fails, because the tape or
+            # the drive is saying it instead.  Here nothing would just look
+            # like it worked.
+            self.print("Could not save: %s\n" % why)
+
+    def load_game(self):
+        name = self.save_name("Name of the game: ")
+        if not name:
+            return
+        try:
+            with open(name, encoding="utf-8") as f:
+                game = json.load(f)
+            if game.get("version") != self.SAVE_VERSION:
+                raise ValueError("not a game saved by this version")
+            location = int(game["location"])
+            flags = [False] * len(self.flags)
+            for n in game["flags"]:
+                flags[int(n)] = True
+            counters = [int(c) for c in game["counters"]]
+            objects = {int(k): int(v) for k, v in game["objects"].items()}
+        except (OSError, ValueError, KeyError, TypeError, IndexError) as why:
+            # A load that fails leaves the game exactly as it was, which is
+            # what the machines do: their LOAD does not look at whether the
+            # block came in, it just goes on with the condition.  So nothing
+            # above this line has touched anything yet.
+            self.print("Could not load: %s\n" % why)
+            return
+        self.current_loc = location
+        self.max_weight = int(game["max_weight"])
+        self.weight = int(game["weight"])
+        self.flags = flags
+        self.counters = counters
+        self.stack = list(game["stack"])
+        for k, where in objects.items():
+            if k in self.objects:
+                self.objects[k]["loc"] = where
 
     def input(self):
         self.line_remain = self.width
