@@ -2955,13 +2955,58 @@ volcado de memoria, por dos motivos.
 de las máquinas y esto usa el de Python; y `obj_entry` son 512 bytes de
 **direcciones** que apuntan a la base de datos.
 
-Y eso segundo merece quedarse apuntado aunque sea de las máquinas:
-`obj_entry` **lo construye `vm_init` una vez y no vuelve a escribirse nunca**
-—comprobado: las únicas escrituras están en `vm_init`—, o sea que es un tercio
-del bloque viajando para nada. Y como son direcciones, es **lo que impide que
-una partida guardada en una máquina se cargue en otra**. Quitarlo del bloque
-ahorraría 512 bytes de cinta y haría las partidas portables, a cambio de que
-las guardadas hasta hoy dejaran de leerse.
+Y eso segundo llevó a lo de abajo, que resultó no ser un desperdicio sino un
+fallo.
+
+### `obj_entry` fuera de la partida guardada
+
+**El bloque eran 1255 bytes y ahora son 743.** Así se reparten:
+
+| campo | bytes |
+|---|---:|
+| dónde está cada objeto (`obj_loc`) | 512 |
+| los contadores | 128 |
+| la pila de condiciones | 64 |
+| las banderas | 32 |
+| dónde está el jugador | 2 |
+| lo que puede llevar y lo que lleva | 2 |
+| la semilla del azar | 2 |
+| el byte que fue la música | 1 |
+| ~~`obj_entry`~~ | ~~512~~ |
+
+En una cinta de Spectrum a 1500 baudios son **4,0 s en vez de 6,7**, cada vez
+que se guarda y cada vez que se carga.
+
+**Que sobraba estaba claro**: `obj_entry` lo construye `vm_init` recorriendo la
+tabla de objetos y **nadie vuelve a escribirlo** —comprobado, las únicas
+escrituras están en `vm_init`—. Además va casi vacío: son 256 huecos indexados
+por número de objeto y las ocho aventuras tienen entre 8 y 19.
+
+**Lo que no estaba claro es que fuera un fallo**, y lo era. Son *direcciones*
+a la base de datos, que en el Spectrum va detrás del código con un
+`ALIGN 256`: si el intérprete cruza un múltiplo de 256, la base de datos se
+mueve y **toda partida guardada antes deja de valer**. Y no falla de frente:
+`vm_init` construye la tabla buena al arrancar, `LOAD` la pisa con la vieja, y
+los objetos quedan apuntando a otro sitio —pesos y nombres equivocados, sin un
+aviso—.
+
+Medido, no supuesto: construido el intérprete de antes de una tarde de tres
+cambios con la misma base de datos, `database` estaba en `$A000`; después, en
+`$A100`. **Se movió.** Y es también lo que impedía que una partida pasara de
+una máquina a otra.
+
+El argumento para dejarlo era no romper las partidas ya guardadas, y ese
+argumento estaba vacío: **ya estaban rotas**.
+
+`obj_entry` se queda inmediatamente **antes** de `vm_state`, de modo que el
+único `ldir` de `vm_init` sigue cubriéndolo junto con `obj_loc` y no hace falta
+partirlo en dos.
+
+Y hay prueba, en `test_conditions_z80.py`: que `obj_entry` está fuera del
+bloque y que el bloque no mide más que los campos que le tocan. Comprobada al
+revés metiendo `obj_entry` otra vez dentro. Mira la forma y no el
+comportamiento; comprobar lo segundo pediría dos construcciones de tamaños
+distintos y una partida jugada entre las dos.
 
 **Lo otro es que un fichero tiene nombre y una cinta no**, así que hay que
 pedirlo; y puestos a preguntar, lo que se escribe puede ser algo que una

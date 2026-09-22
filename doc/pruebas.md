@@ -265,6 +265,31 @@ sola es no arreglar ninguna. La lección es más general que el fallo:
 Un `grep` por la línea que falla —aquí `key_repeat`— sale más barato que dos
 vueltas de diez minutos.
 
+### Medir con la regla que no se mueve
+
+La prueba del canal de ruido del AY cayó **dos veces en dos puertas
+distintas**, y las dos por el mismo motivo de fondo: estaba construida sobre
+una medida inestable. Cuatro vueltas del mismo build en la misma máquina:
+
+| | tramos distintos | cambios de valor |
+|---|---|---|
+| tono | 18 - 21 | 7243 - 9236 |
+| ruido | 38 - 45 | **7373 - 12337** |
+| ambos | 31 - 44 | 11351 - 14088 |
+
+**Los tramos son firmes y los cambios de valor no.** La cuenta de cambios de
+un siseo se mueve dos tercios y se solapa con la del tono, así que cualquier
+afirmación apoyada en ella falla el día que al siseo le toca medir alto —que
+es lo que pasó, con 9934—.
+
+Lo que hice mal las dos veces fue lo mismo: **retocar el umbral en vez de
+medir la dispersión**. La primera vez bajé una exigencia y subí otra; la
+segunda, ya con los cuatro pares de números delante, se vio que una de las dos
+reglas no servía para nada y que la otra valía para los dos casos.
+
+> antes de mover un umbral, mídelo cuatro veces. Si lo que se mueve es la
+> medida y no el código, el umbral no es el problema.
+
 ## Si una vuelta se corta a medias
 
 Un emulador huérfano se queda con el puerto, y la vuelta siguiente falla en

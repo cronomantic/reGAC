@@ -92,6 +92,54 @@ def adventure(conditions, weights=(7, 1, 2)):
     }
 
 
+@needs_tools
+def test_a_saved_game_holds_nothing_that_depends_on_where_the_code_is():
+    """The one rule the saved block has to keep, and it did not.
+
+    `obj_entry` -- where each object's record lives in the database -- used to
+    be inside it.  It is built by vm_init walking the object table and nothing
+    writes it again, so it was 512 bytes travelling unchanged: **two fifths of
+    the block**, and two and a half seconds of a Spectrum tape every time.
+
+    That was only waste.  What made it a fault is that they are **addresses**.
+    The database sits after the code with an ALIGN 256, so an interpreter that
+    grows past a boundary moves it, and a game saved before that came back
+    pointing into the interpreter's own tail -- objects with the wrong weights
+    and the wrong names, and nothing said.  vm_init had built the table
+    properly and LOAD wrote the stale one over the top of it.  Measured: three
+    changes of one afternoon moved it from $A000 to $A100 on a 48.
+
+    It is also why a game saved on one machine never loaded on another.
+
+    This checks the shape and not the behaviour: that obj_entry is outside the
+    block, and that the block is no bigger than the fields that belong in it.
+    A behavioural check would need two builds of different sizes and a game
+    played between them.
+    """
+    listing = emulator.assemble(SOURCE, listing=LISTING)
+    at = {name: emulator.label_address(listing, name)
+          for name in ("vm_state", "vm_state_end", "obj_entry", "obj_loc",
+                       "vm_location", "vm_counters")}
+    saved = range(at["vm_state"], at["vm_state_end"])
+    assert at["obj_entry"] not in saved, (
+        "obj_entry is inside the saved game again: it is addresses into the "
+        "database, and the database moves whenever the interpreter does"
+    )
+    for name in ("obj_loc", "vm_location", "vm_counters"):
+        assert at[name] in saved, f"{name} fell out of the saved game"
+
+    # What a game is: where every object is (512), where the player is (2),
+    # what can be carried and what is (2), the seed (2), the byte the music
+    # left behind (1), the condition stack (64), the flags (32) and the
+    # counters (128).
+    wanted = 512 + 2 + 2 + 2 + 1 + 64 + 32 + 128
+    size = at["vm_state_end"] - at["vm_state"]
+    assert size == wanted, (
+        f"a saved game is {size} bytes and the fields that belong in it come "
+        f"to {wanted}: something joined it or left it"
+    )
+
+
 def run(conditions, weights=(7, 1, 2)):
     """Run the conditions and give back what the machine ended up holding."""
     database = Database(adventure(conditions, weights))

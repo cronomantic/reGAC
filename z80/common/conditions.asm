@@ -56,7 +56,12 @@ vm_init:
                 ldir
                 ld      hl, obj_entry
                 ld      de, obj_entry + 1
-                ld      bc, 512 + 512 - 1
+                ld      bc, 512 - 1
+                ld      (hl), 0
+                ldir
+                ld      hl, obj_loc             ; not next to it any more: it
+                ld      de, obj_loc + 1         ; is inside the saved game and
+                ld      bc, 512 - 1             ; obj_entry is not
                 ld      (hl), 0
                 ldir
                 xor     a
@@ -360,6 +365,34 @@ vm_verb:        db      0
 vm_noun1:       db      0
 vm_noun2:       db      0
 vm_adverb:      db      0
+; Where each object's record is, in the database.  **Outside the saved game
+; on purpose**, and it used not to be.
+;
+; vm_init builds it by walking the object table and nothing writes it again,
+; so it was 512 bytes travelling unchanged -- two fifths of the block, and
+; two and a half seconds of a Spectrum tape every time a game was saved or
+; loaded.  That alone was only waste.  What made it worse is that they are
+; **addresses**: the database sits after the code, aligned to 256, so an
+; interpreter that grows past a boundary moves it, and a game saved before
+; that came back pointing into the interpreter's own tail.  Nothing said a
+; word; the objects simply had the wrong weights and the wrong names, because
+; vm_init had built the table correctly and LOAD then wrote the stale one
+; over the top of it.
+;
+; Measured, and it is not a hypothetical: three changes of one afternoon
+; moved the database from $A000 to $A100 on a Spectrum 48.  It is also what
+; stopped a game saved on one machine ever loading on another.
+;
+; It sits here, outside the block, and **every other field stays where it
+; was**: what a saved game is now is exactly what it was with this taken out
+; of the middle of it.  A game still begins with the room the player is in,
+; which is what test_save_cpc.py reads off the disk.
+;
+; The price is that vm_init clears this and obj_loc apart, where one ldir did
+; both when they were neighbours.  Twelve bytes, against keeping every offset
+; in the block where it has always been.  See doc/pendiente.md.
+obj_entry:      ds      512
+
 ; Everything from here to vm_state_end is what a game amounts to, so it is
 ; what SAVE writes out and LOAD reads back.  The adventure itself never
 ; changes, which is why only this much has to travel.
@@ -382,6 +415,5 @@ vm_music:       db      0
 vm_stack:       ds      VM_STACK_DEPTH * 2
 vm_flags:       ds      FLAG_BYTES
 vm_counters:    ds      COUNTERS
-obj_entry:      ds      512                     ; where each object's record is
-obj_loc:        ds      512                     ; and where it is now
+obj_loc:        ds      512                     ; where every object is now
 vm_state_end:
