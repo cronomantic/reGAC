@@ -653,9 +653,10 @@ intérprete, que valen para cualquier prueba que teclee:
 Salió de la prueba de arriba: después de `LOAD` la sala se describía dos
 veces seguidas, y pegadas (`…ARENAS.ESTAS EN EL PLANETA…`), una porque
 `op_load` daba la sala por nueva y otra por el `LOOK` que la aventura pone
-detrás (`LOAD LOOK WAIT`). Ninguna de las dos referencias implementa `LOAD`
-—grackle dice «Not implemented (yet)» y `runGAC.py` tiene un `TODO`—, así que
-se miró en el original de Spectrum, leído y viéndolo funcionar.
+detrás (`LOAD LOOK WAIT`). Ninguna de las dos referencias implementaba `LOAD` entonces
+—grackle dice «Not implemented (yet)» y `runGAC.py` tenía un `TODO`, que ya no
+tiene: ver «`SAVE` y `LOAD` en `runGAC.py`»—, así que se miró en el original de
+Spectrum, leído y viéndolo funcionar.
 
 **Leído.** Los opcodes del juego están en `$788F` (`SAVE`) y `$78B3` (`LOAD`).
 Los dos piden un nombre —«Introduce nombre del fichero...»— y usan la ROM

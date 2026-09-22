@@ -1104,6 +1104,11 @@ class GAC_Interpreter:
     # ask for one, and once it is asking it may as well write something a
     # person can read.
     #
+    # Asking is not a departure, as it happens: **the original asked too** --
+    # "Introduce nombre del fichero...", read in its code at $788F and $78B3.
+    # It is our own 8 bit interpreters that do not, on purpose, because their
+    # save is a headerless block and not a named file.
+    #
     # What it does *not* do is describe the room afterwards, and that is on
     # purpose: LOAD reads the block, keeps its place in the condition and goes
     # on, and what gets said is whatever the adventure says next.  The
