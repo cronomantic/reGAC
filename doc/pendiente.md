@@ -2964,6 +2964,49 @@ estimación de tiempos** y no sólo que las láminas salen bien. DOSBox-X con
 harían falta **86Box** o **MartyPC**, que no están instalados. Para la
 corrección, DOSBox-X sobra.
 
+### Tres decisiones tomadas, para no volver a discutirlas
+
+**El *snow* de la CGA se ignora.** Sólo lo hacían las tarjetas CGA originales
+de IBM, y de ésas apenas queda ninguna. Nada de sincronizar con el retrazo ni
+de leer el puerto de estado antes de escribir: se escribe en `B800` y ya.
+
+**El XT a 4,77 MHz es el mínimo, no el objetivo.** Lo recomendado es un
+clónico XT turbo. Eso importa para leer bien la estimación de arriba, que está
+hecha **a 4,77**: en la máquina recomendada el margen de dibujo es
+aproximadamente el doble. O sea que el presupuesto de 4-5 s, que es lo que
+podía matar este target, está más holgado de lo que dice el número.
+
+**NASM solo, sin enlazador.** `nasm -f bin` saca un binario plano y `regac` le
+escribe delante los 28 bytes de la cabecera MZ, que es exactamente lo que ya
+se hace en las otras cinco máquinas: sjasmplus saca el binario y Python
+escribe el contenedor —`.tap`, `.cdt`, `.dsk`, `.nex`, `.cas`—. Una cabecera
+MZ sería el más pequeño de los seis. Tres razones:
+
+- **El código cabe en un segmento.** Los intérpretes Z80 andan por los 8-9 KB
+  y un 8086 no se irá mucho más lejos; lo grande es la base de datos, que no
+  es código. Sin pasar de 64K de código, un enlazador no resuelve nada que
+  tengamos.
+- **Sin reubicaciones**, calculando los segmentos desde `CS` en marcha.
+- **La cadena está probada en esta máquina y sin descargar nada.**
+
+**Y lo de Watcom queda abierto a propósito, para el paso 3 y no para antes.**
+El argumento a favor es mejor de lo que parece: **el intérprete de PC duplica
+toda la lógica de todas formas**. Los 9 KB de `z80/common/` —el parser, la
+máquina de condiciones, el reparto de texto, el intérprete de láminas— no se
+comparten ni escribiéndolo en 8086, así que «C no comparte nada» vale igual
+para el ensamblador; y si hay que mantener una segunda implementación, en C
+cuesta menos escribirla y menos equivocarse.
+
+En contra está el dibujo: en el Z80 el relleno del Amstrad pasó de 45 s a 4
+apretándolo a mano, y eso en C no sale. El camino sensato sería C para la
+lógica y ensamblador para los bucles de relleno y recta, y eso ya pide `wlink`
+y dos herramientas nuevas.
+
+No hace falta decidirlo ahora: **el paso 2 no necesita intérprete ninguno**.
+El `CgaDevice` y la comparación de láminas se hacen en Python contra la
+referencia, igual que en las otras cinco máquinas, y cuando eso esté se decide
+el lenguaje con las láminas ya comparando.
+
 ## Cosas menores
 
 ### `SAVE` y `LOAD` en `runGAC.py`, que eran dos `TODO` con un `pass`
