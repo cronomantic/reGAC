@@ -526,10 +526,26 @@ ocurre dentro de una lámina.
 lo ganan las cinco máquinas —el PCW sólo la parte del reparto, que allí
 `GFX_BORDER` está vacía—.
 
-**Lo comprobado**: las 196 láminas de las ocho aventuras dibujadas en el MSX,
-**todas idénticas a la referencia**, y las más lentas de cada aventura entre
-2,9 y 4,5 s. Más las 66 pruebas de gráficos de las cinco máquinas. **No se han
-vuelto a pasar** las 196 del Spectrum ni las del Amstrad.
+**Lo comprobado**: las 196 láminas de las ocho aventuras dibujadas en las tres
+máquinas que las dibujan, **todas idénticas a la referencia en las tres**, más
+las 66 pruebas de gráficos y la batería entera. La más lenta de cada aventura:
+
+| aventura | Spectrum | MSX | Amstrad |
+|---|---:|---:|---:|
+| Bangkok1 | 3,6 | 3,4 | 2,3 |
+| **Bangkok2** | **3,8** | **4,5** | **4,1** |
+| megacorp1 | 3,4 | 3,7 | 2,3 |
+| megacorp2 | 3,6 | 3,5 | 2,9 |
+| quijote1 | 2,9 | 2,9 | 16,8 |
+| quijote2 | 3,6 | 3,6 | 25,3 |
+| vajillas1 | 4,6 | 4,2 | 7,8 |
+| vajillas2 | 4,0 | 3,7 | 6,9 |
+
+**El Spectrum y el MSX quedan enteros dentro del presupuesto.** En el Amstrad
+siguen fuera el Quijote y las Vajillas, y siguen fuera por lo que ya se sabía
+—cuarenta y tantos rellenos por lámina—, que esto no toca: sus números son los
+mismos hasta la décima que antes del cambio, lo cual es de paso la prueba de
+que lo que bajó a Bangkok2 fue el borde y no otra cosa.
 
 La prueba lenta `tests/test_all_pictures_msx.py` guarda el tope de 5 segundos
 para las 196 y lleva esa única lámina apuntada con nombre y con su número en
@@ -934,13 +950,14 @@ tiempo no son los 4-5 s del presupuesto —sólo tres aventuras los cumplen— s
 el día que algo se vuelva más lento la prueba lo diga. La vuelta entera son 27
 minutos.
 
-Lo que mide, con el arreglo que cuenta más abajo y la segunda vuelta de
-rellenos:
+Lo que mide, con el arreglo que cuenta más abajo, la segunda vuelta de
+rellenos y lo del borde de «la lámina 28 del MSX» —que bajó Bangkok2 de 6,1 a
+4,1 también aquí, porque el código es el mismo para las cinco máquinas—:
 
 | aventura | la más lenta |
 |---|---|
-| Bangkok1 | 2,4 s |
-| Bangkok2 | 6,1 s |
+| Bangkok1 | 2,3 s |
+| Bangkok2 | 4,1 s |
 | megacorp1 | 2,3 s |
 | megacorp2 | 2,9 s |
 | quijote1 | 16,8 s |
