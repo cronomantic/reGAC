@@ -64,6 +64,11 @@ BRIGHT = 0x40
 MESSAGE = r"uno \ink 2 dos \ink 12 tres"
 WANTED = {"uno": WHITE, "dos": 2, "tres": BRIGHT | 4}
 
+# And the pair that says how far a change of ink reaches: one message that
+# turns the text red and never turns it back, and another behind it.
+LEAKY = r"rojo \ink 2 rojo"
+AFTER = "blanco"
+
 if pytest is not None:
     needs_tools = pytest.mark.skipif(
         not emulator.available(), reason="sjasmplus and ZEsarUX must be in tools/"
@@ -138,6 +143,97 @@ def test_a_message_says_its_words_in_three_colours():
     assert rows[0][3][1] == WHITE
 
 
+@needs_tools
+def test_a_change_of_ink_dies_with_its_own_message():
+    """Which is the whole of the rule, and it used not to be.
+
+    A change of ink lasted until the next one, and there need never be a next
+    one: a message that turned the text red and did not turn it back left the
+    next room red, and the prompt, and what the parser says when it does not
+    understand.  The damage showed up a long way from the line that caused
+    it, and the author could not see it while writing that line.
+
+    So here the first message ends red on purpose and the second says nothing
+    about colour at all.  The second has to come out white.
+    """
+    ddb = adventure(["MESS 1 MESS 2 END"])
+    ddb["messages"]["1"] = LEAKY
+    ddb["messages"]["2"] = AFTER
+    ddb["font"] = lettered()
+    database = Database(ddb)
+    with open(DATABASE, "wb") as f:
+        f.write(database.build())
+    listing = emulator.assemble(SOURCE, listing=LISTING)
+    glyphs = glyph_table(database)
+
+    finished, (bitmap, attributes) = emulator.run(
+        SNAPSHOT, listing,
+        reads=[(TEXT_THIRD, 2048), (ATTRIBUTES, 256)],
+    )
+    assert finished, "the conditions never reached the end"
+
+    rows = printed(bitmap, attributes, glyphs)
+    line = "".join(char for char, _ in rows[0]).rstrip()
+    assert AFTER in line, f"the second message never came out: {line!r}"
+    at = line.index(AFTER)
+    for offset, char in enumerate(AFTER):
+        _, attribute = rows[0][at + offset]
+        assert attribute == WHITE, (
+            f"{char!r} of the message behind came out in {attribute:#04x} and"
+            f" not {WHITE:#04x}: the red of the one before it reached past its"
+            f" own end -- {line!r}"
+        )
+
+
+CHOSEN = 4                      # green, which is not what any machine starts in
+
+
+@needs_tools
+def test_an_adventure_may_choose_the_ink_of_all_its_text():
+    """Because a change of ink now dies with its message, there had to be
+    somewhere to say it once.
+
+    It used to be possible by accident: an ink set in the first message stuck
+    for ever, because nothing put it back.  That was the fault this rule
+    fixed, and fixing it took the only way there was of colouring a whole
+    adventure -- so `/CTL ink` says it properly, and each message goes back to
+    that and not to the white the interpreter was assembled with.
+    """
+    ddb = adventure(["MESS 1 MESS 2 END"])
+    ddb["ink"] = CHOSEN
+    ddb["messages"]["1"] = LEAKY        # changes the ink and does not put it back
+    ddb["messages"]["2"] = AFTER
+    ddb["font"] = lettered()
+    database = Database(ddb)
+    with open(DATABASE, "wb") as f:
+        f.write(database.build())
+    listing = emulator.assemble(SOURCE, listing=LISTING)
+    glyphs = glyph_table(database)
+
+    finished, (bitmap, attributes) = emulator.run(
+        SNAPSHOT, listing,
+        reads=[(TEXT_THIRD, 2048), (ATTRIBUTES, 256)],
+    )
+    assert finished, "the conditions never reached the end"
+
+    rows = printed(bitmap, attributes, glyphs)
+    line = "".join(char for char, _ in rows[0]).rstrip()
+    assert AFTER in line, f"the second message never came out: {line!r}"
+    at = line.index(AFTER)
+    for offset, char in enumerate(AFTER):
+        _, attribute = rows[0][at + offset]
+        assert attribute == CHOSEN, (
+            f"{char!r} came out in {attribute:#04x} and not {CHOSEN:#04x}: the"
+            f" adventure asked for its own ink and got the machine's -- {line!r}"
+        )
+    # And the first message still says what it asked for, over the top of it.
+    assert rows[0][0][1] == CHOSEN, "the text before the change is not the chosen ink"
+
+
 if __name__ == "__main__":
     test_a_message_says_its_words_in_three_colours()
     print("a message says its words in three colours")
+    test_a_change_of_ink_dies_with_its_own_message()
+    print("a change of ink dies with its own message")
+    test_an_adventure_may_choose_the_ink_of_all_its_text()
+    print("an adventure may choose the ink of all its text")

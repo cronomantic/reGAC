@@ -254,6 +254,17 @@ cero. El contador pasa por ahí una sola vez, porque al llegar abajo se queda
 en `KEY_EVERY` y ya no vuelve a subir, así que no hay forma de confundirse de
 vuelta.
 
+**Y la vuelta siguiente lo dijo otra vez, en el Amstrad.** Esa prueba está
+escrita tres veces —Amstrad, MSX y PCW— con el mismo patrón, y arreglar una
+sola es no arreglar ninguna. La lección es más general que el fallo:
+
+> cuando una prueba de máquina falla por cómo espera, **lo primero es buscar
+> el mismo trozo en las otras máquinas**, porque estos ficheros se escribieron
+> copiando el de al lado y el defecto viaja con la copia.
+
+Un `grep` por la línea que falla —aquí `key_repeat`— sale más barato que dos
+vueltas de diez minutos.
+
 ## Si una vuelta se corta a medias
 
 Un emulador huérfano se queda con el puerto, y la vuelta siguiente falla en

@@ -97,7 +97,10 @@ class GAC_Interpreter_Pygame(GAC_Interpreter):
     PICTURE_CHAR_ROWS = PICTURE_ROWS >> 3
 
     def __init__(self, ddb):
-        self.print_att = 0x07
+        # The ink this adventure asked for in its /CTL, or white.  Every
+        # message goes back to it when it ends; see print() below.
+        self.default_ink = ddb.get("ink") or 7
+        self.print_att = (self.default_ink & 7) | ((self.default_ink & 8) << 3)
         self.pxl_screen = [0 for x in range(self.CHAR_WIDTH * self.SCREEN_HEIGHT)]
         self.att_screen = [
             self.print_att for x in range(self.CHAR_WIDTH * self.CHAR_HEIGHT)
@@ -357,7 +360,14 @@ class GAC_Interpreter_Pygame(GAC_Interpreter):
                     self.text_top = 0
                     self.cls()
                 elif cmd == 0x09:  # the ink the text is printed in
-                    self.print_att = (self.print_att & 0x38) | rx_data[1]
+                    # One of the Spectrum's sixteen, and eight and above is
+                    # the same colour bright -- which in an attribute is bit
+                    # six and not part of the colour, so it has to be moved
+                    # there.  Or-ing the number in whole put twelve's bit
+                    # three into the paper.
+                    colour = rx_data[1]
+                    self.print_att = ((self.print_att & 0x38)
+                                      | (colour & 7) | ((colour & 8) << 3))
 
     def __interpreter_task(self):
         if not self.ready:
@@ -371,11 +381,18 @@ class GAC_Interpreter_Pygame(GAC_Interpreter):
         # This screen has attributes, like the machine it copies, so it obeys
         # it: the text is cut where the commands are, and each piece goes out
         # behind the colour it asked for.
+        #
+        # And the ink goes back when the text ends, which is the rule the 8
+        # bit interpreters follow: a change of ink lasts to the end of the
+        # message it is in.  Without it a message that turned the text red and
+        # did not turn it back left everything after it red -- see
+        # z80/common/unpack.asm.
         for piece in split_inks(txt):
             if isinstance(piece, int):
                 self.cmd_queue.put((0x09, piece))
             else:
                 self.print_plain(piece)
+        self.cmd_queue.put((0x09, self.default_ink))
 
     def print_plain(self, txt):
         # This method replicates the 8bit mechanism. No much python-correctness is expected

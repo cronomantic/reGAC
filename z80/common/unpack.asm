@@ -75,6 +75,15 @@ message_offset:
                 ret
 
 ; Print message DE, unpacking it as it goes.
+;
+; **A change of ink lasts to the end of the message it is in**, and that is
+; what the last two lines of this do.  It used to last until the next one,
+; which meant for ever: a message that turned the text red and did not turn
+; it back left the description of the next room red, and the prompt, and what
+; the parser says when it does not understand -- damage that shows up a long
+; way from the line that caused it, and that the author cannot see while
+; writing that line.  What is given up is painting across several messages,
+; which in GAC is worth little: the unit an author writes is the message.
 ; Corrupts: everything
 print_packed:
                 ld      a, SECTION_TEXT         ; where the machine keeps it,
@@ -99,7 +108,7 @@ print_packed:
 .next:
                 ld      a, b
                 or      c
-                jp      z, text_end             ; the last word goes out
+                jr      z, .ended
                 dec     bc
                 ld      a, (hl)
                 inc     hl
@@ -109,6 +118,10 @@ print_packed:
                 pop     bc
                 pop     hl
                 jr      .next
+.ended:
+                call    text_end                ; the last word goes out
+                ld      a, (text_ink_start)     ; and the ink goes back
+                jp      text_ink
 
 ; Expand one code, A, and print what it stands for.  Calls itself for the left
 ; half of a pair, which is what gives the stack, and nothing it keeps across

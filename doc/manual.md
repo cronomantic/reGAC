@@ -141,7 +141,7 @@ Dentro del texto hay comandos, con barra invertida:
 
 | | |
 |---|---|
-| `\ink n` | lo que sigue se imprime en el color n |
+| `\ink n` | lo que sigue **de este mensaje** se imprime en el color n |
 | `\\` | una barra invertida de verdad |
 
     #14
@@ -151,12 +151,17 @@ El comando **se come los espacios que lo siguen**, para que no salgan dobles.
 Los colores son los dieciséis del Spectrum; cada máquina los entiende a su
 manera y el PCW, que no tiene color, lee el comando y sigue.
 
+**El cambio dura hasta el final del mensaje** y no más: el siguiente empieza
+otra vez en blanco. Así no hace falta devolver la tinta antes de acabar, y un
+mensaje no puede teñir la descripción de la sala que venga detrás.
+
 ### `/CTL` — la configuración
 
     /CTL
     model    SPECTRUM
     start    5000
     width    32
+    ink      4
     punct    "\0" " " "." "," "-" "!" "?" ":"
     sep      "THEN" "AND"
     nothing  "Nada"
@@ -171,6 +176,14 @@ entera —`ANDAR` no es `AND` con cola—. Sin `sep`, sólo parten los signos de
 
 `nothing` es la palabra para «nada», que es lo que escribe `LIST` cuando no
 encuentra ningún objeto.
+
+`ink` es **el color de todo el texto de la aventura**, uno de los dieciséis
+del Spectrum. Cada mensaje empieza en él y vuelve a él al acabar, de modo que
+un `\ink` dentro de un mensaje tiñe una palabra y no el resto de la partida.
+Si no se dice, cada máquina usa el suyo —blanco en Spectrum, Next y MSX; la
+pluma dos en el Amstrad— y el PCW, que no tiene color, lo ignora. El cero no
+vale: en todas estas máquinas es el papel, y texto del color del papel no se
+ve.
 
 ### `/VOC` — el vocabulario
 

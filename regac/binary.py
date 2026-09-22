@@ -255,6 +255,10 @@ class Database:
             for c in word:
                 out += u8(self.code_of(c))
         out += u16(self.no_objs_index)
+        # And last, the ink the adventure asked for, or nought for the one
+        # the machine came with.  It goes at the end because that is where a
+        # thing added later goes: everything before it keeps its place.
+        out += u8(self.ddb.get("ink", 0))
         return bytes(out)
 
     def vocabulary(self):

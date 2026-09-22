@@ -62,6 +62,10 @@ SHADOW_COLOURS  equ SHADOW + $1000
 MSX_BLACK       equ 1
 MSX_WHITE       equ 14
 TEXT_COLOUR     equ (MSX_WHITE << 4) | MSX_BLACK
+; What a message starts in, as text_ink takes it -- one of the Spectrum's
+; sixteen.  Seven is white there and msx_colours turns it into white here, so
+; this and TEXT_COLOUR are the same thing said twice.  See print_packed.
+TEXT_INK_DEFAULT equ 7
 
 ; The eight the pictures ask for, in this machine's own numbers.  It lives
 ; here rather than with the drawing because the text wants it too, and every

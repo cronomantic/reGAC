@@ -227,10 +227,22 @@ def test_a_noise_is_a_hiss_and_not_a_note(folder, machine, tmp_path):
     scatter.  Counting the values instead says nothing at all -- both come
     out of the same four bit volume, and both measure four or five.
 
-    Measured on the three: a note has twelve to nineteen different lengths
-    and a hiss thirty six to forty four, and the two together change value
-    getting on for twice as often as either alone.  The margins asked for
-    below are well inside that.
+    Each of the two is asked for by the signal it is actually strong in, and
+    that was learned the hard way: asking both of them for run lengths passed
+    four times and then failed, with the two together at 37 against 25 for
+    the note and the margin wanting 37.5.
+
+    - **A hiss** is a scatter where a note is not: measured across the three,
+      twice the note's count of different lengths and more, against about
+      the same as the note when the engine is deaf to the fourth byte.
+    - **The two together** are only half a hiss by that measure -- between
+      1.5 and 2.2 times the note -- but they *change value* getting on for
+      twice as often as either alone, because two generators are driving the
+      one channel.  That is the number asked for below.
+
+    Forcing the pitch to stand still does not sharpen the first of these, and
+    it was tried: the spread is the recording being resampled, not the note
+    sweeping.
     """
     blob, where = build(folder)
     sound = str(tmp_path / "heard.raw")
@@ -243,13 +255,13 @@ def test_a_noise_is_a_hiss_and_not_a_note(folder, machine, tmp_path):
 
     lengths = {name: how[0] for name, how in told.items()}
     changes = {name: how[1] for name, how in told.items()}
-    for name in ("noise", "both"):
-        assert lengths[name] > 1.5 * lengths["tone"], (
-            f"{name} came out shaped like a note: {lengths[name]} different "
-            f"run lengths against {lengths['tone']} for the note itself"
-        )
+    assert lengths["noise"] > 1.5 * lengths["tone"], (
+        f"the hiss came out shaped like a note: {lengths['noise']} different "
+        f"run lengths against {lengths['tone']} for the note itself"
+    )
     assert changes["both"] > 1.3 * max(changes["tone"], changes["noise"]), (
-        f"both together did not come out as the two of them: {changes}"
+        f"both together did not come out as the two of them: {changes} "
+        f"changes of value, against {lengths} different run lengths"
     )
 
 

@@ -95,6 +95,11 @@ class SourceWriter:
             self.w(f"charset  {d['charset']}")
         self.w(f"start    {d.get('init_loc', 1)}")
         self.w(f"width    {d.get('width', 32)}")
+        # Only when it was asked for: an adventure that says nothing gets
+        # whatever ink each machine came with, and writing a number here
+        # would turn that into a choice nobody made.
+        if d.get("ink"):
+            self.w(f"ink      {d['ink']}")
         punct = " ".join(quote_char(c) for c in d.get("punctuation", []))
         self.w(f"punct    {punct}")
         sep = " ".join(f'"{s}"' for s in d.get("separators", []))

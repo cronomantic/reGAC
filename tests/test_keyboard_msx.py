@@ -67,6 +67,12 @@ MACHINE = "msx"
 NEWLINE = chr(10)
 FRAME_CYCLES = 71591          # a fiftieth of a second of this processor
 
+# A key that is held sets its count to KEY_DELAY -- thirty five frames, from
+# common/keys.asm -- and it goes down one a frame until the key repeats.
+# Measuring is started once the count has been seen this high, which both
+# proves the press arrived and leaves room for the ten frames it wants.
+COUNTING_FROM = 20
+
 if pytest is not None:
     needs_tools = pytest.mark.skipif(
         not emulator.available() or not os.path.exists(ADVENTURE),
@@ -306,7 +312,21 @@ def test_a_held_key_repeats_in_frames_as_long_as_frames():
         session.jump(at["read_a_line"])
         time.sleep(0.3)
         session.command(f"send-keys-event {code} 1")
-        time.sleep(0.05)
+        # Waited for by looking and not by sleeping.  A new key sets
+        # key_repeat to KEY_DELAY and the count goes down a frame at a time,
+        # so a value up near the top is the press having been seen; a sleep
+        # of a twentieth of a second is a guess that the machine got there,
+        # and when it had not the count was still nought and the measuring
+        # stopped before it began -- "only 0 frames were counted".  The same
+        # fault, and the same remedy, as in test_keyboard_pcw.py.
+        #
+        # Caught above COUNTING_FROM, which leaves well over the ten frames
+        # this wants: the count only passes this way once, because at the
+        # bottom it is set to KEY_EVERY and never climbs again.
+        deadline = time.time() + emulator.longer(10.0)
+        while session.read(at["key_repeat"], 1)[0] < COUNTING_FROM:
+            assert time.time() < deadline, "the key was never seen"
+            time.sleep(0.01)
         session.command("reset-tstates-partial")
         first = last = session.read(at["key_repeat"], 1)[0]
         spent = 0

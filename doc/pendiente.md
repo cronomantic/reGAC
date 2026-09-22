@@ -1907,11 +1907,61 @@ una.
 tiene colores, y el de pygame, que tiene atributos como la máquina que copia,
 lo obedece.
 
-**Lo que queda de esto**: decidir si un mensaje debería empezar siempre con la
-tinta por defecto en vez de heredar la del anterior. Hoy hereda, que es lo que
-hace que se pueda pintar un renglón entero sin repetir el comando, pero también
-lo que hace que un mensaje que cambia la tinta y no la devuelve tiña todo lo que
-venga después.
+~~**Lo que queda de esto**: decidir si un mensaje debería empezar siempre con
+la tinta por defecto.~~ **Decidido y hecho: un cambio de tinta dura hasta el
+final del mensaje en el que está.**
+
+Antes duraba hasta el siguiente `\ink`, y **no tenía por qué haber uno
+siguiente**: nada reiniciaba `text_attr`, que se fija al ensamblar y sólo la
+toca un cambio de tinta. Un mensaje que ponía el texto en rojo y no lo
+devolvía dejaba en rojo la descripción de la sala siguiente, el prompt y lo
+que dice el parser cuando no entiende. Es el peor tipo de fallo: **se ve lejos
+de la línea que lo causa**, y el autor no puede verlo mientras escribe esa
+línea. El propio ejemplo lo tenía, en `#VICTORIA`.
+
+Lo que se da a cambio es pintar a lo largo de varios mensajes, y en GAC vale
+poco: la unidad que el autor escribe **es** el mensaje —un renglón es un
+mensaje, la descripción de una sala es un mensaje— y cuando de verdad se
+quiera, cuesta un `\ink` en el segundo. Y la regla se dice en una frase, que
+es la que uno supone al ver que el comando va dentro del texto.
+
+**No había original al que ser fiel**: el GAC del 86 no tenía color en el
+texto, así que esto es diseño nuestro de cabo a rabo, y ninguna de las ocho
+aventuras lo usa.
+
+**Dónde va el remedio.** En `print_packed`, que es lo que imprime un mensaje
+entero, y no en `text_end`, que parecía el sitio: a `text_end` llega también
+`print_digit`, de modo que un contador impreso en mitad de una frase habría
+cortado la tinta ahí mismo. Cada máquina dice su `TEXT_INK_DEFAULT` —siete en
+Spectrum, Next y MSX; la pluma dos en el Amstrad, que es la que usaba antes de
+que hubiera dónde elegir; y cualquier cosa en el PCW, que lee el comando y no
+hace nada—.
+
+**Y dos cosas en el intérprete de pygame**, que obedece la tinta y tenía que
+seguir la misma regla. La primera es la regla. La segunda es un fallo que
+estaba al lado: metía el número del color entero en el atributo con un `or`,
+y en un atributo de Spectrum el brillo es el bit seis, no parte del color, así
+que `\ink 12` colaba su bit tres en el papel. **Arreglado a ojo y sin
+comprobar**, porque aquí no hay con qué correr pygame.
+
+**Y el fleco que dejó la decisión, atado en el mismo sitio.** La tinta por
+defecto estaba fijada al ensamblar, una por máquina, y la aventura no podía
+elegirla. Antes se podía de refilón —ponías un `\ink` en el primer mensaje y,
+como no se reiniciaba nunca, te quedaba toda la partida de ese color—, de
+modo que la regla nueva **cerraba la única forma que había de colorear una
+aventura entera, aunque fuera por accidente**. Así que ahora se dice en su
+sitio: `ink n` en `/CTL`.
+
+Va al final de la sección `config`, que es donde va lo que se añade después,
+y **el cero significa «no se ha dicho nada»** en vez del color cero —que en
+todas estas máquinas es el papel, y texto del color del papel no se ve—. Eso
+es lo que hace que añadirlo no rompa nada: una base de datos que no lo traiga
+se lee con un cero ahí y obtiene la tinta de siempre.
+
+Lo lee `config_init`, que corre **antes** que `screen_init`, y eso resulta no
+importar: `cls_window` limpia los atributos con la constante y no con la
+variable, y de todas formas una celda vacía no tiene píxeles, así que su
+tinta no se ve. Lo que la variable decide es con qué se dibuja cada letra.
 
 ## Las teclas que se solapan, que ya no se pierden
 

@@ -32,6 +32,21 @@ Un banco 0xFF quiere decir que la sección es residente.
 cuenta de cero— para que el directorio no cambie de forma y las siete de
 delante conserven su número.
 
+### `config`, y cómo crece
+
+En orden: dónde empieza el jugador (dos bytes), el ancho de la pantalla, los
+signos de puntuación —cuántos y sus códigos—, las palabras que parten una
+orden en dos —cuántas, y cada una con su longitud delante—, el objeto que
+dice «nada» (dos bytes) y, el último, **la tinta con la que se imprime el
+texto de esta aventura**.
+
+Ese último se añadió después, y va al final justamente por eso: todo lo de
+delante conserva su sitio. Y **el cero significa «no se ha dicho nada»**, no
+el color cero, que en todas estas máquinas es el papel; así una base de datos
+que no lo traiga, o que lo traiga a cero, obtiene la tinta con la que se
+ensambló cada intérprete, que es lo que hacían todas antes de que esto
+existiera.
+
 Los textos de toda la aventura van a un solo almacén, así que una pareja de
 códigos encontrada en un mensaje sirve también para la descripción de una
 localidad. Los nombres de objeto y las descripciones no se guardan con su tabla:

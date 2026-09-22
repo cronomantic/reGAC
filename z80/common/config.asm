@@ -47,7 +47,21 @@ config_init:
                 inc     hl
                 ld      d, (hl)
                 ld      (nothing_at), de
-                ret
+                inc     hl
+                ; And the last byte of the section: the ink this adventure
+                ; wants its text in, or nought for the one the machine came
+                ; with.  Nought cannot be a colour here -- on every one of
+                ; these machines it is the paper, and text the colour of the
+                ; paper is no text -- so it is free to mean "nothing said".
+                ld      a, (hl)
+                or      a
+                ret     z
+                ld      (text_ink_start), a
+                jp      text_ink
+
+; What a message starts in, and goes back to when it ends: the machine's own
+; unless the adventure asked for another.  See print_packed in unpack.asm.
+text_ink_start: db      TEXT_INK_DEFAULT
 
 ; Whether the code in A ends one order and starts the next.  The original
 ; has these four written into it and nothing else, and uses the adventure's

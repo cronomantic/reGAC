@@ -316,6 +316,11 @@ in_pen:
 ; means here is the pen itself, which is what the adventures written for this
 ; machine meant by a colour in the first place.
 ; Corrupts: AF
+; What a message starts in, as text_ink takes it: pen two, which is what this
+; machine printed in before there was any choice, and what pen_high and
+; pen_low below are set to.  See print_packed.
+TEXT_INK_DEFAULT equ 2
+
 text_ink:
                 and     3
                 ld      c, a

@@ -48,7 +48,7 @@ Dentro del texto hay **comandos**, que empiezan por barra invertida:
 
 | Comando | Qué hace |
 |---|---|
-| `\ink n` | lo que sigue se imprime en el color n |
+| `\ink n` | lo que sigue **de este mensaje** se imprime en el color n |
 | `\\` | una barra invertida de verdad |
 
     #14
@@ -63,7 +63,12 @@ Los colores son los dieciséis del Spectrum, los mismos que en las láminas: del
 manera —el MSX se queda con el más parecido de los suyos, el Amstrad toma el
 número como una de sus cuatro plumas, y el PCW, que no tiene color, lee el
 comando y sigue—, que es exactamente lo que ya hacen con los colores de una
-lámina. El cambio dura hasta el siguiente, no hasta el final del mensaje.
+lámina.
+
+**El cambio dura hasta el final del mensaje.** Cada mensaje empieza en la
+tinta de siempre, de modo que no hace falta devolverla antes de acabar y uno
+que se la deje puesta no tiñe lo que venga detrás. Lo que se pierde es pintar
+a lo largo de varios mensajes, que cuesta un `\ink` en el segundo.
 
 | Sección  | Contenido                                                   |
 |----------|-------------------------------------------------------------|
@@ -84,6 +89,7 @@ lámina. El cambio dura hasta el siguiente, no hasta el final del mensaje.
     model    SPECTRUM
     start    5000
     width    32
+    ink      4
     punct    "\0" " " "." "," "-" "!" "?" ":"
     sep      "THEN" "AND"
     nothing  "Nada"
@@ -102,6 +108,14 @@ siempre y una aventura nueva dice las suyas y nada más:
 Se comparan como palabra entera —`ANDAR` no es `AND` con cola— y se guardan
 sin marcas y en mayúsculas, que es como llegan de los teclados de estas
 máquinas. Sin `sep`, sólo parten los signos de `punct`.
+
+`ink` es el color de todo el texto de la aventura, uno de los dieciséis del
+Spectrum. Cada mensaje empieza en él y vuelve a él al acabar, así que es el
+sitio donde se dice una vez lo que `\ink` dice dentro de una frase. Si no se
+dice, cada máquina usa el suyo. **El cero no vale**, y eso es lo que permite
+añadir la clave sin romper nada: en todas estas máquinas el cero es el papel,
+de modo que queda libre para significar «no se ha dicho nada», que es lo que
+lleva una base de datos que no la trae.
 
 ### `/VOC`
 

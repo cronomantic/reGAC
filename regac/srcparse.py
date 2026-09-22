@@ -30,6 +30,7 @@ from .png import ImageError
 
 QUOTES = "'\""
 from .opcodes import BY_NAME, GFX_CMDS
+from .text import INK_COLOURS
 
 NOWHERE = 0
 CARRIED = 255
@@ -533,6 +534,20 @@ class Parser:
                 self.ddb["punctuation"] = parse_strings(value)
             elif key == "sep":
                 self.ddb["separators"] = parse_strings(value)
+            elif key == "ink":
+                # The colour this adventure's text is printed in, one of the
+                # Spectrum's sixteen as everywhere else.  Nought is not one of
+                # them here: on every machine this builds for it is the paper,
+                # and text the colour of the paper is no text, so nought is
+                # left to mean "nothing said" -- which is what a source that
+                # does not give this gets, and then each machine uses its own.
+                colour = self.number(value, "a number", lineno, raw)
+                if not 1 <= colour <= INK_COLOURS - 1:
+                    self.fail(f"{colour} is not an ink: they run from 1 to "
+                              f"{INK_COLOURS - 1}, and nought would be the "
+                              "colour of the paper", lineno=lineno, line=raw,
+                              column=self.starts_at(raw, value))
+                self.ddb["ink"] = colour
             elif key == "nothing":
                 self.ddb["no_objs_msg"] = parse_strings(value)[0]
             else:

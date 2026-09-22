@@ -316,6 +316,11 @@ new_line:
 ; A change of ink, which this machine cannot do: there is one colour and it
 ; is on or off.  The command is read and let go, so that an adventure written
 ; for the others plays here unchanged.
+; This machine has one colour, so a change of ink is read and nothing is done
+; with it -- and putting it back is nothing as well.  The number is here
+; because print_packed asks every machine for one.
+TEXT_INK_DEFAULT equ 0
+
 text_ink:
                 ret
 

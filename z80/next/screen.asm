@@ -57,6 +57,7 @@ TEXT_ROWS       equ 8                   ; and the rows under it
 SCREEN_COLS     equ 32
 
 TEXT_INK        equ 7                   ; white on black, as on the Spectrum
+TEXT_INK_DEFAULT equ TEXT_INK           ; what a message starts in
 TEXT_PAPER      equ 0
 START_PAPER     equ 7                   ; what a picture starts on
 

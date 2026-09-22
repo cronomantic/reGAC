@@ -21,6 +21,9 @@ TEXT_TOP    equ 16                      ; first character row the text may use
 TEXT_ROWS   equ 24 - TEXT_TOP
 SCREEN_COLS equ 32
 TEXT_ATTR   equ 7                       ; white on black
+; What a message starts in, as text_ink takes it: the same seven, which is
+; what the window is cleared to.  See print_packed.
+TEXT_INK_DEFAULT equ 7
 SCREEN_THIRD equ $5000                  ; the third the text window lives in
 ATTR_BASE   equ $5800 + TEXT_TOP * 32
 
