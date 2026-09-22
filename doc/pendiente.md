@@ -363,14 +363,17 @@ sale gratis.
 
 Lo que vive allí tiene que ser código al que le dé igual dónde está, y se coge
 del final de la lista de `include` para que nada de lo anterior cambie de
-orden. El primer kilobyte está pillado --con música, la tabla del modo dos va
-en `$B000` y su rutina justo encima, en `$B1B1`--, de modo que empieza en
-`$B200`. Ahora vive allí `picture.asm`, y bajo la pared quedan quinientos
-bytes largos. Si hace falta más, se bajan más módulos.
+orden. Empieza en `$B200` y no en `$B000`, y **la razón ya no existe**: ahí
+iban la tabla del modo dos y su rutina, que eran de la música y se fueron con
+ella. La dirección se deja donde está porque moverla no gana nada —el primer
+kilobyte que libera está por debajo de la pared, donde ya sobra sitio—. Ahí
+vive `picture.asm`, y bajo la pared quedan quinientos bytes largos. Si hace
+falta más, se bajan más módulos.
 
 **Lo que queda de esta máquina**: nada urgente. Guardar en fichero por el API
-de NextZXOS, si alguna vez se quiere en vez de la cinta. El sonido ya está, por
-el AY compatible y con la interrupción en modo 2.
+de NextZXOS, si alguna vez se quiere en vez de la cinta. El sonido ya está,
+por su AY compatible —ruidos y clic de tecla—, **sin interrupción ninguna**:
+la de modo 2 era del reproductor de música y se fue con él.
 
 ### MSX1, con la máquina entera y una cinta
 
@@ -485,8 +488,7 @@ mismo qué máquina fuera— ya no está.
 array sabe cambiar son las de `$4000`, con las cuatro configuraciones `&C4` a
 `&C7`, así que la ventana va ahí y todo lo demás se coloca alrededor:
 
-    $0300-$1FFF  la música, si la hay
-    $2000-$3FFF  lo residente de la base de datos (desde $0300 sin música)
+    $0300-$3FFF  lo residente de la base de datos, casi dieciséis kilobytes
     $4000-$7FFF  la ventana, uno de cuatro bancos
     $8000-$BEFF  el intérprete, con la pila encima
     $C000-$FFFF  la pantalla
@@ -528,9 +530,10 @@ Lo que cambia respecto al PCW son tres cosas y media:
   motor en `$FA7E`— y los sectores de un disco de datos se numeran de `$C1` a
   `$C9`.
 - **Las interrupciones se quitan mientras dura.** En mitad de un sector el
-  controlador entrega un byte cada treinta y dos millonésimas y no espera, y las
-  trescientas por segundo de la música perderían alguno. El bucle de los datos
-  gasta unas veinte.
+  controlador entrega un byte cada treinta y dos millonésimas y no espera, así
+  que cualquier cosa que interrumpiera perdería alguno. El bucle de los datos
+  gasta unas veinte. Hoy no interrumpe nada —el intérprete corre con ellas
+  quitadas— y esto dice por qué no pueden volver.
 - Y la media: **escucha la respuesta del controlador**, cosa que el del PCW no
   hace. Un disco protegido o un sector que no se lee vuelven con el acarreo
   quitado en vez de dar la partida por guardada; y cargar deja la partida como
@@ -691,16 +694,13 @@ intérprete, y la base de datos se queda con todo lo de arriba:
    hasta que la isla aprendió a reponer la nuestra antes de devolver el
    control.
 
-**Cómo viaja.** Como la música, porque la línea de BASIC que carga está ella
-misma en `$0170`: el fichero entra en `$4000` con un movedor delante, el
+**Cómo viaja.** No se puede cargar donde corre, porque la línea de BASIC que
+carga está ella misma en `$0170`: el fichero entra en `$4000` con un movedor delante, el
 movedor lo baja y vuelve, y entonces la base de datos se carga encima de donde
 estuvo. El cargador son cinco líneas: `MEMORY &3FFF`, cargar el intérprete,
 llamar al movedor, cargar la base de datos y llamar al arranque de la isla.
 BASIC guarda sus variables debajo de `$3FFF` y hacia abajo; el intérprete acaba
 sobre `$2450`, así que hay siete kilobytes de nadie entre los dos.
-
-**Música y esto no van juntos** —la música vive en `$0300` y son siete
-kilobytes—, y ninguna de las aventuras que lo necesitan tiene.
 
 **Se elige solo.** `regac make` construye como siempre y, si el ensamblador
 dice que no cabe, vuelve a construir con `-DLOW_CODE` y lo dice por pantalla.
@@ -2664,8 +2664,9 @@ próximo que creciera las habría roto igual.
 borra la máscara de los rellenos y para ahí, y la pila baja desde `$BF00`, de
 modo que entre las dos hay casi cuatro kilobytes que nadie tocaba y que el
 fichero ya lleva, porque `SAVENEX BANK 2` se lleva entero `$8000`-`$BFFF`.
-`picture.asm` vive ahora en `$B200` --por encima de la tabla del modo dos y de
-su rutina-- y bajo la pared quedan quinientos bytes largos.
+`picture.asm` vive ahora en `$B200` --que era por encima de la tabla del modo
+dos y de su rutina, y ya no hay ni una ni otra: ver más arriba-- y bajo la
+pared quedan quinientos bytes largos.
 
 **El CPC 464**: ahí el código y la base de datos comparten `$4000`-`$B100` y
 no hay más, pero debajo de `$4000` hay dieciséis kilobytes de RAM que el
@@ -2694,9 +2695,12 @@ De paso quedó medido lo que cuesta la música de verdad dentro del intérprete
 del CPC: **53 bytes** --8282 sin ella, 8335 con ella--. Quitarla de las cinco
 máquinas para hacer sitio habría sido pagar una función entera por 53 bytes.
 
-**Lo que queda apretado**: el 464 **sin** música, que se quedó en `$B0F8` con
-ocho bytes por debajo del firmware. No rompe nada --al siguiente byte se
-repliega solo al mapa bajo-- pero conviene saberlo.
+**Lo que queda apretado**: el 464 con MegaCorp II, que ya **no cabe** del
+derecho y se repliega solo al mapa bajo. Llegó a tener catorce bytes libres, y
+los 103 del clic de tecla se los comieron. No rompe nada, y de hecho ahí gana:
+en el mapa bajo el intérprete tiene 6949 libres y la base de datos pasa de
+20572 a 27392 bytes. Las otras siete siguen cabiendo del derecho, con entre
+1100 y 3100 libres.
 
 ### El eco de Vajillas: el original se pasa del terminador
 
