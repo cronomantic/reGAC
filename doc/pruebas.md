@@ -240,6 +240,20 @@ el `assert` de «la línea no terminó nunca» estaba dentro del `try` y salía
 disparado del bucle en la primera. Un reintento que sólo cubre el caso bueno
 no es un reintento.
 
+**Quedó una sin arreglar, y volvió una vuelta después**: la que mide cada
+cuántas tramas se repite una tecla aguantada. Decía «only 0 frames were
+counted», que es un número que no se parece a un error de medida sino a que no
+había nada que medir, y así era. Al ver una tecla nueva el contador se pone a
+`KEY_DELAY` —treinta y cinco tramas, y es de `common/keys.asm`, igual en todas
+las máquinas— y baja una por trama; la prueba pulsaba,
+dormía un vigésimo de segundo y empezaba a mirar, y si la pulsación aún no
+había llegado el contador valía cero y la medición se cortaba antes de
+empezar. Ahora espera a **verlo contando** —por encima de veinte, que deja de
+sobra las diez tramas que quiere— y sólo entonces pone el contador de ciclos a
+cero. El contador pasa por ahí una sola vez, porque al llegar abajo se queda
+en `KEY_EVERY` y ya no vuelve a subir, así que no hay forma de confundirse de
+vuelta.
+
 ## Si una vuelta se corta a medias
 
 Un emulador huérfano se queda con el puerto, y la vuelta siguiente falla en
