@@ -39,6 +39,12 @@ disco o una instantánea de 1986.
   escribir y comprobar una aventura, pero no construirla.
 - **ZEsarUX en `tools/`**, sólo para correr el banco de pruebas.
 
+`tools/` es donde va **todo programa que no es de este proyecto**, y no
+entra en el repositorio: además de esos dos están ahí los decompiladores
+de referencia con los que se compara lo nuestro y los emuladores que se
+usan a mano. Nada de la raíz del proyecto hace falta para trabajar salvo
+lo que el repositorio ya trae.
+
 Todo se llama con `python -m regac`, **desde la raíz del proyecto**. Desde otra
 carpeta dirá `No module named regac`; los ficheros que le pases sí pueden
 estar donde quieras.
