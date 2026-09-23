@@ -114,6 +114,13 @@ SERIAL_MODULES = {
     # two emulators at once, typed at in turn: it holds one machine while it
     # types at the other, and a busy host would drop the letters anyway
     "test_mirror_z80",
+    # not for the clock but for what it writes: `regac make` builds every
+    # machine where regac is, in z80/, over the same files the groups above
+    # keep apart.  No group can hold a test that treads on all of them, so it
+    # goes where nothing runs beside it.  Beside cpc-game it once had the 464
+    # read an interpreter of nought bytes that sjasmplus was halfway through
+    # writing.  Fifteen seconds on its own.
+    "test_project",
 }
 SERIAL_TESTS = {"test_it_keeps_up_with_quick_typing_and_repeats_a_held_key"}
 

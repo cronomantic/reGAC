@@ -100,6 +100,23 @@ pytest tests/test_parser_z80.py -n 2 --dist loadgroup -v | grep -o "gw[0-9]" | s
 Ocho en uno solo está bien; seis y siete repartidos es que el grupo no se está
 aplicando.
 
+**Y una prueba que no cabía en ningún grupo.** `test_project` corre
+`regac make` para todas las máquinas, y `regac make` construye **donde está
+`regac`**, en `z80/`: los mismos `game.bin` que cada grupo guarda para sí. El
+mapa lo dejaba sin grupo, y así pasó cientos de vueltas hasta que un día cayó
+al lado de `cpc-game`: `test_low_cpc` leyó un intérprete de **cero bytes**,
+el que sjasmplus estaba escribiendo en ese momento para `test_project`. A
+solas pasaba.
+
+Un grupo no sirve para una prueba que pisa los de todos, así que va con las
+de serie, donde no corre nada a su lado. No mide tiempo, pero la segunda
+orden es la única en que corre sola, y le cuesta quince segundos.
+
+**La comprobación, para la próxima que se añada**: una prueba que ensambla en
+`z80/` o corre `regac make` va en el grupo de lo que construye, o en serie si
+construye lo de varios. Las que construyen en su carpeta temporal —como la
+del PC, que ensambla con NASM en `tmp_path`— no necesitan nada.
+
 ## La regla: un fallo en paralelo no se cree hasta repetirlo a solas
 
 Con los plazos estirados quedan una o dos pruebas por vuelta que fallan por la
