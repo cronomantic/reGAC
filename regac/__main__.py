@@ -30,7 +30,7 @@ import sys
 
 from .check import problems_of
 from .binary import MACHINES, SECTION_NAMES, Database, Reader
-from .devices import DEVICES, device_for, make
+from .devices import DEVICES, device_for, from_an_amstrad, make
 from .gfx import Renderer
 from .media import (MSX_SCREEN_BYTES, PCW_SCREEN_BYTES, banks_of, cpc6128_disk,
                     cpc_low_tape, cpc_tape, msx_screen, msx_tape,
@@ -119,7 +119,8 @@ def cmd_check(args):
 
 def cmd_render(args):
     """Draw one picture of an adventure, or all of them, as PNG files."""
-    gfx = read_json(args.input)["gfx"]
+    ddb = read_json(args.input)
+    gfx = ddb["gfx"]
     machine = args.machine
     if args.picture is not None:
         wanted = [str(args.picture)]
@@ -130,7 +131,7 @@ def cmd_render(args):
     for pid in wanted:
         if pid not in gfx:
             sys.exit(f"ERROR: there is no picture {pid}")
-        picture = Renderer(gfx, device_for(machine, gfx, pid)).run(int(pid))
+        picture = Renderer(gfx, device_for(machine, gfx, pid, ddb)).run(int(pid))
         if os.path.isdir(args.output):
             path = os.path.join(args.output, f"{pid}.png")
         else:
@@ -147,13 +148,17 @@ def cmd_checkgfx(args):
     point on the wrong side of a line.  Comparing how much of the screen each
     fill reaches on each machine catches exactly that.
     """
-    gfx = read_json(args.input)["gfx"]
+    ddb = read_json(args.input)
+    gfx = ddb["gfx"]
     name = os.path.basename(args.input)
+    if from_an_amstrad(ddb):
+        sys.exit(f"{name} was written on an Amstrad: its pictures are drawn with "
+                 "the Amstrad's rules and there is no Spectrum to compare them with")
     suspect = 0
     for pid in sorted(gfx, key=int):
         reference = Renderer(gfx, make("spectrum"))
         reference.run(int(pid))
-        target = Renderer(gfx, device_for(args.machine, gfx, pid))
+        target = Renderer(gfx, device_for(args.machine, gfx, pid, ddb))
         target.run(int(pid))
         ref_area = reference.device.width * reference.device.height
         out_area = target.device.width * target.device.height
@@ -505,6 +510,9 @@ def make_one(target, settings, ddb, name, root, output, where_regac_is,
     defines = list(noises)
     if makes_a_noise(ddb):
         defines.append("NOISES")
+    if target.machine == "cpc" and from_an_amstrad(ddb):
+        # drawn with the rules of the GAC it was written with
+        defines.append("AMSTRAD_PICTURES")
     if settings.get("screen"):
         screen = screen_for(target, settings["screen"], root)
         if target.screen_when == "assembly":

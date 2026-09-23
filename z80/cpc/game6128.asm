@@ -53,6 +53,7 @@ RESIDENT_LOADS  equ $4000
                 ASSERT  database + DB_RESIDENT_SIZE <= RESIDENT_LOADS
 
 STACK_AT        equ $BF00
+MASK            equ (last + 255) & $FF00  ; see the ASSERT at the end
 
                 ORG     $8000
 start:
@@ -107,9 +108,20 @@ done_flag:      db      0
                 include "../common/textout.asm"
                 include "keyboard.asm"
                 include "disc.asm"
+                include "pixels.asm"
+                ; The rules of the GAC the adventure was written with: an
+                ; adventure off an Amstrad is built with -DAMSTRAD_PICTURES and
+                ; draws with the Amstrad's, and one off a Spectrum with the
+                ; Spectrum's.  One or the other, never both.
+                IFDEF   AMSTRAD_PICTURES
                 include "draw.asm"
                 include "shapes.asm"
                 include "fill.asm"
+                ELSE
+                include "spectrum.asm"
+                include "../common/shapes.asm"
+                include "spectrum_fill.asm"
+                ENDIF
                 include "../common/conditions.asm"
                 include "../common/opcodes.asm"
                 include "../common/parser.asm"
@@ -117,6 +129,14 @@ done_flag:      db      0
                 include "../common/picture.asm"
 last:
                 ASSERT  last <= STACK_AT        ; or the stack would land in it
+                ; A picture off a Spectrum keeps its mask here while it is
+                ; drawn.  It shares the room with where a saved game is put
+                ; together, because the two are never wanted at once: the mask
+                ; only while a picture is drawn, and a picture drawn after a
+                ; game is loaded starts by wiping it.
+                IFNDEF  AMSTRAD_PICTURES
+                ASSERT  MASK + MASK_BYTES <= STACK_AT - 256
+                ENDIF
                 ASSERT  last <= SAVE_AREA       ; or a saved game would land on us
                 ASSERT  SAVE_AREA + SAVE_BYTES <= STACK_AT - 256
                 ASSERT  vm_state_end - vm_state <= SAVE_BYTES   ; and a game fits

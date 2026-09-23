@@ -50,7 +50,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import emulator  # noqa: E402
 from regac.binary import Database  # noqa: E402
-from regac.devices import CPC_HARDWARE_PALETTE, AmstradDevice  # noqa: E402
+from regac.devices import CPC_HARDWARE_PALETTE, AmstradDevice, device_for  # noqa: E402
 from regac.gfx import Renderer  # noqa: E402
 
 CPC = os.path.join(ROOT, "z80", "cpc")
@@ -95,6 +95,41 @@ if pytest is not None:
             ("one picture calling another", [["INK", 2], ["CALL", 2]]),
         ],
     )
+    # The same machine drawing a picture off a Spectrum, which it does with
+    # the Spectrum's rules: the mask, the three fills, the colours settled as
+    # they arrive.  Compared against the reference as pens, which here are the
+    # pens each colour came to for this picture.
+    spectrum_drawings = pytest.mark.parametrize(
+        "name,commands",
+        [
+            ("a line", [["LINE", 10, 60, 60, 120]]),
+            ("a rectangle", [["RECT", 20, 60, 100, 120]]),
+            ("an ellipse", [["ELLIPSE", 128, 100, 168, 130]]),
+            ("a solid fill", [["INK", 2], ["RECT", 20, 60, 100, 120],
+                              ["FILL", 60, 90]]),
+            # a run that starts and ends in the middle of a byte of screen,
+            # and so in the middle of the pattern's two halves
+            ("a fill between odd edges", [["INK", 1], ["PAPER", 6],
+                                          ["RECT", 21, 61, 99, 119],
+                                          ["FILL", 60, 90]]),
+            ("a half tone", [["INK", 1], ["PAPER", 6], ["RECT", 20, 60, 100, 120],
+                             ["SHADE", 60, 90]]),
+            ("a fill wiped out again", [["INK", 4], ["RECT", 20, 60, 100, 120],
+                                        ["FILL", 60, 90], ["PAPER", 3],
+                                        ["BGFILL", 60, 90]]),
+            ("bright", [["BRIGHT", 1], ["INK", 2], ["RECT", 20, 60, 100, 120],
+                        ["FILL", 60, 90]]),
+            ("an ink that reads on its paper", [["PAPER", 1], ["INK", 9],
+                                                ["RECT", 20, 60, 100, 120],
+                                                ["BGFILL", 60, 90],
+                                                ["LINE", 30, 70, 90, 110]]),
+            ("an ink left as it was", [["INK", 3], ["RECT", 20, 60, 100, 120],
+                                       ["INK", 8], ["FILL", 60, 90]]),
+            ("one picture calling another", [["INK", 2], ["CALL", 2]]),
+            ("a point outside the picture",
+             [["PLOT", 40, 20], ["PLOT", 60, 200], ["PLOT", 80, 100]]),
+        ],
+    )
 else:
 
     def needs_tools(func):
@@ -102,6 +137,8 @@ else:
 
     def drawings(func):
         return func
+
+    spectrum_drawings = drawings
 
 
 def adventure(commands):
@@ -145,11 +182,19 @@ def pens_of(screen):
     return out
 
 
-def draw_on_both(commands):
+def draw_on_both(commands, spectrum=False):
+    """The picture drawn by the Amstrad and by the reference, as the pen of
+    every point.  An adventure off an Amstrad by default, drawn with the
+    Amstrad's rules; with `spectrum`, one off a Spectrum, drawn with the
+    Spectrum's."""
     ddb = adventure(commands)
+    if spectrum:
+        ddb["model"] = "SPECTRUM"
     with open(DATABASE, "wb") as f:
-        f.write(Database(ddb).build())
-    listing = emulator.assemble(SOURCE, listing=LISTING)
+        f.write(Database(ddb, machine="cpc").build())
+    listing = emulator.assemble(
+        SOURCE, listing=LISTING,
+        defines=() if spectrum else ("AMSTRAD_PICTURES",))
     done = emulator.label_address(listing, "done_flag")
     with open(BINARY, "rb") as f:
         blob = f.read()
@@ -166,10 +211,16 @@ def draw_on_both(commands):
     theirs = [
         [drawn[row][PICTURE_LEFT + x] for x in range(256)] for row in range(PICTURE_ROWS)
     ]
-    device = AmstradDevice([CPC_HARDWARE_PALETTE[ink] for ink in INKS])
-    Renderer(ddb["gfx"], device).run(1)
+    if spectrum:
+        device = device_for("cpc", ddb["gfx"], 1, ddb)
+        Renderer(ddb["gfx"], device).run(1)
+        pens = device.colours
+    else:
+        device = AmstradDevice([CPC_HARDWARE_PALETTE[ink] for ink in INKS])
+        Renderer(ddb["gfx"], device).run(1)
+        pens = device.pens
     ours = [
-        [device.pens[row * 256 + x] for x in range(256)] for row in range(PICTURE_ROWS)
+        [pens[row * 256 + x] for x in range(256)] for row in range(PICTURE_ROWS)
     ]
     return finished, theirs, ours
 
@@ -178,6 +229,20 @@ def draw_on_both(commands):
 @drawings
 def test_the_amstrad_draws_what_the_reference_draws(name, commands):
     finished, theirs, ours = draw_on_both(commands)
+    assert finished, f"{name}: the Amstrad never finished drawing"
+    wrong = [
+        (row, x)
+        for row in range(PICTURE_ROWS)
+        for x in range(256)
+        if theirs[row][x] != ours[row][x]
+    ]
+    assert not wrong, f"{name}: {len(wrong)} points differ, first at {wrong[0]}"
+
+
+@needs_tools
+@spectrum_drawings
+def test_a_picture_off_a_spectrum_is_drawn_with_the_spectrums_rules(name, commands):
+    finished, theirs, ours = draw_on_both(commands, spectrum=True)
     assert finished, f"{name}: the Amstrad never finished drawing"
     wrong = [
         (row, x)

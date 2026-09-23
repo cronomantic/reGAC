@@ -15,6 +15,20 @@
 ; said.  Nothing noticed, because every test looked at pens and none at a
 ; colour; see doc/pendiente.md.
 
+; What a build with pictures does with colour.  Its pictures carry their inks
+; (PICTURE_INKS); an adventure off an Amstrad draws with the Amstrad's rules
+; (AMSTRAD_PICTURES), and then its inks may flash; one off a Spectrum draws
+; with the Spectrum's, and then a colour in the text goes through the
+; picture's pens as a colour in the picture does.  A build without pictures
+; -- the tests of the keyboard, the tape, the text -- has neither.
+                IFDEF   PICTURE_INKS
+                IFDEF   AMSTRAD_PICTURES
+                DEFINE  FLASHING_INKS
+                ELSE
+                DEFINE  COLOUR_TEXT
+                ENDIF
+                ENDIF
+
 SCREEN          equ $C000
 PICTURE_LEFT    equ 32                  ; where the picture starts across
 PICTURE_ROWS    equ 128                 ; and how deep it is
@@ -191,14 +205,17 @@ picture_inks:   db      1, 1, 24, 24, 20, 20, 6, 6
 ink_phase:      db      1
 border_pen:     db      0               ; the pen whose colour the border wears
 picture_head:   db      0               ; what each picture carries before its
-                                        ; orders: its inks, or nothing
+                                        ; orders: its inks and, off a
+                                        ; Spectrum, its pens; or nothing
 
                 IFDEF   PICTURE_INKS
 
 ; The inks of picture HL, when the pictures carry any.  The original sets them
 ; for the picture of a room, the border from the first pair and then the
 ; pens, at $0538; a picture called from another steps over its own, at $1C64,
-; which is why this is called from draw_picture and not for a CALL.
+; which is why this is called from draw_picture and not for a CALL.  A picture
+; off a Spectrum carries the pen each of its colours comes to after the inks,
+; and they are put where spectrum.asm looks for them.
 ; Corrupts: AF, BC, DE
 picture_inks_set:
                 ld      a, (picture_head)
@@ -207,20 +224,32 @@ picture_inks_set:
                 push    hl
                 call    picture_find
                 jr      c, .none
-                ld      de, -INKS_BYTES - 2    ; they are in front of the length
+                ld      a, (picture_head)       ; they are in front of the
+                add     a, 2                    ; length, which is in front of
+                neg                             ; the orders
+                ld      e, a
+                ld      d, $FF
                 add     hl, de
                 ld      de, picture_inks
                 ld      bc, INKS_BYTES
                 ldir
+                IFDEF   AMSTRAD_PICTURES
+                call    flash_init
+                ELSE
+                call    unpack_pens             ; which come after the inks
+                ld      a, (text_colour)        ; and the text's colour may
+                call    text_ink                ; have a pen of its own now
+                ENDIF
                 ld      a, 1
                 ld      (ink_phase), a
                 xor     a
                 ld      (border_pen), a
-                call    flash_init
                 call    pens_init
 .none:
                 pop     hl
                 ret
+
+                IFDEF   AMSTRAD_PICTURES
 
 ; Whether any pen flashes, which is any pair of two colours, and the count
 ; started again.  The counting is the keyboard's: see flash_look.
@@ -243,14 +272,15 @@ flash_init:
                 ld      (flash_looks), a        ; nought: start counting afresh
                 ret
 
-                ENDIF
-
 ; The firmware changes a flashing ink every ten frames, the one and then the
 ; other: the original never asks for anything else, SCR SET FLASHING being
-; called nowhere in it.
+; called nowhere in it.  Only a picture off an Amstrad has inks that flash.
 FLASH_FRAMES    equ 10
 flashing:       db      0               ; whether any pen of this picture does
 flash_looks:    db      0               ; looks at the keyboard until it does
+
+                ENDIF
+                ENDIF
 
 ; How far along its pixel line character row A starts, in HL: eighty bytes a
 ; row.
@@ -412,35 +442,56 @@ in_pen:
                 or      c
                 ret
 
-; The ink the text is printed in, from a change of ink in a message.  This
-; machine has four pens and a picture chooses their colours, so what a number
-; means here is the pen itself, which is what the adventures written for this
-; machine meant by a colour in the first place.
-; Corrupts: AF
-; What a message starts in, as text_ink takes it: pen two, which is what this
-; machine printed in before there was any choice, and what pen_high and
-; pen_low below are set to.  See print_packed.
-TEXT_INK_DEFAULT equ 2
+; The ink the text is printed in, from a change of ink in a message or from
+; the adventure's own.  The original prints in pen one on pen nought and never
+; changes either, so that is what a message starts in.
+;
+; In an adventure off an Amstrad a number is the pen itself, which is what a
+; colour meant on that machine.  In one off a Spectrum it is one of the sixteen
+; colours, and it goes to the pen that colour comes to in the picture on the
+; screen, as a colour in the picture does; so it is kept, and settled again
+; when a picture brings its own pens.  See doc/pendiente.md.
+;
+; A pen's low bit is the high half of the byte and its high bit the low half,
+; which is what pen_bytes says.  This had them the other way round, and what
+; saved it was that the default was written as two: the text came out in pen
+; one, which is the original's, and an ink of one or two in a message came
+; out in the other.
+; Corrupts: AF, HL
+                IFDEF   COLOUR_TEXT
+TEXT_INK_DEFAULT equ 7                  ; white, as on the Spectrum
+                ELSE
+TEXT_INK_DEFAULT equ 1
+                ENDIF
 
 text_ink:
+                IFDEF   COLOUR_TEXT
+                and     $0F
+                ld      (text_colour), a
+                ld      hl, colour_pen
+                call    table_byte
+                ENDIF
                 and     3
-                ld      c, a
+                ld      h, a
                 ld      a, 0
-                bit     1, c
+                bit     0, h
                 jr      z, .no_high
                 ld      a, $F0
 .no_high:
                 ld      (pen_high), a
                 ld      a, 0
-                bit     0, c
+                bit     1, h
                 jr      z, .no_low
                 ld      a, $0F
 .no_low:
                 ld      (pen_low), a
                 ret
 
-pen_high:       db      $F0             ; pen two, which is what it printed in
-pen_low:        db      0               ; before there was any choice
+pen_high:       db      $F0             ; pen one, which is the original's
+pen_low:        db      0
+                IFDEF   COLOUR_TEXT
+text_colour:    db      TEXT_INK_DEFAULT        ; the colour the text asked for
+                ENDIF
 
 print_char:
                 push    af

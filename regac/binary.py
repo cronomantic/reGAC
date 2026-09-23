@@ -47,6 +47,7 @@ to hand need: none of them reaches 21K.
 
 import struct
 
+from .devices import AMSTRAD_RULES, cpc_picture_colours, from_an_amstrad, text_ink_of
 from .opcodes import BY_NAME, GFX_CMDS
 from .glyphs import glyph_for
 from .text import TextStore, typed
@@ -73,6 +74,10 @@ MACHINES = {
 # steps over them in a picture that is called from another, at $1C64.  Only
 # an adventure off an Amstrad has them: deGAC keeps them as gfx_inks.
 PICTURE_INKS = 8
+# And what a picture off a Spectrum carries after its four inks there: the pen
+# each of the sixteen colours of the original comes to, two bits a colour,
+# four colours to a byte and the first in the lowest bits.
+PICTURE_PENS = 4
 # What the firmware's inks are when the machine starts, which is what the
 # original's editor stored in a picture nobody gave a colour to: it asked the
 # firmware with SCR GET INK.  See doc/graficos.md.
@@ -192,6 +197,16 @@ class Database:
                  music_mode=MUSIC_COPY):
         if machine not in MACHINES:
             raise BuildError(f"unknown machine {machine!r}")
+        if from_an_amstrad(ddb) and machine not in AMSTRAD_RULES:
+            # Its pictures are pens and not the Spectrum's inks and papers,
+            # and are drawn with the Amstrad's rules on any machine: one that
+            # does not know them would draw them wrong, so it is said instead.
+            # See doc/pendiente.md.
+            raise BuildError(
+                f"this adventure was written on an Amstrad, and its pictures "
+                f"are drawn with the Amstrad's rules; {machine} does not know "
+                f"them, only {', '.join(sorted(AMSTRAD_RULES & set(MACHINES)))} does"
+            )
         self.ddb = ddb
         self.machine = machine
         self.page_bits = page_bits
@@ -278,13 +293,30 @@ class Database:
         return bytes(out)
 
     def picture_head(self):
-        """The inks travel only to the machine that has pens to put them in,
-        and only when the adventure has them: a Spectrum adventure on an
-        Amstrad keeps the four the interpreter starts with, and not a byte
-        more of the database, which on a 464 is what runs out first."""
-        if self.machine != "cpc" or not self.ddb.get("gfx_inks"):
+        """What each picture carries in front of its orders, which only the
+        Amstrad has any use for.  A picture off an Amstrad carries the eight
+        inks it came with, when the adventure has them.  A picture off a
+        Spectrum is drawn there with the Spectrum's rules and shown in four
+        inks chosen for it, and carries those and the pen each colour of the
+        original comes to."""
+        if self.machine != "cpc":
             return 0
-        return PICTURE_INKS
+        if from_an_amstrad(self.ddb):
+            return PICTURE_INKS if self.ddb.get("gfx_inks") else 0
+        return PICTURE_INKS + PICTURE_PENS
+
+    def head_of(self, key):
+        """The bytes picture `key` carries in front of its orders."""
+        if from_an_amstrad(self.ddb):
+            return bytes(self.inks_of(key))
+        inks, pens = cpc_picture_colours(self.ddb["gfx"], key,
+                                         text_ink_of(self.ddb))
+        out = bytearray()
+        for ink in inks:
+            out += bytes((ink, ink))            # a pair that does not flash
+        for four in range(0, 16, 4):
+            out.append(sum(pens[four + n] << (2 * n) for n in range(4)))
+        return bytes(out)
 
     def inks_of(self, key):
         inks = self.ddb.get("gfx_inks") or {}
@@ -426,7 +458,7 @@ class Database:
                 # In front of the length, so that the index still points at
                 # the length and everything that walks the orders is the same
                 # on every machine.
-                blocks += bytes(self.inks_of(key))
+                blocks += self.head_of(key)
             index += u16(int(key)) + u16(head + len(blocks))
             picture = bytearray()
             for command in gfx[key]:

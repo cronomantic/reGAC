@@ -27,13 +27,16 @@ measured is the machine that was eleven times slower than it should be.
 
 So this measures it and keeps it measured, the same round as the others: in
 the Z80's own clock cycles turned into seconds of a real Amstrad, with every
-picture compared against the reference renderer -- a picture that is quick
+picture compared against the reference renderer -- the Spectrum's rules,
+as these adventures are drawn here -- a picture that is quick
 and wrong is not quick.  It is slow, so it only runs when asked for it:
 
     REGAC_SLOW=1 pytest tests/test_all_pictures_cpc.py -s
 
 What it asserts about time is not the four or five seconds the project wants
-but what this machine does today, adventure by adventure.  That is on purpose:
+but what this machine does today, adventure by adventure -- which since these
+are drawn with the Spectrum's rules is inside the four or five for all eight,
+Bangkok2 on the edge.  That is on purpose:
 the budget is a conversation and belongs in doc/pendiente.md, and what a test
 is good for is catching the day something gets slower than it already was.
 Every number below was measured; if one comes down, bring the ceiling with it.
@@ -59,10 +62,10 @@ sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import emulator  # noqa: E402
-from regac.devices import CPC_HARDWARE_PALETTE, AmstradDevice  # noqa: E402
+from regac.devices import device_for  # noqa: E402
 from regac.gfx import Renderer  # noqa: E402
 from test_all_pictures import adventures  # noqa: E402
-from test_graphics_cpc import INKS, PICTURE_LEFT, PICTURE_ROWS, pens_of  # noqa: E402
+from test_graphics_cpc import PICTURE_LEFT, PICTURE_ROWS, pens_of  # noqa: E402
 
 CPC = os.path.join(ROOT, "z80", "cpc")
 SOURCE = os.path.join(CPC, "test_picture.asm")
@@ -78,15 +81,17 @@ SCREEN_BYTES = 0x4000
 # What each adventure's worst picture costs today, rounded up to the second.
 # Not a budget -- the budget is four or five and only three of these meet it --
 # but a ratchet: the day one of them gets slower, this says so.
+# Measured with the Spectrum's rules, which is how these adventures -- all
+# eight off a Spectrum -- are drawn on this machine now: see doc/pendiente.md.
 CEILING = {
-    "Bangkok1": 3.0,            # the worst of its thirty two measured 2.4
-    "Bangkok2": 7.0,            # 6.1
-    "megacorp1": 3.0,           # 2.3
-    "megacorp2": 4.0,           # 2.9
-    "quijote1": 18.0,           # 16.8
-    "quijote2": 27.0,           # 25.3
-    "vajillas1": 9.0,           # 7.8
-    "vajillas2": 8.0,           # 6.9
+    "Bangkok1": 4.0,            # the worst of its thirty two measured 3.2
+    "Bangkok2": 6.0,            # 5.0, on the edge of the budget
+    "megacorp1": 3.0,           # 2.8
+    "megacorp2": 4.0,           # 3.5
+    "quijote1": 3.0,            # 2.9, which was 16.8 with the Amstrad's rules
+    "quijote2": 4.0,            # 3.6, which was 25.3
+    "vajillas1": 5.0,           # 4.2
+    "vajillas2": 4.0,           # 3.7
 }
 
 needs = (
@@ -138,7 +143,8 @@ def draw_them_all(path):
     with open(BINARY, "rb") as f:
         blob = f.read()
     with open(path, encoding="utf-8") as f:
-        gfx = json.load(f)["gfx"]
+        ddb = json.load(f)
+    gfx = ddb["gfx"]
 
     out = []
     session = emulator.Session(machine="CPC6128")
@@ -163,10 +169,11 @@ def draw_them_all(path):
             drawn = pens_of(session.read(SCREEN, SCREEN_BYTES))
             theirs = [[drawn[row][PICTURE_LEFT + x] for x in range(256)]
                       for row in range(PICTURE_ROWS)]
-            device = AmstradDevice([CPC_HARDWARE_PALETTE[ink] for ink in INKS])
+            # these are adventures off a Spectrum, drawn with its rules
+            device = device_for("cpc", gfx, number, ddb)
             Renderer(gfx, device).run(number)
             wrong = sum(1 for row in range(PICTURE_ROWS) for x in range(256)
-                        if theirs[row][x] != device.pens[row * 256 + x])
+                        if theirs[row][x] != device.colours[row * 256 + x])
             out.append((number, wrong, seconds))
     finally:
         session.close()

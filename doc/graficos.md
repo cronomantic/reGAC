@@ -172,12 +172,13 @@ pomo de una puerta.
 Con eso, 125 de las 196 láminas no pierden ningún color. De las otras, 50
 pierden uno, 17 pierden dos y 4 pierden tres.
 
-**Esto es el plan, y el intérprete del CPC todavía no lo cumple.** Lo que hace
-hoy con una aventura de Spectrum es dibujarla con las reglas del Amstrad
-—`AmstradDevice`: tinta `& 3`, relleno que se para al cambiar de pluma, y en
-la pluma uno porque sólo `PENS` la cambia—, y con eso 146 de las 196 láminas
-no se parecen a las del Spectrum. Está contado, y lo que falta, en
-`pendiente.md`.
+Esto fue el plan durante mucho tiempo sin que el intérprete del CPC lo
+cumpliera: dibujaba las aventuras de Spectrum con las reglas del Amstrad, y
+146 de las 196 láminas no se parecían a las del Spectrum. Ahora lo cumple,
+con las tintas elegidas así y llevadas en la base de datos; y con un cambio:
+de las cuatro, la más cercana al negro va a la pluma cero y la más cercana a
+la tinta del texto a la uno, porque el texto comparte las plumas con la
+lámina. Está en `pendiente.md`.
 
 ### Verificarlo
 

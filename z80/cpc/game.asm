@@ -4,6 +4,12 @@
 
                 DEVICE  AMSTRADCPC6128
                 DEFINE  PICTURE_INKS            ; its pictures carry their inks
+; Where a picture off a Spectrum keeps its mask while it is drawn: four
+; kilobytes under $4000.  Once the interpreter runs with both ROMs out that is
+; RAM nobody else uses -- the firmware cannot read it, but the firmware never
+; needs to: the mask is only for drawing.  With LOW_CODE the interpreter is
+; down there too, and ends well short of it; see the ASSERT at the end.
+MASK            equ $3000
 
 ; An adventure that asks for a noise is told so with -DNOISES, and then
 ; the sound chip engine travels with it.  There is no music: the tracker
@@ -116,9 +122,20 @@ done_flag:      db      0
 ; hundred and four and travel only with -DNOISES, which none of the eight of
 ; 1986 needs, since SOUND and QUIET are opcodes of ours.
                 include "tape.asm"
+                include "pixels.asm"
+                ; The rules of the GAC the adventure was written with: an
+                ; adventure off an Amstrad is built with -DAMSTRAD_PICTURES and
+                ; draws with the Amstrad's, and one off a Spectrum with the
+                ; Spectrum's.  One or the other, never both.
+                IFDEF   AMSTRAD_PICTURES
                 include "draw.asm"
                 include "shapes.asm"
                 include "fill.asm"
+                ELSE
+                include "spectrum.asm"
+                include "../common/shapes.asm"
+                include "spectrum_fill.asm"
+                ENDIF
                 include "../common/conditions.asm"
                 include "../common/opcodes.asm"
                 include "../common/parser.asm"
@@ -136,6 +153,7 @@ last:
                 ; below it and the loader's variables grow down from there, so
                 ; an LDIR that reached them would come back to nothing.
                 ASSERT  last <= BASIC_KEEPS_FROM
+                ASSERT  last <= MASK            ; or drawing would tread on us
 database        equ DATABASE_AT
 CODE_BYTES      equ last - start
                 ENT                             ; back to where the file loads

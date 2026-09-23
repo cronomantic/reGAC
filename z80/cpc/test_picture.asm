@@ -9,6 +9,7 @@
 
                 DEVICE  AMSTRADCPC6128
                 DEFINE  PICTURE_INKS            ; its pictures carry their inks
+MASK            equ $3000                ; as the 464 has it: see game.asm
 
                 ; above the lower ROM, which shadows anything under $4000
                 ORG     $4000
@@ -55,9 +56,20 @@ picture_wanted: dw      1
                 include "../common/database.asm"
                 include "../common/config.asm"
                 include "screen.asm"
+                include "pixels.asm"
+                ; The rules of the GAC the adventure was written with: an
+                ; adventure off an Amstrad is built with -DAMSTRAD_PICTURES and
+                ; draws with the Amstrad's, and one off a Spectrum with the
+                ; Spectrum's.  One or the other, never both.
+                IFDEF   AMSTRAD_PICTURES
                 include "draw.asm"
                 include "shapes.asm"
                 include "fill.asm"
+                ELSE
+                include "spectrum.asm"
+                include "../common/shapes.asm"
+                include "spectrum_fill.asm"
+                ENDIF
                 include "../common/picture.asm"
 
                 ALIGN   256

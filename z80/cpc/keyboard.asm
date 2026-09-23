@@ -31,7 +31,7 @@ INPUT_MAX       equ 64                  ; as much of a line as is kept
 LOOKS_A_FRAME   equ 12
 LOOKS_HELD      equ 11                  ; a look with a key held, about 6960
 
-                IFDEF   PICTURE_INKS
+                IFDEF   FLASHING_INKS
 
 ; One look's worth of flashing, which is how an ink of the picture flashes
 ; here.  The interpreter runs with the interrupts off, so there is no frame to
@@ -133,7 +133,7 @@ keyboard_init:
 ; look like nothing being typed at all; what they do is decided afterwards.
 ; Corrupts: BC, DE, HL
 scan_keyboard:
-                IFDEF   PICTURE_INKS
+                IFDEF   FLASHING_INKS
                 call    flash_look              ; every wait is looks like this
                 ENDIF
                 xor     a

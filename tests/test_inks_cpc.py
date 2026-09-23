@@ -27,12 +27,13 @@ command to the gate array, set none of them, and showed the firmware's four
 whatever it asked for; and nothing failed.  These look at the screen the
 emulator paints, as a picture, and ask it what colours are on it.
 
-What they hold it to is the original, read at $0538 of its interpreter: the
-picture of a room sets its own inks, the border from the first pair and then
-each pen; a picture called from another steps over its own, at $1C64; and a
-pen whose pair is two colours flashes between them, the second of the pair
-first.  And an adventure that carries no inks -- one off a Spectrum -- keeps
-the four the firmware starts with, as it always has.
+What they hold an adventure off an Amstrad to is the original, read at $0538
+of its interpreter: the picture of a room sets its own inks, the border from
+the first pair and then each pen; a picture called from another steps over
+its own, at $1C64; and a pen whose pair is two colours flashes between them,
+the second of the pair first.  An adventure off a Spectrum is drawn with the
+Spectrum's rules, and each of its pictures is shown in the four inks chosen
+for it.
 """
 
 import os
@@ -52,7 +53,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import emulator  # noqa: E402
 from regac.binary import Database  # noqa: E402
-from regac.devices import CPC_HARDWARE_PALETTE  # noqa: E402
+from regac.devices import CPC_HARDWARE_PALETTE, cpc_picture_colours  # noqa: E402
 from test_markers_z80 import adventure  # noqa: E402
 
 CPC = os.path.join(ROOT, "z80", "cpc")
@@ -81,9 +82,9 @@ ALL_FOUR = [
 ]
 
 
-def one_room(gfx, inks=None):
+def one_room(gfx, inks=None, model="CPC"):
     ddb = adventure(rooms={"1": {"graphic_id": 1, "exits": [], "desc": "UN CUARTO"}})
-    ddb["model"] = "CPC"
+    ddb["model"] = model
     ddb["gfx"] = gfx
     if inks is not None:
         ddb["gfx_inks"] = inks
@@ -127,7 +128,9 @@ def playing(ddb, looks=1, every=0.0):
     screen `looks` times, `every` seconds apart."""
     with open(DATABASE, "wb") as f:
         f.write(Database(ddb, machine="cpc").build())
-    listing = emulator.assemble(SOURCE, listing=LISTING)
+    amstrad = ddb.get("model") == "CPC"
+    listing = emulator.assemble(SOURCE, listing=LISTING,
+                                defines=("AMSTRAD_PICTURES",) if amstrad else ())
     ready = emulator.label_address(listing, "vm_location")
     with open(BINARY, "rb") as f:
         blob = f.read()
@@ -178,17 +181,63 @@ def test_a_pen_of_two_colours_flashes_while_the_game_waits():
 
 
 @needs_tools
-def test_a_picture_off_a_spectrum_keeps_the_inks_it_always_had():
-    """No inks in the adventure: the firmware's four, as the screen has always
-    shown.  And BORDER, which only a Spectrum picture has, gives the border
-    the colour of the pen it names, as the reference does."""
-    [(seen, border)] = playing(one_room({"1": ALL_FOUR + [["BORDER", 6]]}))
-    assert seen == START_INKS, f"the screen shows inks {sorted(seen)}"
-    assert border == 20, f"BORDER 6 is pen two, which is ink 20, not {border}"
+def test_a_picture_off_a_spectrum_is_shown_in_the_inks_chosen_for_it():
+    """Red on white, drawn with the Spectrum's rules: what is on the screen is
+    the inks chosen for this picture and nothing else, red and white among
+    them where the picture has them.  And BORDER, which only a Spectrum
+    picture has, gives the border the ink its colour came to."""
+    gfx = {"1": [["INK", 2], ["RECT", 20, 60, 100, 120], ["FILL", 60, 90],
+                 ["BORDER", 6]]}
+    inks, pens = cpc_picture_colours(gfx, 1)
+    [(seen, border)] = playing(one_room(gfx, model="SPECTRUM"))
+    assert seen <= set(inks), f"the screen shows inks {sorted(seen)}, chosen {inks}"
+    assert inks[pens[2]] in seen, "the red of the picture is not on the screen"
+    assert inks[pens[7]] in seen, "the white of the picture is not on the screen"
+    assert border == inks[pens[6]], (
+        f"BORDER 6 is ink {inks[pens[6]]} for this picture, and the border is {border}"
+    )
+
+
+# A change of ink inside a text, as it travels: the code that says the ink
+# changes, and the colour as a character.
+def ink(colour):
+    return "" + chr(ord("0") + colour)
+
+
+@needs_tools
+def test_the_text_of_an_amstrad_adventure_is_in_pen_one_and_ink_names_a_pen():
+    """The original prints in pen one on pen nought and never changes them; a
+    change of ink in a message is ours, and on this machine it names a pen.
+    The picture is empty, so what is on the screen is the text: the paper,
+    the letter in pen one, and the words after the change in pen three.  Pen
+    one and not two is the point of it: the two were crossed once, and with a
+    change to two the screen shows the same three inks either way."""
+    inks = {"1": [3, 3, 26, 26, 18, 18, 2, 2]}
+    ddb = one_room({"1": []}, inks)
+    ddb["locations"]["1"]["desc"] = "UN CUARTO " + ink(3) + "AZUL"
+    [(seen, _)] = playing(ddb)
+    assert seen == {3, 26, 2}, f"the screen shows inks {sorted(seen)}"
+
+
+@needs_tools
+def test_the_text_of_a_spectrum_adventure_takes_the_pictures_pens():
+    """White on black, as on the Spectrum, in the inks of the picture closest
+    to them -- which are pens one and nought -- and a change of ink in a
+    message is a colour, in the pen that colour comes to in this picture."""
+    gfx = {"1": [["INK", 2], ["RECT", 20, 60, 100, 120], ["FILL", 60, 90]]}
+    inks, pens = cpc_picture_colours(gfx, 1)
+    ddb = one_room(gfx, model="SPECTRUM")
+    ddb["locations"]["1"]["desc"] = "UN CUARTO " + ink(6) + "AMARILLO"
+    [(seen, _)] = playing(ddb)
+    assert pens[0] == 0 and pens[7] == 1, "the text's paper and letter are not pens 0 and 1"
+    wanted = {inks[pens[0]], inks[pens[7]], inks[pens[2]], inks[pens[6]]}
+    assert seen == wanted, f"the screen shows inks {sorted(seen)}, and it should be {sorted(wanted)}"
 
 
 if __name__ == "__main__":
     test_a_picture_off_an_amstrad_puts_up_its_own_inks()
     test_a_pen_of_two_colours_flashes_while_the_game_waits()
-    test_a_picture_off_a_spectrum_keeps_the_inks_it_always_had()
+    test_a_picture_off_a_spectrum_is_shown_in_the_inks_chosen_for_it()
+    test_the_text_of_an_amstrad_adventure_is_in_pen_one_and_ink_names_a_pen()
+    test_the_text_of_a_spectrum_adventure_takes_the_pictures_pens()
     print("the Amstrad shows the inks it is given")

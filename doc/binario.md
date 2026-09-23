@@ -48,11 +48,18 @@ ensambló cada intérprete, que es lo que hacían todas antes de que esto
 existiera.
 
 Y detrás de la tinta, por la misma razón, **cuántos bytes lleva cada lámina
-delante de sus órdenes**: cero, o los ocho de tintas de una lámina de Amstrad
-—una pareja por pluma, porque una tinta del CPC puede parpadear entre dos
-colores—. Sólo los lleva el CPC y sólo si la aventura los trae (`gfx_inks`,
-que `deGAC` saca de una aventura de Amstrad); en cualquier otro caso es cero y
-la sección de gráficos queda igual byte a byte que antes. Van **delante de la
+delante de sus órdenes**. Sólo el CPC lleva alguno:
+
+- una aventura de Amstrad, **ocho**, las tintas de cada lámina —una pareja
+  por pluma, porque una tinta del CPC puede parpadear entre dos colores—, si
+  la aventura las trae (`gfx_inks`, que `deGAC` saca de ella); si no, cero;
+- una aventura de Spectrum, **doce**: las cuatro tintas elegidas para la
+  lámina, por parejas que no parpadean, y la pluma a la que va cada uno de
+  los dieciséis colores del original, dos bits por color y cuatro por byte,
+  el primero en los bits de abajo.
+
+En cualquier otra máquina es cero y la sección de gráficos queda igual byte a
+byte que antes. Van **delante de la
 longitud** de cada lámina, de modo que el índice sigue apuntando a la
 longitud y lo que recorre las órdenes es el mismo en todas las máquinas; el
 intérprete del CPC los encuentra diez bytes antes de la primera orden.

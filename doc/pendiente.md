@@ -1992,7 +1992,7 @@ láminas:
 |---|---|
 | Spectrum y Next | el color tal cual, con el brillo del bit de arriba |
 | MSX | el más parecido de los suyos, por la misma tabla que las láminas |
-| Amstrad | la pluma, de cero a tres, que es lo que un color significaba en las aventuras de esa máquina |
+| Amstrad | en una aventura de Amstrad, la pluma, de cero a tres, que es lo que un color significaba en las aventuras de esa máquina; en una de Spectrum, el color, en la pluma a la que va en la lámina del cuarto (ver «El texto, que comparte las cuatro plumas con la lámina») |
 | PCW | nada: lee el comando y sigue, que es como una máquina de un solo color tiene que comportarse |
 
 En el Spectrum eso obligó a **guardar el borde en memoria** —el puerto no se
@@ -2032,9 +2032,10 @@ aventuras lo usa.
 entero, y no en `text_end`, que parecía el sitio: a `text_end` llega también
 `print_digit`, de modo que un contador impreso en mitad de una frase habría
 cortado la tinta ahí mismo. Cada máquina dice su `TEXT_INK_DEFAULT` —siete en
-Spectrum, Next y MSX; la pluma dos en el Amstrad, que es la que usaba antes de
-que hubiera dónde elegir; y cualquier cosa en el PCW, que lee el comando y no
-hace nada—.
+Spectrum, Next y MSX; en el Amstrad un «dos» que, por un cruce de plumas en
+`text_ink`, era la pluma uno, que es la del original --ver «El texto, que
+comparte las cuatro plumas con la lámina»--; y cualquier cosa en el PCW, que
+lee el comando y no hace nada—.
 
 **Y dos cosas en el intérprete de pygame**, que obedece la tinta y tenía que
 seguir la misma regla. La primera es la regla. La segunda es un fallo que
@@ -2841,8 +2842,9 @@ segundo byte primero.
 
 - **El formato** lleva los ocho bytes delante de la longitud de cada lámina,
   sólo en el CPC y sólo si la aventura los trae; el último byte de la
-  configuración dice cuántos son. Una aventura de Spectrum sale igual que
-  antes más ese byte. Ver `binario.md`.
+  configuración dice cuántos son. Ver `binario.md`. (Una aventura de Spectrum
+  salía entonces igual que antes más ese byte; desde que el CPC la dibuja con
+  las reglas del Spectrum lleva doce por lámina: ver más abajo.)
 - **El formato fuente** los escribe en la cabecera de la lámina,
   `#9 inks=0,13,17/0,20`; las 44 láminas de Bangkok hacen el viaje de ida y
   vuelta sin perder ninguna, las tres que parpadean incluidas.
@@ -2861,9 +2863,10 @@ con el chip de sonido no admite que nadie lo interrumpa, ver `keyboard.asm`--.
 Afecta a cuatro láminas de las 91 de las tres aventuras de Amstrad, y durante
 lo que tardan en dibujarse.
 
-Le cuesta al 464 **105 bytes** de intérprete, y siguen cabiendo sin cambiar
+Le costó al 464 **105 bytes** de intérprete, y siguieron cabiendo sin cambiar
 nada las mismas cinco aventuras de las ocho; la que va más justa, Bangkok2,
-queda a 1070 bytes del firmware.
+quedó a 1070 bytes del firmware. (Con las reglas del Spectrum, más abajo,
+son 614.)
 
 ### Y los tres fallos que había debajo, que ninguna prueba veía
 
@@ -2881,8 +2884,8 @@ Ninguno lo podía ver una prueba: todas leían la pantalla como plumas. Ahora
 (`save-screen`, un BMP con sus colores) y mira qué tintas hay en ella; y las
 27 de la tabla están comprobadas contra el emulador, de cuatro en cuatro.
 
-Las tintas de una aventura sin tintas propias pasan a ser **1, 24, 20 y 6**,
-las del firmware al arrancar: es lo que la pantalla enseñó siempre --por el
+Las tintas de una lámina de Amstrad sin tintas propias pasan a ser
+**1, 24, 20 y 6**, las del firmware al arrancar: es lo que la pantalla enseñó siempre --por el
 primer fallo--, y es lo que el comentario de `picture_inks` decía querer.
 
 Y un cuarto, de acuerdo con la referencia y no de la pantalla: `BORDER n`, que
@@ -2942,6 +2945,96 @@ cada máquina está por medir --el Next, el MSX y el PC no se han mirado--, y
 donde no quepa, `regac` lo dice con un mensaje claro en vez de compilar algo
 que dibuja mal. Hoy ninguna máquina salvo el CPC sabe dibujar con las reglas
 del CPC: está pendiente, detrás del PC.
+
+### Hecho: el CPC dibuja las aventuras de Spectrum con las reglas del Spectrum
+
+**Qué modelo lleva una compilación** lo dice de dónde viene la aventura: el
+`model` que `deGAC` escribe y el formato fuente guarda en `/CTL`. Con `CPC`,
+`regac` ensambla con `-DAMSTRAD_PICTURES` y entran `draw.asm`, `shapes.asm` y
+`fill.asm`, que son lo de siempre. Sin él entran `spectrum.asm`,
+`../common/shapes.asm` y `spectrum_fill.asm`: el dibujo del Next --la máscara,
+la recta de la ROM, la elipse del Spectrum, el relleno del Spectrum-- con la
+pantalla del CPC debajo. Lo que comparten los dos, las tablas de plumas y
+dónde cae un punto, está en `pixels.asm`. **Una compilación lleva uno solo.**
+
+**Los colores**: cada lámina lleva cuatro tintas y la pluma a la que va cada
+uno de los dieciséis colores, en los mismos bytes delante de la longitud que
+abrieron las tintas del Amstrad --doce aquí: las cuatro por parejas y cuatro
+de mapa--. Se eligen al construir la base de datos con `cpc_picture_colours`,
+pesando cada color por lo que cubre en la lámina de referencia, y **la
+referencia de las pruebas sale de la misma función**, así que las dos no
+pueden discrepar. Un relleno se tiende de byte en byte: el patrón del
+Spectrum va alineado con la x, así que un byte de pantalla, que son cuatro
+puntos, lleva siempre su primera mitad o la segunda, y las dos se calculan una
+vez por tramo.
+
+**La máscara** va en $3000 en el 464, con y sin `LOW_CODE`, y en el 6128 en la
+primera página detrás del intérprete, compartiendo sitio con donde se monta
+una partida guardada: nunca se quieren a la vez.
+
+**Lo que dio**: las **196 láminas, punto por punto iguales** a la referencia
+fiel en el emulador. En el 464 siguen cabiendo las mismas cinco aventuras; la
+más justa, Bangkok2, a 614 bytes del firmware. **Y el tiempo, que era lo que
+el presupuesto de 4-5 s no cumplía**: con las reglas del Amstrad sólo tres
+aventuras lo cumplían, y con las del Spectrum lo cumplen las ocho. Por qué
+tanto en el Quijote no está medido; lo que se ve es que con las reglas del
+Amstrad sus rellenos cubrían otra cosa --son de las láminas de la tabla de
+arriba--.
+
+| aventura | reglas del Amstrad | reglas del Spectrum |
+|---|---:|---:|
+| Bangkok1 | 2,4 s | 3,2 s |
+| Bangkok2 | 4,1 s | **5,0 s**, en el borde |
+| megacorp1 | 2,3 s | 2,8 s |
+| megacorp2 | 2,9 s | 3,5 s |
+| quijote1 | 16,8 s | 2,9 s |
+| quijote2 | 25,3 s | 3,6 s |
+| vajillas1 | 7,8 s | 4,2 s |
+| vajillas2 | 6,9 s | 3,7 s |
+
+Los techos de `test_all_pictures_cpc.py` van con estos números.
+
+**Y el rechazo decidido**: `Database` no construye una aventura de Amstrad
+para otra máquina, y `checkgfx` no compara una aventura de Amstrad con el
+Spectrum, que no es lo que es. El C64, cuyas láminas también son de plumas,
+sigue aparcado y no se toca aquí.
+
+### El texto, que comparte las cuatro plumas con la lámina
+
+**El original del CPC imprime en la pluma uno sobre la cero y no las cambia
+nunca mientras se juega**: `TXT SET PAPER` no está en ningún sitio, y
+`TXT SET PEN` sólo en $2630, que pone una pluma, imprime y deja la uno --y a
+$2630 sólo la llaman $29AD, $2F92 y $320A, que por la zona son del editor de
+láminas--. O sea que el color del texto es el de las plumas cero y uno de la
+lámina del cuarto, y cambia con ella.
+
+**Decidido**, y hecho:
+
+- **Una aventura de Amstrad**: la letra en la pluma uno sobre la cero, como
+  el original. Un `\ink n` en un mensaje --que es nuestro, el GAC del 86 no
+  tenía color en el texto-- sigue siendo la pluma `n`.
+- **Una aventura de Spectrum**: blanco sobre negro, como en el Spectrum, y un
+  `\ink n` o el `ink n` de `/CTL` son **colores**, que van a la pluma a la que
+  va ese color en la lámina, como un color de la lámina. Para que eso no
+  estropee el texto que ya está escrito cuando llega otra lámina, las cuatro
+  tintas se reparten con la más cercana al negro en la pluma cero y la más
+  cercana a la tinta del texto en la uno --qué pluma lleva cada tinta no le
+  cambia nada a la lámina--. Así el papel y la letra son siempre las plumas
+  cero y uno, como en el original.
+
+Contado sobre las 196: **194 dejan el texto legible**. Las dos que no son las
+láminas de los cuartos 1001 de megacorp1 y 5000 de megacorp2, que son negro,
+azul, azul brillante y rojo y no tienen ninguna tinta clara: ahí el texto sale
+en azul brillante sobre negro. Es lo que la lámina da de sí; está dicho para
+que no sorprenda.
+
+**Y lo que había debajo, otra vez sin que nada lo viera**: `text_ink` tenía
+cruzadas la pluma uno y la dos. Lo que lo tapaba es que la tinta por defecto
+se había escrito como un dos, y un dos cruzado es la pluma uno, que es la del
+original; un `\ink 1` o un `\ink 2` en un mensaje salían en la otra. La
+prueba nueva mira el texto por colores, con un `\ink 3` a propósito: con un
+cambio a la dos la pantalla enseña los mismos tres colores estén cruzadas o
+no, y se comprobó que así sí falla con las plumas cruzadas.
 
 ## PC XT con CGA: el paso uno, que era el que podía matarlo
 

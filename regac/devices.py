@@ -491,6 +491,56 @@ def colour_usage(device):
     return counts
 
 
+# What the text of an adventure off a Spectrum is printed in when it says
+# nothing: white on black, as on the Spectrum.
+SPECTRUM_TEXT_INK = 7
+SPECTRUM_TEXT_PAPER = 0
+
+
+def cpc_picture_colours(gfx, picture_id, text_ink=SPECTRUM_TEXT_INK):
+    """How a picture off a Spectrum is shown on an Amstrad: the four inks it
+    gets, as the firmware numbers them, and the pen each of the sixteen colours
+    of the original comes to.
+
+    It is drawn with the Spectrum's rules -- that is what the picture is -- and
+    only the colours have to give, because the machine has four at a time.
+    Which four is chosen for each picture against the reference, weighted by
+    how much of the screen each colour covers.  The database carries both, so
+    that the interpreter looks nothing up, and the reference is built from
+    this same function, so that the two cannot disagree.
+
+    The text shares the four pens with the picture, and on the Amstrad the
+    original prints it in pen one on pen nought and never changes them.  So of
+    the four, the one the text's paper comes to goes to pen nought and the one
+    its ink comes to to pen one: which pen an ink is in changes nothing of the
+    picture, and this way the text is always in the colours closest to the
+    ones it asks for, and what is already on the screen stays paper and letter
+    when the next picture comes.
+    """
+    from .gfx import Renderer
+
+    reference = Renderer(gfx, SpectrumDevice()).run(int(picture_id))
+    chosen = choose_inks(colour_usage(reference))
+    order = list(range(len(chosen)))
+    paper = nearest(SPECTRUM_PALETTE[SPECTRUM_TEXT_PAPER], chosen)
+    letter = nearest(SPECTRUM_PALETTE[text_ink], chosen)
+    order.remove(paper)
+    order.insert(0, paper)
+    if letter != paper:
+        order.remove(letter)
+        order.insert(1, letter)
+    chosen = [chosen[n] for n in order]
+    inks = [CPC_HARDWARE_PALETTE.index(colour) for colour in chosen]
+    pens = [nearest(colour, chosen) for colour in SPECTRUM_PALETTE]
+    return inks, pens
+
+
+def text_ink_of(ddb):
+    """The colour an adventure's text is printed in when it says nothing
+    else: its own, from ink= in /CTL, or white."""
+    return (ddb or {}).get("ink") or SPECTRUM_TEXT_INK
+
+
 class AmstradDevice(Device):
     """Four pens a pixel, the way the Amstrad drew.
 
@@ -582,24 +632,32 @@ class AmstradDevice(Device):
 
     def to_rgb(self):
         return [
-            [self.palette[self.pens[y * self.width + x]] for x in range(self.width)]
+            [rgb(self.palette[self.pens[y * self.width + x]]) for x in range(self.width)]
             for y in range(self.height)
         ]
+
+
+# The inks the firmware starts the machine with, which is what an Amstrad
+# picture with none of its own is shown in.
+CPC_START_INKS = [1, 24, 20, 6]
 
 
 def amstrad_device(header=None):
     """A device for one Amstrad picture, in the four inks it names.
 
     Those are the eight bytes it carries at its head: four pairs, because an
-    ink there can flash between two colours.  Only the five bits the firmware
-    reads count: a colour that was typed rather than taken from the screen is
-    stored as the letter that was typed, and A or a comes out 1, Z or z 26,
-    and a space black, which is what the machine does with it.
+    ink there can flash between two colours.  Of each pair the second is the
+    one the machine shows first -- it is what the original hands SCR SET INK
+    as the first colour -- so that is the one a still picture is drawn in.
+    Only the five bits the firmware reads count: a colour that was typed
+    rather than taken from the screen is stored as the letter that was typed,
+    and A or a comes out 1, Z or z 26, and a space black, which is what the
+    machine does with it.
     """
     if header:
-        inks = [header[n * 2] & 0x1F for n in range(4)]
+        inks = [header[n * 2 + 1] & 0x1F for n in range(4)]
     else:
-        inks = [0, 26, 20, 8]
+        inks = CPC_START_INKS
     return AmstradDevice([CPC_HARDWARE_PALETTE[min(c, 26)] for c in inks])
 
 
@@ -828,6 +886,17 @@ DEVICES = {
 # therefore better off having them chosen for each picture.
 LIMITED = {"cpc", "cpc-wide"}
 
+# The machines that draw an adventure off an Amstrad with the Amstrad's rules.
+# An adventure is drawn with the rules of the GAC it was written with, on any
+# machine; today only the Amstrad itself knows those.
+AMSTRAD_RULES = {"cpc", "amstrad"}
+
+
+def from_an_amstrad(ddb):
+    """Whether an adventure was written with the Amstrad's GAC, whose
+    pictures are pens and not the Spectrum's inks and papers."""
+    return bool(ddb) and ddb.get("model") == "CPC"
+
 
 def make(name):
     if name not in DEVICES:
@@ -835,20 +904,29 @@ def make(name):
     return DEVICES[name]()
 
 
-def device_for(name, gfx=None, picture_id=None):
-    """Build a device for one picture.
+def device_for(name, gfx=None, picture_id=None, ddb=None):
+    """Build a device for one picture, the way that machine shows it.
 
-    On a machine short of inks, which four or sixteen colours to load is a
-    decision per picture, not per adventure: the Amstrad can reload its inks
-    for every screen.  Choosing them from what the picture actually uses beats
-    any fixed palette.
+    An adventure is drawn with the rules of the GAC it was written with: one
+    off an Amstrad with the Amstrad's, in the inks each of its pictures
+    carries; one off a Spectrum with the Spectrum's.  On a machine short of
+    inks, which four to load is a decision per picture, not per adventure: the
+    Amstrad reloads its inks for every screen, and choosing them from what the
+    picture actually uses beats any fixed palette.
     """
+    if name in AMSTRAD_RULES and from_an_amstrad(ddb):
+        header = None
+        if picture_id is not None:
+            inks = ddb.get("gfx_inks") or {}
+            header = inks.get(str(picture_id), inks.get(int(picture_id)))
+        return amstrad_device(header)
     if name not in LIMITED or gfx is None or picture_id is None:
         return make(name)
-    from .gfx import Renderer
-
-    reference = Renderer(gfx, SpectrumDevice()).run(int(picture_id))
-    inks = choose_inks(colour_usage(reference))
     if name == "cpc-wide":
+        from .gfx import Renderer
+
+        reference = Renderer(gfx, SpectrumDevice()).run(int(picture_id))
+        inks = choose_inks(colour_usage(reference))
         return PixelDevice(CPC_SCREEN_WIDTH, SOURCE_ROWS, inks, name="cpc-wide")
-    return cpc_device(inks)
+    inks, _ = cpc_picture_colours(gfx, picture_id, text_ink_of(ddb))
+    return cpc_device([CPC_HARDWARE_PALETTE[ink] for ink in inks])
