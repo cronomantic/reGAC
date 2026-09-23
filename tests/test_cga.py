@@ -37,9 +37,11 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
+from regac.binary import Database, Reader  # noqa: E402
 from regac.devices import (CGA_BANK, CGA_PALETTE, CGA_SCREEN_BYTES, CGA_TRIOS,  # noqa: E402
                            AmstradDevice, PixelDevice,
-                           cga_amstrad_colours, cga_screen, device_for)
+                           cga_amstrad_colours, cga_picture_colours,
+                           cga_screen, device_for)
 from regac.gfx import Renderer  # noqa: E402
 
 
@@ -139,3 +141,52 @@ if __name__ == "__main__":
     test_the_pens_of_an_amstrad_picture_are_dealt_to_suit_the_colours()
     test_an_amstrad_picture_keeps_its_pens_on_the_card()
     print("the CGA shows what the reference draws")
+
+
+def unpacked(head):
+    """The two port bytes and the sixteen values out of a picture's head."""
+    values = [(head[2 + n // 4] >> (2 * (n % 4))) & 3 for n in range(16)]
+    return head[0], head[1], values
+
+
+def smallest(gfx, model="48K", inks=None):
+    ddb = {
+        "font": [0] * 1024, "verbs": {"N": 1}, "nouns": {}, "adverbs": {},
+        "pronouns": [], "messages": {"1": "x"},
+        "objects": {"1": {"weight": 1, "initial_loc": 1, "name": "x"}},
+        "locations": {"1": {"graphic_id": 1, "exits": [], "desc": "x"}},
+        "hpcs": [], "lpcs": [], "lcs": {}, "model": model,
+        "punctuation": list("\0 .,-!?:"), "separators": [], "init_loc": 1,
+        "no_objs_msg": "x", "gfx": gfx,
+    }
+    if inks:
+        ddb["gfx_inks"] = inks
+    return ddb
+
+
+def test_a_picture_carries_its_palette_to_the_pc():
+    """What the interpreter puts up for a picture is what the reference drew
+    it in: the two port bytes of its background and trio, and the value each
+    of the sixteen colours comes to."""
+    gfx = {"1": [["PAPER", 1], ["INK", 6], ["RECT", 20, 60, 100, 120],
+                 ["BGFILL", 60, 90]]}
+    reader = Reader(Database(smallest(gfx), machine="pc").build())
+    assert reader.picture_head() == 6
+    select, mode, values = unpacked(reader.picture_inks()["1"])
+    background, trio, wanted = cga_picture_colours(gfx, 1)
+    assert (select, mode) == (trio.select(background), trio.mode())
+    assert values == list(wanted)
+
+
+def test_an_amstrad_picture_carries_its_pens_to_the_pc_four_times_over():
+    """Off an Amstrad the sixteen are the four pens, dealt out as the
+    reference deals them, over and over: an ink's low two bits are its pen,
+    so the interpreter looks an ink up as it comes."""
+    gfx = {"1": [["INK", 2], ["RECT", 20, 60, 100, 120]]}
+    header = [0, 0, 24, 24, 26, 26, 6, 6]
+    ddb = smallest(gfx, model="CPC", inks={"1": header})
+    reader = Reader(Database(ddb, machine="pc").build())
+    select, mode, values = unpacked(reader.picture_inks()["1"])
+    background, trio, pens = cga_amstrad_colours(gfx, 1, header)
+    assert (select, mode) == (trio.select(background), trio.mode())
+    assert values == [pens[n & 3] for n in range(16)]

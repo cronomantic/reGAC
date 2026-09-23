@@ -99,6 +99,13 @@ GROUPS = {
     ],
     "pcw-text": ["test_keyboard_pcw", "test_text_pcw"],
     "pcw-picture": ["test_graphics_pcw"],
+    # These build in a folder of their own each, so it is not for the files:
+    # DOSBox-X runs them flat out, and up to four of it at once beside the Z80
+    # machines is load that some of those measure by.  In the run that added
+    # them the AY's hiss came out shaped like a note on the Next, and was
+    # right on its own; whether they were why is not known, but one at a time
+    # they cost nothing.
+    "pc": ["test_graphics_pc", "test_media_pc"],
 }
 
 GROUP_OF = {module: group for group, modules in GROUPS.items()

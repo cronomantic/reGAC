@@ -56,24 +56,30 @@ def available():
     return bool(find_nasm() and find_dosbox())
 
 
-def assemble(source, output):
-    """A flat binary, which is all NASM is asked for: the container is ours."""
-    result = subprocess.run(
-        [find_nasm(), "-f", "bin", "-o", output, source],
-        capture_output=True, text=True,
-    )
+def assemble(source, output, include=None, defines=None):
+    """A flat binary, which is all NASM is asked for: the container is ours.
+    `include` is a folder the source's %include lines are looked for in, and
+    `defines` a mapping of names to what they stand for."""
+    command = [find_nasm(), "-f", "bin", "-o", output]
+    if include:
+        command.append("-I" + os.path.join(include, ""))
+    for name, value in (defines or {}).items():
+        command.append(f"-D{name}={value}")
+    result = subprocess.run(command + [source], capture_output=True, text=True)
     if result.returncode != 0:
         raise RuntimeError(f"{source} did not assemble:\n{result.stderr}")
     return output
 
 
-def run(folder, program):
+def run(folder, program, cycles=CYCLES):
     """Run one program in `folder`, which is drive C, and wait for DOSBox-X
-    to go.  Whatever the program wrote is in `folder` afterwards."""
+    to go.  Whatever the program wrote is in `folder` afterwards.  `cycles` is
+    how fast: a number, or "max" when only what comes out matters."""
     conf = os.path.join(folder, "dosbox.conf")
+    speed = cycles if cycles == "max" else f"fixed {cycles}"
     with open(conf, "w") as f:
         f.write(f"[dosbox]\nmachine={MACHINE}\n"
-                f"[cpu]\ncycles=fixed {CYCLES}\n"
+                f"[cpu]\ncycles={speed}\n"
                 f"[autoexec]\nmount c .\nc:\n{program}\nexit\n")
     subprocess.run(
         [find_dosbox(), "-conf", conf, "-fastlaunch", "-exit"],

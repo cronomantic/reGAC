@@ -3311,7 +3311,8 @@ exit
 2. ~~Un **`CgaDevice`** en `regac/devices.py` y la comparación de láminas
    contra la referencia, antes de que exista intérprete: es como se hicieron
    las otras cinco.~~ Hecho: ver «El `CgaDevice`, como el CPC», más abajo.
-3. Sólo entonces, el intérprete en 8086.
+3. Sólo entonces, el intérprete en 8086. Empezado por las láminas: ver «El
+   intérprete de PC empieza por las láminas, y salen iguales», más abajo.
 
 **Y un emulador con reloj fiel, si alguna vez se quiere verificar la
 estimación de tiempos** y no sólo que las láminas salen bien. DOSBox-X con
@@ -3366,6 +3367,46 @@ el lenguaje con las láminas ya comparando.
 (Los números de «paso uno» y «paso dos» de los títulos no son los de la
 lista de lo que falta, que vuelve a empezar en uno. Por eso aquí se dice
 qué es cada cosa y no su número.)
+
+### Decidido ya: NASM solo, sin enlazador, y no en un segmento
+
+**El intérprete de PC va en ensamblador, con NASM y sin enlazador.** Lo que
+inclinó la balanza: los bucles que deciden el tiempo tienen que ir en
+ensamblador de todas formas, y escrito así el intérprete puede seguir rutina a
+rutina la forma de `z80/common/`, que es lo que deja comprobar que hace lo
+mismo que los de 8 bits y que el original.
+
+**El enlazador se miró y se descartó por el usuario de `regac`**, que es quien
+tiene que conseguir las herramientas. NASM es un zip de 626 KB
+(`nasm-3.02-win64.zip`, en nasm.us) que va a `tools/` o al PATH, como
+`sjasmplus`. Open Watcom no publica `wlink` suelto: sería bajarse un paquete de
+128 a 150 MB para sacar un fichero. JWlink no tiene versiones publicadas y
+ALINK es de 1999. Y lo que un enlazador daría, aquí lo da NASM: módulos con
+`%include`, como los intérpretes de Z80, y las direcciones de las etiquetas en
+el mapa que escribe con `[map]`, que es lo que las pruebas leen del listado de
+sjasmplus.
+
+**Una corrección a lo de arriba**: en esta máquina *sí* había enlazadores sin
+descargar nada --`wlink` de Open Watcom 1.9 en `E:\proyectos\DOSDEV\WATCOM1`
+y ALINK 1.6 en `E:\proyectos\DOSDEV\bin`, los dos arrancan--. No cambia la
+decisión, que es por el usuario y no por esta máquina.
+
+**Y no todo en un segmento de 64 KB**, que habría sido un límite sin motivo. El
+`.EXE` que carga el DOS puede ser mucho mayor que eso, y un programa puede usar
+los segmentos que quiera si calcula dónde empieza cada uno desde `CS` al
+arrancar, que es lo que ya estaba decidido para no tener reubicaciones:
+
+- el código, en `CS` --los intérpretes Z80 andan por los 9 KB--;
+- los datos y la pila, en un segmento suyo;
+- la base de datos detrás, del tamaño que sea, **en bancos de 64 KB** como los
+  del 128, el 6128 o el Next: el formato ya viene partido en secciones y
+  bancos, y aquí traer un banco es cambiar `ES`;
+- y la memoria de trabajo --la máscara, la partida-- la que se le pida al DOS
+  en la cabecera, detrás de todo.
+
+Un solo `.EXE`, hecho con NASM y `mz_exe`, y el límite es la memoria del PC.
+Un enlazador sólo haría falta para código en varios segmentos que se llamen
+entre sí, y el intérprete no va a pasar de 64 KB de código.
 
 ### Y una cuarta: la paleta, trío y fondo por lámina
 
@@ -3527,6 +3568,124 @@ La prueba tarda un segundo y medio, DOSBox-X incluido, y va en la puerta.
 `tests/dosbox.py` es el arnés: ensamblar con NASM, escribir la
 configuración, correr y esperar a que se vaya. Lo usará también lo que
 venga.
+
+### El intérprete de PC empieza por las láminas, y salen iguales
+
+Como en las otras máquinas, lo primero es la construcción de prueba de
+láminas: `x86/test_picture.asm` dibuja una tras otra todas las láminas de su
+base de datos y, después de cada una, escribe los 16384 bytes de `B800` en un
+fichero con su número --`P001C.BIN`, en hexadecimal--. La prueba,
+`tests/test_graphics_pc.py`, ensambla con NASM, le pone la cabecera con
+`mz_exe`, la corre en DOSBox-X y compara cada fichero con `cga_screen`, que
+es la misma lámina de la referencia tal como la tendría la tarjeta.
+
+**Lo que hay en `x86/`**, que sigue fichero a fichero a los de Z80 para que se
+pueda comprobar que hace lo mismo:
+
+| fichero | qué es | lo sigue |
+|---|---|---|
+| `database.asm` | las secciones, en el segmento de la base de datos por `ES` | `z80/common/database.asm` |
+| `picture.asm` | el intérprete de órdenes de lámina | `z80/common/picture.asm` |
+| `cga.asm` | filas, píxeles, paleta de cada lámina, tendido de un tramo | --de la CGA-- |
+| `line.asm` | la recta de la ROM, con los extremos ordenados si es de Amstrad | `z80/next/draw.asm`, `amstrad.asm` |
+| `shapes.asm` | rectángulo y elipse, con el medio píxel del Amstrad si toca | `z80/common/shapes.asm`, `z80/cpc/shapes.asm` |
+| `draw.asm`, `fill.asm` | las reglas del Spectrum: la máscara y su relleno | `z80/next/draw.asm`, `fill.asm` |
+| `amstrad.asm`, `amstrad_fill.asm` | las del Amstrad: la pluma leída de la pantalla | `z80/next/amstrad.asm`, `amstrad_fill.asm` |
+
+Una construcción lleva unas reglas u otras, nunca las dos, según
+`AMSTRAD_PICTURES`, igual que el Next.
+
+**Las dos cosas que son de la CGA**:
+
+- **El tendido de un tramo de relleno.** El patrón del Spectrum es de ocho
+  puntos y va alineado con la x, así que un byte de pantalla, que son cuatro,
+  lleva siempre la primera mitad del patrón --en una columna par de bytes-- o
+  la segunda; las dos se calculan una vez por tramo y se escriben byte a
+  byte, mezclando sólo los dos extremos. El damero del Amstrad es aún más
+  simple: los cuatro puntos de un byte empiezan en columna par, así que todos
+  los bytes del tramo son el mismo.
+- **La pluma no se escribe como tal**: cada lámina reparte sus cuatro plumas
+  entre los cuatro valores (ver «El `CgaDevice`, como el CPC»), y el relleno
+  del Amstrad compara valores, que es lo mismo porque no hay dos plumas con
+  el mismo valor. Y recorre el tramo como el del Spectrum recorre la máscara:
+  un byte entero del valor de la semilla son cuatro puntos de un golpe.
+
+**Lo que lleva cada lámina en la base de datos del PC**: seis bytes delante de
+su longitud --el último byte de la configuración lo dice--: los de los puertos
+`3D9h` y `3D8h`, y en cuatro bytes el valor de cada uno de los dieciséis
+colores. Una lámina de Amstrad lleva ahí sus cuatro plumas **cuatro veces
+seguidas**, de modo que el intérprete busca una tinta tal cual y sus dos bits
+bajos eligen la pluma. `regac build -m pc` acepta ya las aventuras de Amstrad
+--el PC está en `AMSTRAD_RULES`--, y la negativa de las demás máquinas dice
+ahora «cpc, next and pc do».
+
+**El `BORDER` de una lámina no hace nada en el PC.** En el modo de 320 por 200
+el borde de la CGA es el fondo, un mismo registro para los dos: no puede tener
+un color propio sin cambiar todos los puntos del valor cero de la lámina.
+
+**Lo que sale:**
+
+| | láminas | distintas |
+|---|---:|---:|
+| los trece dibujos de las pruebas del Next, con las reglas del Spectrum | 13 | 0 |
+| los doce de las del CPC, con las del Amstrad | 12 | 0 |
+| las ocho aventuras de Spectrum | 196 | 0 |
+| las seis de Amstrad (con `REGAC_SLOW`, como en el Next) | 187 | 0 |
+
+Y la prueba **se ha visto fallar**: tocando a mano la fase del patrón y el
+desplazamiento de un punto en el Spectrum, y en el Amstrad la fase del damero,
+el redondeo del medio píxel y el orden de los extremos, cada cambio lo pilla
+su caso --la media tinta, 2591 puntos; el damero, 4661--.
+
+`tests/dosbox.py` ensambla ahora con carpeta de `%include` y definiciones, y
+corre a la velocidad que se le pida: las pruebas de corrección van a
+`cycles=max`, porque sólo importa lo que sale. Las ocho aventuras de Spectrum
+son una prueba cada una.
+
+**Y van todas en un mismo trabajador**, el grupo `pc` de `conftest.py`. En el
+primer lote en paralelo con ellas falló
+`test_a_noise_is_a_hiss_and_not_a_note[next]` --el ruido del AY salió con
+forma de nota--, que a solas pasó. Es una prueba que depende de cuánto tiempo
+de máquina le toca, y hasta cuatro DOSBox-X a toda velocidad a la vez son
+carga. **No está demostrado que fuera eso**; juntas en un trabajador no
+cuestan nada y el lote siguiente salió entero en verde, en el mismo tiempo:
+dieciocho minutos.
+
+**Y el tiempo, que no es una medida.** La construcción apunta, por lámina, los
+tics del reloj de la BIOS --18,2 por segundo-- entre pedirla y tenerla, y los
+escribe en `TIMES.BIN`. Corrida a `cycles=fixed 315`, que es lo que DOSBox-X
+llama un XT a 4,77 MHz, la peor de cada aventura, al lado de la del CPC con
+las mismas reglas --la tabla de «Hecho: el CPC dibuja las aventuras de
+Spectrum con las reglas del Spectrum»--:
+
+| aventura | PC, DOSBox-X a 315 | CPC, medido | la lámina en el PC |
+|---|---:|---:|---|
+| Bangkok1 | 3,13 s | 3,2 s | #26 |
+| Bangkok2 | **4,67 s** | 5,0 s | #28 |
+| megacorp1 | 2,75 s | 2,8 s | #10 |
+| megacorp2 | 3,41 s | 3,5 s | #291 |
+| quijote1 | 2,86 s | 2,9 s | #15 |
+| quijote2 | 3,57 s | 3,6 s | #15 |
+| vajillas1 | 4,06 s | 4,2 s | #13 |
+| vajillas2 | 3,46 s | 3,7 s | #14 |
+
+Las 196 suman 339 segundos. Las 187 de las seis aventuras de Amstrad, con
+sus reglas, van más holgadas: la peor, bangkok_fac #35, 2,69 s, y todas
+suman 226. Todo dentro del tope de cuatro o cinco segundos, **pero DOSBox-X
+no es exacto al ciclo** --lo dicho en «El paso dos» y en `tests/dosbox.py`:
+sirve para saber si algo sale bien y no para cuánto tarda--, así que esto es
+una aproximación. Las dos láminas de la estimación de arriba caen dentro de
+su horquilla: quijote1 #8, 1,98 s contra 1,1 a 3,3; megacorp2 #29, 3,35 s
+contra 1,3 a 3,8. Pero ninguna de las dos es la peor, y Bangkok2 #28 se va a
+4,67. Que salga casi igual que el CPC, aventura a aventura, puede ser
+casualidad de lo que DOSBox-X llama 315. Medirlo de verdad
+pide 86Box o MartyPC, que no están instalados. Y 4,77 MHz es el mínimo y no
+la máquina recomendada.
+
+**Lo que sigue en el PC**: el resto del intérprete --parser, condiciones,
+texto con las reglas del CPC, teclado, guardar y cargar, la base de datos en
+bancos de 64 KB--, el parpadeo de las aventuras de Amstrad --lo que se pueda,
+como quedó dicho--, el objetivo `pc` en `regac make`, y NASM en el manual.
 
 ## Cosas menores
 

@@ -57,9 +57,10 @@ Two, on purpose.
 The tools -- everything in Python -- are under the **GNU General Public
 License v3**, whose text is in [LICENSE](LICENSE).
 
-The interpreters in [z80/](z80), which are what ends up inside somebody's
-adventure, are under the **MIT licence**: see [z80/LICENSE](z80/LICENSE).  An
-adventure built with these tools carries no obligation from them.
+The interpreters in [z80/](z80) and [x86/](x86), which are what ends up
+inside somebody's adventure, are under the **MIT licence**: see
+[z80/LICENSE](z80/LICENSE) and [x86/LICENSE](x86/LICENSE).  An adventure built
+with these tools carries no obligation from them.
 
 --
 

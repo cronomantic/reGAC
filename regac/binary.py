@@ -47,7 +47,8 @@ to hand need: none of them reaches 21K.
 
 import struct
 
-from .devices import AMSTRAD_RULES, cpc_picture_colours, from_an_amstrad, text_ink_of
+from .devices import (AMSTRAD_RULES, cga_amstrad_colours, cga_picture_colours,
+                      cpc_picture_colours, from_an_amstrad, text_ink_of)
 from .opcodes import BY_NAME, GFX_CMDS
 from .glyphs import glyph_for
 from .text import TextStore, typed
@@ -65,6 +66,7 @@ MACHINES = {
     "sam": 5,
     "next": 6,
     "pcw": 7,
+    "pc": 8,                    # a PC with a CGA, in its 320 by 200 mode
 }
 
 # What an Amstrad picture carries in front of its orders: its four inks, a
@@ -78,6 +80,8 @@ PICTURE_INKS = 8
 # each of the sixteen colours of the original comes to, two bits a colour,
 # four colours to a byte and the first in the lowest bits.
 PICTURE_PENS = 4
+# And on a PC: the two port bytes of its CGA palette, and those four of pens.
+PC_PICTURE_HEAD = 2 + PICTURE_PENS
 # What the firmware's inks are when the machine starts, which is what the
 # original's editor stored in a picture nobody gave a colour to: it asked the
 # firmware with SCR GET INK.  See doc/graficos.md.
@@ -202,10 +206,11 @@ class Database:
             # and are drawn with the Amstrad's rules on any machine: one that
             # does not know them would draw them wrong, so it is said instead.
             # See doc/pendiente.md.
+            knowing = sorted(AMSTRAD_RULES & set(MACHINES))
             raise BuildError(
                 f"this adventure was written on an Amstrad, and its pictures "
                 f"are drawn with the Amstrad's rules; {machine} does not know "
-                f"them; {' and '.join(sorted(AMSTRAD_RULES & set(MACHINES)))} do"
+                f"them; {', '.join(knowing[:-1])} and {knowing[-1]} do"
             )
         self.ddb = ddb
         self.machine = machine
@@ -298,7 +303,11 @@ class Database:
         inks it came with, when the adventure has them.  A picture off a
         Spectrum is drawn there with the Spectrum's rules and shown in four
         inks chosen for it, and carries those and the pen each colour of the
-        original comes to."""
+        original comes to.  On a PC every picture carries the two bytes of
+        its CGA palette and which pixel value each colour, or each pen, is
+        written as."""
+        if self.machine == "pc":
+            return PC_PICTURE_HEAD
         if from_an_amstrad(self.ddb):
             if self.machine == "next":
                 # always: its palette has nothing to fall back on but these
@@ -312,6 +321,8 @@ class Database:
 
     def head_of(self, key):
         """The bytes picture `key` carries in front of its orders."""
+        if self.machine == "pc":
+            return self.cga_head_of(key)
         if from_an_amstrad(self.ddb):
             return bytes(self.inks_of(key))
         inks, pens = cpc_picture_colours(self.ddb["gfx"], key,
@@ -321,6 +332,31 @@ class Database:
             out += bytes((ink, ink))            # a pair that does not flash
         for four in range(0, 16, 4):
             out.append(sum(pens[four + n] << (2 * n) for n in range(4)))
+        return bytes(out)
+
+    def cga_head_of(self, key):
+        """What a picture carries on a PC: the two bytes that put up its
+        background and trio -- port 3D9h, then 3D8h -- and the pixel value
+        each of the sixteen colours of the original comes to, two bits a
+        colour, four to a byte, the first in the lowest bits.  Chosen by
+        cga_picture_colours, which is where the reference gets them too.
+
+        A picture off an Amstrad has four pens and not sixteen colours, dealt
+        out among the four values by cga_amstrad_colours off the inks it came
+        with; the four are written four times over, so that the interpreter
+        looks an ink up as it is and its low two bits pick the pen."""
+        gfx = self.ddb["gfx"]
+        if from_an_amstrad(self.ddb):
+            self.inks_of(key)                   # which says if they are wrong
+            inks = self.ddb.get("gfx_inks") or {}
+            header = inks.get(str(key), inks.get(int(key)))
+            background, trio, pens = cga_amstrad_colours(gfx, key, header)
+            values = [pens[colour & 3] for colour in range(16)]
+        else:
+            background, trio, values = cga_picture_colours(gfx, key)
+        out = bytearray((trio.select(background), trio.mode()))
+        for four in range(0, 16, 4):
+            out.append(sum(values[four + n] << (2 * n) for n in range(4)))
         return bytes(out)
 
     def inks_of(self, key):

@@ -1069,9 +1069,10 @@ LIMITED = {"cpc", "cpc-wide"}
 # An adventure is drawn with the rules of the GAC it was written with, on any
 # machine that has room for them.  The Next does, and needs nothing extra: its
 # screen is a byte a pixel, so the pen of every point is on it to be read back.
-# The others would need eight kilobytes to keep the pens in, and are left out:
-# see doc/pendiente.md.
-AMSTRAD_RULES = {"cpc", "amstrad", "next", "cga"}
+# A PC's CGA is two bits a pixel like the Amstrad's own, so the same holds;
+# "pc" is the machine and "cga" its screen.  The others would need eight
+# kilobytes to keep the pens in, and are left out: see doc/pendiente.md.
+AMSTRAD_RULES = {"cpc", "amstrad", "next", "cga", "pc"}
 
 
 def from_an_amstrad(ddb):
