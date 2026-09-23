@@ -2820,6 +2820,129 @@ del espejo, y su clave --`SPIELBERG`, un nombre, no un verbo: nombrarlo lleva
 a la sala 21-- queda apuntada aquí para cuando haga falta.
 
 
+## Las tintas del Amstrad, que nunca se habían puesto
+
+**Cómo se escondió.** El original pone ocho bytes de tintas delante de cada
+lámina, y `deGAC` los guardaba en `gfx_inks` desde que se leyó el primer
+disco. El formato no los llevaba, y lo que quedó dicho de eso fue un
+comentario en `z80/cpc/screen.asm` --«until the format holds them these are
+the four the machine starts with»-- y nada en este diario. Salió a la luz por
+casualidad, preparando el PC. **Lo que se aplaza va aquí, no a un
+comentario.**
+
+**Lo que hace el original**, leído en su intérprete (el detalle, con las
+direcciones, en `graficos.md`, «Las tintas de una lámina»): la lámina de un
+cuarto pone sus tintas --el borde de la primera pareja, luego las cuatro
+plumas--, una lámina llamada desde otra se salta las suyas, y una pareja de
+dos colores parpadea al ritmo del firmware, diez fotogramas cada uno, el
+segundo byte primero.
+
+**Lo que hace el nuestro ahora:**
+
+- **El formato** lleva los ocho bytes delante de la longitud de cada lámina,
+  sólo en el CPC y sólo si la aventura los trae; el último byte de la
+  configuración dice cuántos son. Una aventura de Spectrum sale igual que
+  antes más ese byte. Ver `binario.md`.
+- **El formato fuente** los escribe en la cabecera de la lámina,
+  `#9 inks=0,13,17/0,20`; las 44 láminas de Bangkok hacen el viaje de ida y
+  vuelta sin perder ninguna, las tres que parpadean incluidas.
+- **El intérprete** los pone en `draw_picture`, que es el camino de un cuarto,
+  y no en `CALL`. El parpadeo va en `scan_keyboard`: con las interrupciones
+  cortadas no hay fotogramas que contar, pero cada espera de tecla es mirar el
+  teclado `LOOKS_A_FRAME` veces por fotograma, que está medido. Cambia en el
+  retrazo, como el firmware, esperándolo como mucho un fotograma de cada diez
+  y sólo mientras una pluma parpadea.
+
+**La diferencia que queda, dicha**: el firmware parpadea siempre; el nuestro,
+sólo mientras espera una tecla. Mientras dibuja una lámina o escribe un
+mensaje, las tintas se quedan quietas. Hacerlo siempre pediría las
+interrupciones, y el intérprete las corta a propósito --el baile del teclado
+con el chip de sonido no admite que nadie lo interrumpa, ver `keyboard.asm`--.
+Afecta a cuatro láminas de las 91 de las tres aventuras de Amstrad, y durante
+lo que tardan en dibujarse.
+
+Le cuesta al 464 **105 bytes** de intérprete, y siguen cabiendo sin cambiar
+nada las mismas cinco aventuras de las ocho; la que va más justa, Bangkok2,
+queda a 1070 bytes del firmware.
+
+### Y los tres fallos que había debajo, que ninguna prueba veía
+
+Al mirar la pantalla por colores y no por plumas salieron tres, y los tres
+son del primer día:
+
+| | qué hacía | qué salía |
+|---|---|---|
+| elegir pluma | con `%01...`, que es *dar color* a la pluma elegida, no elegirla | **ninguna tinta se puso nunca**: la pantalla enseñaba las del firmware, 1, 24, 20 y 6, dijera lo que dijera `picture_inks` --que decía 0, 24, 20, 6--, y el fondo salía azul en vez de negro |
+| `mode_init` | `inc hl` sobre un HL que `hardware_ink` acababa de machacar | las plumas uno a tres, de la tabla del hardware y no de las tintas; no se notaba porque nada llegaba a ponerse |
+| `firmware_inks` | la 24 y la 26 cambiadas | pedir amarillo daba blanco |
+
+Ninguno lo podía ver una prueba: todas leían la pantalla como plumas. Ahora
+`tests/test_inks_cpc.py` le pide al emulador la pantalla como imagen
+(`save-screen`, un BMP con sus colores) y mira qué tintas hay en ella; y las
+27 de la tabla están comprobadas contra el emulador, de cuatro en cuatro.
+
+Las tintas de una aventura sin tintas propias pasan a ser **1, 24, 20 y 6**,
+las del firmware al arrancar: es lo que la pantalla enseñó siempre --por el
+primer fallo--, y es lo que el comentario de `picture_inks` decía querer.
+
+Y un cuarto, de acuerdo con la referencia y no de la pantalla: `BORDER n`, que
+sólo tiene una lámina de Spectrum, le daba al borde la tinta del firmware
+número `n`. `AmstradDevice` le da el color de la pluma `n & 3`, y ahora el Z80
+también.
+
+### Y lo que salió al mirar: las aventuras de Spectrum no se ven en el CPC
+
+El intérprete del CPC dibuja con las reglas del Amstrad: el relleno se para
+donde cambia la pluma, la tinta es `& 3`, y un relleno va en la pluma que
+diga `PENS`, que ninguna lámina de Spectrum tiene, así que va siempre en la
+uno. La prueba de las 196 láminas lo compara punto por punto contra
+`AmstradDevice`, que hace lo mismo, y por eso pasa. Contra el Spectrum, que es
+lo que esas láminas son, cubriendo cada relleno más de un 2 % distinto:
+
+| aventura | láminas | rellenos |
+|---|---:|---:|
+| Bangkok1 | 30 de 32 | 240 de 793 |
+| Bangkok2 | 23 de 28 | 221 de 402 |
+| megacorp1 | 8 de 33 | 37 de 681 |
+| megacorp2 | 20 de 31 | 59 de 783 |
+| quijote1 | 22 de 25 | 375 de 975 |
+| quijote2 | 17 de 20 | 541 de 926 |
+| vajillas1 | 11 de 11 | 470 de 1384 |
+| vajillas2 | 15 de 16 | 233 de 1816 |
+
+**146 de las 196.** Comprobado en el emulador con Bangkok1 #7: una figura
+sobre fondo negro en el Spectrum sale como unos trazos azules sobre una
+lámina entera amarilla. Y las herramientas no lo decían: `checkgfx -m cpc`,
+que `manual.md` recomienda para esto, mide con `PixelDevice`, un modelo que la
+máquina no usa, y dice que todo está bien; `render -m cpc` dibuja con ese
+mismo; y `render -m amstrad` se cae, porque `AmstradDevice.to_rgb` devuelve
+enteros donde el PNG quiere ternas.
+
+**Decidido: fiel a GAC.** Una aventura se dibuja con las reglas del GAC de su
+máquina: una de Amstrad con las del Amstrad, que es lo que hay; una de
+Spectrum con las del Spectrum --el relleno se para en un punto encendido, con
+la máscara de un bit que ya llevan el Next y el Sam, y la tinta y el papel
+llevados a cuatro tintas por lámina, elegidas contra la referencia--. Es lo
+que `graficos.md` planeaba en «Las dos familias de color» y el Z80 nunca
+llegó a hacer. Cada compilación lleva un solo modelo, el de la aventura, así
+que el código no se suma. Y la máscara, 4 KB, cabe: en el 464 normal, debajo
+de $4000, que con las ROM fuera es RAM libre --el firmware no la puede leer,
+pero la máscara sólo la usa el intérprete mientras dibuja--; en el del
+Quijote, entre el final del código, hacia $2400, y $4000; en el 6128, en los
+casi ocho kilobytes que quedan por encima del intérprete.
+
+**Y al revés, decidido también: una aventura de CPC se dibuja con las reglas
+del CPC en cualquier máquina, pero sólo va a las máquinas que tengan sitio.**
+Las reglas del CPC necesitan saber de qué pluma es cada punto, y en una
+máquina de un bit por punto --el Spectrum, el PCW-- eso es un búfer aparte de
+dos bits por punto, 8 KB para la lámina, que sale del sitio de la base de
+datos; en un Spectrum 48 es mucho. El código no crece --cada compilación
+lleva un solo modelo, el de la aventura--; la memoria, sí. Cuánto le cuesta a
+cada máquina está por medir --el Next, el MSX y el PC no se han mirado--, y
+donde no quepa, `regac` lo dice con un mensaje claro en vez de compilar algo
+que dibuja mal. Hoy ninguna máquina salvo el CPC sabe dibujar con las reglas
+del CPC: está pendiente, detrás del PC.
+
 ## PC XT con CGA: el paso uno, que era el que podía matarlo
 
 No está decidido hacerlo. Lo que sigue es lo único que había que saber antes
@@ -2830,9 +2953,9 @@ tope de cuatro o cinco segundos**. Sale que sí, y con holgura.
 
 CGA en modo 4 es 320 por 200, dos bits por píxel, cuatro colores, ochenta
 bytes por fila. Eso es **exactamente** el modo 1 del Amstrad, hasta el ancho
-de fila. **En la forma, no en el color**: el Amstrad elige cuatro tintas de
-veintisiete para cada lámina y la CGA sólo deja libre el fondo --ver «Y una
-cuarta: la paleta», más abajo--. Para el dibujo y su cuenta da igual, y en la
+de fila. **En la forma, no en el color**: el Amstrad puede poner cualquiera
+de sus veintisiete tintas en cada pluma y la CGA sólo deja libre el fondo
+--ver «Y una cuarta: la paleta», más abajo--. Para el dibujo y su cuenta da igual, y en la
 forma hay dos diferencias, las dos a favor:
 
 - **El empaquetado de CGA es más simple.** El Amstrad reparte los dos bits de
@@ -3030,12 +3153,45 @@ otros tres vienen en tríos fijos:
 
 El último es el modo 5, que en la CGA quita la señal de color y en un
 monitor RGB da ese trío. Seis tríos por dieciséis fondos son **noventa y seis
-paletas**, contra las cuatro de veintisiete que elige el Amstrad.
+paletas**.
 
-**Decidido: trío y fondo por lámina**, elegidos igual que las tintas del
-Amstrad, por lo que la lámina de referencia cubre de cada color --lo que ya
-hace `choose_inks` en `regac/devices.py`--, pero entre esas noventa y seis y
-no entre todas las combinaciones. Al intérprete le cuesta un byte en el
+**Decidido: trío y fondo por lámina.** Y conviene dejar escrito lo que pasó al
+decidirlo, porque se dijo mal: se dio por hecho que el CPC ya elegía sus
+tintas por lámina, y no las elegía --cargaba siempre las mismas,
+«until the format holds them» decía el código, y ni siquiera ésas, como se
+vio después: ver «Las tintas del Amstrad, que nunca se habían puesto»--.
+`choose_inks` sólo lo usaba el lado de Python.
+
+**Y lo medido aquí está medido sobre el modelo equivocado.** La elección se
+probó dibujando cada lámina con las plumas del Amstrad --tinta `& 3`, el
+damero de dos plumas, el relleno que se para al cambiar de pluma:
+`AmstradDevice`-- y mirando para cada pluma qué colores tiene la referencia de
+Spectrum en esos puntos. Pero la regla es **ser fiel a GAC**: una aventura de
+Spectrum se dibuja con las reglas del Spectrum en cualquier máquina, y el
+modelo del Amstrad sólo vale para una aventura de Amstrad. Así que en el PC la
+elección tendrá que hacerse sobre el dibujo con las reglas del Spectrum, igual
+que el CPC después de su arreglo, y la tabla de abajo **hay que rehacerla**
+entonces. Se queda como lo que es: la prueba de que una paleta fija se queda
+corta. Sobre las 196 láminas, con aquel modelo:
+
+| trío | láminas |
+|---|---:|
+| paleta 0 | 143 |
+| paleta 0 brillante | 28 |
+| modo 5 | 13 |
+| paleta 1 | 11 |
+| modo 5 brillante | 1 |
+| paleta 1 brillante | 0 |
+
+Y el fondo: negro en 121, gris en 42, cian en 23, gris oscuro en 8 y cian
+claro en 2. La paleta fija que se habría puesto de oficio --cian, magenta y
+blanco sobre negro-- no la elige **ninguna**. Las 196 se eligen en 28
+segundos de Python, que es lo que cuesta dibujar cada una dos veces.
+
+Para que llegue a la máquina, el formato tiene ya dónde: los bytes que cada
+lámina lleva delante de sus órdenes, que se abrieron para las tintas del
+Amstrad y que dice cuántos son el último byte de la configuración. Va con el
+intérprete, el tercero de la lista. Al intérprete le cuesta un byte en el
 puerto `3D9h` por lámina, que lleva el fondo, la paleta y el brillo; el trío
 del modo 5 pide además otro en `3D8h`, que es donde se pone ese modo. Una paleta fija
 para todas las láminas era más simple y habría sacado feas muchas de ellas.

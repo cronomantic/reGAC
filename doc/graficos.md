@@ -172,6 +172,13 @@ pomo de una puerta.
 Con eso, 125 de las 196 láminas no pierden ningún color. De las otras, 50
 pierden uno, 17 pierden dos y 4 pierden tres.
 
+**Esto es el plan, y el intérprete del CPC todavía no lo cumple.** Lo que hace
+hoy con una aventura de Spectrum es dibujarla con las reglas del Amstrad
+—`AmstradDevice`: tinta `& 3`, relleno que se para al cambiar de pluma, y en
+la pluma uno porque sólo `PENS` la cambia—, y con eso 146 de las 196 láminas
+no se parecen a las del Spectrum. Está contado, y lo que falta, en
+`pendiente.md`.
+
 ### Verificarlo
 
 La orden `checkgfx` dibuja cada lámina en el Spectrum y en la máquina destino y
@@ -635,6 +642,25 @@ Y por eso hay láminas con valores limpios de 0 a 26: ésas no las tecleó nadie
 Cuando la lámina no trae color, el intérprete lee el que hay con SCR GET INK y
 lo guarda tal cual, y de ahí salen los 1, 24, 20 y 6 que son las tintas del
 modo 1 al arrancar.
+
+Lo de $2EF3 es el **editor**: es lo que corre al abrir una lámina para
+cambiarla, justo detrás del `LDIR` que la copia al búfer de $A800. El
+**juego** lo hace en otro sitio, y leído entero es esto:
+
+| dónde | qué |
+|---|---|
+| $04BB–$04E3 | el cuarto nuevo: busca su lámina desde el puntero de $4012 y llama a $0538 con el puntero en las tintas |
+| $0538 | la primera pareja al borde con SCR SET BORDER ($BC38), y cada pareja a su pluma, de la cero a la tres, con SCR SET INK ($BC32); después, las órdenes |
+| $1C64 | la orden de llamar a otra lámina: **se salta sus ocho bytes** y dibuja las órdenes; las tintas de la llamada no se ponen |
+
+A SCR SET INK le da en C el primer byte de la pareja y en B el segundo, y B es
+el color que el firmware enseña primero cuando parpadea. **SCR SET FLASHING no
+se llama nunca**, así que el parpadeo va al ritmo del firmware: diez
+fotogramas cada color. Las tres aventuras de Amstrad que tenemos traen el
+mismo código en los mismos sitios.
+
+Nuestro intérprete hace eso mismo desde que el formato lleva las tintas: ver
+«Las tintas del Amstrad, que nunca se habían puesto» en `pendiente.md`.
 
 ## El PCW, una pantalla sin color y sin mapa de bits
 

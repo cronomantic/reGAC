@@ -76,6 +76,8 @@ GROUPS = {
         "test_textmode_cpc", "test_media_cpc",
         # it saves and loads from the 6128 build, which test_media_cpc makes
         "test_save_cpc",
+        # the colours, looked at on the game it builds
+        "test_inks_cpc",
     ],
     "cpc-picture": ["test_all_pictures_cpc", "test_graphics_cpc"],
     "cpc-text": ["test_keyboard_cpc", "test_tape_cpc", "test_text_cpc"],

@@ -66,6 +66,18 @@ MACHINES = {
     "pcw": 7,
 }
 
+# What an Amstrad picture carries in front of its orders: its four inks, a
+# pair for each pen because an ink there can flash between two colours.  The
+# original sets them for the picture of a room -- the border from the first
+# pair, then each pen, with SCR SET BORDER and SCR SET INK at $0538 -- and
+# steps over them in a picture that is called from another, at $1C64.  Only
+# an adventure off an Amstrad has them: deGAC keeps them as gfx_inks.
+PICTURE_INKS = 8
+# What the firmware's inks are when the machine starts, which is what the
+# original's editor stored in a picture nobody gave a colour to: it asked the
+# firmware with SCR GET INK.  See doc/graficos.md.
+START_INKS = (1, 1, 24, 24, 20, 20, 6, 6)
+
 # How the music player gets at the tune it is playing.  The player runs from
 # the interrupt, so it must never read through a paging window that the main
 # code is free to change underneath it.  See doc/binario.md.
@@ -259,7 +271,33 @@ class Database:
         # the machine came with.  It goes at the end because that is where a
         # thing added later goes: everything before it keeps its place.
         out += u8(self.ddb.get("ink", 0))
+        # And after it, for the same reason, how many bytes every picture
+        # carries in front of its orders: nought, or the eight inks of a
+        # picture off an Amstrad.
+        out += u8(self.picture_head())
         return bytes(out)
+
+    def picture_head(self):
+        """The inks travel only to the machine that has pens to put them in,
+        and only when the adventure has them: a Spectrum adventure on an
+        Amstrad keeps the four the interpreter starts with, and not a byte
+        more of the database, which on a 464 is what runs out first."""
+        if self.machine != "cpc" or not self.ddb.get("gfx_inks"):
+            return 0
+        return PICTURE_INKS
+
+    def inks_of(self, key):
+        inks = self.ddb.get("gfx_inks") or {}
+        found = inks.get(str(key), inks.get(int(key)))
+        if found is None:
+            return START_INKS
+        if len(found) != PICTURE_INKS:
+            raise BuildError(f"picture {key} has {len(found)} inks where an "
+                             f"Amstrad picture has {PICTURE_INKS}")
+        if any(not 0 <= ink <= 26 for ink in found):
+            raise BuildError(f"picture {key} has an ink that is not one of "
+                             "the Amstrad's, which go from 0 to 26")
+        return tuple(found)
 
     def vocabulary(self):
         entries = []
@@ -382,7 +420,13 @@ class Database:
         head = 2 + 4 * len(order)
         blocks = bytearray()
         index = bytearray(u16(len(order)))
+        carried = self.picture_head()
         for key in order:
+            if carried:
+                # In front of the length, so that the index still points at
+                # the length and everything that walks the orders is the same
+                # on every machine.
+                blocks += bytes(self.inks_of(key))
             index += u16(int(key)) + u16(head + len(blocks))
             picture = bytearray()
             for command in gfx[key]:
@@ -595,6 +639,23 @@ class Reader:
             codes = data[p + 3 : p + 3 + length]
             p += 3 + length
             out.append((kind, wid, bytes(codes)))
+        return out
+
+    def picture_head(self):
+        """The last byte of the configuration."""
+        return self.section(S_CONFIG)[-1]
+
+    def picture_inks(self):
+        """The inks each picture carries, when they carry any."""
+        head = self.picture_head()
+        if not head:
+            return {}
+        data = self.section(S_GRAPHICS)
+        count = struct.unpack_from("<H", data, 0)[0]
+        out = {}
+        for n in range(count):
+            gid, offset = struct.unpack_from("<HH", data, 2 + 4 * n)
+            out[str(gid)] = list(data[offset - head:offset])
         return out
 
     def graphics(self):

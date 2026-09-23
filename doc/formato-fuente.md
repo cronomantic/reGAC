@@ -206,6 +206,18 @@ para no alterar el código al recompilar.
       LINE 128 159 128 79
       CALL 1000
 
+Una lámina de una aventura de Amstrad lleva además sus cuatro tintas en la
+cabecera, con los números del firmware, de 0 a 26: una pluma por coma, y una
+pluma que parpadea con sus dos colores separados por una barra, en el orden en
+que la lámina los guarda.
+
+    #9 inks=0,13,17/0,20
+
+Son las que el original pone al dibujar la lámina de un cuarto —el borde de la
+primera—, y las que una lámina llamada con `CALL` no pone. Una lámina sin
+`inks=` en una aventura que las lleva recibe las del firmware al arrancar:
+1, 24, 20 y 6.
+
 ### `/FONT`
 
 La tipografía de la aventura, entera o letra a letra.

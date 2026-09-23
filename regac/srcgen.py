@@ -44,6 +44,17 @@ def _ids(d):
     return sorted(d.items(), key=lambda kv: int(kv[0]))
 
 
+def written_inks(inks):
+    """An Amstrad picture's eight inks as the source spells them: a pen to
+    each comma, and a pen that flashes as its two colours with a stroke
+    between, in the order the picture keeps them."""
+    pens = []
+    for pen in range(4):
+        one, other = inks[2 * pen], inks[2 * pen + 1]
+        pens.append(str(one) if one == other else f"{one}/{other}")
+    return ",".join(pens)
+
+
 class SourceWriter:
     def __init__(self, ddb, name="adventure"):
         self.ddb = ddb
@@ -169,8 +180,12 @@ class SourceWriter:
         if not gfx:
             return
         self.w("/GFX")
+        inks = {str(k): v for k, v in (self.ddb.get("gfx_inks") or {}).items()}
         for gid, insts in _ids(gfx):
-            self.w(f"#{gid}")
+            head = f"#{gid}"
+            if str(gid) in inks:
+                head += " inks=" + written_inks(inks[str(gid)])
+            self.w(head)
             for inst in insts:
                 args = " ".join(str(a) for a in inst[1:])
                 self.w(f"  {inst[0]}{' ' + args if args else ''}")

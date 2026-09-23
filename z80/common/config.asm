@@ -48,6 +48,15 @@ config_init:
                 ld      d, (hl)
                 ld      (nothing_at), de
                 inc     hl
+                IFDEF   PICTURE_INKS
+                ; After the ink, the byte added after it: how many bytes
+                ; every picture carries in front of its orders -- an Amstrad
+                ; picture's inks, or nothing.
+                inc     hl
+                ld      a, (hl)
+                ld      (picture_head), a
+                dec     hl
+                ENDIF
                 ; And the last byte of the section: the ink this adventure
                 ; wants its text in, or nought for the one the machine came
                 ; with.  Nought cannot be a colour here -- on every one of

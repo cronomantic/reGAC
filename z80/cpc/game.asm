@@ -3,6 +3,7 @@
 ; The Amstrad interpreter: everything put together and playing.
 
                 DEVICE  AMSTRADCPC6128
+                DEFINE  PICTURE_INKS            ; its pictures carry their inks
 
 ; An adventure that asks for a noise is told so with -DNOISES, and then
 ; the sound chip engine travels with it.  There is no music: the tracker

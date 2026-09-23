@@ -696,7 +696,10 @@ class Parser:
         self.ddb[key] = self.cond_lines()
 
     def gfx(self):
-        for gid, _, body, first in self.entries():
+        for gid, rest, body, first in self.entries():
+            a = self.attrs(rest)
+            if "inks" in a:
+                self.ddb.setdefault("gfx_inks", {})[gid] = self.inks(a["inks"])
             insts = []
             for number, raw in enumerate(body):
                 st = strip_comment(raw).strip()
@@ -721,6 +724,28 @@ class Parser:
                                                   "drawing command")
                                       for p in parts[1:]])
             self.ddb["gfx"][gid] = insts
+
+    def inks(self, written):
+        """The four inks of an Amstrad picture: a pen to each comma, and a pen
+        that flashes as its two colours with a stroke between.  They are the
+        firmware's numbers, from 0 to 26."""
+        pens = written.split(",")
+        if len(pens) != 4:
+            self.fail(f"inks= is four pens, one to each comma, and here there "
+                      f"are {len(pens)}")
+        out = []
+        for pen in pens:
+            colours = pen.split("/")
+            if len(colours) > 2:
+                self.fail(f"a pen flashes between two colours, not "
+                          f"{len(colours)}: {pen!r}")
+            numbers = [self.number(c, "an ink") for c in colours]
+            for ink in numbers:
+                if not 0 <= ink <= 26:
+                    self.fail(f"{ink} is not one of the Amstrad's inks, which "
+                              "go from 0 to 26")
+            out += numbers if len(numbers) == 2 else numbers * 2
+        return out
 
     def sound(self):
         """The noises this adventure asks for: one to a line, in the order

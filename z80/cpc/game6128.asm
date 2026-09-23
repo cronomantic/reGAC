@@ -29,6 +29,7 @@
 
                 DEFINE  BANKED
                 DEVICE  AMSTRADCPC6128
+                DEFINE  PICTURE_INKS            ; its pictures carry their inks
 
                 include "banks6128.inc"
 

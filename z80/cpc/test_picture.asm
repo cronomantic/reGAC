@@ -8,6 +8,7 @@
 ; what the disk loader would have done.
 
                 DEVICE  AMSTRADCPC6128
+                DEFINE  PICTURE_INKS            ; its pictures carry their inks
 
                 ; above the lower ROM, which shadows anything under $4000
                 ORG     $4000

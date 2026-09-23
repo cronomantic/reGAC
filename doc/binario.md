@@ -47,6 +47,16 @@ que no lo traiga, o que lo traiga a cero, obtiene la tinta con la que se
 ensambló cada intérprete, que es lo que hacían todas antes de que esto
 existiera.
 
+Y detrás de la tinta, por la misma razón, **cuántos bytes lleva cada lámina
+delante de sus órdenes**: cero, o los ocho de tintas de una lámina de Amstrad
+—una pareja por pluma, porque una tinta del CPC puede parpadear entre dos
+colores—. Sólo los lleva el CPC y sólo si la aventura los trae (`gfx_inks`,
+que `deGAC` saca de una aventura de Amstrad); en cualquier otro caso es cero y
+la sección de gráficos queda igual byte a byte que antes. Van **delante de la
+longitud** de cada lámina, de modo que el índice sigue apuntando a la
+longitud y lo que recorre las órdenes es el mismo en todas las máquinas; el
+intérprete del CPC los encuentra diez bytes antes de la primera orden.
+
 Los textos de toda la aventura van a un solo almacén, así que una pareja de
 códigos encontrada en un mensaje sirve también para la descripción de una
 localidad. Los nombres de objeto y las descripciones no se guardan con su tabla:

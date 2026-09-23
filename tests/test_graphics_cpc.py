@@ -63,7 +63,7 @@ LOADS_AT = 0x4000
 SCREEN = 0xC000
 PICTURE_LEFT = 32  # where the picture sits on a screen of 320
 PICTURE_ROWS = 128
-INKS = [0, 24, 20, 6]  # what the runtime starts with
+INKS = [1, 24, 20, 6]  # what the runtime starts with: the firmware's own
 
 if pytest is not None:
     needs_tools = pytest.mark.skipif(

@@ -488,18 +488,19 @@ ink_byte:       db      $F0                     ; pen one, where a picture start
                 call    set_border
                 ENDM
 
+;
+; The colour is a pen, as an ink is -- the low two bits -- and the border
+; wears that pen's colour, which is what AmstradDevice does.  It gave the
+; border the firmware's ink of that number before, which the reference never
+; did; and it never showed, for the reason at the top of screen.asm.
 set_border:
                 push    hl
                 push    bc
                 push    af
-                ld      bc, GATE_ARRAY
-                ld      a, %01010000
-                out     (c), a
+                and     3
+                ld      (border_pen), a
+                call    border_init
                 pop     af
-                call    hardware_ink
-                or      %01000000
-                ld      bc, GATE_ARRAY
-                out     (c), a
                 pop     bc
                 pop     hl
                 ret

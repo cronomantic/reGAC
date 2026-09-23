@@ -156,6 +156,9 @@ draw_picture:
                 ld      (gfx_border_now), a     ; so the first one is written
                 call    gfx_clear
                 pop     hl
+                IFDEF   PICTURE_INKS
+                call    picture_inks_set        ; its own inks, where it has any
+                ENDIF
                 call    gfx_start_colours       ; what a picture starts in
                 call    run_picture
                 jp      gfx_show                ; and let the machine show it

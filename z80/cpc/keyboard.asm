@@ -13,6 +13,7 @@
 ; next have keys of their own here, which on a Spectrum they do not.
 
 PPI_A           equ $F4                 ; the chip's data, one row at a time
+PPI_B           equ $F5                 ; the flyback, among other things
 PPI_C           equ $F6                 ; and what it is being asked for
 PPI_CONTROL     equ $F7
 
@@ -29,6 +30,48 @@ INPUT_MAX       equ 64                  ; as much of a line as is kept
 ; with a key held costs a little more, so a key repeats a little late.
 LOOKS_A_FRAME   equ 12
 LOOKS_HELD      equ 11                  ; a look with a key held, about 6960
+
+                IFDEF   PICTURE_INKS
+
+; One look's worth of flashing, which is how an ink of the picture flashes
+; here.  The interpreter runs with the interrupts off, so there is no frame to
+; count; what there is is the keyboard, looked at LOOKS_A_FRAME times a frame
+; -- measured -- and every wait for a key is that.  So the pens change here and
+; only here: a picture being drawn or a message being printed holds them as
+; they are.  Nothing at all happens unless a pen flashes.
+; Corrupts: AF, BC, DE, HL
+flash_look:
+                ld      a, (flashing)
+                or      a
+                ret     z
+                ld      hl, flash_looks
+                ld      a, (hl)
+                or      a
+                jr      nz, .counting
+                ld      (hl), FLASH_FRAMES * LOOKS_A_FRAME
+.counting:
+                dec     (hl)
+                ret     nz
+                ; The firmware changes them in the frame flyback, and so does
+                ; this: changed while the picture is being painted, the top of
+                ; one frame comes out in one colour and the bottom in the
+                ; other.  The start of the next flyback is at most a frame
+                ; away, once in ten, and only while a pen flashes.
+                ld      b, PPI_B
+.in_flyback:
+                in      a, (c)
+                rra                             ; bit nought is the flyback
+                jr      c, .in_flyback
+.not_yet:
+                in      a, (c)
+                rra
+                jr      nc, .not_yet
+                ld      a, (ink_phase)
+                xor     1
+                ld      (ink_phase), a
+                jp      pens_init
+
+                ENDIF
 
 ; Read the eight keys of row A, into A.  A bit low means held.
 ;
@@ -90,6 +133,9 @@ keyboard_init:
 ; look like nothing being typed at all; what they do is decided afterwards.
 ; Corrupts: BC, DE, HL
 scan_keyboard:
+                IFDEF   PICTURE_INKS
+                call    flash_look              ; every wait is looks like this
+                ENDIF
                 xor     a
                 ld      (key_found), a
                 ld      (key_count), a

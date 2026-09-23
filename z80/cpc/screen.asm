@@ -2,10 +2,18 @@
 ;
 ; The Amstrad's screen, without asking the firmware for anything.
 ;
-; The gate array takes everything through port $7Fxx: a byte with the top two
-; bits 01 chooses which pen is being set and 010 what colour to give it, and
-; 100 sets the mode.  The colours are the hardware's own numbering, which is
-; not the firmware's, so what a picture names has to be looked up.
+; The gate array takes everything through port $7Fxx, and the top two bits of
+; a byte say what it is: 00 chooses a pen, with sixteen the border, 01 gives
+; the one chosen a colour, and 10 sets the mode.  The colours are the
+; hardware's own numbering, which is not the firmware's, so what a picture
+; names has to be looked up.
+;
+; The pens were chosen with 01 here for as long as this machine had them, and
+; that is not choosing at all: it gives a colour to whatever pen the firmware
+; had chosen last.  So none of them was ever set, and the screen came up in
+; the firmware's own four -- blue, yellow, cyan and red -- whatever this file
+; said.  Nothing noticed, because every test looked at pens and none at a
+; colour; see doc/pendiente.md.
 
 SCREEN          equ $C000
 PICTURE_LEFT    equ 32                  ; where the picture starts across
@@ -16,6 +24,8 @@ block_starts:   dw      0, 80, 160, 240, 320, 400, 480, 560
                 dw      640, 720, 800, 880, 960, 1040, 1120, 1200
                 dw      1280, 1360, 1440, 1520, 1600, 1680, 1760, 1840, 1920
 GATE_ARRAY      equ $7F00
+GATE_BORDER     equ %00010000           ; choosing pen sixteen, the border
+GATE_COLOUR     equ %01000000           ; and giving the chosen pen a colour
 MODE_1          equ %10001101           ; mode 1, both ROMs out of the way
 
 ; Mode 1 is forty characters across and twenty five down, of which the picture
@@ -30,11 +40,15 @@ SCREEN_COLS     equ 40
 LINE_BYTES      equ 80
 
 ; The twenty seven colours the hardware knows, in the order the firmware
-; numbers them, which is the order an adventure names them in.
+; numbers them, which is the order an adventure names them in.  The last
+; three are bright yellow, pastel yellow and bright white; the yellow and the
+; white were the other way round here, and it never showed while no ink was
+; ever set -- see the gate array above.  What gave it away was the emulator
+; painting white where 24 was asked for.
 firmware_inks:  db      $54, $44, $55, $5C, $58, $5D, $4C, $45
                 db      $4D, $56, $46, $57, $5E, $40, $5F, $4E
                 db      $47, $4F, $52, $42, $53, $5A, $59, $5B
-                db      $4B, $43, $4A
+                db      $4A, $43, $4B
 
 ; Read the font out of the database, put the machine in mode 1 with the
 ; picture's four pens, and clear the text window.
@@ -101,34 +115,52 @@ mode_init:
                 ld      bc, GATE_ARRAY
                 ld      a, MODE_1
                 out     (c), a
-                ; the four pens, and the border with them
-                ld      hl, picture_inks
-                ld      d, 0
+                ; fall through
+
+; The four pens and the border, from the inks of the picture on the screen:
+; of each pair, the one the flashing is showing now.
+; Corrupts: AF, BC, DE, HL
+pens_init:
+                ld      e, 0                    ; which pen
 .each_pen:
-                ld      a, d
-                or      %01000000               ; choose this pen
+                ld      a, e
+                call    pen_colour
                 ld      bc, GATE_ARRAY
-                out     (c), a
-                ld      a, (hl)
-                call    hardware_ink
-                or      %01000000               ; give it a colour
-                ld      bc, GATE_ARRAY
-                out     (c), a
-                inc     hl
-                inc     d
-                ld      a, d
+                out     (c), e                  ; choose it
+                or      GATE_COLOUR
+                out     (c), a                  ; and give it its colour
+                inc     e
+                ld      a, e
                 cp      4
                 jr      nz, .each_pen
-                ; the border, which is pen sixteen
+                ; fall through
+
+; The border, which is pen sixteen and wears the colour of one of the four.
+; Corrupts: AF, BC, HL
+border_init:
+                ld      a, (border_pen)
+                call    pen_colour
                 ld      bc, GATE_ARRAY
-                ld      a, %01010000
-                out     (c), a
-                ld      a, (picture_inks)
-                call    hardware_ink
-                or      %01000000
-                ld      bc, GATE_ARRAY
+                ld      l, GATE_BORDER
+                out     (c), l
+                or      GATE_COLOUR
                 out     (c), a
                 ret
+
+; The hardware's colour for what pen A is wearing now.
+; Corrupts: AF, HL
+pen_colour:
+                add     a, a                    ; a pair of inks to a pen
+                ld      hl, ink_phase
+                add     a, (hl)                 ; and which of the two
+                ld      hl, picture_inks
+                add     a, l
+                ld      l, a
+                jr      nc, .no_carry
+                inc     h
+.no_carry:
+                ld      a, (hl)
+                ; fall through
 
 ; The hardware's colour for the firmware's number in A.
 ; Corrupts: AF, HL
@@ -146,10 +178,79 @@ hardware_ink:
                 ld      a, (hl)
                 ret
 
-; The four pens a picture wants, in the firmware's numbering.  An adventure
-; off an Amstrad carries its own; until the format holds them these are the
-; four the machine starts with.
-picture_inks:   db      0, 24, 20, 6
+; The inks of the picture on the screen, in the firmware's numbering: a pair
+; to each pen, as an Amstrad picture carries them, because an ink there can
+; flash between two colours.  Until a picture says otherwise they are the four
+; the firmware starts the machine with, which is what the screen has always
+; shown -- see the gate array above.
+INKS_BYTES      equ 8
+picture_inks:   db      1, 1, 24, 24, 20, 20, 6, 6
+; Which of each pair is on: the second one first, because that is the one the
+; original hands the firmware as the first colour -- B to SCR SET INK, with the
+; first byte of the pair in C.  Read at $0538 of its interpreter.
+ink_phase:      db      1
+border_pen:     db      0               ; the pen whose colour the border wears
+picture_head:   db      0               ; what each picture carries before its
+                                        ; orders: its inks, or nothing
+
+                IFDEF   PICTURE_INKS
+
+; The inks of picture HL, when the pictures carry any.  The original sets them
+; for the picture of a room, the border from the first pair and then the
+; pens, at $0538; a picture called from another steps over its own, at $1C64,
+; which is why this is called from draw_picture and not for a CALL.
+; Corrupts: AF, BC, DE
+picture_inks_set:
+                ld      a, (picture_head)
+                or      a
+                ret     z
+                push    hl
+                call    picture_find
+                jr      c, .none
+                ld      de, -INKS_BYTES - 2    ; they are in front of the length
+                add     hl, de
+                ld      de, picture_inks
+                ld      bc, INKS_BYTES
+                ldir
+                ld      a, 1
+                ld      (ink_phase), a
+                xor     a
+                ld      (border_pen), a
+                call    flash_init
+                call    pens_init
+.none:
+                pop     hl
+                ret
+
+; Whether any pen flashes, which is any pair of two colours, and the count
+; started again.  The counting is the keyboard's: see flash_look.
+; Corrupts: AF, BC, HL
+flash_init:
+                ld      hl, picture_inks
+                ld      bc, 4 * 256             ; four pairs, none flashing yet
+.each:
+                ld      a, (hl)
+                inc     hl
+                cp      (hl)
+                inc     hl
+                jr      z, .steady
+                inc     c
+.steady:
+                djnz    .each
+                ld      a, c
+                ld      (flashing), a
+                xor     a
+                ld      (flash_looks), a        ; nought: start counting afresh
+                ret
+
+                ENDIF
+
+; The firmware changes a flashing ink every ten frames, the one and then the
+; other: the original never asks for anything else, SCR SET FLASHING being
+; called nowhere in it.
+FLASH_FRAMES    equ 10
+flashing:       db      0               ; whether any pen of this picture does
+flash_looks:    db      0               ; looks at the keyboard until it does
 
 ; How far along its pixel line character row A starts, in HL: eighty bytes a
 ; row.
