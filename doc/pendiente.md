@@ -2830,7 +2830,10 @@ tope de cuatro o cinco segundos**. Sale que sí, y con holgura.
 
 CGA en modo 4 es 320 por 200, dos bits por píxel, cuatro colores, ochenta
 bytes por fila. Eso es **exactamente** el modo 1 del Amstrad, hasta el ancho
-de fila. Y hay dos diferencias, las dos a favor:
+de fila. **En la forma, no en el color**: el Amstrad elige cuatro tintas de
+veintisiete para cada lámina y la CGA sólo deja libre el fondo --ver «Y una
+cuarta: la paleta», más abajo--. Para el dibujo y su cuenta da igual, y en la
+forma hay dos diferencias, las dos a favor:
 
 - **El empaquetado de CGA es más simple.** El Amstrad reparte los dos bits de
   cada píxel por el byte --los pares 3/7, 2/6, 1/5, 0/4-- y CGA los pone
@@ -2951,8 +2954,9 @@ exit
 
 **Lo que falta para un target de verdad**, por orden:
 
-1. La **cabecera MZ** para el `.EXE`, que son 28 bytes escritos por `regac`
-   --sin reubicaciones si los segmentos se calculan en marcha desde `CS`--.
+1. ~~La **cabecera MZ** para el `.EXE`, que son 28 bytes escritos por `regac`
+   --sin reubicaciones si los segmentos se calculan en marcha desde `CS`--.~~
+   Hecha: ver «La cabecera MZ, cargada por el DOS de verdad», más abajo.
 2. Un **`CgaDevice`** en `regac/devices.py` y la comparación de láminas
    contra la referencia, antes de que exista intérprete: es como se hicieron
    las otras cinco.
@@ -2977,10 +2981,10 @@ aproximadamente el doble. O sea que el presupuesto de 4-5 s, que es lo que
 podía matar este target, está más holgado de lo que dice el número.
 
 **NASM solo, sin enlazador.** `nasm -f bin` saca un binario plano y `regac` le
-escribe delante los 28 bytes de la cabecera MZ, que es exactamente lo que ya
+escribe delante la cabecera MZ, que es exactamente lo que ya
 se hace en las otras cinco máquinas: sjasmplus saca el binario y Python
 escribe el contenedor —`.tap`, `.cdt`, `.dsk`, `.nex`, `.cas`—. Una cabecera
-MZ sería el más pequeño de los seis. Tres razones:
+MZ es el más pequeño de los seis. Tres razones:
 
 - **El código cabe en un segmento.** Los intérpretes Z80 andan por los 8-9 KB
   y un 8086 no se irá mucho más lejos; lo grande es la base de datos, que no
@@ -2989,7 +2993,8 @@ MZ sería el más pequeño de los seis. Tres razones:
 - **Sin reubicaciones**, calculando los segmentos desde `CS` en marcha.
 - **La cadena está probada en esta máquina y sin descargar nada.**
 
-**Y lo de Watcom queda abierto a propósito, para el paso 3 y no para antes.**
+**Y lo de Watcom queda abierto a propósito, para el intérprete --el tercero
+de la lista de lo que falta-- y no para antes.**
 El argumento a favor es mejor de lo que parece: **el intérprete de PC duplica
 toda la lógica de todas formas**. Los 9 KB de `z80/common/` —el parser, la
 máquina de condiciones, el reparto de texto, el intérprete de láminas— no se
@@ -3002,10 +3007,72 @@ apretándolo a mano, y eso en C no sale. El camino sensato sería C para la
 lógica y ensamblador para los bucles de relleno y recta, y eso ya pide `wlink`
 y dos herramientas nuevas.
 
-No hace falta decidirlo ahora: **el paso 2 no necesita intérprete ninguno**.
-El `CgaDevice` y la comparación de láminas se hacen en Python contra la
+No hace falta decidirlo ahora: **el `CgaDevice` no necesita intérprete
+ninguno**. Él y la comparación de láminas se hacen en Python contra la
 referencia, igual que en las otras cinco máquinas, y cuando eso esté se decide
 el lenguaje con las láminas ya comparando.
+
+(Los números de «paso uno» y «paso dos» de los títulos no son los de la
+lista de lo que falta, que vuelve a empezar en uno. Por eso aquí se dice
+qué es cada cosa y no su número.)
+
+### Y una cuarta: la paleta, trío y fondo por lámina
+
+Lo que el «exactamente el modo 1 del Amstrad» de arriba callaba. En el modo 4
+de la CGA el color 0 es el fondo, y ése se elige entre los dieciséis, pero los
+otros tres vienen en tríos fijos:
+
+| | normal | brillante |
+|---|---|---|
+| paleta 0 | verde, rojo, marrón | verde, rojo y amarillo claros |
+| paleta 1 | cian, magenta, gris | cian, magenta claros, blanco |
+| modo 5 | cian, rojo, gris | cian, rojo claros, blanco |
+
+El último es el modo 5, que en la CGA quita la señal de color y en un
+monitor RGB da ese trío. Seis tríos por dieciséis fondos son **noventa y seis
+paletas**, contra las cuatro de veintisiete que elige el Amstrad.
+
+**Decidido: trío y fondo por lámina**, elegidos igual que las tintas del
+Amstrad, por lo que la lámina de referencia cubre de cada color --lo que ya
+hace `choose_inks` en `regac/devices.py`--, pero entre esas noventa y seis y
+no entre todas las combinaciones. Al intérprete le cuesta un byte en el
+puerto `3D9h` por lámina, que lleva el fondo, la paleta y el brillo; el trío
+del modo 5 pide además otro en `3D8h`, que es donde se pone ese modo. Una paleta fija
+para todas las láminas era más simple y habría sacado feas muchas de ellas.
+
+Como el GAC no tuvo versión de PC, aquí no hay original al que ser fiel: es
+una decisión y no una lectura.
+
+### La cabecera MZ, cargada por el DOS de verdad
+
+`mz_exe` en `regac/media.py`. La cabecera son 28 bytes, pero la imagen tiene
+que empezar en un párrafo de 16 bytes, porque el campo que dice dónde empieza
+cuenta en párrafos; así que en el fichero van **32**: los 28 y cuatro ceros.
+Sin tabla de reubicaciones. El DOS suma el segmento de carga a `CS` y a `SS`
+sin que se lo pidan, y el resto de segmentos se calculan desde `CS` en
+marcha.
+
+Detrás de la imagen, la memoria que el programa quiere y el fichero no
+lleva, y detrás de eso la pila, en un segmento suyo. El mínimo que se pide al
+DOS es eso; el máximo, toda la que haya, que es lo que hacen los enlazadores.
+
+La prueba, `tests/test_media_pc.py`, no se fía de haber leído bien el
+formato: ensambla un programa que le pregunta al DOS dónde lo ha puesto y lo
+escribe en un fichero. Pidiendo 3000 bytes de memoria, con una pila de 1 KB y
+la entrada en `40h`, lo que contestó DOSBox-X:
+
+| | salió | tenía que salir |
+|---|---|---|
+| `CS` | PSP + `10h` | el PSP son 256 bytes |
+| `SS` − `CS` | 196 párrafos | 8 de imagen + 188 de los 3000 bytes |
+| `SP` | `400h` | la pila entera |
+| cima de la memoria | `9FFFh` | toda, que es lo pedido |
+| lo leído con `DS` = `CS` | `REGAC` | lo que la imagen lleva |
+
+La prueba tarda un segundo y medio, DOSBox-X incluido, y va en la puerta.
+`tests/dosbox.py` es el arnés: ensamblar con NASM, escribir la
+configuración, correr y esperar a que se vaya. Lo usará también lo que
+venga.
 
 ## Cosas menores
 

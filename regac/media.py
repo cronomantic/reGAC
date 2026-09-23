@@ -582,3 +582,56 @@ def msx_tape(code, database=b"", screen=None, load=MSX_CODE_AT, entry=None,
     for piece in chunks[1:]:
         msx_block(out, piece)
     return bytes(out)
+
+
+# -- the PC, which runs an .EXE and asks for nothing else ---------------------
+
+# What DOS reads at the head of an .EXE.  The image behind it is whatever NASM
+# wrote with `-f bin`, and nothing in it names a segment: the interpreter
+# works its segments out from CS once it is running, so there is no table of
+# places for DOS to patch.  What DOS does patch without being asked is CS and
+# SS themselves, which the header gives counting from the start of the image.
+MZ_HEADER_BYTES = 0x1C          # the header proper, and the table would go here
+MZ_PARAGRAPH = 16               # the unit DOS counts memory in
+MZ_PAGE = 512                   # and the unit it counts the file in
+MZ_STACK_BYTES = 1024
+MZ_ALL = 0xFFFF                 # ask for all the memory there is
+
+
+def paragraphs(size):
+    return (size + MZ_PARAGRAPH - 1) // MZ_PARAGRAPH
+
+
+def mz_exe(image, entry=0, stack=MZ_STACK_BYTES, memory=0, most=MZ_ALL):
+    """An .EXE out of a flat binary built to run from offset nought.
+
+    The header is twenty eight bytes but the image has to start on a
+    paragraph, so the file carries thirty two in front of it.  Behind the
+    image in memory go `memory` bytes that the program wants and the file does
+    not carry, and behind those the stack, in a segment of its own.  DOS will
+    not start the program without room for both, and gives it up to `most`
+    paragraphs more if it has them: all of it, unless told otherwise.
+    """
+    if not 0 < stack <= 0x10000 or stack % 2:
+        raise ValueError(f"a stack of {stack} bytes is not one DOS can set up")
+    head = paragraphs(MZ_HEADER_BYTES)
+    size = head * MZ_PARAGRAPH + len(image)
+    needed = paragraphs(memory) + paragraphs(stack)
+    header = struct.pack(
+        "<2s13H",
+        b"MZ",
+        size % MZ_PAGE,                         # what the last page holds
+        (size + MZ_PAGE - 1) // MZ_PAGE,        # pages, counting the last
+        0,                                      # nothing to patch
+        head,
+        needed,                                 # the least DOS must add
+        max(needed, most),                      # and the most it may
+        paragraphs(len(image)) + paragraphs(memory),  # SS, from the image
+        stack & 0xFFFF,                         # SP: a full 64K is nought
+        0,                                      # no checksum, as DOS ignores it
+        entry,                                  # IP
+        0,                                      # CS, from the image
+        MZ_HEADER_BYTES,                        # where the table would be
+        0,                                      # not an overlay
+    )
+    return header.ljust(head * MZ_PARAGRAPH, b"\x00") + bytes(image)
