@@ -130,6 +130,11 @@ done_flag:      db      0
 database:
                 INCBIN  "game128.rgac", 0, DB_RESIDENT_SIZE
 last:
+                ; What is resident has to end before the window, or paging a
+                ; bank in would take the end of it away without a word.  The
+                ; eight adventures leave from 338 bytes (Bangkok2) to four
+                ; kilobytes; nothing looked at it before.
+                ASSERT  last <= $C000
 
                 SAVESNA "game128.sna", start
 

@@ -244,6 +244,37 @@ def test_a_noun_on_its_own_is_something_it_cannot_do():
 
 
 @needs_tools
+def test_a_description_in_the_next_turn_covers_the_complaint():
+    """What the original was asked in the room of the password, with three
+    high priority tables and the same unknown word typed each time:
+
+        LOOK        the room, and no complaint
+        MESS 89     "Perdon?", and then the message
+        nothing     "Perdon?"
+
+    It complains every time.  What hides it is that a description goes back
+    to the start of the line it is on and writes over it, and the high
+    priority table runs at the top of the next turn, straight after the
+    complaint.  A message does no such thing.  The room here says more than
+    the complaint, so it covers all of it, as MegaCorp's did; a shorter one
+    leaves the complaint's tail showing, which the original does too."""
+    room = {"1": {"graphic_id": 0, "exits": [], "desc": "UN CUARTO GRANDE Y VACIO"}}
+
+    looked = played(adventure(hpcs=[["LOOK"]], rooms=room), orders=["XYZZY"])
+    assert not any("COMO DICES?" in line for line in looked), looked
+    assert any("UN CUARTO GRANDE Y VACIO" in line for line in looked), looked
+
+    told = played(adventure(hpcs=[["PUSH", 100], ["MESS"]], rooms=room,
+                            messages={"100": "EL TIEMPO PASA"}), orders=["XYZZY"])
+    said = "\n".join(told)
+    assert "COMO DICES?" in said and "EL TIEMPO PASA" in said, told
+    assert said.rindex("EL TIEMPO PASA") > said.rindex("COMO DICES?"), told
+
+    left = played(adventure(rooms=room), orders=["XYZZY"])
+    assert any("COMO DICES?" in line for line in left), left
+
+
+@needs_tools
 def test_goto_describes_the_room_it_arrives_in():
     """Their GOTO is their LOOK with a room put in first, so the description
     comes out where the GOTO is and not when the turn comes round again.

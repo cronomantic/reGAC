@@ -90,8 +90,8 @@ def ys_of(command):
     ELLIPSE is where its radii come from and not a place, so it falls outside
     the frame as a matter of course -- the example adventure's own lighthouse
     does it five times over, which is how this was found.  A fill is left out
-    too, because what the original does with a seed outside has not been
-    asked of it.
+    too: its seed is a y, but what the original does with one outside is not
+    what it does with a point, and it is said on its own below.
     """
     name = command[0]
     if name == "PLOT":
@@ -253,6 +253,33 @@ def problems_of(ddb):
                     f" this draws what fits, where the original would have"
                     f" stopped drawing the picture there",
                     fault=False))
+
+    # A fill started outside the frame.  Ours lays nothing; the original does
+    # not agree, and not in one way: asked of it with a box and a seed above
+    # and below, a seed just above filled from the top of the picture down,
+    # a little further up nothing, and far up hung it; below the frame it
+    # filled from the seed upwards, rows of the text window and all.  Laying
+    # nothing and saying so is what was decided, as for the orders above --
+    # see doc/pendiente.md.  No picture of the eight adventures does it.
+    for pid, drawing in (ddb.get("gfx") or {}).items():
+        for number, command in enumerate(drawing, start=1):
+            if command[0] not in ("FILL", "BGFILL", "SHADE"):
+                continue
+            y = command[2]
+            if PICTURE_BOTTOM <= y <= PICTURE_TOP:
+                continue
+            if y < PICTURE_BOTTOM:
+                theirs = ("filled from there upwards, into the text window "
+                          "as well")
+            else:
+                theirs = ("filled from the top of the picture down, or did "
+                          "nothing, or hung, depending on how far above")
+            found.append(Problem(
+                f"picture {pid}",
+                f"its order {number}, {command[0]}, starts at y={y}, outside"
+                f" the frame ({PICTURE_BOTTOM} to {PICTURE_TOP}): this lays"
+                f" nothing, where the original {theirs}",
+                fault=False))
 
     # What the interpreter says for itself.
     for number, what in NEEDED.items():

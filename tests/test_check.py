@@ -141,6 +141,34 @@ def test_a_picture_that_is_not_there():
     assert any("calls picture 5" in s for s in faults(ddb))
 
 
+def test_a_picture_that_draws_outside_the_frame_is_said():
+    """Ours draws what fits and the original stopped drawing the picture:
+    only a warning, and only for what is a place -- the second pair of an
+    ELLIPSE is where its radii come from and falls outside as a matter of
+    course."""
+    ddb = of()
+    ddb["gfx"] = {"1": [["PLOT", 40, 30], ["LINE", 10, 100, 20, 190],
+                        ["ELLIPSE", 128, 100, 168, 20]]}
+    said = warnings(ddb)
+    assert any("order 1, PLOT, goes to y=30" in s for s in said), said
+    assert any("order 2, LINE, goes to y=190" in s for s in said), said
+    assert not any("ELLIPSE" in s for s in said), said
+    assert not any("picture 1" in s for s in faults(ddb))
+
+
+def test_a_fill_started_outside_the_frame_is_said():
+    """Ours lays nothing, and the original did something else on each side,
+    which the warning says."""
+    ddb = of()
+    ddb["gfx"] = {"1": [["FILL", 80, 30], ["SHADE", 80, 180], ["BGFILL", 80, 100]]}
+    said = warnings(ddb)
+    assert any("order 1, FILL, starts at y=30" in s and "text window" in s
+               for s in said), said
+    assert any("order 2, SHADE, starts at y=180" in s and "hung" in s
+               for s in said), said
+    assert not any("order 3" in s for s in said), said
+
+
 def test_a_noise_the_adventure_has_not_got():
     """A bank exported from the tracker is assembly and nothing here can count
     what is in it, but an adventure that says its own noises can be counted."""

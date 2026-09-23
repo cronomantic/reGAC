@@ -117,12 +117,10 @@ def draw_them_all(path):
             session.command(f"write-memory {where['done_flag']} 0")
             session.command("reset-tstates-partial")
             session.command(f"write-memory {where['go_flag']} 1")
-            if not session.wait_for(where["done_flag"], 0xFF, timeout=120.0,
-                                    every=0.1):
+            seconds = session.seconds_until(where["done_flag"], MSX_HZ)
+            if seconds is None:
                 out.append((number, None, None))
                 continue
-            reply = session.command("get-tstates-partial")
-            seconds = int(reply.split("\n")[0].strip()) / MSX_HZ
             drawn = (bytes(session.read(MSX_PATTERNS, MSX_PICTURE_BYTES,
                                         zone=VRAM)),
                      bytes(session.read(MSX_COLOURS, MSX_PICTURE_BYTES,

@@ -105,31 +105,6 @@ needs = (
 )
 
 
-def finished_after(session, flag, timeout=120.0):
-    """Seconds of a real Amstrad from the counter being cleared to the flag
-    going up, or None if it never does.
-
-    The emulator's cycle counter is exact, but nothing stops it: a breakpoint
-    on the loop the build parks in was set here for a long time on the belief
-    that it froze the counter with the machine, and it does not -- outside the
-    emulator's step mode a breakpoint fires and the machine carries on, and in
-    step mode the run that would wait for it brings the emulator down.  So
-    whatever passes between
-    the picture finishing and the flag being looked at is counted too.  That
-    was every half second, which added up to three tenths of a second to every
-    picture and made different pictures come out at the same count to within
-    ten cycles.  Looked at every hundredth of a second instead, what is added
-    is about that and no more.
-    """
-    deadline = time.time() + emulator.longer(timeout)
-    while time.time() < deadline:
-        if session.read(flag, 1)[0] == 0xFF:
-            reply = session.command("get-tstates-partial")
-            return int(reply.split("\n")[0].strip()) / CPC_HZ
-        time.sleep(0.01)
-    return None
-
-
 def draw_them_all(path):
     """Every picture of one adventure: its number, how many points differ from
     the reference, and what it cost in seconds of a real Amstrad."""
@@ -162,7 +137,7 @@ def draw_them_all(path):
             # z80/cpc/test_picture.asm.
             session.command("reset-tstates-partial")
             session.command(f"write-memory {where['go_flag']} 1")
-            seconds = finished_after(session, where["done_flag"])
+            seconds = session.seconds_until(where["done_flag"], CPC_HZ)
             if seconds is None:
                 out.append((number, None, None))
                 continue

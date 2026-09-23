@@ -273,6 +273,18 @@ def test_the_word_for_having_nothing_is_read_from_the_interpreter():
     assert word_for_nothing([0] * 256) == "Nothing"
 
 
+def test_the_amstrads_word_for_having_nothing_is_where_it_is_printed():
+    """The Amstrad's interpreter prints it in line, after the call that lists
+    what the player carries: call $0560, ret nz, call $2240 and the letters.
+    Its "Memory full" is there as well, with code behind it and no word."""
+    from deGAC import word_for_nothing
+
+    blob = bytearray(64) + b"Memory full ... " + bytes((0xFF,)) + bytearray(40)
+    blob += bytes((0xCD, 0x60, 0x05, 0xC0, 0xCD, 0x40, 0x22)) + b"nothing"
+    blob += bytes((0xFF, 0xC9))
+    assert word_for_nothing(list(blob)) == "nothing"
+
+
 #: What each of the eight really says, which is not the same in all of them:
 #: two of the four Spanish adaptations never translated the word.
 WORD_FOR_NOTHING = {

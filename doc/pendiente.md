@@ -93,7 +93,8 @@ mira que las aventuras decompiladas las traigan: una que las perdiera dejaría
 de partir órdenes y no se enteraría nadie.
 
 **Las que ya estuvieran decompiladas hay que volver a pasarlas por `deGAC`**,
-porque el campo se escribía vacío.
+porque el campo se escribía vacío. Hecho: las ocho de `snapshots/` traen
+`["THEN", "AND"]`.
 
 Para que eso sirva de algo hubo que enseñar al teclado a dar los signos, que
 en el Spectrum piden símbolo y otra tecla a la vez. De paso se arregló que
@@ -1222,6 +1223,11 @@ bandera cada décima, así que cuentan hasta una décima de más. No cambia nada
 de lo que se dijo con ellas, pero conviene pasarles el mismo arreglo la
 próxima vez que se toquen.
 
+**Pasado.** La espera del CPC es ahora `Session.seconds_until`, en
+`tests/emulator.py`, y la usan las tres. No es `wait_for` con otro intervalo:
+`wait_for` pide los registros en cada vuelta, y pedirlos cada centésima es
+justo lo que tumba el emulador; `seconds_until` sólo lee el byte.
+
 ## Los cuatro marcadores que son del intérprete
 
 Los marcadores 0 a 3 y los contadores 0, 126 y 127 **no son de la aventura**,
@@ -1415,6 +1421,17 @@ Cuatro adaptaciones al castellano y **dos no llegaron a traducir la palabra**.
 lo que hay veinte bytes más allá, de modo que no depende de una dirección
 fija. De las versiones de Amstrad y de Commodore no se sabe dónde está; si no
 aparece, se queda en `Nothing` y se dice.
+
+**La del Amstrad ya se sabe**, y no está con las otras: el intérprete la
+imprime donde la usa, en línea. En $05A4 de las tres aventuras de Amstrad que
+tenemos: `call $0560`, que lista lo que se lleva, `ret nz` si listó algo, y
+`call $2240` --que imprime las letras que siguen a la llamada hasta el $FF y
+sigue detrás-- con `nothing`. Su `Memory full` también está, pero con código
+detrás y no la palabra. Las tres dicen **`nothing`**, en minúscula: ninguna de
+las tres la tradujo, y `deGAC` las dejaba en el `Nothing` de oficio. Ahora la
+busca también con ese mojón; prueba en `test_interpreter.py` y, sobre el disco
+de Bangkok, en `test_disk.py`. La del Commodore sigue sin buscar: el C64 está
+aparcado.
 
 ### `TEXT` y `PICT`, medidos y hechos en las cinco
 
@@ -2042,7 +2059,10 @@ seguir la misma regla. La primera es la regla. La segunda es un fallo que
 estaba al lado: metía el número del color entero en el atributo con un `or`,
 y en un atributo de Spectrum el brillo es el bit seis, no parte del color, así
 que `\ink 12` colaba su bit tres en el papel. **Arreglado a ojo y sin
-comprobar**, porque aquí no hay con qué correr pygame.
+comprobar**, porque aquí no hay con qué correr pygame. **Comprobado después**,
+cuando ya lo había: `tests/test_pygame.py` lo corre sin ventana y mira el
+atributo de una letra con cada una de las dieciséis tintas, y se comprobó que
+falla con el bit tres metido en el papel.
 
 **Y el fleco que dejó la decisión, atado en el mismo sitio.** La tinta por
 defecto estaba fijada al ensamblar, una por máquina, y la aventura no podía
@@ -2280,6 +2300,18 @@ de la tabla local o de la baja se cumplió. Falta decidir qué cuenta
 exactamente como que algo pasó --describir la sala, imprimir, las dos-- antes
 de tocarlo, que es de esas cosas que se arreglan en diez minutos y se eligen
 mal en uno.
+
+**Cerrado sin tocarlo, porque no había nada que decidir.** Lo explicó lo que
+se leyó después, en «Leyendo el intérprete original»: el original se queja
+siempre, y lo que la tapa es que **una descripción vuelve a la columna cero de
+la línea en la que está y escribe encima**, y la tabla alta corre al principio
+del turno siguiente, justo detrás de la queja. Un mensaje no hace eso. Así que
+no hay que elegir qué cuenta como que algo pasó: nosotros también nos quejamos
+siempre, y desde que `describe_location` vuelve a la columna cero la tabla sale
+igual. `test_markers_z80.py` lo pregunta con las tres tablas de arriba y las
+tres salen como en el original; la sala de la prueba dice más que la queja,
+como la de MegaCorp, porque una más corta deja asomar la cola --que es lo que
+el original hace también, «INTRODUZCA LA CLAVEsa...»--.
 
 ## Leyendo el intérprete original, que es el camino corto
 
@@ -2550,11 +2582,41 @@ Dos detalles que costaron su rato y evitan repetirlos:
   centro, así que cae fuera del marco como cosa corriente --el faro de la
   aventura de ejemplo lo hace cinco veces--. Eso lo encontró el propio aviso
   saltando sobre nuestra aventura. De los rellenos no se ha preguntado qué
-  hace con una semilla fuera, así que tampoco avisan.
+  hace con una semilla fuera, así que tampoco avisan. **Preguntado después, y
+  ya avisan**: ver «La semilla de un relleno fuera del marco», justo aquí
+  debajo.
 - **Al Next no le sobran bytes.** La comprobación se escribió primero en
   dieciséis y no cabía bajo su máscara; queda en doce aprovechando que el
   marco son ciento veintiocho filas justas: se le resta el fondo y basta una
   comparación, porque lo que está por debajo se envuelve y falla igual.
+
+### La semilla de un relleno fuera del marco
+
+Preguntado con el mismo guión de `test_fills_original.py`: una caja de y=60 a
+y=130, un `FILL` con x=80 y la semilla fuera, **cada caso con la instantánea
+recién cargada** --la primera vuelta los encadenó en la misma máquina, y el que
+se desbocó estropeó los de detrás; lo que salía allí no valía--.
+
+| semilla | el original | nosotros |
+|---|---|---|
+| y=176, justo encima | rellena de y=175 abajo hasta la caja: 45 filas | nada |
+| y=180 | nada | nada |
+| y=200 | nada | nada |
+| y=250 | **no vuelve**: se queda en $8A37 con parte de la caja pintada | nada |
+| y=47, justo debajo | rellena de la semilla arriba hasta la caja, **y la fila de la semilla es ya la primera de la ventana de texto** | nada |
+| y=30 | igual: de y=30 arriba, 18 filas de la ventana de texto incluidas | nada |
+
+O sea que su comprobación de dónde se para no mira que la semilla esté dentro:
+por debajo pinta lo que haya debajo, que es el texto, y por encima depende de
+cuánto se pase.
+
+**Decidido: no se copia.** Nosotros no rellenamos nada con la semilla fuera y
+`regac check` lo avisa, diciendo lo que habría hecho el original --lo mismo que
+se decidió con `PLOT`, `LINE` y `RECT` fuera del marco: se dibuja lo que cabe y
+se avisa--. Copiarlo sería pintar la ventana de texto desde una lámina, y el
+caso de y=250 no hay forma sensata de copiarlo. Ninguna de las ocho aventuras
+tiene un relleno así, ni la del faro. Pruebas en `test_check.py`, que de paso
+estrena la del aviso de `PLOT`, `LINE` y `RECT`, que no tenía ninguna.
 
 **Lo que queda por leer**: nada del intérprete original, y desde ahora tampoco
 queda nada por preguntarle. Los casos raros del relleno --lo último que
@@ -2919,7 +2981,9 @@ lámina entera amarilla. Y las herramientas no lo decían: `checkgfx -m cpc`,
 que `manual.md` recomienda para esto, mide con `PixelDevice`, un modelo que la
 máquina no usa, y dice que todo está bien; `render -m cpc` dibuja con ese
 mismo; y `render -m amstrad` se cae, porque `AmstradDevice.to_rgb` devuelve
-enteros donde el PNG quiere ternas.
+enteros donde el PNG quiere ternas. (Las tres cosas quedaron bien con lo de
+más abajo: el CPC dibuja ahora con ese mismo modelo, `render` enseña lo que
+enseña la máquina y ya no se cae.)
 
 **Decidido: fiel a GAC.** Una aventura se dibuja con las reglas del GAC de su
 máquina: una de Amstrad con las del Amstrad, que es lo que hay; una de
@@ -3324,6 +3388,31 @@ configuración, correr y esperar a que se vaya. Lo usará también lo que
 venga.
 
 ## Cosas menores
+
+### Lo residente del 128 y del +3, que nadie vigilaba
+
+En el 128 y en el +3 el intérprete va en $8000 y lo residente de la base de
+datos detrás, y todo tiene que acabar antes de $C000, que es la ventana por la
+que entran los bancos: lo que pasara de ahí se lo llevaría en silencio el
+primer banco que se paginara. **Ningún `ASSERT` lo miraba**, cuando el PCW, el
+MSX y el Next sí tienen el suyo. Medido con las ocho, en las dos máquinas:
+
+| aventura | margen hasta $C000 |
+|---|---:|
+| Bangkok2 | **338 bytes** |
+| quijote1 | 1539 |
+| Bangkok1 | 2422 |
+| quijote2 | 2790 |
+| vajillas2 | 3431 |
+| megacorp2 | 3471 |
+| megacorp1 | 3697 |
+| vajillas1 | 4069 |
+
+Caben todas, pero Bangkok2 va justa y nadie lo habría dicho. Ahora
+`game128.asm` y `game3.asm` llevan `ASSERT last <= $C000`: no cambia ningún
+binario, y una aventura que no quepa deja de ensamblar en vez de salir rota.
+Salió al medir la memoria de cada máquina para las aventuras de CPC.
+
 
 ### `SAVE` y `LOAD` en `runGAC.py`, que eran dos `TODO` con un `pass`
 

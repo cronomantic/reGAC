@@ -310,19 +310,34 @@ NOTHING_AFTER = b"Memory full"      # the landmark just before it
 NOTHING_AT = 20                     # how far past the start of it the word is
 NOTHING_ENDS = 0xFF
 
+# The Amstrad's interpreter does not keep the word with the others: it prints
+# it where it is used, straight after listing what the player carries --
+# call $0560, which lists, ret nz if it listed anything, and then call $2240,
+# which prints the letters that follow the call up to $FF and carries on after
+# them.  Read at $05A4 of the three Amstrad adventures we have, which all say
+# "nothing": none of them translated it.
+NOTHING_INLINE = bytes((0xCD, 0x60, 0x05, 0xC0, 0xCD, 0x40, 0x22))
+
+# Where to look, in order, and how far past the landmark the word starts.
+NOTHING_LANDMARKS = ((NOTHING_AFTER, NOTHING_AT),
+                     (NOTHING_INLINE, len(NOTHING_INLINE)))
+
 
 def word_for_nothing(sysram, otherwise="Nothing"):
     """What this adventure's interpreter writes for having none."""
     blob = bytes(byte & 0xFF for byte in sysram)
-    at = blob.find(NOTHING_AFTER)
-    if at < 0:
-        return otherwise            # another machine's interpreter, or none
-    at += NOTHING_AT
-    end = blob.find(bytes((NOTHING_ENDS,)), at)
-    if end < 0 or end - at > 32:
-        return otherwise
-    word = blob[at:end].decode("latin-1").rstrip()
-    return word or otherwise
+    for landmark, past in NOTHING_LANDMARKS:
+        at = blob.find(landmark)
+        if at < 0:
+            continue
+        at += past
+        end = blob.find(bytes((NOTHING_ENDS,)), at)
+        if end < 0 or end - at > 32:
+            continue
+        word = blob[at:end].decode("latin-1").rstrip()
+        if word:
+            return word
+    return otherwise            # another machine's interpreter, or none
 
 
 def find_token(sysram, token):

@@ -528,6 +528,32 @@ class Session:
             time.sleep(every)
         return False
 
+    def seconds_until(self, flag, hz, wanted=0xFF, timeout=120.0):
+        """Seconds of the real machine, at `hz`, from the partial counter being
+        cleared to the byte at `flag` taking `wanted`; None if it never does.
+
+        The emulator's cycle counter is exact, but nothing stops it: a
+        breakpoint on the loop a build parks in was set for a long time on the
+        belief that it froze the counter with the machine, and it does not --
+        outside the emulator's step mode a breakpoint fires and the machine
+        carries on, and in step mode the run that would wait for it brings the
+        emulator down.  So whatever passes between the flag going up and it
+        being looked at is counted too.  Looked at every half second that
+        added three tenths to every picture; every hundredth, it adds about
+        that and no more.
+
+        And it looks at the flag and nothing else: asking for the registers
+        this often brings the emulator down, where reading a byte does not,
+        which is why this is not `wait_for`.  See doc/pendiente.md, «El reloj
+        de las pruebas contaba de más»."""
+        deadline = time.time() + longer(timeout)
+        while time.time() < deadline:
+            if self.read(flag, 1)[0] == wanted:
+                reply = self.command("get-tstates-partial")
+                return int(reply.split("\n")[0].strip()) / hz
+            time.sleep(0.01)
+        return None
+
     def wait_for_change(self, address, was, timeout=20.0, every=0.05):
         """The other way round from `wait_for`: run until a byte stops being
         what it was, and say whether it did.  What it is for is proving that

@@ -115,6 +115,16 @@ def test_a_disk_that_cannot_be_copied_is_read_track_by_track():
         assert pointers == sorted(pointers) and pointers[0] > PUNCTUATION
 
 
+@needs_games
+def test_an_amstrad_adventure_says_nothing_in_its_own_word():
+    """Read off the disk the way deGAC reads it: the three Amstrad adventures
+    never translated the word, and it is "nothing", as it is printed at $05A4."""
+    from deGAC import word_for_nothing
+
+    memory, _ = laid(image("carvalho_ams.zip", ".dsk"), "CARVALHO.FAC")
+    assert word_for_nothing(list(memory)) == "nothing"
+
+
 if __name__ == "__main__":
     test_a_plain_file_is_laid_where_it_says()
     print("a plain file is laid where it says")
