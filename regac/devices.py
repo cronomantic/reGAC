@@ -876,6 +876,177 @@ class PcwDevice(Device):
         ]
 
 
+# -- the PC, with a CGA in its 320 by 200 mode -------------------------------
+
+# The CGA's sixteen colours, the IBM monitor's: the dark yellow comes out
+# brown, which the monitor does on purpose.
+CGA_PALETTE = [
+    0x000000, 0x0000AA, 0x00AA00, 0x00AAAA,
+    0xAA0000, 0xAA00AA, 0xAA5500, 0xAAAAAA,
+    0x555555, 0x5555FF, 0x55FF55, 0x55FFFF,
+    0xFF5555, 0xFF55FF, 0xFFFF55, 0xFFFFFF,
+]
+
+
+class CgaTrio:
+    """Three colours of the four a CGA shows in its 320 by 200 mode.  The
+    fourth is the background, any of the sixteen; these three come as a set,
+    and which set is two registers: the mode, whose third bit takes the colour
+    away from a composite monitor and gives the third set on an RGB one, and
+    the colour select, whose fourth bit is the brightness and fifth which of
+    the other two sets."""
+
+    def __init__(self, name, colours, bright, palette, mode5):
+        self.name = name
+        self.colours = colours          # what pixels one to three show
+        self.bright = bright
+        self.palette = palette
+        self.mode5 = mode5
+
+    def select(self, background):
+        """The byte for port 3D9h: the background, the brightness, the set."""
+        return background | (self.bright << 4) | (self.palette << 5)
+
+    def mode(self):
+        """The byte for port 3D8h: graphics, 320 across, the picture on, and
+        the colour off for the third set."""
+        return 0x0A | (0x04 if self.mode5 else 0)
+
+
+CGA_TRIOS = [
+    CgaTrio("paleta 0", (2, 4, 6), 0, 0, False),
+    CgaTrio("paleta 0 brillante", (10, 12, 14), 1, 0, False),
+    CgaTrio("paleta 1", (3, 5, 7), 0, 1, False),
+    CgaTrio("paleta 1 brillante", (11, 13, 15), 1, 1, False),
+    CgaTrio("modo 5", (3, 4, 7), 0, 0, True),
+    CgaTrio("modo 5 brillante", (11, 12, 15), 1, 0, True),
+]
+
+CGA_BYTES_ACROSS = 80                   # four pixels to a byte
+CGA_BANK = 0x2000                       # odd rows are in a bank of their own
+CGA_SCREEN_BYTES = 0x4000
+CGA_MARGIN = (320 - SOURCE_WIDTH) // 2 // 4   # the picture in the middle: 8
+
+
+def cga_colours(background, trio):
+    """What pixel values nought to three show."""
+    return [CGA_PALETTE[background]] + [CGA_PALETTE[c] for c in trio.colours]
+
+
+def best_cga_palette(cost_of):
+    """The background and the trio that cost least, trying the ninety six.
+    `cost_of` is given the four colours and says what they cost."""
+    best = None
+    for trio in CGA_TRIOS:
+        for background in range(16):
+            cost = cost_of(cga_colours(background, trio))
+            if best is None or cost < best[0]:
+                best = (cost, background, trio)
+    return best[1], best[2]
+
+
+def cga_picture_colours(gfx, picture_id):
+    """How a picture off a Spectrum is shown on a CGA: the background and the
+    trio chosen for it, and the pixel value each of the sixteen colours of the
+    original comes to.  Chosen against the reference, weighted by how much of
+    the screen each colour covers, as the Amstrad's four inks are -- see
+    cpc_picture_colours.  Unlike the Amstrad's, the four cannot be put in any
+    order: nought is the background and one to three the trio as it comes, so
+    the text is printed in whichever values its colours come to."""
+    from .gfx import Renderer
+
+    reference = Renderer(gfx, SpectrumDevice()).run(int(picture_id))
+    usage = colour_usage(reference)
+
+    def cost_of(four):
+        return sum(area * min(distance(SPECTRUM_PALETTE[colour], c) for c in four)
+                   for colour, area in usage.items())
+
+    background, trio = best_cga_palette(cost_of)
+    four = cga_colours(background, trio)
+    return background, trio, [nearest(colour, four) for colour in SPECTRUM_PALETTE]
+
+
+def cga_amstrad_colours(gfx, picture_id, header=None):
+    """How a picture off an Amstrad is shown on a CGA: the background, the
+    trio, and which pixel value each of its four pens is written as.
+
+    The pens need not be the pixel values.  What the Amstrad's rules ask of a
+    pen is only to be told apart from the others -- a fill stops where the pen
+    changes -- and that holds for any way of dealing the four pens out to the
+    four values, as long as it is the same over the whole picture.  So they
+    are dealt out as suits the colours: the background can be any of sixteen
+    and a trio is three in a fixed order, and a picture in yellow and white,
+    say, has its white in the background and its yellow in the trio that has
+    one.  Of the ninety six palettes and the twenty four ways to deal, the one
+    closest to the inks the picture carries, pen by pen, weighted by how much
+    of the picture each pen covers."""
+    from itertools import permutations
+
+    from .gfx import Renderer
+
+    inks = [header[n * 2 + 1] & 0x1F for n in range(4)] if header else CPC_START_INKS
+    wanted = [CPC_HARDWARE_PALETTE[min(ink, 26)] for ink in inks]
+    drawn = Renderer(gfx, AmstradDevice(wanted)).run(int(picture_id))
+    area = [drawn.pens.count(pen) for pen in range(4)]
+
+    best = None
+    for trio in CGA_TRIOS:
+        for background in range(16):
+            four = cga_colours(background, trio)
+            for values in permutations(range(4)):
+                cost = sum(area[pen] * distance(wanted[pen], four[values[pen]])
+                           for pen in range(4))
+                if best is None or cost < best[0]:
+                    best = (cost, background, trio, list(values))
+    return best[1], best[2], best[3]
+
+
+def cga_device(gfx=None, picture_id=None, ddb=None):
+    """A picture as a CGA shows it, drawn with the rules of the GAC the
+    adventure was written with.  The drawing is the Amstrad's or the
+    Spectrum's own device; what is the CGA's is the four colours and where
+    the pixels go, which is cga_screen."""
+    if from_an_amstrad(ddb):
+        header = None
+        if picture_id is not None:
+            inks = ddb.get("gfx_inks") or {}
+            header = inks.get(str(picture_id), inks.get(int(picture_id)))
+        if gfx is None or picture_id is None:
+            background, trio, values = 0, CGA_TRIOS[3], [0, 1, 2, 3]
+        else:
+            background, trio, values = cga_amstrad_colours(gfx, picture_id, header)
+        four = cga_colours(background, trio)
+        device = AmstradDevice([four[values[pen]] for pen in range(4)], name="cga")
+        device.cga_values = values      # the pixel value each pen is written as
+        return device
+    if gfx is None or picture_id is None:
+        four = cga_colours(0, CGA_TRIOS[3])
+    else:
+        background, trio, _ = cga_picture_colours(gfx, picture_id)
+        four = cga_colours(background, trio)
+    return PixelDevice(SOURCE_WIDTH, SOURCE_ROWS, four, name="cga")
+
+
+def cga_screen(device):
+    """The picture as the CGA's own memory at B800 holds it: two pixels to a
+    nibble and four to a byte, the first in the top two bits; eighty bytes a
+    row; the even rows in the first eight kilobytes and the odd ones in the
+    second; and the picture eight bytes in, in the middle of the 320.  The
+    rest is nought, which is the background.  What an interpreter's dump of
+    the screen is compared against."""
+    values = device.vram()
+    dealt = getattr(device, "cga_values", None)
+    if dealt:
+        values = bytes(dealt[pen] for pen in values)
+    out = bytearray(CGA_SCREEN_BYTES)
+    for row in range(SOURCE_ROWS):
+        base = (row & 1) * CGA_BANK + (row >> 1) * CGA_BYTES_ACROSS + CGA_MARGIN
+        for x in range(SOURCE_WIDTH):
+            out[base + (x >> 2)] |= (values[row * SOURCE_WIDTH + x] & 3) << (6 - 2 * (x & 3))
+    return bytes(out)
+
+
 DEVICES = {
     "spectrum": SpectrumDevice,
     "sam": sam_device,
@@ -886,6 +1057,7 @@ DEVICES = {
     "msx2": msx2_device,
     "pcw": PcwDevice,
     "amstrad": amstrad_device,
+    "cga": cga_device,
 }
 
 
@@ -899,7 +1071,7 @@ LIMITED = {"cpc", "cpc-wide"}
 # screen is a byte a pixel, so the pen of every point is on it to be read back.
 # The others would need eight kilobytes to keep the pens in, and are left out:
 # see doc/pendiente.md.
-AMSTRAD_RULES = {"cpc", "amstrad", "next"}
+AMSTRAD_RULES = {"cpc", "amstrad", "next", "cga"}
 
 
 def from_an_amstrad(ddb):
@@ -924,6 +1096,8 @@ def device_for(name, gfx=None, picture_id=None, ddb=None):
     Amstrad reloads its inks for every screen, and choosing them from what the
     picture actually uses beats any fixed palette.
     """
+    if name == "cga":
+        return cga_device(gfx, picture_id, ddb)
     if name in AMSTRAD_RULES and from_an_amstrad(ddb):
         header = None
         if picture_id is not None:

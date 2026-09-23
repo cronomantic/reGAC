@@ -3308,9 +3308,9 @@ exit
 1. ~~La **cabecera MZ** para el `.EXE`, que son 28 bytes escritos por `regac`
    --sin reubicaciones si los segmentos se calculan en marcha desde `CS`--.~~
    Hecha: ver «La cabecera MZ, cargada por el DOS de verdad», más abajo.
-2. Un **`CgaDevice`** en `regac/devices.py` y la comparación de láminas
+2. ~~Un **`CgaDevice`** en `regac/devices.py` y la comparación de láminas
    contra la referencia, antes de que exista intérprete: es como se hicieron
-   las otras cinco.
+   las otras cinco.~~ Hecho: ver «El `CgaDevice`, como el CPC», más abajo.
 3. Sólo entonces, el intérprete en 8086.
 
 **Y un emulador con reloj fiel, si alguna vez se quiere verificar la
@@ -3399,8 +3399,9 @@ Spectrum se dibuja con las reglas del Spectrum en cualquier máquina, y el
 modelo del Amstrad sólo vale para una aventura de Amstrad. Así que en el PC la
 elección tendrá que hacerse sobre el dibujo con las reglas del Spectrum, igual
 que el CPC después de su arreglo, y la tabla de abajo **hay que rehacerla**
-entonces. Se queda como lo que es: la prueba de que una paleta fija se queda
-corta. Sobre las 196 láminas, con aquel modelo:
+entonces --rehecha en «El `CgaDevice`, como el CPC»--. Se queda como lo que es:
+la prueba de que una paleta fija se queda corta. Sobre las 196 láminas, con
+aquel modelo:
 
 | trío | láminas |
 |---|---:|
@@ -3426,6 +3427,75 @@ para todas las láminas era más simple y habría sacado feas muchas de ellas.
 
 Como el GAC no tuvo versión de PC, aquí no hay original al que ser fiel: es
 una decisión y no una lectura.
+
+### El `CgaDevice`, como el CPC
+
+**Decidido: el PC se hace como el CPC**, que es lo que el modo 4 de la CGA es
+en forma --320 por 200, cuatro plumas, cuarenta columnas--. Una aventura de
+Spectrum se dibuja con las reglas del Spectrum, con la máscara, y cuatro
+colores elegidos para cada lámina contra la referencia; una de Amstrad, con
+las del Amstrad, que la CGA puede hacer porque, como el CPC, tiene la pluma de
+cada punto en la pantalla. El texto, con las reglas del CPC. Y **el dibujo no
+es de la CGA**: es `PixelDevice` o `AmstradDevice`, los mismos contra los que se
+comparan las otras máquinas. Lo de la CGA en `regac/devices.py` es sólo:
+
+- **Los colores**: los dieciséis del monitor de IBM, con su marrón, y los seis
+  tríos, cada uno con los bytes de `3D9h` y `3D8h` que lo ponen.
+- **La elección**: de las noventa y seis paletas, la que menos se aparta de la
+  lámina, pesando cada color por lo que cubre.
+- **La memoria**: `cga_screen` pone la lámina como la tiene la tarjeta en
+  `B800` --cuatro puntos por byte, las filas pares en un banco y las impares
+  en otro, ocho bytes adentro--, que es contra lo que se comparará lo que
+  vuelque el intérprete en DOSBox-X.
+- `render -m cga` la dibuja.
+
+**Lo único que la CGA obliga a hacer distinto del CPC es el orden.** Allí las
+cuatro tintas se ponen en las plumas que se quiera; aquí el valor cero es el
+fondo y del uno al tres el trío tal como viene. De eso salen dos cosas:
+
+- **En una aventura de Spectrum** el papel y la letra del texto van donde
+  caigan el negro y la tinta del texto, no a la cero y a la uno. Medido: el
+  negro queda en el fondo en 185 de las 196, y el blanco en el valor tres en
+  190.
+- **En una de Amstrad las plumas se reparten.** Si la pluma dos tuviera que
+  ser el valor dos, una lámina en amarillo y blanco sobre negro --Bangkok #3--
+  saldría con el blanco en el magenta del trío que tiene blanco. Pero lo que
+  las reglas del Amstrad le piden a una pluma es sólo que se distinga de las
+  otras: un relleno para donde cambia la pluma, y eso sigue igual con las
+  cuatro plumas repartidas entre los cuatro valores en cualquier orden,
+  siempre el mismo en toda la lámina. Así que se reparten como convenga a los
+  colores --de las noventa y seis paletas por veinticuatro repartos, la más
+  cercana a las tintas de la lámina, pluma a pluma, pesada por lo que cubre
+  cada una--. Bangkok #3 sale con el blanco en el fondo y el negro en su
+  sitio, y el amarillo en rojo claro: ningún trío con negro tiene amarillo.
+
+**Rehecha la tabla de antes**, ahora con las reglas del Spectrum, que son con
+las que se dibujan estas láminas:
+
+| trío | láminas |
+|---|---:|
+| paleta 1 | 92 |
+| modo 5 | 44 |
+| paleta 0 brillante | 38 |
+| paleta 0 | 21 |
+| modo 5 brillante | 1 |
+| paleta 1 brillante | 0 |
+
+El fondo, negro en 176. Colores que se pierden, contando los que cubren algo:
+**ninguno en 60** láminas, uno en 103, dos en 27 y tres en 6 --peor que en el
+CPC, que elige entre veintisiete tintas y no pierde ninguno en 125--. Y el
+texto, blanco sobre negro pasado por el mapa de cada lámina, legible en 192 de
+las 196 y justo en las otras cuatro.
+
+**Lo que queda para el intérprete, dicho ya**: el parpadeo de una aventura de
+Amstrad. En la CGA sólo se puede cambiar el fondo o el trío entero, no un color
+del trío, así que parpadeará lo que se pueda --el fondo, o el trío entero
+cuando las dos tintas caigan en tríos que existan-- y lo demás se quedará
+quieto, con la limitación escrita cuando se haga.
+
+Pruebas en `tests/test_cga.py`: dónde cae cada punto en `B800`, los bytes de
+los puertos, una lámina de Spectrum en cuatro colores de la CGA, y el reparto
+de plumas de una de Amstrad, uno a uno.
 
 ### La cabecera MZ, cargada por el DOS de verdad
 
