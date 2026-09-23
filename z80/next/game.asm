@@ -6,17 +6,22 @@
 ;
 ;   $0000  the window a bank of the database appears in -- or the 48K ROM,
 ;          for as long as a save takes
-;          wants, because this machine's screen is layer 2 and the sixteen
-;          kilobytes a Spectrum keeps its screen in are free here
+;   $4000  free: a Spectrum keeps its screen here, and this machine's screen
+;          is layer 2.  The tracker player and its tune lived here until the
+;          music was taken out, and nothing has moved in since
 ;   $5C00  left free, because that is where the ROM keeps its variables and
 ;          the ROM is borrowed to save a game
 ;   $5D00  what is resident of the database
 ;   $8000  this, and its buffers
 ;   $A000  the mask a fill walks, four kilobytes on its own boundary, and
-;          wiped whole every time a picture is: nothing else may live there
-;   $B200  free, some three kilobytes of it up to the stack -- which comes down
-;          from $BF00 and was measured going thirty four bytes deep, drawing
-;          every picture of four adventures and playing
+;          wiped whole every time a picture is: nothing else may live there.
+;          Only an adventure off a Spectrum has one: one off an Amstrad is
+;          drawn with the Amstrad's rules, whose pens are in layer 2 itself,
+;          and there this is free
+;   $B200  the picture interpreter, put above the mask (see ABOVE_MASK below),
+;          and after it what is left of three kilobytes up to the stack --
+;          which comes down from $BF00 and was measured going thirty four bytes
+;          deep, drawing every picture of four adventures and playing
 ;   $C000  whichever sixteen kilobytes of layer 2 are wanted: the top half of
 ;          the picture, the bottom half, or the text
 ;
@@ -32,6 +37,12 @@
 
                 DEFINE  BANKED
                 DEVICE  ZXSPECTRUMNEXT
+; An adventure off an Amstrad: its pictures carry their inks, and the inks may
+; flash.
+                IFDEF   AMSTRAD_PICTURES
+                DEFINE  PICTURE_INKS
+                DEFINE  FLASHING_INKS
+                ENDIF
 
                 include "banks.inc"
 
@@ -173,9 +184,20 @@ done_flag:      db      0
                 DEFINE  WITH_AY 1
                 include "../spectrum/keyboard.asm"
                 include "tape.asm"
+                include "pixels.asm"
+                ; The rules of the GAC the adventure was written with: an
+                ; adventure off an Amstrad is built with -DAMSTRAD_PICTURES and
+                ; draws with the Amstrad's, and one off a Spectrum with the
+                ; Spectrum's.  One or the other, never both.
+                IFDEF   AMSTRAD_PICTURES
+                include "amstrad.asm"
+                include "../cpc/shapes.asm"
+                include "amstrad_fill.asm"
+                ELSE
                 include "draw.asm"
                 include "../common/shapes.asm"
                 include "fill.asm"
+                ENDIF
                 include "../common/conditions.asm"
                 include "../common/opcodes.asm"
                 include "../common/parser.asm"
@@ -189,7 +211,11 @@ last:
                 ; mask is there.  Loaded with the processor held, a marker at
                 ; $A020 is in memory; after the first room it is noughts, and
                 ; one at $B300 is still there.
+                IFNDEF  AMSTRAD_PICTURES
                 ASSERT  last <= MASK            ; or the first picture wipes it
+                ELSE
+                ASSERT  last <= ABOVE_MASK      ; no mask: up to what is above it
+                ENDIF
                 ASSERT  last < STACK_AT         ; or the stack would land in it
 
 ; Above the mask there is room that nothing touches, and for a long time it

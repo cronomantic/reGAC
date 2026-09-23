@@ -16,19 +16,11 @@
 ; pictures come out the same, and it is laid out row by row, thirty two bytes
 ; to a row, so the fill that walks it is the Spectrum's own.
 
-GAC_TOP         equ 175                 ; y=175 is the first row of the screen
-
 ; The mask, four kilobytes on a four kilobyte boundary: a row is the high byte
 ; of the address and nothing else, which is what lets a run be walked with inc
 ; l and dec l.
 MASK            equ $A000
 MASK_BYTES      equ PICTURE_ROWS * 32
-
-; Turn the adventure's y into a screen row.  In A, out A.
-to_row:
-                neg
-                add     a, GAC_TOP
-                ret
 
 ; The colours a picture starts in: black on white, as the screen starts.
 ;
@@ -137,49 +129,6 @@ bright_now:     db      0
 line_colour:    db      0                       ; and what they come to
 fill_colour:    db      START_PAPER
 
-; Turn a command's y into a screen row, keeping sixteen bits with their sign.
-; A picture may name a y above the top or below the bottom, and those have to
-; stay outside rather than come round in a byte.  In A, out HL.
-; Corrupts: AF, C
-row_of:
-                ld      c, a
-                ld      a, GAC_TOP
-                sub     c
-                ld      l, a
-                sbc     a, a                    ; all ones when it went below
-                ld      h, a
-                ret
-
-; Bring an x that left the picture to its edge.  In HL, out L.
-; Corrupts: AF
-clamp_x:
-                ld      a, h
-                or      a
-                ret     z                       ; nought to 255 already
-                ld      l, 0
-                bit     7, h
-                ret     nz
-                ld      l, 255
-                ret
-
-; The same for a row.  In HL, out L.
-; Corrupts: AF
-clamp_row:
-                ld      a, h
-                or      a
-                jr      nz, .outside
-                ld      a, l
-                cp      PICTURE_ROWS
-                ret     c
-                ld      l, PICTURE_ROWS - 1
-                ret
-.outside:
-                ld      l, 0
-                bit     7, h
-                ret     nz
-                ld      l, PICTURE_ROWS - 1
-                ret
-
 ; The byte of the mask holding pixel (D across, E down) in HL, its bit as a
 ; mask in B.
 ;
@@ -225,22 +174,6 @@ pixel_address:
 
 bit_masks:      db      %10000000, %01000000, %00100000, %00010000
                 db      %00001000, %00000100, %00000010, %00000001
-
-; Where pixel (D across, E down) is in layer 2, with its half of the picture
-; mapped.  Inside a piece the row is the high byte and the column the low one.
-; Corrupts: AF, HL
-colour_address:
-                ld      a, e
-                rlca
-                rlca                            ; bit six of the row: which half
-                and     1
-                call    map_piece
-                ld      a, e
-                and     PIECE_LINES - 1
-                add     a, WINDOW >> 8
-                ld      h, a
-                ld      l, d
-                ret
 
 ; Put down a pixel of the outline at (D, E), which also stops fills: the
 ; colour into the picture and the bit into the mask.

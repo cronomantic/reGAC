@@ -140,6 +140,38 @@ def test_the_guessing_is_not_case_bound():
     assert nearest("zzz", ("MESS", "LOOK")) is None
 
 
+def test_an_amstrad_adventure_is_refused_where_it_cannot_be_drawn():
+    """An adventure written on an Amstrad is drawn with the Amstrad's rules,
+    and only on the machines that know them: anywhere else it is said, and
+    said as a sentence, not as a traceback."""
+    import subprocess
+    import tempfile
+
+    source = HEAD.replace("SPECTRUM", "CPC") + "/MSG\n#1\nx\n"
+    with tempfile.TemporaryDirectory() as folder:
+        path = os.path.join(folder, "partida.gac")
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(source)
+        done = subprocess.run(
+            [sys.executable, "-m", "regac", "compile", path,
+             os.path.join(folder, "partida.json")],
+            cwd=ROOT, capture_output=True, text=True)
+        assert done.returncode == 0, done.stderr
+        for machine, refused in (("msx", True), ("spectrum48", True),
+                                 ("pcw", True), ("next", False), ("cpc", False)):
+            built = subprocess.run(
+                [sys.executable, "-m", "regac", "build",
+                 os.path.join(folder, "partida.json"),
+                 os.path.join(folder, "partida.rgac"), "-m", machine],
+                cwd=ROOT, capture_output=True, text=True)
+            said = built.stdout + built.stderr
+            if refused:
+                assert built.returncode != 0, f"{machine} built it"
+                assert "Amstrad's rules" in said and "Traceback" not in said, said
+            else:
+                assert built.returncode == 0, f"{machine}: {said}"
+
+
 if __name__ == "__main__":
     for name, test in sorted(globals().items()):
         if name.startswith("test_"):

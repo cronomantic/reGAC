@@ -62,7 +62,8 @@ sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import emulator  # noqa: E402
-from regac.devices import device_for  # noqa: E402
+from regac.devices import device_for, from_an_amstrad  # noqa: E402
+import amstrad_games  # noqa: E402
 from regac.gfx import Renderer  # noqa: E402
 from test_all_pictures import adventures  # noqa: E402
 from test_graphics_cpc import PICTURE_LEFT, PICTURE_ROWS, pens_of  # noqa: E402
@@ -107,12 +108,17 @@ needs = (
 
 def draw_them_all(path):
     """Every picture of one adventure: its number, how many points differ from
-    the reference, and what it cost in seconds of a real Amstrad."""
+    the reference, and what it cost in seconds of a real Amstrad.  Drawn with
+    the rules of the GAC the adventure was written with."""
+    with open(path, encoding="utf-8") as f:
+        amstrad = from_an_amstrad(json.load(f))
     subprocess.run(
         [sys.executable, "-m", "regac", "build", path, DATABASE, "-m", "cpc"],
         cwd=ROOT, check=True, capture_output=True,
     )
-    listing = emulator.assemble(SOURCE, listing=LISTING)
+    listing = emulator.assemble(
+        SOURCE, listing=LISTING,
+        defines=("AMSTRAD_PICTURES",) if amstrad else ())
     where = {name: emulator.label_address(listing, name)
              for name in ("redraw", "done_flag", "picture_wanted", "go_flag")}
     with open(BINARY, "rb") as f:
@@ -144,27 +150,28 @@ def draw_them_all(path):
             drawn = pens_of(session.read(SCREEN, SCREEN_BYTES))
             theirs = [[drawn[row][PICTURE_LEFT + x] for x in range(256)]
                       for row in range(PICTURE_ROWS)]
-            # these are adventures off a Spectrum, drawn with its rules
+            # the pen of every point, whichever rules drew it
             device = device_for("cpc", gfx, number, ddb)
             Renderer(gfx, device).run(number)
+            ours = device.vram()
             wrong = sum(1 for row in range(PICTURE_ROWS) for x in range(256)
-                        if theirs[row][x] != device.colours[row * 256 + x])
+                        if theirs[row][x] != ours[row * 256 + x])
             out.append((number, wrong, seconds))
     finally:
         session.close()
     return out
 
 
-@needs
-def test_every_picture_matches_and_does_not_get_slower():
+def every_picture(named_paths, ceiling):
+    """Draw them all, and say which differ, which never finished and which
+    got slower than `ceiling` allows."""
     wrong, unfinished, slow = [], [], []
-    for path in adventures():
-        name = os.path.basename(path)[:-5]
+    for name, path in named_paths:
         drawn = draw_them_all(path)
         slowest = max((s for _, _, s in drawn if s is not None), default=0.0)
         wrong += [f"{name} {n} ({m} points)" for n, m, _ in drawn if m]
         unfinished += [f"{name} {n}" for n, m, _ in drawn if m is None]
-        allowed = CEILING.get(name)
+        allowed = ceiling.get(name)
         if allowed is not None and slowest > allowed:
             worst = max((s, n) for n, _, s in drawn if s is not None)
             slow.append(f"{name} {worst[1]} at {worst[0]:.1f}s, over {allowed}")
@@ -176,6 +183,42 @@ def test_every_picture_matches_and_does_not_get_slower():
     assert not slow, "slower than it was: " + ", ".join(slow)
 
 
+@needs
+def test_every_picture_matches_and_does_not_get_slower():
+    every_picture([(os.path.basename(path)[:-5], path) for path in adventures()],
+                  CEILING)
+
+
+# The adventures written on an Amstrad, drawn with the Amstrad's rules, which
+# is what this machine was doing to every adventure until the Spectrum's got
+# rules of their own -- and never to these, whose pictures are the ones that
+# AmstradDevice was checked against the original with, point for point.
+AMSTRAD_CEILING = {
+    "bangkok_fac": 3.0,         # the worst of its forty four measured 2.6
+    "bangkok_exp": 2.0,         # 1.6
+    "megacorp2": 3.0,           # 2.3
+    "megacorp3": 2.0,           # 1.8
+    "vajillas1": 2.0,           # 1.8
+    "vajillas2": 3.0,           # 2.2
+}
+
+needs_amstrad_games = (
+    pytest.mark.skipif(
+        not emulator.available() or not amstrad_games.available()
+        or not os.environ.get("REGAC_SLOW"),
+        reason="set REGAC_SLOW=1, with the tools and the Amstrad disks in juegos/",
+    )
+    if pytest is not None
+    else (lambda f: f)
+)
+
+
+@needs_amstrad_games
+def test_every_picture_off_an_amstrad_matches_and_does_not_get_slower():
+    every_picture(amstrad_games.amstrad_adventures(), AMSTRAD_CEILING)
+
+
 if __name__ == "__main__":
     test_every_picture_matches_and_does_not_get_slower()
+    test_every_picture_off_an_amstrad_matches_and_does_not_get_slower()
     print("every picture of every adventure comes out right on an Amstrad")

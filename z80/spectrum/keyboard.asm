@@ -41,6 +41,9 @@ LOOKS_HELD      equ 29
 ; next.
 ; Corrupts: BC, DE, HL
 scan_keyboard:
+                IFDEF   FLASHING_INKS
+                call    flash_look              ; every wait is looks like this:
+                ENDIF                           ; see next/screen.asm
                 xor     a
                 ld      (key_found), a
                 ld      (key_count), a

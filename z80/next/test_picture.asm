@@ -16,6 +16,11 @@
 ; was told to fill are in it, and so is where to start.
 
                 DEVICE  ZXSPECTRUMNEXT
+; An adventure off an Amstrad: its pictures carry their inks.  They may flash,
+; but only while a key is waited for, and this build waits for none.
+                IFDEF   AMSTRAD_PICTURES
+                DEFINE  PICTURE_INKS
+                ENDIF
 
 STACK_AT        equ $9F00
 database        equ $0000
@@ -84,13 +89,26 @@ piece_wanted:   db      PIECE_TOP
                 include "../common/unpack.asm"
                 include "screen.asm"
                 include "../common/textout.asm"
+                include "pixels.asm"
+                ; The rules of the GAC the adventure was written with: an
+                ; adventure off an Amstrad is built with -DAMSTRAD_PICTURES and
+                ; draws with the Amstrad's, and one off a Spectrum with the
+                ; Spectrum's.  One or the other, never both.
+                IFDEF   AMSTRAD_PICTURES
+                include "amstrad.asm"
+                include "../cpc/shapes.asm"
+                include "amstrad_fill.asm"
+                ELSE
                 include "draw.asm"
                 include "../common/shapes.asm"
                 include "fill.asm"
+                ENDIF
                 include "../common/picture.asm"
 
 last_code:
+                IFNDEF  AMSTRAD_PICTURES
                 ASSERT  last_code < MASK        ; or it would draw over itself
+                ENDIF
 
 ; The database, in pages of its own so that all of it is reachable at once:
 ; three of them mapped low, one after another, and then it is written across

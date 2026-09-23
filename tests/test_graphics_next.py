@@ -50,7 +50,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import emulator  # noqa: E402
 from regac.binary import Database  # noqa: E402
-from regac.devices import SPECTRUM_PALETTE, next_device  # noqa: E402
+from regac.devices import (SPECTRUM_PALETTE, amstrad_device, device_for,  # noqa: E402
+                           from_an_amstrad, next_device)
+import amstrad_games  # noqa: E402
 from regac.gfx import Renderer  # noqa: E402
 
 NEXT = os.path.join(ROOT, "z80", "next")
@@ -113,6 +115,10 @@ if pytest is not None:
             ("one picture calling another", [["INK", 2], ["CALL", 2]]),
         ],
     )
+    # An adventure off an Amstrad, drawn here with the Amstrad's rules: the
+    # same drawings the Amstrad itself is held to in test_graphics_cpc.py.
+    from test_graphics_cpc import drawings as amstrad_cases
+    amstrad_drawings = amstrad_cases
 else:
 
     def needs_tools(func):
@@ -122,6 +128,8 @@ else:
 
     def drawings(func):
         return func
+
+    amstrad_drawings = drawings
 
 
 def adventure(commands):
@@ -163,11 +171,18 @@ def layer2(session, wanted):
     return out
 
 
-def draw_on_both(commands):
+def draw_on_both(commands, off_an_amstrad=False):
+    """The picture drawn by the Next and by the reference, as layer 2 holds
+    it.  With `off_an_amstrad`, an adventure written on an Amstrad, drawn
+    with the Amstrad's rules: a byte of layer 2 is then the pen."""
     ddb = adventure(commands)
+    if off_an_amstrad:
+        ddb["model"] = "CPC"
     with open(DATABASE, "wb") as f:
-        f.write(Database(ddb).build())
-    listing = emulator.assemble(SOURCE, listing=LISTING)
+        f.write(Database(ddb, machine="next").build())
+    listing = emulator.assemble(
+        SOURCE, listing=LISTING,
+        defines=("AMSTRAD_PICTURES",) if off_an_amstrad else ())
     where = {name: emulator.label_address(listing, name)
              for name in ("done_flag", "piece_wanted")}
 
@@ -180,7 +195,8 @@ def draw_on_both(commands):
     finally:
         session.close()
 
-    return finished, drawn, Renderer(ddb["gfx"], next_device()).run(1).vram()
+    device = amstrad_device() if off_an_amstrad else next_device()
+    return finished, drawn, Renderer(ddb["gfx"], device).run(1).vram()
 
 
 @needs_tools
@@ -196,22 +212,37 @@ def test_the_next_draws_what_the_reference_draws(name, commands):
     )
 
 
-@needs_adventure
-def test_every_picture_of_an_adventure_comes_out_the_same():
-    """The primitives one at a time prove the sums; a real adventure proves
-    they hold together.  Every picture of Megacorp is drawn on the machine and
-    compared with the reference, in one sitting: the build is asked for a
-    picture, draws it, and waits to be asked for the next.
-    """
+@needs_tools
+@amstrad_drawings
+def test_a_picture_off_an_amstrad_is_drawn_with_the_amstrads_rules(name, commands):
+    finished, theirs, ours = draw_on_both(commands, off_an_amstrad=True)
+    assert finished, f"{name}: the Next never finished drawing"
+    wrong = [n for n in range(PICTURE_BYTES) if ours[n] != theirs[n]]
+    assert not wrong, (
+        f"{name}: {len(wrong)} pixels differ, the first at "
+        f"({wrong[0] % 256}, {wrong[0] // 256}): ours ${ours[wrong[0]]:02X}, "
+        f"theirs ${theirs[wrong[0]]:02X}"
+    )
+
+
+def every_picture_drawn(path):
+    """Draw every picture of the adventure at `path` on the machine, in one
+    sitting, with the rules of the GAC it was written with, and say which
+    differ from the reference: the build is asked for a picture, draws it,
+    and waits to be asked for the next."""
+    with open(path, encoding="utf-8") as f:
+        ddb = json.load(f)
+    gfx = ddb["gfx"]
+    amstrad = from_an_amstrad(ddb)
     subprocess.run(
-        [sys.executable, "-m", "regac", "build", ADVENTURE, DATABASE, "-m", "next"],
+        [sys.executable, "-m", "regac", "build", path, DATABASE, "-m", "next"],
         cwd=ROOT, check=True, capture_output=True,
     )
-    listing = emulator.assemble(SOURCE, listing=LISTING)
+    listing = emulator.assemble(
+        SOURCE, listing=LISTING,
+        defines=("AMSTRAD_PICTURES",) if amstrad else ())
     where = {name: emulator.label_address(listing, name)
              for name in ("done_flag", "picture_wanted", "piece_wanted", "redraw", "go_flag")}
-    with open(ADVENTURE, encoding="utf-8") as f:
-        gfx = json.load(f)["gfx"]
 
     wrong = {}
     session = emulator.Session(machine="TBBlue")
@@ -253,14 +284,47 @@ def test_every_picture_of_an_adventure_comes_out_the_same():
                                  + " ".join(f"${at:04X}" for at in seen if at))
                 break
             drawn = layer2(session, where["piece_wanted"])
-            reference = Renderer(gfx, next_device()).run(number).vram()
+            reference = Renderer(gfx, device_for("next", gfx, number, ddb)).run(number).vram()
             differ = sum(1 for n in range(PICTURE_BYTES) if drawn[n] != reference[n])
             if differ:
                 wrong[number] = f"{differ} pixels"
     finally:
         session.close()
+    return wrong
 
-    assert not wrong, f"{len(wrong)} of {len(gfx)} pictures differ: {wrong}"
+
+@needs_adventure
+def test_every_picture_of_an_adventure_comes_out_the_same():
+    """The primitives one at a time prove the sums; a real adventure proves
+    they hold together.  Every picture of Megacorp is drawn on the machine and
+    compared with the reference, in one sitting.
+    """
+    wrong = every_picture_drawn(ADVENTURE)
+
+    assert not wrong, f"{len(wrong)} pictures differ: {wrong}"
+
+
+needs_amstrad_games = (
+    pytest.mark.skipif(
+        not emulator.available() or not amstrad_games.available()
+        or not os.environ.get("REGAC_SLOW"),
+        reason="set REGAC_SLOW=1, with the tools and the Amstrad disks in juegos/",
+    )
+    if pytest is not None
+    else (lambda f: f)
+)
+
+
+@needs_amstrad_games
+def test_every_picture_off_an_amstrad_comes_out_the_same():
+    """The six adventures written on an Amstrad, every picture of them drawn
+    with the Amstrad's rules, against the reference those pictures were
+    checked with on the original."""
+    wrong = {}
+    for name, path in amstrad_games.amstrad_adventures():
+        wrong.update({f"{name} {n}": what
+                      for n, what in every_picture_drawn(path).items()})
+    assert not wrong, f"pictures that differ: {wrong}"
 
 
 def test_the_palette_is_the_one_the_reference_paints_with():

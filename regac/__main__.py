@@ -29,7 +29,7 @@ import os
 import sys
 
 from .check import problems_of
-from .binary import MACHINES, SECTION_NAMES, Database, Reader
+from .binary import MACHINES, SECTION_NAMES, BuildError, Database, Reader
 from .devices import DEVICES, device_for, from_an_amstrad, make
 from .gfx import Renderer
 from .media import (MSX_SCREEN_BYTES, PCW_SCREEN_BYTES, banks_of, cpc6128_disk,
@@ -237,12 +237,15 @@ def noises_source(noises, out):
 def cmd_build(args):
     """Write the binary database the 8 bit interpreter reads."""
     ddb = read_json(args.input)
-    database = Database(
-        ddb,
-        machine=args.machine,
-        page_bits=BANK_SIZES[args.banks],
-    )
-    image = database.build()
+    try:
+        database = Database(
+            ddb,
+            machine=args.machine,
+            page_bits=BANK_SIZES[args.banks],
+        )
+        image = database.build()
+    except BuildError as e:
+        sys.exit(f"ERROR: {e}")
     with open(args.output, "wb") as f:
         f.write(image)
     noises = ddb.get("sounds") or []
@@ -460,7 +463,7 @@ def cmd_make(args):
             noises = make_noises(ddb, tree)
             written = make_one(TARGETS[which], settings, ddb, name, root, output,
                                tree, noises)
-        except ProjectError as e:
+        except (ProjectError, BuildError) as e:
             sys.exit(f"ERROR: {which}: {e}")
         print(f"{which:12} -> " + ", ".join(
             os.path.relpath(path, output) for path in written))
@@ -510,7 +513,7 @@ def make_one(target, settings, ddb, name, root, output, where_regac_is,
     defines = list(noises)
     if makes_a_noise(ddb):
         defines.append("NOISES")
-    if target.machine == "cpc" and from_an_amstrad(ddb):
+    if target.machine in ("cpc", "next") and from_an_amstrad(ddb):
         # drawn with the rules of the GAC it was written with
         defines.append("AMSTRAD_PICTURES")
     if settings.get("screen"):

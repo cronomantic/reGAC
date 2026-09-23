@@ -88,7 +88,9 @@ GROUPS = {
     "msx-picture": ["test_all_pictures_msx", "test_graphics_msx"],
     "msx-text": ["test_keyboard_msx"],
     "msx-save": ["test_save_msx"],
-    "next-game": ["test_game_next", "test_textmode_next"],
+    "next-game": ["test_game_next", "test_textmode_next",
+                  # the colours, looked at on the game it builds
+                  "test_inks_next"],
     "next-picture": ["test_graphics_next"],
     "next-save": ["test_save_next"],
     "pcw-game": [

@@ -52,14 +52,18 @@ delante de sus órdenes**. Sólo el CPC lleva alguno:
 
 - una aventura de Amstrad, **ocho**, las tintas de cada lámina —una pareja
   por pluma, porque una tinta del CPC puede parpadear entre dos colores—, si
-  la aventura las trae (`gfx_inks`, que `deGAC` saca de ella); si no, cero;
+  la aventura las trae (`gfx_inks`, que `deGAC` saca de ella); si no, cero.
+  **En el Next, siempre ocho**, con las del firmware al arrancar en las
+  láminas que no traigan las suyas: allí son la paleta de layer 2 y no hay
+  otra a la que volver;
 - una aventura de Spectrum, **doce**: las cuatro tintas elegidas para la
   lámina, por parejas que no parpadean, y la pluma a la que va cada uno de
   los dieciséis colores del original, dos bits por color y cuatro por byte,
   el primero en los bits de abajo.
 
 En cualquier otra máquina es cero y la sección de gráficos queda igual byte a
-byte que antes. Van **delante de la
+byte que antes. Una aventura de Amstrad, además, sólo se construye para el CPC
+y el Next. Van **delante de la
 longitud** de cada lámina, de modo que el índice sigue apuntando a la
 longitud y lo que recorre las órdenes es el mismo en todas las máquinas; el
 intérprete del CPC los encuentra diez bytes antes de la primera orden.

@@ -636,6 +636,13 @@ class AmstradDevice(Device):
             for y in range(self.height)
         ]
 
+    def vram(self):
+        """The picture as a machine with a byte to a pixel holds it: the pen
+        of every point, row after row.  That is the Next's layer 2 for a
+        picture off an Amstrad, whose palette puts the picture's inks in the
+        first four entries."""
+        return bytes(self.pens)
+
 
 # The inks the firmware starts the machine with, which is what an Amstrad
 # picture with none of its own is shown in.
@@ -888,8 +895,11 @@ LIMITED = {"cpc", "cpc-wide"}
 
 # The machines that draw an adventure off an Amstrad with the Amstrad's rules.
 # An adventure is drawn with the rules of the GAC it was written with, on any
-# machine; today only the Amstrad itself knows those.
-AMSTRAD_RULES = {"cpc", "amstrad"}
+# machine that has room for them.  The Next does, and needs nothing extra: its
+# screen is a byte a pixel, so the pen of every point is on it to be read back.
+# The others would need eight kilobytes to keep the pens in, and are left out:
+# see doc/pendiente.md.
+AMSTRAD_RULES = {"cpc", "amstrad", "next"}
 
 
 def from_an_amstrad(ddb):

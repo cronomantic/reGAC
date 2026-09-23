@@ -3007,8 +3007,8 @@ datos; en un Spectrum 48 es mucho. El código no crece --cada compilación
 lleva un solo modelo, el de la aventura--; la memoria, sí. Cuánto le cuesta a
 cada máquina está por medir --el Next, el MSX y el PC no se han mirado--, y
 donde no quepa, `regac` lo dice con un mensaje claro en vez de compilar algo
-que dibuja mal. Hoy ninguna máquina salvo el CPC sabe dibujar con las reglas
-del CPC: está pendiente, detrás del PC.
+que dibuja mal. (Hecho, y ya no detrás del PC: el Next sabe, y las demás lo
+dicen; ver «Las aventuras de Amstrad en el Next, y en ninguna otra».)
 
 ### Hecho: el CPC dibuja las aventuras de Spectrum con las reglas del Spectrum
 
@@ -3099,6 +3099,77 @@ original; un `\ink 1` o un `\ink 2` en un mensaje salían en la otra. La
 prueba nueva mira el texto por colores, con un `\ink 3` a propósito: con un
 cambio a la dos la pantalla enseña los mismos tres colores estén cruzadas o
 no, y se comprobó que así sí falla con las plumas cruzadas.
+
+## Las aventuras de Amstrad en el Next, y en ninguna otra
+
+Lo decidido era que una aventura de Amstrad se dibuja con las reglas del
+Amstrad en cualquier máquina **que tenga sitio**. Mirado máquina por máquina
+--lo marcado *deducido* sale de los fuentes y de los binarios, no de una
+medida--:
+
+| máquina | ¿guarda la pantalla la pluma de cada punto? | un búfer de 8 KB para las plumas | color |
+|---|---|---|---|
+| Next | **sí**: layer 2 es un byte por punto | no hace falta | paleta programable |
+| MSX1 | no: dos colores por cada 8×1 | cabría detrás de la base de datos (*deducido*) | con choque en horizontal |
+| Spectrum 128 y +3 | no: un bit por punto, color por celda | hay bancos, pero se ven por la ventana de $C000 que usa la base de datos, y dibujar necesita las dos a la vez | con choque de 8×8 |
+| PCW | no: un bit por punto, sin color | bancos de sobra, sin mirar cómo mapearlo | las plumas a tramas |
+| Spectrum 48 | no | quedan 3-8 KB según la aventura (*deducido*) | con choque de 8×8 |
+
+Y dos cosas que pesan: **sólo hay tres aventuras de Amstrad** --Bangkok,
+MegaCorp y las Vajillas, seis partes--, y **las tres tienen versión de
+Spectrum**, que va a todas las máquinas. En todas salvo el Next habría que
+decidir cómo se ven cuatro plumas por punto en una pantalla con choque o sin
+color, y eso ya no es leer el original: el GAC de esas máquinas nunca dibujó
+una lámina de Amstrad.
+
+**Decidido: el Next, y ninguna otra.** Las demás no las construyen: `regac
+build` y `regac make` lo dicen con una frase --«this adventure was written on
+an Amstrad, and its pictures are drawn with the Amstrad's rules; msx does not
+know them; cpc and next do»-- y no con una traza, que es lo que salía la
+primera vez. Prueba en `test_errors.py`.
+
+**Cómo lo hace el Next.** Una compilación con `-DAMSTRAD_PICTURES` lleva
+`next/amstrad.asm`, `../cpc/shapes.asm` --la elipse del Amstrad, que sólo pide
+la recta-- y `next/amstrad_fill.asm`, en vez del dibujo del Spectrum; lo que
+comparten, en `next/pixels.asm`. Un punto de layer 2 es su pluma, de cero a
+tres, y **no hay máscara**: el relleno que se para donde cambia la pluma mira
+las plumas en la propia pantalla. El código acaba en $9EA8 con cualquiera de
+las seis, y los 4 KB de la máscara quedan libres.
+
+- **Las tintas** de cada lámina van a las cuatro primeras entradas de la
+  paleta de layer 2, con las mismas reglas que en el CPC: las pone la lámina
+  del cuarto y no la llamada con `CALL`, y parpadean mientras se espera
+  tecla, en el retrazo --aquí, esperando a que la línea de vídeo pase de la
+  192--. **No son exactas**: los tres niveles de cada canal del Amstrad van al
+  más cercano de los ocho del Next, así que el medio del Amstrad, 128, sale
+  146.
+- **El borde** es el de la ULA, así que se le da la tinta a la entrada 16 de
+  la paleta de la ULA --la del papel del color cero-- y al puerto un cero.
+  Comprobado en pantalla.
+- **El texto**, como en el Amstrad: pluma uno sobre pluma cero, y `\ink n` es
+  la pluma `n`.
+
+**Lo que dio**: las **187 láminas de las seis aventuras de Amstrad**, punto por
+punto iguales a `AmstradDevice` **en el Next y en el CPC**. Es la primera vez
+que el intérprete del CPC dibuja en una prueba láminas de Amstrad de verdad
+--hasta hoy sus reglas se probaban con las ocho de Spectrum, que no eran para
+ellas--, y `AmstradDevice` es el que se contrastó contra el original punto por
+punto. En el CPC la peor tarda 2,6 s. Las aventuras las saca de los discos de
+`juegos/` `tests/amstrad_games.py`, con `disk.py` y `deGAC`; las pruebas son
+lentas y van con `REGAC_SLOW=1`.
+
+### Y el magenta brillante del Next, que no se veía
+
+Al mirar el Next por colores salió otro de los que nadie veía. **Layer 2 no
+enseña los puntos del color $E3**: es su color transparente de fábrica, y deja
+ver lo que haya debajo. Y $E3 es justo lo que el magenta brillante del
+Spectrum da en nueve bits --y el del Amstrad también--. Comprobado en el
+emulador: una caja rellena de magenta brillante salía en negro. Lo usan **dos
+láminas de las ocho aventuras**, Bangkok1 #46 con 288 puntos y Bangkok2 #20
+con 839, y en el Next esos puntos no estaban. Ahora el intérprete le da al
+registro de transparencia $01, que no es ningún color de los que le pone a la
+paleta, ni del Spectrum ni del Amstrad. `test_inks_next.py` lo mira en
+pantalla, y se comprobó que falla sin el arreglo.
 
 ## PC XT con CGA: el paso uno, que era el que podía matarlo
 

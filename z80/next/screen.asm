@@ -37,12 +37,22 @@ REG_L2_BANK     equ $12                 ; which 16K bank layer 2 starts at
 REG_PALETTE_SEL equ $43                 ; which palette is being written
 REG_PALETTE_IX  equ $40                 ; and where in it
 REG_PALETTE_9   equ $44                 ; nine bits of colour, in two writes
+REG_TRANSPARENT equ $14                 ; the colour layer 2 does not show
+REG_LINE_HIGH   equ $1E                 ; the line the video is drawing
+REG_LINE_LOW    equ $1F
 MMU6            equ $56                 ; the two registers that map $C000
 MMU7            equ $57
 
 TURBO_28        equ 3                   ; twenty eight megahertz
 L2_FIRST_PAGE   equ 16                  ; the 8K pages layer 2 is in: bank 8
 L2_PALETTE      equ %00010000           ; layer 2's first palette, to write
+ULA_PALETTE     equ %00000000           ; and the ULA's, which the border is
+; The colour layer 2 treats as not there.  The machine starts it at $E3, which
+; is exactly what the Spectrum's bright magenta comes to in nine bits -- and
+; the Amstrad's too -- so every point of that colour showed whatever was
+; under layer 2 instead: two pictures of Los pajaros de Bangkok lost them.  No
+; colour this machine is given comes to $01.  See doc/pendiente.md.
+NOTHING_IS_CLEAR equ $01
 
 WINDOW          equ $C000               ; where a piece of layer 2 is seen
 PIECE_LINES     equ 64
@@ -56,10 +66,19 @@ PICTURE_ROWS    equ 128                 ; what a picture is given
 TEXT_ROWS       equ 8                   ; and the rows under it
 SCREEN_COLS     equ 32
 
+                IFDEF   AMSTRAD_PICTURES
+; An adventure off an Amstrad prints as the Amstrad's GAC does, in pen one on
+; pen nought, which are whatever inks the picture on the screen gave them; and
+; a picture starts on pen nought.
+TEXT_INK        equ 1
+TEXT_PAPER      equ 0
+START_PAPER     equ 0
+                ELSE
 TEXT_INK        equ 7                   ; white on black, as on the Spectrum
-TEXT_INK_DEFAULT equ TEXT_INK           ; what a message starts in
 TEXT_PAPER      equ 0
 START_PAPER     equ 7                   ; what a picture starts on
+                ENDIF
+TEXT_INK_DEFAULT equ TEXT_INK           ; what a message starts in
 
 ; Put the machine in layer 2 and lay the screen out.  The colours go in first,
 ; because everything shown afterwards is one of them.
@@ -77,6 +96,8 @@ screen_init:
                 ld      bc, L2_PORT
                 ld      a, %00000010            ; layer 2 shown
                 out     (c), a
+                ld      a, NOTHING_IS_CLEAR
+                nextreg REG_TRANSPARENT, a
                 call    set_palette
                 call    cls_picture
                 call    cls_window
@@ -151,6 +172,235 @@ map_piece:
                 ret
 
 piece_now:      db      $FF                     ; none of them, to begin with
+
+                IFDEF   PICTURE_INKS
+
+; -- the inks of a picture off an Amstrad ------------------------------------
+
+; A picture off an Amstrad carries its four inks, a pair to each pen because
+; an ink there can flash between two colours, and the original puts them up
+; for the picture of a room: the border from the first pair and then each pen,
+; at $0538 of its interpreter.  Here they go into the first four entries of
+; layer 2's palette, which is what a pen is on this screen, and the border is
+; the ULA's.  See z80/cpc/screen.asm, which does the same on the Amstrad.
+INKS_BYTES      equ 8
+picture_inks:   db      1, 1, 24, 24, 20, 20, 6, 6
+ink_phase:      db      1               ; the second of a pair shows first
+border_pen:     db      0
+picture_head:   db      0               ; what each picture carries in front
+                                        ; of its orders
+
+; The inks of picture HL.  A picture called from another steps over its own,
+; which is why this is called from draw_picture and not for a CALL.
+; Corrupts: AF, BC, DE
+picture_inks_set:
+                ld      a, (picture_head)
+                or      a
+                ret     z
+                push    hl
+                call    picture_find
+                jr      c, .none
+                ld      a, (picture_head)       ; they are in front of the
+                add     a, 2                    ; length, which is in front of
+                neg                             ; the orders
+                ld      e, a
+                ld      d, $FF
+                add     hl, de
+                ld      de, picture_inks
+                ld      bc, INKS_BYTES
+                ldir
+                IFDEF   FLASHING_INKS
+                call    flash_init
+                ENDIF
+                ld      a, 1
+                ld      (ink_phase), a
+                xor     a
+                ld      (border_pen), a
+                call    pens_init
+.none:
+                pop     hl
+                ret
+
+; The four pens and the border, from the picture's inks: of each pair, the
+; one the flashing is showing now.
+; Corrupts: AF, BC, DE, HL
+pens_init:
+                ld      a, L2_PALETTE
+                nextreg REG_PALETTE_SEL, a
+                xor     a
+                nextreg REG_PALETTE_IX, a       ; from entry nought, counting up
+                ld      e, 0
+.each_pen:
+                ld      a, e
+                call    pen_colour
+                nextreg REG_PALETTE_9, a
+                ld      a, (hl)
+                nextreg REG_PALETTE_9, a
+                inc     e
+                ld      a, e
+                cp      4
+                jr      nz, .each_pen
+                ; fall through
+
+; The border, which on this machine is the ULA's: it is drawn in the colour
+; of the ULA palette's paper entry for the colour on the port, so the port is
+; given nought and that entry the pen's ink.
+; Corrupts: AF, HL
+border_init:
+                ld      a, ULA_PALETTE
+                nextreg REG_PALETTE_SEL, a
+                ld      a, ULA_BORDER_ENTRY
+                nextreg REG_PALETTE_IX, a
+                ld      a, (border_pen)
+                call    pen_colour
+                nextreg REG_PALETTE_9, a
+                ld      a, (hl)
+                nextreg REG_PALETTE_9, a
+                xor     a
+                ld      (gfx_border), a         ; the speaker shares the port
+                out     ($FE), a
+                ret
+
+; The first of the two bytes of the colour pen A is wearing now, in A, and HL
+; at the second.
+; Corrupts: AF, HL
+pen_colour:
+                add     a, a                    ; a pair of inks to a pen
+                ld      hl, ink_phase
+                add     a, (hl)                 ; and which of the two
+                ld      hl, picture_inks
+                add     a, l
+                ld      l, a
+                jr      nc, .no_carry
+                inc     h
+.no_carry:
+                ld      a, (hl)                 ; the firmware's number
+                cp      27
+                jr      c, .known
+                xor     a
+.known:
+                add     a, a                    ; two bytes to a colour
+                ld      hl, next_inks
+                add     a, l
+                ld      l, a
+                jr      nc, .no_carry2
+                inc     h
+.no_carry2:
+                ld      a, (hl)
+                inc     hl
+                ret
+
+; The ULA palette entry the border is drawn in when the port says nought.
+ULA_BORDER_ENTRY equ 16
+
+; The Amstrad's twenty seven colours, in the firmware's order, in the nine
+; bits of this machine: each of the Amstrad's three levels to the nearest of
+; the eight here, so nought, four and seven.  RRRGGGBB, then the last bit of
+; the blue.  None of them is NOTHING_IS_CLEAR.
+next_inks:
+                db      $00, 0          ;  0  black
+                db      $02, 0          ;  1  blue
+                db      $03, 1          ;  2  bright blue
+                db      $80, 0          ;  3  red
+                db      $82, 0          ;  4  magenta
+                db      $83, 1          ;  5  mauve
+                db      $E0, 0          ;  6  bright red
+                db      $E2, 0          ;  7  purple
+                db      $E3, 1          ;  8  bright magenta
+                db      $10, 0          ;  9  green
+                db      $12, 0          ; 10  cyan
+                db      $13, 1          ; 11  sky blue
+                db      $90, 0          ; 12  yellow
+                db      $92, 0          ; 13  white
+                db      $93, 1          ; 14  pastel blue
+                db      $F0, 0          ; 15  orange
+                db      $F2, 0          ; 16  pink
+                db      $F3, 1          ; 17  pastel magenta
+                db      $1C, 0          ; 18  bright green
+                db      $1E, 0          ; 19  sea green
+                db      $1F, 1          ; 20  bright cyan
+                db      $9C, 0          ; 21  lime
+                db      $9E, 0          ; 22  pastel green
+                db      $9F, 1          ; 23  pastel cyan
+                db      $FC, 0          ; 24  bright yellow
+                db      $FE, 0          ; 25  pastel yellow
+                db      $FF, 1          ; 26  bright white
+
+                IFDEF   FLASHING_INKS
+
+; Whether any pen flashes, which is any pair of two colours, and the count
+; started again.
+; Corrupts: AF, BC, HL
+flash_init:
+                ld      hl, picture_inks
+                ld      bc, 4 * 256
+.each:
+                ld      a, (hl)
+                inc     hl
+                cp      (hl)
+                inc     hl
+                jr      z, .steady
+                inc     c
+.steady:
+                djnz    .each
+                ld      a, c
+                ld      (flashing), a
+                ld      hl, 0
+                ld      (flash_looks), hl       ; nought: start counting afresh
+                ret
+
+; The firmware changes a flashing ink every ten frames, the one and then the
+; other; the original never asks for anything else.  This interpreter runs
+; with the interrupts off, so there is no frame to count: what there is is the
+; keyboard, looked at LOOKS_A_FRAME times a frame -- measured -- and every wait
+; for a key is that.  So the pens change there and only there.
+FLASH_FRAMES    equ 10
+flashing:       db      0
+flash_looks:    dw      0
+
+; One look's worth of flashing.  Nothing at all unless a pen flashes.
+; Corrupts: AF, BC, DE, HL
+flash_look:
+                ld      a, (flashing)
+                or      a
+                ret     z
+                ld      hl, (flash_looks)
+                ld      a, h
+                or      l
+                jr      nz, .counting
+                ld      hl, FLASH_FRAMES * LOOKS_A_FRAME
+.counting:
+                dec     hl
+                ld      (flash_looks), hl
+                ld      a, h
+                or      l
+                ret     nz
+                ; In the frame flyback, as the firmware does, so that no frame
+                ; comes out half in the one colour and half in the other: the
+                ; video is past the 192 lines of the picture from line 192 to
+                ; the end of the frame.
+.wait:
+                ld      bc, NEXT_REG_SELECT
+                ld      a, REG_LINE_HIGH
+                out     (c), a
+                inc     b
+                in      a, (c)
+                or      a
+                jr      nz, .wait
+                dec     b
+                ld      a, REG_LINE_LOW
+                out     (c), a
+                inc     b
+                in      a, (c)
+                cp      192
+                jr      c, .wait
+                ld      a, (ink_phase)
+                xor     1
+                ld      (ink_phase), a
+                jp      pens_init
+
+                ENDIF
+                ENDIF
 
 ; The picture is drawn where it is shown, so there is nothing to send across.
 gfx_show:
@@ -303,7 +553,11 @@ new_line:
 ; order, so the colour asked for is the colour written.
 ; Corrupts: AF
 text_ink:
+                IFDEF   AMSTRAD_PICTURES
+                and     3                       ; a pen, as on the Amstrad
+                ELSE
                 and     15
+                ENDIF
                 ld      (text_colour), a
                 ret
 

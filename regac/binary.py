@@ -205,7 +205,7 @@ class Database:
             raise BuildError(
                 f"this adventure was written on an Amstrad, and its pictures "
                 f"are drawn with the Amstrad's rules; {machine} does not know "
-                f"them, only {', '.join(sorted(AMSTRAD_RULES & set(MACHINES)))} does"
+                f"them; {' and '.join(sorted(AMSTRAD_RULES & set(MACHINES)))} do"
             )
         self.ddb = ddb
         self.machine = machine
@@ -299,10 +299,15 @@ class Database:
         Spectrum is drawn there with the Spectrum's rules and shown in four
         inks chosen for it, and carries those and the pen each colour of the
         original comes to."""
+        if from_an_amstrad(self.ddb):
+            if self.machine == "next":
+                # always: its palette has nothing to fall back on but these
+                return PICTURE_INKS
+            if self.machine == "cpc":
+                return PICTURE_INKS if self.ddb.get("gfx_inks") else 0
+            return 0
         if self.machine != "cpc":
             return 0
-        if from_an_amstrad(self.ddb):
-            return PICTURE_INKS if self.ddb.get("gfx_inks") else 0
         return PICTURE_INKS + PICTURE_PENS
 
     def head_of(self, key):
