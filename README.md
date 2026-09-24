@@ -1,8 +1,12 @@
 # ReGAC
 
 Write a Graphic Adventure Creator adventure as a text file and publish it on
-eight eighties machines with one command -- or rescue one from a 1986 tape and
+nine eighties machines with one command -- or rescue one from a 1986 tape and
 read it as source.
+
+The nine: the Spectrum 48, 128 and +3, the Amstrad CPC 464 and 6128, the
+Amstrad PCW, the MSX, the Spectrum Next, and a PC with a CGA, from an XT at
+4.77 MHz up.
 
 ## Documentation
 
@@ -35,6 +39,12 @@ order and why. It is not reference material.
   tape as they assemble and the Next its own .nex; the Amstrad's disk and tape,
   the PCW's self-starting disk and the MSX's cassette are made with
   `regac release`.
+* x86: The PC's interpreter, in 8086 assembler for NASM. `regac make` puts it
+  and the adventure together in one DOS .EXE named after the project.
+
+What has to be installed besides Python -- sjasmplus for the Z80 machines,
+NASM for the PC, and ZEsarUX and DOSBox-X only to run the tests -- is in
+[doc/manual.md](doc/manual.md).
 
 ```
 python -m regac decompile game.json game.gac
@@ -45,6 +55,7 @@ python -m regac checkgfx  game.json -m cpc
 python -m regac text      game.json
 python -m regac make      game.toml
 python -m regac build     game.json game.rgac -m spectrum128 -b 16k
+python -m regac build     game.json game.rgac -m pc -b 64k
 python -m regac release   game.bin  release/ -m cpc
 python -m regac release   game_code.bin release/ -m pcw        --boot boot.bin --database game.rgac
 python -m regac release   game.bin  release/ -m msx           --database game.rgac
