@@ -91,6 +91,17 @@ def test_a_mark_of_punctuation_ends_a_word():
 
 
 @needs_tools
+def test_a_space_after_a_mark_goes_down_with_the_word():
+    """MegaCorp's second room, which the original shows with the space after
+    the full stop at the start of the new line: that space follows another
+    separator, and the original's $778A breaks at the first of the two.  A
+    space that ends a word stays where it is: see doc/pendiente.md."""
+    lines = laid_out("LA BODEGA DE CARGA DE LA NAVE. SALIDAS:NORTE." + RULE)
+    assert lines[:3] == ["LA BODEGA DE CARGA DE LA NAVE.", " SALIDAS:NORTE.",
+                         RULE], f"the lines came out as {lines}"
+
+
+@needs_tools
 def test_a_line_that_fills_itself_is_not_ended_again():
     """The prompt comes on the line straight after the rule."""
     lines = laid_out("UN CUARTO." + RULE)

@@ -1312,6 +1312,14 @@ al final del anterior, donde no se ve. Es una sangría de un espacio en un
 punto de corte, y se ha vuelto a ver en las pruebas de `TEXT`, así que es
 constante y no una casualidad de una pantalla.
 
+**Cerrada.** Es la regla de «Cómo corta las líneas el original», más abajo,
+leída en `$778A`: el espacio va detrás de un punto, que también es separador,
+así que es un espacio de una tirada y baja con la palabra. Lo comprueba
+`test_a_space_after_a_mark_goes_down_with_the_word`, con el texto de la sala 2
+de megacorp1 tal cual: sale ` SALIDAS:NORTE.` como en el original, y se ha
+visto fallar, con `SALIDAS:NORTE.` sin el espacio, al quitar la regla de
+`word_print` en `z80/common/textout.asm`.
+
 La prueba es [`test_wrapping_z80.py`](../tests/test_wrapping_z80.py), con la
 forma de MegaCorp escrita como MegaCorp la escribe.
 
