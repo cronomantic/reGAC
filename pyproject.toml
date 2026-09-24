@@ -6,8 +6,9 @@ authors = [
     {name = "Cronomantic",email = "cronomantic@gmail.com"}
 ]
 readme = "README.md"
-# pygame-ce needs 3.10, and 3.9 reached its end of life in 2025.
-requires-python = ">=3.10"
+# 3.11 is the first whose standard library reads TOML, which is what a
+# project file is written in.
+requires-python = ">=3.11"
 dependencies = [
     # The community fork: it is import compatible with pygame and, unlike
     # pygame itself, publishes wheels for current Python versions.

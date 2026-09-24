@@ -48,11 +48,7 @@ import os
 import shutil
 import subprocess
 import sys
-
-try:
-    import tomllib
-except ImportError:                     # pragma: no cover - Python below 3.11
-    tomllib = None
+import tomllib
 
 from .media import MSX_SCREEN_BYTES, NEXT_SCREEN_BYTES, msx_screen
 
@@ -170,8 +166,6 @@ PROJECT_KEYS = {"name", "source", "output", "targets"}
 
 def read(path):
     """Read a project file and check it says things that exist."""
-    if tomllib is None:
-        raise ProjectError("reading a project file needs Python 3.11 or later")
     with open(path, "rb") as f:
         project = tomllib.load(f)
     strange = set(project) - PROJECT_KEYS
