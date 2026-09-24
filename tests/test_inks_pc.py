@@ -65,9 +65,9 @@ def playing(tmp_path, ddb, wait_first=0):
     ddb["lpcs"] = [["PUSH", QUIT_VERB], ["VERB"], ["IF"], ["EXIT"], ["END"]]
     folder = str(tmp_path)
     pc_game.build(ddb, folder)
-    # the typing starts that much later, and the game waits for it
+    # the first key comes that many seconds of asking later
     said, screen = pc_game.play(folder, "SALIR" + ENTER + "X",
-                                wait=3 + wait_first)
+                                start=pc_game.START_FRAMES + 50 * wait_first)
     assert screen is not None, f"the game never ended: {said}"
     with open(os.path.join(folder, "PALETTE.BIN"), "rb") as f:
         raw = f.read()

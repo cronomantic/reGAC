@@ -89,6 +89,8 @@ def test_every_noise_lasts_what_it_lasts_on_a_spectrum(tmp_path):
     wanted = [lasts(*CLICK)] + [lasts(*effect) for effect in EFFECTS]
     assert len(measured) == len(wanted), measured
     for number, (got, should) in enumerate(zip(measured, wanted)):
-        assert should * 0.98 < got < should * 1.05, (
+        # within a hundredth: the flips are timed from the note's start, so
+        # a wait that ends late does not make the next one later
+        assert should * 0.99 < got < should * 1.01, (
             f"{'the click' if number == 0 else f'noise {number}'} lasted "
             f"{got} clocks, not about {should}")

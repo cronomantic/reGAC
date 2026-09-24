@@ -75,11 +75,31 @@ def picture_area(session):
                     for line in range(8))
 
 
+DRAW = 98                       # a verb of our own that draws after TEXT
+
+
+def margins(area):
+    """Of the picture's rows as picture_area gives them, the eight bytes at
+    each end of every line: the screen either side of the picture."""
+    out = b""
+    for line in range(8):
+        block = area[line * PICTURE_ROWS * LINE_BYTES:
+                     (line + 1) * PICTURE_ROWS * LINE_BYTES]
+        for row in range(PICTURE_ROWS):
+            at = row * LINE_BYTES
+            out += block[at:at + 8] + block[at + LINE_BYTES - 8:at + LINE_BYTES]
+    return out
+
+
 def picture_area_after(orders, settle=6.0):
     """What the picture's rows held after the game started and after each of
     the orders."""
+    ddb = a_room_and_a_verb()
+    ddb["verbs"]["DIBUJA"] = DRAW
+    ddb["lpcs"] += [["PUSH", DRAW], ["VERB"], ["IF"], ["PICT"], ["PUSH", 2],
+                    ["GOTO"], ["END"]]
     with open(DATABASE, "wb") as f:
-        f.write(Database(a_room_and_a_verb(), machine="cpc").build())
+        f.write(Database(ddb, machine="cpc").build())
     listing = emulator.assemble(SOURCE, listing=LISTING)
     ready = emulator.label_address(listing, "vm_location")
     with open(BINARY, "rb") as f:
@@ -133,6 +153,20 @@ def test_with_text_on_a_room_draws_no_picture():
     assert with_pictures != with_text, (
         "the room drew its picture although TEXT had asked for none"
     )
+
+
+@needs_tools
+def test_a_picture_clears_what_the_text_left_either_side_of_it():
+    """TEXT gives the text the whole screen, and a long message fills it, the
+    rows of the picture edge to edge.  A picture drawn after that takes its
+    rows back whole, and not only its own 256 points: what the text left
+    either side of it goes, as on the PC."""
+    first, after_text, after_picture = (
+        margins(area) for area in picture_area_after(["TEXTO", "DIBUJA"]))
+    assert not any(first), "there was something beside the first picture"
+    assert any(after_text), "the text never reached beside the picture"
+    assert not any(after_picture), (
+        "what the text left beside the picture is still there")
 
 
 if __name__ == "__main__":

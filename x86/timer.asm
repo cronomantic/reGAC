@@ -86,25 +86,54 @@ frame_gone:
                 clc
                 ret
 
-; Wait AX clocks of the counter, the fine grain the speaker is timed in.
+; Start counting the timer's clocks from nought, for a noise: see beat_until.
 ; Corrupts: AX
-wait_clocks:
-                push    bx
-                push    dx
-                mov     bx, ax
+beat_start:
                 call    timer_read
-                mov     dx, ax
+                mov     [beat_last], ax
+                xor     ax, ax
+                mov     [beat_clocks], ax
+                mov     [beat_clocks + 2], ax
+                ret
+
+; Wait until DX:AX clocks have gone by since beat_start.  A noise waits for
+; each flip of the speaker until a time counted from the start of the note,
+; and not for so long from now: a wait always ends a little late, by however
+; long a look at the timer takes, and counted from now every flip's lateness
+; went on top of the last's.  On a busy machine that made a noise a twentieth
+; too long; on a slow one it would too.
+; Corrupts: nothing
+beat_until:
+                push    bx
+                push    cx
+                mov     bx, ax
+                mov     cx, dx
 .waiting:
                 call    timer_read
-                neg     ax
-                add     ax, dx                  ; how far since the start
+                push    dx
+                mov     dx, [beat_last]
+                mov     [beat_last], ax
+                sub     dx, ax                  ; how far it has counted down
+                add     [beat_clocks], dx
+                adc     word [beat_clocks + 2], 0
+                pop     dx
+                mov     ax, [beat_clocks + 2]
+                cmp     ax, cx
+                jb      .waiting
+                ja      .done
+                mov     ax, [beat_clocks]
                 cmp     ax, bx
                 jb      .waiting
-                pop     dx
+.done:
+                mov     ax, bx
+                mov     dx, cx
+                pop     cx
                 pop     bx
                 ret
 
 section .data
+beat_last:      dw      0
+beat_clocks:    dd      0
 timer_last:     dw      0
 timer_owed:     dw      0
 section .text

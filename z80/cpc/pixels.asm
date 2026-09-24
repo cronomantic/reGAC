@@ -101,6 +101,35 @@ pixel_address:
                 and     3
                 ret
 
+; Wipe the rows the picture lives in to pen nought, the whole width of the
+; screen and not only the picture's 256 points.  The text may have had those
+; rows -- TEXT gives it the whole screen, and so does a room with no picture
+; -- and what it left either side of the picture stayed there beside the next
+; one drawn.  Pen nought is the paper, so the rows come out as a picture with
+; nothing round it.  Decided for the Amstrad and the PC together; see
+; doc/pendiente.md.
+; Corrupts: everything
+wipe_picture_rows:
+                ld      e, 0
+.each_row:
+                ld      d, 0
+                push    de
+                call    pixel_address
+                ld      bc, -PICTURE_LEFT / 4   ; back to the edge of the screen
+                add     hl, bc
+                ld      b, LINE_BYTES
+                xor     a
+.across:
+                ld      (hl), a
+                inc     hl
+                djnz    .across
+                pop     de
+                inc     e
+                ld      a, e
+                cp      PICTURE_ROWS
+                jr      nz, .each_row
+                ret
+
 ; The byte with the pen in A all the way across.
 ; Corrupts: AF, HL
 pen_byte:

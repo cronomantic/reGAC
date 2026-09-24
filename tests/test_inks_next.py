@@ -121,9 +121,10 @@ def looked_at(session, folder, name):
     return seen, (red, green, blue)
 
 
-def playing(ddb, looks=1, every=0.0):
+def playing(ddb, looks=1, every=0.0, until=None):
     """Build the adventure, start it, and look at the screen once its room is
-    up, `looks` times, `every` seconds apart."""
+    up, `looks` times, `every` seconds apart -- or, with `until`, for as long
+    as it takes for what it says to have been seen, `looks` times at most."""
     build(ddb)
     out = []
     folder = tempfile.mkdtemp(prefix="regac-next-inks-")
@@ -133,6 +134,8 @@ def playing(ddb, looks=1, every=0.0):
         time.sleep(emulator.longer(10.0))       # loading, and the first picture
         for n in range(looks):
             out.append(looked_at(session, folder, f"look{n}"))
+            if until is not None and until(out):
+                break
             time.sleep(every)
     finally:
         session.close()
@@ -153,11 +156,21 @@ def test_a_picture_off_an_amstrad_puts_up_its_own_inks():
 
 @needs_tools
 def test_a_pen_of_two_colours_flashes_while_the_game_waits():
+    """It flashes only while the game waits for a key, so it is looked at
+    until both colours have been seen, four hundred looks at most.  Twelve
+    looks over two seconds, ten seconds after loading, were not enough on a
+    busy host: the first picture could still be being drawn, and every look
+    saw the same colour."""
     inks = {"1": [3, 3, 26, 9, 18, 18, 2, 2]}
-    looks = playing(one_room({"1": ALL_FOUR}, inks), looks=12, every=0.15)
-    shown_sets = {frozenset(seen) for seen, _ in looks}
     one = frozenset(amstrad(n) for n in (3, 9, 18, 2))
     other = frozenset(amstrad(n) for n in (3, 26, 18, 2))
+
+    def both(looks):
+        return {one, other} <= {frozenset(seen) for seen, _ in looks}
+
+    looks = playing(one_room({"1": ALL_FOUR}, inks), looks=400, every=0.15,
+                    until=both)
+    shown_sets = {frozenset(seen) for seen, _ in looks}
     assert one in shown_sets, "the second of the pair never showed"
     assert other in shown_sets, "the first of the pair never showed"
     assert shown_sets <= {one, other}, f"something else changed: {shown_sets}"

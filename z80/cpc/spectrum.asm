@@ -447,9 +447,9 @@ line_sy:        db      0
 line_err:       db      0
 
 ; Wipe the picture and the mask with it: the mask to nothing, because a wiped
-; picture stops no fill, and the picture to pen nought, which is the paper the
-; text is printed on.  A picture about to be drawn is then laid white by
-; gfx_start_colours, once its inks are in.
+; picture stops no fill, and the picture's rows to pen nought, which is the
+; paper the text is printed on -- see wipe_picture_rows.  A picture about to
+; be drawn is then laid white by gfx_start_colours, once its inks are in.
 ; Corrupts: everything
 gfx_clear:
                 ld      hl, MASK
@@ -457,5 +457,4 @@ gfx_clear:
                 ld      bc, MASK_BYTES - 1
                 ld      (hl), 0
                 ldir
-                xor     a
-                jp      paint_picture
+                jp      wipe_picture_rows

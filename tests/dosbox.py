@@ -42,6 +42,10 @@ MACHINE = "cga"
 # it takes: see doc/pendiente.md.
 CYCLES = 315
 RUN_SECONDS = longer(30)
+# No window: SDL's dummy video driver runs the machine and shows nothing, so a
+# run of the tests does not fill the desktop with DOSBox-X windows.  What the
+# tests look at is what the program writes, never the window.
+WINDOWLESS = dict(os.environ, SDL_VIDEODRIVER="dummy")
 
 
 def find_nasm():
@@ -111,8 +115,11 @@ def run(folder, program, cycles=CYCLES, typed=None, wait=3, pace=0.25,
     typing = ""
     if typed:
         typing = f"autotype -w {wait} -p {pace} " + " ".join(typed) + "\n"
+    # No sound either: the noises are timed on the machine's clock, and
+    # nobody should have to hear a run of the tests.
     with open(conf, "w") as f:
         f.write(f"[dosbox]\nmachine={MACHINE}\n"
+                f"[mixer]\nnosound=true\n"
                 f"[cpu]\ncycles={speed}\n"
                 f"[autoexec]\nmount c .\nc:\n{typing}{program}\nexit\n")
     command = [find_dosbox(), "-conf", conf, "-fastlaunch", "-exit"]
@@ -121,7 +128,7 @@ def run(folder, program, cycles=CYCLES, typed=None, wait=3, pace=0.25,
     # shim that started the emulator, and killing the shim alone leaves the
     # emulator running.
     process = subprocess.Popen(command, cwd=folder, stdout=subprocess.DEVNULL,
-                               stderr=subprocess.DEVNULL)
+                               stderr=subprocess.DEVNULL, env=WINDOWLESS)
     try:
         process.wait(timeout=seconds or RUN_SECONDS)
     except subprocess.TimeoutExpired:

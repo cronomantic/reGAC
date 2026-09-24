@@ -48,19 +48,27 @@ beep_note:
                 mov     bx, ax
                 in      al, SPEAKER_PORT
                 and     al, ~SPEAKER_BITS
-                mov     dl, al                  ; the port, speaker at rest
+                mov     [speaker_rest], al      ; the port, speaker at rest
+                call    beat_start
+                xor     ax, ax
+                mov     [flip_at], ax           ; when the next flip is due
+                mov     [flip_at + 2], ax
 .each_flip:
                 jcxz    .done
-                xor     dl, SPEAKER_MOVE
-                mov     al, dl
+                mov     al, [speaker_rest]
+                xor     al, SPEAKER_MOVE
+                mov     [speaker_rest], al
                 out     SPEAKER_PORT, al
-                mov     ax, bx
-                call    wait_clocks
+                add     [flip_at], bx
+                adc     word [flip_at + 2], 0
+                mov     ax, [flip_at]
+                mov     dx, [flip_at + 2]
+                call    beat_until
                 dec     cx
                 jmp     .each_flip
 .done:
-                and     dl, ~SPEAKER_BITS       ; and leave it where it was
-                mov     al, dl
+                mov     al, [speaker_rest]      ; and leave it where it was
+                and     al, ~SPEAKER_BITS
                 out     SPEAKER_PORT, al
                 ret
 
@@ -92,21 +100,28 @@ beep_sound:
                 mov     bh, [si + 2]            ; and how it moves
                 in      al, SPEAKER_PORT
                 and     al, ~SPEAKER_BITS
-                mov     dh, al
+                mov     [speaker_rest], al
+                call    beat_start
+                xor     ax, ax
+                mov     [flip_at], ax
+                mov     [flip_at + 2], ax
 .each_flip:
                 jcxz    .done
-                xor     dh, SPEAKER_MOVE
-                mov     al, dh
+                mov     al, [speaker_rest]
+                xor     al, SPEAKER_MOVE
+                mov     [speaker_rest], al
                 out     SPEAKER_PORT, al
                 mov     al, bl
                 test    al, al
                 jnz     .some
                 inc     al                      ; never nothing at all
 .some:
-                push    dx
-                call    half_wave
-                pop     dx
-                call    wait_clocks
+                call    half_wave               ; AX, the clocks it lasts
+                add     [flip_at], ax
+                adc     word [flip_at + 2], 0
+                mov     ax, [flip_at]
+                mov     dx, [flip_at + 2]
+                call    beat_until
                 mov     al, bh
                 test    al, al
                 jns     .rising
@@ -123,13 +138,15 @@ beep_sound:
                 dec     cx
                 jmp     .each_flip
 .done:
-                and     dh, ~SPEAKER_BITS
-                mov     al, dh
+                mov     al, [speaker_rest]
+                and     al, ~SPEAKER_BITS
                 out     SPEAKER_PORT, al
 .none:
                 ret
 
 section .data
+speaker_rest:   db      0               ; what port 61h holds, speaker and all
+flip_at:        dd      0               ; the clocks from the note's start
 ; The noises an adventure can ask for: see z80/common/effects.asm, whose
 ; table this is.  An adventure may say what noises it wants, and then regac
 ; writes them into a file of their own that comes in here instead.

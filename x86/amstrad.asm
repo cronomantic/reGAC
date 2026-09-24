@@ -101,8 +101,7 @@ pen_at:
                 mov     al, 255
                 ret
 
-; Wipe the picture to value nought.
+; Wipe the picture's rows to value nought: see wipe_picture_rows.
 ; Corrupts: AX, BX, CX, DI, ES
 gfx_clear:
-                xor     al, al
-                jmp     paint_picture
+                jmp     wipe_picture_rows

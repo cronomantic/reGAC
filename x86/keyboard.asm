@@ -47,16 +47,20 @@ KEY_EVERY       equ 5
 ; Corrupts: AX, BX, DX, ES
 keyboard_init:
                 mov     [cs:isr_data], ds
-                mov     ax, (DOS_GET_VECTOR << 8) | 09h
+                %ifndef SCRIPTED_KEYS                   ; a test's keys: see
+                mov     ax, (DOS_GET_VECTOR << 8) | 09h ; script.asm
                 int     21h
                 mov     [old_int9], bx
                 mov     [old_int9 + 2], es
+                %endif
                 push    ds
                 push    cs
                 pop     ds
+                %ifndef SCRIPTED_KEYS
                 mov     dx, keyboard_isr
                 mov     ax, (DOS_SET_VECTOR << 8) | 09h
                 int     21h
+                %endif
                 mov     dx, ignore_break
                 mov     ax, (DOS_SET_VECTOR << 8) | 23h
                 int     21h
@@ -69,13 +73,13 @@ keyboard_init:
 ; And give it back.  DOS puts back the other two itself.
 ; Corrupts: AX, DX
 keyboard_done:
+                %ifndef SCRIPTED_KEYS
                 push    ds
-                mov     dx, [old_int9]
-                mov     ax, [old_int9 + 2]
-                mov     ds, ax
+                lds     dx, [old_int9]
                 mov     ax, (DOS_SET_VECTOR << 8) | 09h
                 int     21h
                 pop     ds
+                %endif
                 ret
 
 ; A break is not ours to act on.
@@ -110,6 +114,9 @@ keyboard_isr:
                 push    es
                 mov     ds, [cs:isr_data]
                 in      al, KEYBOARD_DATA
+                %ifdef TRANSCRIPT
+                inc     word [codes_seen]       ; for a test: see game.asm
+                %endif
                 cmp     byte [pause_left], 0
                 je      .not_pause
                 dec     byte [pause_left]       ; the rest of pause says nothing
@@ -383,6 +390,9 @@ key_down:       times 128 db 0          ; which keys are down
 key_pressed:    times 128 db 0          ; which went down since the last look
 key_char:       times 128 db 0          ; and what each says
 pause_left:     db      0
+                %ifdef TRANSCRIPT
+codes_seen:     dw      0               ; every code the keyboard sent
+                %endif
 key_found:      db      0
 key_count:      db      0
 held_key:       db      0

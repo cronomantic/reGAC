@@ -380,24 +380,7 @@ set_border:
                 pop     hl
                 ret
 
-; Wipe the picture area to pen nought.  It is 64 bytes of every line, 32
-; pixels in from the left, and 128 lines of them.
+; Wipe the picture's rows to pen nought: see wipe_picture_rows.
 ; Corrupts: everything
 gfx_clear:
-                ld      e, 0
-.each_row:
-                ld      d, 0
-                push    de
-                call    pixel_address
-                ld      b, 64
-                xor     a
-.across:
-                ld      (hl), a
-                inc     hl
-                djnz    .across
-                pop     de
-                inc     e
-                ld      a, e
-                cp      PICTURE_ROWS
-                jr      nz, .each_row
-                ret
+                jp      wipe_picture_rows

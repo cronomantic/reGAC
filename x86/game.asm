@@ -54,6 +54,11 @@ start:
                 call    save_init
                 call    timer_init
                 call    keyboard_init
+                %ifdef SCRIPTED_KEYS
+                call    read_script             ; a test's keys, not the PC's
+                %elifdef TRANSCRIPT
+                call    watch_init              ; and how many came, to see
+                %endif
                 ; the player starts where the adventure says
                 mov     al, SECTION_CONFIG
                 call    db_section
@@ -67,6 +72,11 @@ start:
                 ; then it is back to DOS as it was left.
                 call    next_key
                 call    keyboard_done
+                %ifdef TRANSCRIPT
+                %ifndef SCRIPTED_KEYS
+                call    watch_done
+                %endif
+                %endif
                 call    timer_done
                 mov     ax, 0003h               ; the text screen again
                 int     10h
@@ -179,6 +189,91 @@ transcript_card:
                 int     21h
                 ret
 
+                %ifndef SCRIPTED_KEYS
+; How many codes the keyboard has sent so far, in WATCH.BIN, once a second,
+; written from the clock's interrupt: a test typing at the machine's own
+; keyboard with DOSBox-X's AUTOTYPE reads it to tell a game that stopped
+; answering from a typist that stopped typing -- which AUTOTYPE does now and
+; then, from a thread of its own with nothing to keep it in step.  From the
+; clock's interrupt because it is apart from everything the game does, so it
+; changes nothing of when the game looks at the keyboard.
+watch_init:
+                mov     ah, 34h                 ; where DOS says it is busy
+                int     21h
+                mov     [dos_busy], bx
+                mov     [dos_busy + 2], es
+                mov     ah, 3Ch
+                xor     cx, cx
+                mov     dx, watch_name
+                int     21h
+                mov     [watch_file], ax
+                mov     ax, 3508h
+                int     21h
+                mov     [cs:old_int8], bx
+                mov     [cs:old_int8 + 2], es
+                push    ds
+                push    cs
+                pop     ds
+                mov     dx, watch_isr
+                mov     ax, 2508h
+                int     21h
+                pop     ds
+                ret
+
+watch_done:
+                push    ds
+                lds     dx, [cs:old_int8]
+                mov     ax, 2508h
+                int     21h
+                pop     ds
+                mov     ah, 3Eh
+                mov     bx, [watch_file]
+                int     21h
+                ret
+
+watch_isr:
+                pushf
+                call    far [cs:old_int8]
+                push    ax
+                push    bx
+                push    cx
+                push    dx
+                push    ds
+                push    es
+                mov     ds, [cs:isr_data]
+                inc     byte [watch_ticks]
+                cmp     byte [watch_ticks], 18  ; a second
+                jb      .out
+                mov     byte [watch_ticks], 0
+                les     bx, [dos_busy]
+                cmp     byte [es:bx], 0
+                jne     .out                    ; not while DOS is at work
+                mov     ah, 40h
+                mov     bx, [watch_file]
+                mov     cx, 2
+                mov     dx, codes_seen
+                int     21h
+                mov     ah, 68h
+                mov     bx, [watch_file]
+                int     21h
+.out:
+                pop     es
+                pop     ds
+                pop     dx
+                pop     cx
+                pop     bx
+                pop     ax
+                iret
+
+old_int8:       dd      0
+section .data
+dos_busy:       dd      0
+watch_file:     dw      0
+watch_ticks:    db      0
+watch_name:     db      "WATCH.BIN", 0
+section .text
+                %endif
+
 section .data
 transcript_name: db     "TRANSCR.TXT", 0
 screen_name:    db      "SCREEN.BIN", 0
@@ -197,6 +292,13 @@ section .text
 %include "unpack.asm"
 %include "textout.asm"
 %include "screen.asm"
+%ifdef SCRIPTED_KEYS
+%include "script.asm"
+; The script's frames go by as the game's do.
+script_frame:
+                call    script_step
+                ret
+%endif
 %include "timer.asm"
 %include "keyboard.asm"
 %include "sound.asm"

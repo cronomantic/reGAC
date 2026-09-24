@@ -161,8 +161,9 @@ is_boundary:
                 ret
 
 ; Wipe the picture and the mask with it: the mask to nothing, because a wiped
-; picture stops no fill, and the picture to value nought.  A picture about to
-; be drawn is then laid white by gfx_start_colours, once its colours are in.
+; picture stops no fill, and its rows to value nought: see wipe_picture_rows.  A
+; picture about to be drawn is then laid white by gfx_start_colours, once its
+; colours are in.
 ; Corrupts: AX, BX, CX, DI, ES
 gfx_clear:
                 push    ds
@@ -171,8 +172,7 @@ gfx_clear:
                 mov     cx, MASK_BYTES / 2
                 xor     ax, ax
                 rep     stosw
-                xor     al, al
-                jmp     paint_picture
+                jmp     wipe_picture_rows
 
 section .data
 ; The mask: a bit a pixel, thirty two bytes a row, as a Spectrum's screen

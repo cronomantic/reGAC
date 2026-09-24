@@ -23,8 +23,8 @@
 MegaCorp, as on the Amstrad: it opens asking for its password, takes it, and
 answers what it is asked -- a word it knows and one it does not -- until the
 player says to stop, and then the game ends and the machine goes back to DOS
-at a key.  Typed through the keyboard's own interrupt, which is what the
-interpreter reads; see tests/pc_game.py.
+at a key.  Typed from a script, underneath the interpreter's own reading of
+the keys, and once at the machine's own keyboard; see tests/pc_game.py.
 
 And one written on an Amstrad, played through with the Amstrad's rules: La
 guerra de las vajillas, off its disk in juegos/.
@@ -95,6 +95,29 @@ def test_it_asks_and_answers_on_a_pc(tmp_path):
     assert messages["240"] + "JARRO" + chr(10) + messages["241"] in said, said
     assert said.rstrip().endswith(messages["244"]), said
     assert screen is not None, "the game never ended"
+
+
+@needs_tools
+def test_the_machines_own_keyboard_gets_the_keys_there(tmp_path):
+    """The rest of the games are played from a script; this one at the
+    machine's own keyboard, by DOSBox-X's AUTOTYPE, through the keyboard's
+    interrupt, the BIOS and whatever layout DOS was given, which is the way a
+    person's keys come in.  AUTOTYPE types from a thread of its own and now
+    and then stops sending keys at all; the build counts the codes the
+    keyboard sent, so a failure says which of the two stopped."""
+    ddb = megacorp()
+    folder = str(tmp_path)
+    pc_game.build(ddb, folder, real_keyboard=True)
+    said, screen, came, sent = pc_game.play_at_the_keyboard(
+        folder, PASSWORD + ENTER + "I" + ENTER + "FIN" + ENTER + "S" + ENTER
+        + "X")
+    assert came >= sent or screen is not None, (
+        f"DOSBox-X's AUTOTYPE stopped typing: the keyboard sent {came} codes "
+        f"of the {sent} it was given, and the game waited for the rest: {said}")
+    assert "Una ancha calle de la Ciudad" in said, said
+    assert "Llevo conmigo:un disco metalico" in said, said
+    assert screen is not None, (
+        f"all {came} codes came and the game never ended: {said}")
 
 
 @needs_tools

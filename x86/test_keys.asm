@@ -24,8 +24,6 @@
 bits 16
 cpu 8086
 
-TAIL_FRAMES     equ 100                 ; how long after the script to stop
-MOST_EVENTS     equ 256
 MOST_KEYS       equ 256
 BIOS_SEGMENT    equ 40h
 BIOS_TICKS      equ 6Ch
@@ -101,61 +99,13 @@ flash_frame:
 
 ; -- the script ---------------------------------------------------------------
 
-; Read KEYS.BIN.
-read_script:
-                mov     ax, 3D00h
-                mov     dx, script_name
-                int     21h
-                jc      .none
-                mov     bx, ax
-                mov     ah, 3Fh
-                mov     cx, MOST_EVENTS * 4
-                mov     dx, script
-                int     21h
-                mov     ah, 3Eh
-                int     21h
-.none:
-                ret
-
-; A frame has gone by: every event of this frame happens, and a while after
-; the last the keys given so far are written and the program ends.
+; A frame has gone by: the script's events of this frame happen, and once it
+; has been over a while the keys given so far are written and the program
+; ends.  See script.asm.
 ; Corrupts: nothing but AX
 script_frame:
-                push    bx
-                push    cx
-                push    si
-                inc     word [frame_now]
-                mov     si, [script_at]
-.each:
-                mov     ax, [script + si]
-                cmp     ax, 0FFFFh
-                je      .ended
-                cmp     ax, [frame_now]
-                ja      .done
-                mov     bl, [script + si + 2]   ; the key
-                and     bx, 7Fh
-                mov     al, [script + si + 3]   ; what it says, or let go
-                test    al, al
-                jz      .up
-                mov     byte [key_down + bx], 1
-                mov     [key_char + bx], al
-                jmp     .next
-.up:
-                mov     byte [key_down + bx], 0
-.next:
-                add     si, 4
-                mov     [script_at], si
-                jmp     .each
-.ended:
-                xor     ax, ax
-                test    si, si
-                jz      .no_events
-                mov     ax, [script + si - 4]   ; the last event's frame
-.no_events:
-                neg     ax
-                add     ax, [frame_now]
-                cmp     ax, TAIL_FRAMES
-                jb      .done
+                call    script_step
+                jnc     .going
                 %ifdef KEYS_TEST
                 mov     dx, keys_name
                 mov     si, keys_out
@@ -163,10 +113,7 @@ script_frame:
                 call    write_file
                 jmp     finish
                 %endif
-.done:
-                pop     si
-                pop     cx
-                pop     bx
+.going:
                 ret
 
 ; -- timing -------------------------------------------------------------------
@@ -235,18 +182,13 @@ write_file:
                 ret
 
 section .data
-script_name:    db      "KEYS.BIN", 0
 keys_name:      db      "KEYS.OUT", 0
 hold_name:      db      "HOLD.OUT", 0
 sound_name:     db      "SOUND.OUT", 0
-frame_now:      dw      0
-script_at:      dw      0
 keys_at:        dw      0
 effect:         db      0
 clock_then:     dd      0
 clock_out:      dd      0
-script:         times MOST_EVENTS * 4 db 0
-                dw      0FFFFh
 keys_out:       times MOST_KEYS * 4 db 0
 section .text
 
@@ -259,6 +201,7 @@ print_char:
 new_line:
 backspace:
                 ret
+%include "script.asm"
 %include "timer.asm"
 %include "keyboard.asm"
 %include "sound.asm"

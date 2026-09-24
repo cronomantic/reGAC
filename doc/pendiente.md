@@ -3938,10 +3938,116 @@ al bajar y al subir, y aun así `next_key` no lo daba.
 Repetida seis veces seguidas a solas la prueba que fallaba una de cada dos, y
 el lote entero de las del PC, en verde.
 
+**Pero la conclusión estaba mal**: los dos arreglos son de verdad y se
+quedan, pero los cuelgues no venían de ahí. Siguieron saliendo, y lo que eran
+está en «Los cuelgues eran de `AUTOTYPE`», más abajo.
+
 Y el tiempo que se le da a una partida del PC ya no es fijo: sale de lo que
 se teclea --un cuarto de segundo por tecla, medio por pausa-- más un margen.
 Los treinta segundos de siempre eran justo lo que tarda la de MegaCorp a
 solas, y en el lote en paralelo se pasaba.
+
+### Una lámina borra sus filas enteras, en el CPC y en el PC
+
+En la pantalla del desierto de Vajillas quedaban a los lados de la lámina
+trozos de texto --«ESTA», «FREN», «NE.»--: la casa no tiene lámina y le da al
+texto la pantalla entera, el texto sube por las filas de la lámina de borde a
+borde, y la lámina siguiente sólo borraba sus 256 puntos. **El CPC hacía lo
+mismo**: su `gfx_clear` borraba 64 bytes de cada fila. En el Spectrum, el Next
+y el MSX la lámina ocupa todo el ancho y no hay márgenes.
+
+**Decidido por el usuario: borrar los márgenes en los dos.** Ahora dibujar una
+lámina deja a cero sus 128 filas enteras, los 80 bytes: `wipe_picture_rows`
+en `z80/cpc/pixels.asm`, que usan las dos maneras de dibujar del CPC, y en
+`x86/cga.asm`, que usan las dos del PC. El cero es el papel en los dos --la
+pluma 0 en el CPC; el valor 0 en la CGA desde que el papel va siempre al
+fondo--, así que lo que queda es la lámina y nada alrededor. Pasa también en
+una sala a oscuras, que borra la lámina igual.
+
+Cuesta **26 bytes** al CPC. En el 464, con las ocho aventuras: siguen cabiendo
+las mismas cinco, Bangkok2 pasa de 614 a 588 bytes de holgura y la más justa
+es ahora megacorp1, con 535; las otras tres ya iban del revés, con el
+intérprete bajo `$4000`.
+
+Pruebas: `test_a_picture_clears_what_the_text_left_either_side_of_it`, en
+`test_textmode_cpc.py` y en `test_textmode_pc.py`: con `TEXT` un mensaje largo
+llena de texto las filas de la lámina de borde a borde, y una lámina dibujada
+después deja vacíos los ocho bytes de cada lado de cada fila. Se han visto
+fallar las dos, volviendo a borrar sólo el ancho de la lámina.
+
+### Los cuelgues eran de `AUTOTYPE`, y las partidas ya no lo usan
+
+Con los márgenes, el lote en paralelo siguió sin salir verde: alguna partida
+del PC se quedaba parada, la última letra en pantalla y ninguna tecla más, y
+a solas pasaban. Salió también con las pruebas una detrás de otra, una vez
+cada diez o veinte. **Lo que costó saberlo, para no repetirlo**:
+
+- Cada diagnóstico que escribía en disco desde el camino del teclado --un
+  registro de códigos, marcas a la entrada de `next_key`, latidos-- hacía que
+  el fallo dejara de salir: cambia los tiempos. Lo que funcionó fue mirar
+  **desde la interrupción del reloj**, que va aparte de todo lo que hace el
+  juego: cada 5 s apuntaba dónde estaba el programa y el estado de las cosas.
+- Estaba vivo, dando vueltas en `next_key`; la tecla que no llegaba estaba
+  abajo para él y la repetía --«LARGOOOOOO»--, que es la regla de la ROM.
+- La interrupción del teclado había entrado nueve veces, las nueve con su
+  código, y la última era una tecla al bajar: **nunca llegó su subida ni
+  nada de después**. El controlador de interrupciones, en reposo: nada en
+  servicio, nada pedido, el teclado sin enmascarar; el de teclado, sin nada
+  que dar. La máquina esperaba teclas que nadie le mandaba.
+- Y en el código de DOSBox-X, `AUTOTYPE` teclea **desde otro hilo del
+  ordenador, sin ningún cerrojo** con el que emula, cada tecla sujeta 50 ms
+  de reloj real; el propio código lo avisa: «not necessarily reentrant and can
+  cause screw ups when called from multiple threads». Falla de vez en cuando
+  y más con la máquina cargada, que es lo que se veía.
+
+Por el camino se sospechó de dos cosas que no eran, y se descartaron: el
+puerto `61h` del clic, que en un XT tiene bits del teclado --DOSBox-X sólo
+atiende los dos del altavoz--; y leer el puerto `60h` antes que el BIOS, que
+en DOSBox-X trae el código siguiente 0,3 ms después --se llegó a enganchar la
+INT 15h, función 4Fh, para no leerlo, y se deshizo: no era la causa, y su
+camino para los primeros XT habría sido código sin ejecutar nunca--.
+
+**Decidido por el usuario: las partidas se teclean desde un guion, y una con
+el teclado de verdad.** El guion es el de las reglas del teclado, ahora en
+`x86/script.asm` y compartido: una construcción de juego con `SCRIPTED_KEYS`
+no toma la INT 9 y mueve las teclas fotograma a fotograma desde `KEYS.BIN`.
+Los fotogramas sólo corren mientras el juego espera una tecla, así que una
+tecla llega cuando el juego pregunta, siempre igual, sin pausas a ojo, y
+mucho antes que tecleando con pausas. El camino de
+verdad --la INT 9, el BIOS, la distribución de DOS-- lo sigue probando
+`test_the_machines_own_keyboard_gets_the_keys_there`, con `AUTOTYPE`: la
+construcción cuenta cada código que entra por la INT 9 y lo apunta una vez
+por segundo, desde la interrupción del reloj, en `WATCH.BIN`, de modo que si
+falla dice si fue DOSBox-X el que dejó de teclear --entraron menos códigos de
+los que se le dieron-- o el juego el que dejó de contestar. Ésa puede fallar
+de vez en cuando, y cuando lo haga lo dirá.
+
+**Y las pruebas del PC ya no abren ventanas ni hacen ruido**: DOSBox-X
+arranca con el vídeo `dummy` de SDL y `nosound`. Salió porque una prueba de
+esfuerzo abrió más de un centenar de ventanas en el escritorio del usuario,
+que no debió lanzarse sin decírselo.
+
+### Dos pruebas que dependían de la carga
+
+- **Los ruidos del PC duraban de más con la máquina lenta**, hasta un 5 %. Era
+  del intérprete: cada medio periodo esperaba «tanto desde ahora», y lo que
+  cada espera se pasaba se sumaba a la siguiente; en un XT de verdad, que
+  mira el reloj despacio, pasaría igual. Ahora cada cambio del altavoz espera
+  hasta una hora contada desde el principio de la nota (`beat_until`, en
+  `x86/timer.asm`), y lo que una espera se pasa no se acumula: medidos, el
+  clic y los cinco ruidos a menos de un 0,25 % de lo que deben, y la prueba
+  pide ahora un 1 % por arriba y por abajo, donde antes admitía un 5 % de más.
+- **El parpadeo del Next** esperaba 10 s fijos y miraba doce veces en dos
+  segundos; con carga la primera lámina aún se estaba dibujando y todas las
+  miradas veían el mismo color. Ahora mira hasta haber visto los dos, con un
+  tope, y exige lo mismo que antes: los dos colores y nada más.
+
+Y una que se vio y no es de esto: en el lote de serie,
+`test_keyboard_pcw.py::test_keys_typed_over_each_other_all_arrive` dio `OL`
+en vez de `SOL` una vez --la primera tecla de las solapadas, perdida--. No se
+ha tocado nada del PCW ni de `z80/common/`, y a solas pasó tres de tres. Queda
+apuntada: es de las que dependen del ritmo con que ZEsarUX recibe las teclas,
+como las del teclado de las otras máquinas, y si vuelve hay que mirarla.
 
 ## Cosas menores
 

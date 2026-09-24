@@ -44,6 +44,7 @@ from pc_game import ENTER  # noqa: E402
 from test_textmode_z80 import a_room_and_a_verb  # noqa: E402
 
 STOP = 99                       # a verb of our own, so that the game ends
+DRAW = 98                       # and one that draws again after TEXT
 
 if pytest is not None:
     needs_tools = pytest.mark.skipif(
@@ -61,12 +62,26 @@ def picture_area(screen):
     return screen[:64 * 80] + screen[0x2000:0x2000 + 64 * 80]
 
 
-def picture_area_after(tmp_path, orders):
-    """What the picture's rows held when the game first asked, and when it
-    asked again after each of the orders."""
+def margins(screen):
+    """The screen either side of the picture, in its 128 rows: eight bytes at
+    each end of every row, in both banks."""
+    out = b""
+    for bank in (0, 0x2000):
+        for line in range(64):
+            at = bank + line * 80
+            out += screen[at:at + 8] + screen[at + 72:at + 80]
+    return out
+
+
+def screens_after(tmp_path, orders, of=picture_area):
+    """Something of the screen when the game first asked, and when it asked
+    again after each of the orders."""
     ddb = a_room_and_a_verb()
     ddb["verbs"]["FIN"] = STOP
+    ddb["verbs"]["DIBUJA"] = DRAW
     ddb["lpcs"] += [["PUSH", STOP], ["VERB"], ["IF"], ["EXIT"], ["END"]]
+    ddb["lpcs"] += [["PUSH", DRAW], ["VERB"], ["IF"], ["PICT"], ["PUSH", 2],
+                    ["GOTO"], ["END"]]
     os.makedirs(tmp_path, exist_ok=True)
     folder = str(tmp_path)
     pc_game.build(ddb, folder)
@@ -76,8 +91,12 @@ def picture_area_after(tmp_path, orders):
     out = []
     for asked in range(len(orders) + 1):
         with open(os.path.join(folder, f"S{asked:02X}.BIN"), "rb") as f:
-            out.append(picture_area(f.read()))
+            out.append(of(f.read()))
     return out
+
+
+def picture_area_after(tmp_path, orders):
+    return screens_after(tmp_path, orders)
 
 
 @needs_tools
@@ -98,3 +117,17 @@ def test_with_text_on_a_room_draws_no_picture(tmp_path):
     assert with_pictures != drawn, "the other room drew no picture"
     assert with_text == first, (
         "the room drew its picture although TEXT had asked for none")
+
+
+@needs_tools
+def test_a_picture_clears_what_the_text_left_either_side_of_it(tmp_path):
+    """TEXT gives the text the whole screen, and a long message fills it, the
+    rows of the picture edge to edge.  A picture drawn after that takes its
+    rows back whole, and not only its own 256 points: what the text left
+    either side of it goes, as on the Amstrad."""
+    first, after_text, after_picture = screens_after(
+        tmp_path, ["TEXTO", "DIBUJA"], of=margins)
+    assert not any(first), "there was something beside the first picture"
+    assert any(after_text), "the text never reached beside the picture"
+    assert not any(after_picture), (
+        "what the text left beside the picture is still there")

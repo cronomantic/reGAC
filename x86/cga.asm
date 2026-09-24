@@ -129,6 +129,28 @@ paint_picture:
                 jne     .each_row
                 ret
 
+; Wipe the rows the picture lives in to value nought, the whole width of the
+; screen and not only the picture's 256 points: the text may have had those
+; rows -- TEXT gives it the whole screen, and so does a room with no picture
+; -- and what it left either side of the picture stayed beside the next one.
+; Value nought is the paper and the border, so the rows come out as a picture
+; with nothing round it.  The Amstrad does the same; see doc/pendiente.md.
+; Corrupts: AX, BX, CX, DI, ES
+wipe_picture_rows:
+                mov     ax, CGA_SEGMENT
+                mov     es, ax
+                xor     bx, bx
+.each_row:
+                mov     di, [cga_rows + bx]
+                sub     di, CGA_MARGIN          ; back to the edge of the screen
+                mov     cx, CGA_ACROSS / 2
+                xor     ax, ax
+                rep     stosw
+                add     bx, 2
+                cmp     bx, PICTURE_ROWS * 2
+                jne     .each_row
+                ret
+
 ; Lay a run of a fill across row AL, from pixel BL to pixel BH, with DL the
 ; byte for an even column of bytes and DH for an odd one: a fill's pattern
 ; comes round every eight pixels, which is two bytes.  Only the two ends are
