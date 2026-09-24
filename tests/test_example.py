@@ -166,7 +166,7 @@ def test_it_can_be_played_to_the_end_on_a_pc(tmp_path):
     # once the walkthrough has had its time.
     said, _ = pc_game.play(folder, "".join(order + ENTER
                                            for order in WALKTHROUGH),
-                           seconds=45, stop=True)
+                           stop=True)
     assert "sendero" in said, f"it never described where it starts: {said}"
     assert won in said, f"the lamp was never lit: {said}"
 

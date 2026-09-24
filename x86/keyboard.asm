@@ -32,6 +32,8 @@ BIOS_BUFFER_START equ 80h
 BIOS_BUFFER_END equ 82h
 OLD_BUFFER_START equ 1Eh
 OLD_BUFFER_END  equ 3Eh
+ENTER_KEY       equ 1Ch                 ; the codes of the white enter
+SLASH_KEY       equ 35h                 ; and slash
 DOS_SET_VECTOR  equ 25h
 DOS_GET_VECTOR  equ 35h
 
@@ -87,6 +89,19 @@ fail_the_call:
                 iret
 
 ; The keyboard's interrupt.
+;
+; A key that goes down is marked down, and pressed as well: pressed stays
+; until the next look at the keyboard has seen it, so that a key pressed and
+; let go while nobody was looking -- the interpreter drawing, or clicking for
+; the key before -- is still typed once.  A person can type a key that short;
+; DOSBox-X's AUTOTYPE does, every time, and that is how it was found.
+;
+; What the key says is taken out of the BIOS's buffer, where each entry is the
+; key's code in its high byte and the character in its low one, so each goes
+; to its own key.  It used to go to "the key last pressed", and the BIOS's
+; handler lets interrupts in before it ends: a second key coming in there
+; took the first one's character, and a typed N came out as the letter of
+; the key behind it.
 keyboard_isr:
                 push    ax
                 push    bx
@@ -115,20 +130,20 @@ keyboard_isr:
                 jmp     .bios
 .down:
                 mov     byte [key_down + bx], 1
-                mov     byte [key_char + bx], 0 ; until the BIOS says
-                mov     [isr_key], bl
-                mov     byte [isr_wanted], 1
+                mov     byte [key_pressed + bx], 1
 .bios:
                 pushf
                 call    far [old_int9]
-                ; whatever the BIOS made of it, out of its buffer
+                ; whatever the BIOS made of it, out of its buffer, with nothing
+                ; let in while the head moves
+                cli
                 mov     ax, BIOS_SEGMENT
                 mov     es, ax
 .drain:
                 mov     si, [es:BIOS_BUFFER_HEAD]
                 cmp     si, [es:BIOS_BUFFER_TAIL]
                 je      .drained
-                mov     al, [es:si]             ; the character
+                mov     ax, [es:si]             ; the key's code, the character
                 add     si, 2
                 ; Where the buffer ends and starts again.  A BIOS from before
                 ; the AT keeps it at 1Eh to 3Eh and does not say so: the two
@@ -146,16 +161,22 @@ keyboard_isr:
                 mov     si, OLD_BUFFER_START
 .in_range:
                 mov     [es:BIOS_BUFFER_HEAD], si
-                cmp     byte [isr_wanted], 0
-                je      .drain                  ; a repeat of the PC's own
+                ; The grey enter and the grey slash come as E0 with their
+                ; character; they are the same keys to us as the white ones.
+                cmp     ah, KEY_PREFIX
+                jne     .own_code
+                mov     ah, ENTER_KEY
+                cmp     al, KEY_ENTER
+                je      .own_code
+                mov     ah, SLASH_KEY
+.own_code:
+                mov     bl, ah
+                and     bx, 7Fh
+                jz      .drain                  ; no key: typed at the keypad
                 call    worth_keeping
-                mov     bl, [isr_key]
-                xor     bh, bh
                 mov     [key_char + bx], al
-                mov     byte [isr_wanted], 0
                 jmp     .drain
 .drained:
-                mov     byte [isr_wanted], 0
                 pop     es
                 pop     ds
                 pop     si
@@ -197,9 +218,12 @@ scan_keyboard:
                 mov     [key_found], al
                 xor     bx, bx
                 mov     cx, 128
+                cli                             ; down and pressed, as one
 .each:
-                cmp     byte [key_down + bx], 0
-                je      .next
+                mov     ah, [key_down + bx]
+                or      ah, [key_pressed + bx]  ; pressed since the last look
+                mov     [key_pressed + bx], al  ; which this is
+                jz      .next
                 cmp     byte [key_char + bx], 0
                 je      .next
                 inc     byte [key_count]
@@ -207,6 +231,7 @@ scan_keyboard:
 .next:
                 inc     bx
                 loop    .each
+                sti
                 mov     bl, [key_found]
                 test    bl, bl
                 jz      .none
@@ -355,9 +380,8 @@ isr_data:       dw      0
 section .data
 old_int9:       dd      0
 key_down:       times 128 db 0          ; which keys are down
-key_char:       times 128 db 0          ; and what each said when it went
-isr_key:        db      0               ; the key whose character is awaited
-isr_wanted:     db      0
+key_pressed:    times 128 db 0          ; which went down since the last look
+key_char:       times 128 db 0          ; and what each says
 pause_left:     db      0
 key_found:      db      0
 key_count:      db      0

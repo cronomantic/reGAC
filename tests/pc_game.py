@@ -45,6 +45,9 @@ GAME = os.path.join(X86, "game.asm")
 PAGE_BITS = 16                  # regac make's banks for the PC
 STACK = 2048                    # and its stack
 PROGRAM = "GAME.EXE"
+PACE = 0.25                     # seconds between two keys typed
+MARGIN = 45                     # and what a game may take beyond its typing
+SETTLE = 15                     # or, for one that never ends, to answer the last
 ENTER = chr(13)
 
 
@@ -77,9 +80,18 @@ def play(folder, typed, wait=3, pauses=6, seconds=None, stop=False):
         path = os.path.join(folder, name)
         if os.path.exists(path):
             os.remove(path)
-    dosbox.run(folder, PROGRAM, cycles="max",
-               typed=dosbox.keys(typed, pauses), wait=wait, seconds=seconds,
-               stop=stop)
+    keys = dosbox.keys(typed, pauses)
+    if seconds is None:
+        # As long as the typing takes, and then some: a key is PACE, and a
+        # pause was measured at twice that.  A fixed limit was too little for
+        # MegaCorp's five orders, which take thirty seconds on their own and
+        # more in a busy parallel run.
+        pauses_typed = keys.count(dosbox.PAUSE)
+        seconds = (wait + PACE * (len(keys) - pauses_typed)
+                   + 2 * PACE * pauses_typed
+                   + (SETTLE if stop else MARGIN))
+    dosbox.run(folder, PROGRAM, cycles="max", typed=keys, wait=wait,
+               pace=PACE, seconds=seconds, stop=stop)
     return transcript(folder), screen(folder)
 
 

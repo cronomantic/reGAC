@@ -62,6 +62,11 @@ inside somebody's adventure, are under the **MIT licence**: see
 [z80/LICENSE](z80/LICENSE) and [x86/LICENSE](x86/LICENSE).  An adventure built
 with these tools carries no obligation from them.
 
+The letters an adventure gets when it brings none of its own,
+[regac/moderndos8x8.bin](regac/moderndos8x8.bin), are **Modern DOS 8x8** by
+Jayvee Enaguas, dedicated to the public domain under CC0 1.0: see
+[regac/moderndos.py](regac/moderndos.py).
+
 --
 
 MIT License

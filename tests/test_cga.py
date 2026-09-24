@@ -96,24 +96,46 @@ def test_a_picture_off_a_spectrum_is_the_spectrums_in_four_cga_colours():
 
 
 def test_the_pens_of_an_amstrad_picture_are_dealt_to_suit_the_colours():
-    """Black, bright yellow and bright white, most of it white: the white goes
-    to the background, which can be any colour, rather than to the place of
-    its pen in a trio that has none.  The dealing is one to one, so what tells
-    two pens apart still does."""
+    """Black, bright yellow and bright white, most of it white.  Pen nought,
+    the black, is the background, always: it is the text's paper and the
+    border, as on the Amstrad.  The other three are dealt among the trio as
+    suits them, and the white goes to a trio's white.  The dealing is one to
+    one, so what tells two pens apart still does."""
     gfx = {"1": [["PENS", 2, 2], ["FILL", 100, 100], ["INK", 1],
                  ["RECT", 20, 60, 100, 120], ["PENS", 1, 1], ["FILL", 60, 90],
                  ["INK", 0], ["LINE", 30, 70, 90, 110]]}
     header = [0, 0, 24, 24, 26, 26, 6, 6]
     background, trio, values = cga_amstrad_colours(gfx, 1, header)
     assert sorted(values) == [0, 1, 2, 3]
-    assert values[2] == 0 and CGA_PALETTE[background] == 0xFFFFFF, (background, values)
+    assert values[0] == 0 and CGA_PALETTE[background] == 0x000000, (
+        background, values)
+    four = cga_colours(background, trio)
+    assert four[values[2]] == 0xFFFFFF, (trio.name, values)
     ddb = {"model": "CPC", "gfx": gfx, "gfx_inks": {"1": header}}
     device = device_for("cga", gfx, 1, ddb)
     assert isinstance(device, AmstradDevice)
     Renderer(gfx, device).run(1)
     screen = cga_screen(device)
-    # the white of the picture, pen two, is written as value nought
-    assert device.pens[0] == 2 and (screen[8] >> 6) == 0
+    # the white of the picture, pen two, is written as the trio's white
+    assert device.pens[0] == 2 and (screen[8] >> 6) == values[2]
+
+
+def test_the_paper_is_the_background_in_every_picture():
+    """Off a Spectrum or off an Amstrad, the text's paper is value nought,
+    which is also the border and everything round the picture: so the screen
+    outside the picture is one colour, whatever the picture chose.  A picture
+    that is mostly white, with red and green and one black point, would
+    otherwise take the white for its background and put the black in the
+    green of a trio."""
+    gfx = {"1": [["INK", 2], ["RECT", 20, 60, 100, 120], ["FILL", 60, 90],
+                 ["INK", 4], ["RECT", 140, 60, 220, 120], ["FILL", 180, 90],
+                 ["INK", 0], ["PLOT", 5, 170]]}
+    _, _, values = cga_picture_colours(gfx, 1)
+    assert values[0] == 0
+    amstrad = {"1": [["PENS", 3, 3], ["FILL", 100, 100], ["INK", 1],
+                     ["RECT", 20, 60, 100, 120]]}
+    _, _, pens = cga_amstrad_colours(amstrad, 1, [0, 0, 24, 24, 6, 6, 2, 2])
+    assert pens[0] == 0
 
 
 def test_an_amstrad_picture_keeps_its_pens_on_the_card():

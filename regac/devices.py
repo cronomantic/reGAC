@@ -933,13 +933,17 @@ def cga_colours(background, trio):
     return [CGA_PALETTE[background]] + [CGA_PALETTE[c] for c in trio.colours]
 
 
-def best_cga_palette(cost_of):
+def best_cga_palette(cost_of, allowed=None):
     """The background and the trio that cost least, trying the ninety six.
-    `cost_of` is given the four colours and says what they cost."""
+    `cost_of` is given the four colours and says what they cost; `allowed`,
+    when given, says which of them may be had at all."""
     best = None
     for trio in CGA_TRIOS:
         for background in range(16):
-            cost = cost_of(cga_colours(background, trio))
+            four = cga_colours(background, trio)
+            if allowed is not None and not allowed(four):
+                continue
+            cost = cost_of(four)
             if best is None or cost < best[0]:
                 best = (cost, background, trio)
     return best[1], best[2]
@@ -952,7 +956,14 @@ def cga_picture_colours(gfx, picture_id):
     the screen each colour covers, as the Amstrad's four inks are -- see
     cpc_picture_colours.  Unlike the Amstrad's, the four cannot be put in any
     order: nought is the background and one to three the trio as it comes, so
-    the text is printed in whichever values its colours come to."""
+    the text is printed in whichever values its colours come to.
+
+    But the text's paper comes to nought, always, as it goes to pen nought on
+    the Amstrad: nought is also the border and everything round the picture
+    that nobody writes, and the paper anywhere else would leave the screen in
+    two colours where it should be one -- the text that scrolled up beside
+    the picture in one, and the border in the other.  So only a palette whose
+    background is the nearest of its four to the paper is had."""
     from .gfx import Renderer
 
     reference = Renderer(gfx, SpectrumDevice()).run(int(picture_id))
@@ -962,7 +973,10 @@ def cga_picture_colours(gfx, picture_id):
         return sum(area * min(distance(SPECTRUM_PALETTE[colour], c) for c in four)
                    for colour, area in usage.items())
 
-    background, trio = best_cga_palette(cost_of)
+    def paper_on_the_background(four):
+        return nearest(SPECTRUM_PALETTE[SPECTRUM_TEXT_PAPER], four) == 0
+
+    background, trio = best_cga_palette(cost_of, paper_on_the_background)
     four = cga_colours(background, trio)
     return background, trio, [nearest(colour, four) for colour in SPECTRUM_PALETTE]
 
@@ -978,9 +992,15 @@ def cga_amstrad_colours(gfx, picture_id, header=None):
     are dealt out as suits the colours: the background can be any of sixteen
     and a trio is three in a fixed order, and a picture in yellow and white,
     say, has its white in the background and its yellow in the trio that has
-    one.  Of the ninety six palettes and the twenty four ways to deal, the one
-    closest to the inks the picture carries, pen by pen, weighted by how much
-    of the picture each pen covers."""
+    one.  Of the ninety six palettes and the ways to deal, the one closest to
+    the inks the picture carries, pen by pen, weighted by how much of the
+    picture each pen covers.
+
+    Pen nought is not dealt: it is the background, value nought, always.  It
+    is the text's paper, and on the Amstrad the border wears it too; on a CGA
+    the border is the background, and so is everything round the picture
+    that nobody writes, so pen nought anywhere else would leave the screen in
+    two colours where the Amstrad shows one."""
     from itertools import permutations
 
     from .gfx import Renderer
@@ -994,7 +1014,8 @@ def cga_amstrad_colours(gfx, picture_id, header=None):
     for trio in CGA_TRIOS:
         for background in range(16):
             four = cga_colours(background, trio)
-            for values in permutations(range(4)):
+            for rest in permutations(range(1, 4)):
+                values = (0,) + rest
                 cost = sum(area[pen] * distance(wanted[pen], four[values[pen]])
                            for pen in range(4))
                 if best is None or cost < best[0]:

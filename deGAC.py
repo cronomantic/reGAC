@@ -73,6 +73,8 @@ MACHINES = {
         "min_ram": 0x0000,
         "max_ram": 0xFFFF,
         "pictures": "amstrad",
+        # The Amstrad's GAC keeps no letters of its own: it printed with the
+        # firmware's, which are in the machine's ROM and not ours to carry.
         "font": False,
     },
     "c64": {
@@ -857,6 +859,17 @@ def mirror_byte(c):
     return o & 0xFF
 
 
+def stand_in_font():
+    """The letters an adventure gets when it brings none of its own: Modern
+    DOS 8x8, the CGA's, which is in the public domain -- see
+    regac/moderndos.py.  The machine's own are in its ROM and not ours."""
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from regac.moderndos import letters
+    print("This adventure printed with its machine's own letters, which are "
+          "not in it: it gets Modern DOS 8x8 instead")
+    return letters()
+
+
 def get_font(sysram):
     font = []
     fontbase = peek2(sysram, 23606) + 256
@@ -907,6 +920,8 @@ def get_database(sysram):
     database = {}
 
     font = get_font(sysram) if MACHINE["font"] else []
+    if not font and MACHINE["model"] != "C64":
+        font = stand_in_font()
     verbs = get_verbs(sysram)
     nouns = get_nouns(sysram)
     adverbs = get_adverbs(sysram)

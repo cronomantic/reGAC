@@ -62,7 +62,8 @@ def test_a_game_saved_comes_back_in_another(tmp_path):
     first = ddb["locations"]["1"]["desc"][:30]
 
     said, screen = pc_game.play(folder, PASSWORD + ENTER + "N" + ENTER
-                                + "SAVE" + ENTER + "FIN" + ENTER + "S" + "X")
+                                + "SAVE" + ENTER + "FIN" + ENTER + "S"
+                                + ENTER + "X")
     assert screen is not None, f"the first game never ended: {said}"
     path = os.path.join(folder, SAVED)
     assert os.path.exists(path), "SAVE wrote nothing beside the program"
@@ -72,7 +73,7 @@ def test_a_game_saved_comes_back_in_another(tmp_path):
     assert struct.unpack_from("<H", game)[0] == 6, "not the room it was in"
 
     said, screen = pc_game.play(folder, PASSWORD + ENTER + "LOAD" + ENTER
-                                + "FIN" + ENTER + "S" + "X")
+                                + "FIN" + ENTER + "S" + ENTER + "X")
     assert screen is not None, f"the second game never ended: {said}"
     after = said[said.index("LOAD"):]
     assert street in after, f"LOAD did not bring the game back: {after}"
@@ -85,7 +86,7 @@ def test_a_load_with_nothing_to_load_leaves_the_game_alone(tmp_path):
     folder = str(tmp_path)
     pc_game.build(ddb, folder)
     said, screen = pc_game.play(folder, PASSWORD + ENTER + "LOAD" + ENTER
-                                + "FIN" + ENTER + "S" + "X")
+                                + "FIN" + ENTER + "S" + ENTER + "X")
     assert screen is not None, f"the game never ended: {said}"
     after = said[said.index("LOAD"):]
     assert ddb["locations"]["1"]["desc"][:30] in after, after

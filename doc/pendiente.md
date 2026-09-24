@@ -3311,8 +3311,9 @@ exit
 2. ~~Un **`CgaDevice`** en `regac/devices.py` y la comparación de láminas
    contra la referencia, antes de que exista intérprete: es como se hicieron
    las otras cinco.~~ Hecho: ver «El `CgaDevice`, como el CPC», más abajo.
-3. Sólo entonces, el intérprete en 8086. Empezado por las láminas: ver «El
-   intérprete de PC empieza por las láminas, y salen iguales», más abajo.
+3. ~~Sólo entonces, el intérprete en 8086.~~ Hecho: empezado por las láminas
+   --ver «El intérprete de PC empieza por las láminas, y salen iguales»-- y
+   terminado en «El intérprete de PC, entero», más abajo.
 
 **Y un emulador con reloj fiel, si alguna vez se quiere verificar la
 estimación de tiempos** y no sólo que las láminas salen bien. DOSBox-X con
@@ -3745,11 +3746,13 @@ vez que una lámina trae los suyos. Antes de la primera, la paleta y los
 valores son los de la referencia para una pantalla sin lámina: cian, magenta
 y blanco sobre negro.
 
-**Lo que eso deja, dicho**: el texto ya escrito no cambia de valor cuando
+~~**Lo que eso deja, dicho**: el texto ya escrito no cambia de valor cuando
 cambia la lámina, así que si en la nueva el negro cae en otro valor --en 11
 de las 196 láminas de Spectrum no cae en el cero--, el papel del texto viejo
 y el del nuevo se ven distintos hasta que el viejo se va. En el CPC no pasa
-porque el papel es siempre la pluma cero.
+porque el papel es siempre la pluma cero.~~ **Era un fallo y no una
+consecuencia**, y era peor de lo que decía: ver «El papel, siempre en el
+fondo», más abajo.
 
 **El parpadeo de las aventuras de Amstrad, lo que se pueda.** Cada lámina
 lleva ahora ocho bytes: los seis de antes y la segunda paleta, la que un
@@ -3795,6 +3798,150 @@ salir, después de que el programa ha escrito y cerrado sus ficheros, así que
 en esas corridas manda lo que salió y no cómo acabó; y el `dosbox-x` del PATH
 es un lanzador de scoop, y matarlo no mata al emulador, así que una corrida
 que se pasa de tiempo se corta con `taskkill /T`, el árbol entero.
+
+### El papel, siempre en el fondo, como en el Amstrad
+
+**Lo vio el usuario en la partida de Vajillas**: colores que se salían del
+dibujo. En el desierto de Vajillas 1 --la lámina 11-- el cielo azul era el
+fondo, el valor 0, y el negro, que es la pluma 0 y el papel del texto, había
+ido a parar al valor 1, que en esa paleta es verde claro. Así el borde y los
+márgenes que nadie escribe salían azules, y el texto que había subido por
+toda la pantalla en la casa --una sala sin lámina, que le da al texto la
+pantalla entera-- salía verde al lado de la lámina.
+
+**Era un fallo de haber hecho el PC distinto del CPC en esto.** En el CPC el
+papel es siempre la pluma 0 y el borde la lleva también: `cpc_picture_colours`
+pone en la pluma 0 la tinta a la que llega el papel. En la CGA el valor 0 es a
+la vez el fondo, el borde y todo lo que hay fuera de la lámina, así que ahí es
+donde tiene que ir el papel, y yo dejé que el reparto lo mandara a cualquier
+sitio con tal de parecerse más dentro de la lámina. Lo que tenía apuntado
+como consecuencia --«11 de las 196 láminas de Spectrum»-- era este mismo
+fallo, y en las aventuras de Amstrad, que se ven mucho menos, pasaba en 10 de
+las 187.
+
+**Arreglado con la regla del CPC**: en una aventura de Amstrad la pluma 0 va
+siempre al valor 0 y las otras tres se reparten entre el trío; en una de
+Spectrum sólo se elige entre las paletas cuyo fondo es, de sus cuatro
+colores, el más cercano al papel del texto. Así el borde, los márgenes y el
+papel son siempre el mismo color. Lo que cuesta, contado igual antes y
+después sobre las 196 láminas de Spectrum:
+
+| colores perdidos | antes | ahora |
+|---|---:|---:|
+| ninguno | 60 | 61 |
+| uno | 99 | 95 |
+| dos | 30 | 33 |
+| tres | 7 | 7 |
+
+Y el fondo negro en 181 en vez de 176. (Esta cuenta mira si dos colores
+usados comparten valor; la de «El `CgaDevice`, como el CPC» contaba de otra
+manera, y por eso sus cifras de antes no son éstas.) El parpadeo no cambia:
+se sigue viendo en 2 de las 11.
+
+Pruebas: `test_the_paper_is_the_background_in_every_picture` en
+`test_cga.py`, con una lámina de Spectrum y una de Amstrad donde la regla
+antigua ponía el papel fuera del fondo --comprobado con ella--; y la de los
+repartos, que fijaba el reparto viejo (el blanco al fondo y el negro a un
+valor del trío), dice ahora el nuevo.
+
+### La letra de las aventuras de Amstrad, que no estaba
+
+Al mirar la pantalla de esa misma partida salió otra cosa, **y no era del
+PC**: el texto no se veía. Las seis aventuras de Amstrad salían de `deGAC`
+con la letra vacía --256 ceros--, porque el GAC de Amstrad no guarda letra:
+escribía con la del firmware, que está en la ROM de la máquina. Construidas
+para el CPC, el Next o el PC, sus 85 glifos no tenían un solo punto, así que
+**en las tres máquinas salían mudas** desde que se abrieron a ellas. `regac
+check` lo avisaba; ninguna prueba lo veía, porque las del CPC y el Next con
+aventuras de Amstrad usan aventuras hechas a mano con letra propia y las de
+láminas no miran el texto.
+
+**Primero se hizo con la letra del firmware, sacada de una ROM del CPC en
+`tools/`**, y se quitó enseguida: obligaba al que use `regac` a buscarse una
+ROM que no es nuestra y dejarla ahí, que es lo contrario de fácil. Lo que
+quedó, **decidido por el usuario: Modern DOS 8x8**, la letra de la CGA de
+Jayvee Enaguas, versión 20190101.02, **de dominio público (CC0 1.0)**. Se buscó
+una libre de verdad, porque la letra va dentro de cada aventura que se
+construya y una con atribución obligatoria o «compartir igual» le pasaría
+obligaciones: la CGA del Oldschool PC Font Pack de VileR, y sus copias en
+pcface y font-vault, son CC BY-SA 4.0 y se descartaron. font8x8 de Daniel
+Hepper era la otra de dominio público. Las dos vienen de la letra de las ROM
+de IBM, cuyo estado legal está discutido --VileR sostiene que un mapa de
+puntos no tiene derechos; en DOSBox dicen que la de IBM los tiene todavía--;
+las dos se declaran libres y ninguna es invención propia, y eso se dijo antes
+de elegir.
+
+**Cómo está**: del repositorio del autor, que ya no existe en NotABug, queda
+el espejo archivado `notpeter/ttf-moderndos` en GitHub; de ahí se bajaron el
+fuente de FontForge, `ModernDOS8x8.sfd`, y la licencia, a `tools/moderndos/`,
+fuera del repositorio. En el repositorio sólo están las 96 letras, del
+espacio al final de ASCII, en `regac/moderndos8x8.bin`, y el guion que las
+saca del fuente, `regac/moderndos.py`: cada punto del fuente es un cuadrado de
+100 unidades, y un punto se enciende si su centro cae dentro de los trazos,
+contando cruces para que el hueco de la A siga siendo hueco. Las mayúsculas
+dejan libre la fila de abajo, como pide `regac` para bajar una fila las que
+llevan tilde; la única que no es la Q, por su rabo, y ninguna Q lleva tilde.
+
+`deGAC` se la pone **a toda aventura que no traiga letra propia**, y lo dice:
+las de Amstrad siempre, y una de Spectrum que escribiera con la letra de la
+ROM --ninguna de las ocho--. El C64, aparcado, no se toca.
+
+Pruebas: `test_an_amstrad_adventure_gets_letters_it_can_print_with` en
+`test_disk.py`, que saca Bangkok del disco y mira que su letra es ésta byte a
+byte; `test_moderndos.py`, con las 96, la A con su hueco, las mayúsculas y, si
+está el fuente en `tools/`, que el volcado es lo que el fuente dibuja; y la
+partida de abajo, que mira que el texto se vea.
+
+### La partida de Amstrad, entera en el PC
+
+`test_an_adventure_off_an_amstrad_is_played_through_on_a_pc`, en
+`test_game_pc.py`: La guerra de las vajillas, primera parte, sacada de su
+disco de `juegos/` y jugada en DOSBox-X. Del desierto a la casa, que no tiene
+lámina; coger la lata; el inventario; de vuelta al desierto, que sí la tiene;
+una palabra que no conoce; los puntos; y `QUIT`, que pregunta y acaba con la
+puntuación. Se comprueba el texto de cada paso, que la puntuación final es la
+que dijo `PUNTOS`, que la última lámina en pantalla es punto por punto la de
+la referencia con las reglas del Amstrad, y que el texto se ve: la pluma 1
+sobre la 0, y la 0 en el fondo. Corre en el lote normal cuando están los
+discos en `juegos/`: descompilar las seis tarda menos de dos segundos.
+
+Y una carrera del arnés que salió al hacerla: la tecla que devuelve a DOS
+llegaba mientras el juego escribía la puntuación y se perdía. Ahora va detrás
+de un enter con su pausa, en todas las partidas del PC.
+
+### Las teclas del PC que se perdían, y la que cambiaba de letra
+
+Al pasar el lote con todo esto, las partidas del PC fallaban de vez en cuando:
+una vez una `N` salió como `O`; otra, en `SALIR` el enter no llegó y la `X`
+de después se pegó a la palabra. **Eran dos fallos de la interrupción del
+teclado, y no del arnés** --lo primero que se sospechó fue la transcripción,
+que escribía en disco a cada letra, y se descartó midiendo--. Un registro de
+cada código que llegaba a la interrupción mostró que el enter entraba entero,
+al bajar y al subir, y aun así `next_key` no lo daba.
+
+1. **Una pulsación corta se perdía.** Una tecla que bajaba y subía entera
+   mientras el intérprete no miraba --dibujando, o haciendo el clic de la
+   anterior-- quedaba anotada como subida y nadie la veía. `AUTOTYPE` pulsa
+   muy corto y por eso le tocaba a veces; una persona que teclee rápido,
+   también. Ahora una tecla que baja queda además **pulsada** hasta que la
+   siguiente mirada al teclado la ve, aunque ya haya subido: lo que el PC
+   dijo que se pulsó se teclea una vez. En las máquinas de 8 bits no se puede
+   hacer, porque no hay interrupción que diga que una tecla bajó; aquí sí.
+2. **El carácter se apuntaba a la tecla equivocada.** Se guardaba «qué tecla
+   espera su carácter» en una sola variable, y la interrupción del BIOS deja
+   entrar otras antes de acabar: una segunda tecla que entraba ahí se llevaba
+   el carácter de la primera. Ahora cada entrada del búfer del BIOS, que lleva
+   el código de su tecla en el byte alto, va a esa tecla; el enter y la barra
+   grises, que el BIOS marca con E0, a las blancas; y el búfer se vacía con
+   las interrupciones cerradas.
+
+Repetida seis veces seguidas a solas la prueba que fallaba una de cada dos, y
+el lote entero de las del PC, en verde.
+
+Y el tiempo que se le da a una partida del PC ya no es fijo: sale de lo que
+se teclea --un cuarto de segundo por tecla, medio por pausa-- más un margen.
+Los treinta segundos de siempre eran justo lo que tarda la de MegaCorp a
+solas, y en el lote en paralelo se pasaba.
 
 ## Cosas menores
 

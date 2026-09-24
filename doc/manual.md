@@ -348,6 +348,12 @@ viene con `-m`. De ahí a fuente legible:
 entera de una hecha para no poder copiarse. **`grab.py`** carga un medio en su
 máquina y escribe lo que dejó en memoria.
 
+Una aventura de **Amstrad** no guarda su letra: el GAC de Amstrad escribía con
+la del firmware, que está en la ROM de la máquina y no es nuestra. `deGAC.py`
+le pone **Modern DOS 8x8**, la letra de la CGA de Jayvee Enaguas, que es de
+dominio público (CC0), y lo dice. Lo mismo a una de Spectrum que escribiera
+con la letra de la ROM. Sin eso, imprimirían en blanco en todas las máquinas.
+
 ---
 
 ## 9. Las máquinas, y lo que cada una tiene de suyo

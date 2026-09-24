@@ -125,6 +125,27 @@ def test_an_amstrad_adventure_says_nothing_in_its_own_word():
     assert word_for_nothing(list(memory)) == "nothing"
 
 
+@needs_games
+def test_an_amstrad_adventure_gets_letters_it_can_print_with(tmp_path):
+    """The Amstrad's GAC keeps no letters in the adventure: it printed with
+    the firmware's, which are in the ROM and not ours to carry.  Without any
+    it would print blanks on every machine, so deGAC gives it Modern DOS 8x8,
+    the CGA's letters, which are in the public domain: see
+    regac/moderndos.py.  From the space on, byte for byte those."""
+    import json
+    import subprocess
+    from regac.moderndos import letters
+    memory, _ = laid(image("carvalho_ams.zip", ".dsk"), "CARVALHO.FAC")
+    plain = tmp_path / "bangkok.bin"
+    plain.write_bytes(bytes(memory))
+    out = tmp_path / "bangkok.json"
+    subprocess.run([sys.executable, os.path.join(ROOT, "deGAC.py"), "-m",
+                    "cpc", str(plain), str(out)], check=True,
+                   capture_output=True)
+    font = json.loads(out.read_text(encoding="utf-8"))["font"]
+    assert font[8 * 32:] == letters()
+    assert any(font), "the adventure has no letters"
+
 if __name__ == "__main__":
     test_a_plain_file_is_laid_where_it_says()
     print("a plain file is laid where it says")
