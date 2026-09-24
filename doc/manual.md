@@ -2,7 +2,7 @@
 
 Esto y [`gac.md`](gac.md) son todo lo que hace falta. Entre los dos está el
 camino entero: qué instalar, cómo se escribe una aventura, cómo se comprueba y
-cómo se construye para ocho máquinas.
+cómo se construye para nueve máquinas.
 
 Lo demás que hay en `doc/` son **diarios de desarrollo** —lo que se midió, en
 qué orden y por qué— y no sirven de referencia.
@@ -24,6 +24,7 @@ Una aventura conversacional al estilo del **Graphic Adventure Creator** de
 | Amstrad PCW | disco `.dsk` que arranca solo |
 | MSX | cinta `.cas` |
 | Spectrum Next | `.nex` |
+| PC con CGA | `.EXE` de DOS |
 
 Se puede empezar de cero o **partir de una aventura que ya existe**: hay un
 decompilador que saca a fuente legible lo que hay dentro de una cinta, un
@@ -37,7 +38,10 @@ disco o una instantánea de 1986.
   que es lo que usan los ficheros de proyecto.
 - **`sjasmplus` en `tools/`**, que ensambla los intérpretes. Sin él se puede
   escribir y comprobar una aventura, pero no construirla.
-- **ZEsarUX en `tools/`**, sólo para correr el banco de pruebas.
+- **NASM en `tools/` o en el PATH**, sólo para el PC, que es 8086 y no Z80.
+  Es un zip de algo más de medio mega en nasm.us; basta con `nasm.exe`.
+- **ZEsarUX en `tools/`**, sólo para correr el banco de pruebas, y
+  **DOSBox-X** en el PATH para las del PC.
 
 `tools/` es donde va **todo programa que no es de este proyecto**, y no
 entra en el repositorio: además de esos dos están ahí los decompiladores
@@ -58,7 +62,7 @@ objetos y un enigma, comentada de arriba abajo para leerse como un tutorial.
 
     python -m regac make ejemplo/faro.toml
 
-Construye las ocho máquinas y las deja en `ejemplo/salida/`, una carpeta por
+Construye las nueve máquinas y las deja en `ejemplo/salida/`, una carpeta por
 destino. Cárgala en el emulador que tengas y ya está jugando.
 
 Y para verla sin emulador ninguno:
@@ -94,6 +98,7 @@ El proyecto del faro entero:
     [targets.msx]
     [targets.next]
     [targets.pcw]
+    [targets.pc]
 
 Cada destino puede llevar lo suyo:
 
@@ -286,10 +291,11 @@ toca el tono —que es lo más parecido que hay—, así que usarla no deja ning
 máquina fuera: sólo suena mejor donde hay con qué.
 
 **Suenan por el chip de sonido en las seis máquinas que lo tienen** —128, +3,
-Amstrad, MSX y Next— y por el altavoz de un bit en el Spectrum 48, que es la
-única sin chip. Son dos motores y **una sola tabla**: un tono es medio ciclo
+Amstrad, MSX y Next— y por el altavoz de un bit en el Spectrum 48 y en el PC,
+que no tienen chip. Son dos motores y **una sola tabla**: un tono es medio ciclo
 del altavoz y la mitad de eso como periodo del chip, así que `SOUND 2` dura lo
-mismo y suena a lo mismo en las siete. Donde hay chip se gana una nota más
+mismo y suena a lo mismo en las ocho —en el PC, contado en el reloj del
+sistema y no en el procesador, que puede ir a cualquier velocidad—. Donde hay chip se gana una nota más
 limpia y que no se toque lo que comparte puerto con el altavoz —el borde en el
 Spectrum, el motor del casete y el led de mayúsculas en el MSX—.
 
@@ -361,9 +367,18 @@ máquina y escribe lo que dejó en memoria.
 - **Amstrad PCW.** Disco que arranca solo, sin CP/M. Monocromo, 64 columnas.
 - **MSX.** Cinta, y la máquina entera en RAM.
 - **Spectrum Next.** `.nex`, en layer 2 y con color por píxel.
+- **PC con CGA.** Un `.EXE` de DOS con el nombre del proyecto, que corre en
+  cualquier PC desde un XT a 4,77 MHz con una CGA o algo que haga su modo de
+  320 por 200. Cuatro colores **elegidos para cada lámina** entre los que la
+  CGA permite; el texto, como en el Amstrad, cuarenta columnas bajo la lámina.
+  Una aventura de Amstrad se dibuja con las reglas del Amstrad y parpadea lo
+  que la CGA deja: el fondo, o el trío entero cuando no mueve nada más. `SAVE`
+  y `LOAD` usan un fichero junto al programa, con su nombre y `.SAV`; al
+  acabar la partida, una tecla vuelve a DOS. La tecla que se pulsa es la de la
+  distribución que tenga DOS (`KEYB SP` y las demás).
 
 El **ancho de pantalla** no es el mismo en todas —32 columnas en Spectrum, MSX
-y Next; 40 en Amstrad; 64 en PCW— y eso cambia dónde parten las líneas. Un
+y Next; 40 en Amstrad y PC; 64 en PCW— y eso cambia dónde parten las líneas. Un
 texto que quede bien en una puede quedar distinto en otra.
 
 ---
@@ -371,8 +386,8 @@ texto que quede bien en una puede quedar distinto en otra.
 ## 10. Las dos licencias, que son a propósito
 
 Las herramientas —todo lo que es Python— están bajo la **GPL v3**. Los
-intérpretes de [`z80/`](../z80), que son lo que acaba dentro de la aventura de
-otro, están bajo la **licencia MIT**: una aventura construida con esto **no
+intérpretes de [`z80/`](../z80) y [`x86/`](../x86), que son lo que acaba
+dentro de la aventura de otro, están bajo la **licencia MIT**: una aventura construida con esto **no
 arrastra ninguna obligación** de las herramientas que la construyeron.
 
 ---

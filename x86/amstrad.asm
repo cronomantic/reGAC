@@ -19,8 +19,10 @@
 ; asks whether a point is still the seed's pen, and that is the same question
 ; asked of the values, since no two pens share one.
 
+section .data
 ; The value an outline is written in: its pen's.
 ink_value:      db      0
+section .text
 
 ; The colours a picture starts in.  Pen one, and nothing in the picture data
 ; says so: the frame every room of the Amstrad adventures draws carries no

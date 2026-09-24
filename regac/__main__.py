@@ -35,7 +35,7 @@ from .gfx import Renderer
 from .media import (MSX_SCREEN_BYTES, PCW_SCREEN_BYTES, banks_of, cpc6128_disk,
                     cpc_low_tape, cpc_tape, msx_screen, msx_tape,
                     pcw_release, CPC_LOW_CODE_AT, CPC_LOW_ROOM,
-                    plus3_banked_disk, plus3_disk)
+                    plus3_banked_disk, plus3_disk, mz_exe, MZ_STACK_BYTES)
 from .project import (TARGETS, ProjectError, assemble, screen_for,
                       wide)
 from .project import read as read_project
@@ -200,7 +200,7 @@ def cmd_text(args):
     print(f"  unpacking stack {store.packer.depth()} bytes")
 
 
-BANK_SIZES = {"none": 0, "8k": 13, "16k": 14}
+BANK_SIZES = {"none": 0, "8k": 13, "16k": 14, "64k": 16}
 
 # Where each machine's interpreter is built to sit, which is where its medium
 # has to put it.
@@ -415,6 +415,17 @@ def write_database(ddb, path, machine, banks, defs=None):
     return database
 
 
+# The PC's stack: the unpacking of a message calls itself, and a picture calls
+# others eight deep.
+PC_STACK_BYTES = 2 * MZ_STACK_BYTES
+
+
+def dos_name(name):
+    """A name DOS will run: letters and digits, eight at most, in capitals."""
+    kept = "".join(c for c in name.upper() if c.isascii() and c.isalnum())
+    return (kept or "GAME")[:8]
+
+
 def cmd_make(args):
     """Build an adventure for every machine its project file names.
 
@@ -513,9 +524,14 @@ def make_one(target, settings, ddb, name, root, output, where_regac_is,
     defines = list(noises)
     if makes_a_noise(ddb):
         defines.append("NOISES")
-    if target.machine in ("cpc", "next") and from_an_amstrad(ddb):
+    if target.machine in ("cpc", "next", "pc") and from_an_amstrad(ddb):
         # drawn with the rules of the GAC it was written with
         defines.append("AMSTRAD_PICTURES")
+    if target.assembler == "nasm" and "WITH_OWN_NOISES" in defines:
+        # NASM is told where the adventure's noises are, rather than finding
+        # them by a path from where it sits
+        where = os.path.join(where_regac_is, "music", "noises.asm")
+        defines.append(f'NOISES_FILE="{where.replace(os.sep, "/")}"')
     if settings.get("screen"):
         screen = screen_for(target, settings["screen"], root)
         if target.screen_when == "assembly":
@@ -546,6 +562,15 @@ def make_one(target, settings, ddb, name, root, output, where_regac_is,
     where = os.path.join(output, target.machine if target.release is None
                          else target.release)
     os.makedirs(where, exist_ok=True)
+    if target.machine == "pc":
+        # The whole of it is one .EXE: the image NASM made, the database
+        # inside it, and the header regac writes in front.
+        with open(os.path.join(tree, target.binary), "rb") as f:
+            image = f.read()
+        path = os.path.join(where, dos_name(name) + ".EXE")
+        with open(path, "wb") as f:
+            f.write(mz_exe(image, stack=PC_STACK_BYTES))
+        return [path]
     if target.media:
         # The assembler wrote the medium as it went; it only has to be given
         # the name the project asked for.

@@ -252,12 +252,14 @@ nibble_byte:
                 or      al, ah
                 ret
 
+section .data
 ; The two bits of every pixel lit in a nibble, the first pixel in bit three.
 lit_pixels:     db      00h, 03h, 0Ch, 0Fh, 30h, 33h, 3Ch, 3Fh
                 db      0C0h, 0C3h, 0CCh, 0CFh, 0F0h, 0F3h, 0FCh, 0FFh
 ; Every bit of a mask byte from this one rightwards, and up to this one.
 mask_from:      db      0FFh, 7Fh, 3Fh, 1Fh, 0Fh, 07h, 03h, 01h
 mask_to:        db      80h, 0C0h, 0E0h, 0F0h, 0F8h, 0FCh, 0FEh, 0FFh
+section .text
 
 ; Choose what a fill lays down: AL says which of the three.
 ; Corrupts: AX, BX
@@ -271,6 +273,7 @@ set_fill_pattern:
                 mov     [fill_high], al
                 ret
 
+section .data
 ; Solid, wiped, half tone: the three pairs the original holds at $6364.
 fill_patterns:  db      0FFh, 00h
                 db      00h, 00h
@@ -287,3 +290,4 @@ fill_high:      db      0
 span_pattern:   db      0
 span_last:      db      0
 row_base:       dw      0
+section .text

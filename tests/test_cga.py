@@ -39,9 +39,10 @@ sys.path.insert(0, ROOT)
 
 from regac.binary import Database, Reader  # noqa: E402
 from regac.devices import (CGA_BANK, CGA_PALETTE, CGA_SCREEN_BYTES, CGA_TRIOS,  # noqa: E402
-                           AmstradDevice, PixelDevice,
-                           cga_amstrad_colours, cga_picture_colours,
-                           cga_screen, device_for)
+                           CPC_HARDWARE_PALETTE, SPECTRUM_PALETTE,
+                           AmstradDevice, PixelDevice, cga_amstrad_colours,
+                           cga_amstrad_flash, cga_colours, cga_picture_colours,
+                           cga_screen, device_for, nearest)
 from regac.gfx import Renderer  # noqa: E402
 
 
@@ -171,11 +172,13 @@ def test_a_picture_carries_its_palette_to_the_pc():
     gfx = {"1": [["PAPER", 1], ["INK", 6], ["RECT", 20, 60, 100, 120],
                  ["BGFILL", 60, 90]]}
     reader = Reader(Database(smallest(gfx), machine="pc").build())
-    assert reader.picture_head() == 6
-    select, mode, values = unpacked(reader.picture_inks()["1"])
+    assert reader.picture_head() == 8
+    head = reader.picture_inks()["1"]
+    select, mode, values = unpacked(head)
     background, trio, wanted = cga_picture_colours(gfx, 1)
     assert (select, mode) == (trio.select(background), trio.mode())
     assert values == list(wanted)
+    assert head[6:] == [select, mode], "a picture off a Spectrum never flashes"
 
 
 def test_an_amstrad_picture_carries_its_pens_to_the_pc_four_times_over():
@@ -190,3 +193,63 @@ def test_an_amstrad_picture_carries_its_pens_to_the_pc_four_times_over():
     background, trio, pens = cga_amstrad_colours(gfx, 1, header)
     assert (select, mode) == (trio.select(background), trio.mode())
     assert values == [pens[n & 3] for n in range(16)]
+
+
+def the_trio(select, mode):
+    """Which background and trio two port bytes put up."""
+    for trio in CGA_TRIOS:
+        for background in range(16):
+            if (trio.select(background), trio.mode()) == (select, mode):
+                return background, trio
+    raise AssertionError(f"no palette is {select:02X} {mode:02X}")
+
+
+def test_a_flashing_pen_on_the_background_flashes_and_nothing_else_moves():
+    """A CGA can change its background or its whole trio and nothing
+    between, so a pen flashes where it can and a pen that does not flash is
+    never moved to make room for one that does.  Here the flashing pen is the
+    one dealt to the background, which can be any of the sixteen, and it
+    goes to the nearest of them to its other ink."""
+    gfx = {"1": [["INK", 1], ["RECT", 20, 60, 100, 120],
+                 ["PENS", 1, 1], ["FILL", 60, 90]]}
+    # pen nought flashes black and bright white; one, two and three are still
+    header = [26, 0, 6, 6, 18, 18, 2, 2]
+    chosen = cga_amstrad_colours(gfx, 1, header)
+    background, trio, values = chosen
+    alt_background, alt_trio = the_trio(*cga_amstrad_flash(gfx, 1, header, chosen))
+    before = cga_colours(background, trio)
+    after = cga_colours(alt_background, alt_trio)
+    for pen in (1, 2, 3):
+        assert before[values[pen]] == after[values[pen]], f"pen {pen} moved"
+    if values[0] == 0:
+        assert after[0] == CGA_PALETTE[nearest(CPC_HARDWARE_PALETTE[26],
+                                               CGA_PALETTE)]
+
+
+def test_a_pen_that_cannot_flash_alone_does_not_flash():
+    """When the flashing pen is in the trio, and no other trio keeps the
+    still pens where they are, the second palette is the first."""
+    gfx = {"1": [["INK", 1], ["RECT", 20, 60, 100, 120]]}
+    header = [0, 0, 24, 24, 20, 20, 17, 0]
+    chosen = cga_amstrad_colours(gfx, 1, header)
+    background, trio, values = chosen
+    flashed = cga_amstrad_flash(gfx, 1, header, chosen)
+    alt_background, alt_trio = the_trio(*flashed)
+    before = cga_colours(background, trio)
+    after = cga_colours(alt_background, alt_trio)
+    for pen in (0, 1, 2):
+        assert before[values[pen]] == after[values[pen]], f"pen {pen} moved"
+
+
+def test_the_colours_a_screen_starts_in_are_the_references():
+    """Before any picture the interpreter shows the reference's own screen
+    without a picture: cyan, magenta and white on black.  x86/cga.asm holds
+    what each colour comes to in that, which is checked here against it."""
+    four = cga_colours(0, CGA_TRIOS[3])
+    wanted = [nearest(c, four) for c in SPECTRUM_PALETTE]
+    source = open(os.path.join(ROOT, "x86", "cga.asm"), encoding="utf-8").read()
+    table = source[source.index("%else"):].split("colour_value:")[1]
+    found = [int(n) for n in table.split(chr(10))[0].replace("db", "").split(",")]
+    assert found == wanted
+    assert "START_SELECT    equ 30h" in source and CGA_TRIOS[3].select(0) == 0x30
+    assert "START_MODE      equ 0Ah" in source and CGA_TRIOS[3].mode() == 0x0A

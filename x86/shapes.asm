@@ -50,10 +50,12 @@ draw_rect:
                 mov     [lin_y1], ax
                 ret
 
+section .data
 rect_x0:        dw      0
 rect_y0:        dw      0
 rect_x1:        dw      0
 rect_y1:        dw      0
+section .text
 
 ; How big the sixteen bit number in AX is, without its sign, in AL.  A radius
 ; never reaches 256, so a byte holds it.
@@ -273,6 +275,7 @@ gfx_fill:
                 mov     dh, [gfx_y0]
                 jmp     flood_fill
 
+section .data
 quarter_signs:  db      1, 1
                 db      1, -1
                 db      -1, 1
@@ -293,3 +296,4 @@ ell_sx:         db      0
 ell_sy:         db      0
 ell_step:       db      0
 ell_quarter:    db      0
+section .text

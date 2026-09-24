@@ -20,6 +20,9 @@ CGA_SEGMENT     equ 0B800h
 CGA_BANK        equ 2000h               ; the odd rows are in the second eight K
 CGA_ACROSS      equ 80                  ; bytes to a row
 CGA_MARGIN      equ 8                   ; the picture is 256 of the 320, centred
+CGA_STATUS      equ 3DAh
+CGA_FLYBACK     equ 08h                 ; the beam is going back up
+FLASH_FRAMES    equ 10
 
 ; Where each row of the picture starts in the card's memory, worked out once.
 ; Corrupts: AX, BX, CX, DX
@@ -199,11 +202,13 @@ blend_screen:
                 mov     [es:di], al
                 ret
 
+section .data
 ; The pixels of a screen byte from pixel n on, and up to pixel n.
 from_pixel:     db      0FFh, 3Fh, 0Fh, 03h
 upto_pixel:     db      0C0h, 0F0h, 0FCh, 0FFh
 lay_first:      db      0
 lay_last:       db      0
+section .text
 
 ; The byte with value AL in all four of its pixels.
 ; Corrupts: AH
@@ -214,12 +219,37 @@ value_byte:
 
 ; -- colours ------------------------------------------------------------------
 
+section .data
 ; The pixel value each of the sixteen colours of the original comes to, for
 ; the picture on the screen, out of the four bytes the picture carries.  A
 ; picture off an Amstrad carries its four pens' values there four times over,
 ; so that an ink is looked up here as it is, and its low two bits pick the
 ; pen.
-colour_value:   times 16 db 0
+;
+; Until a picture brings its own they are what the reference takes for a
+; screen with no picture on it: cyan, magenta and white on black, the brighter
+; of the CGA's second trio -- the colours of the original to the nearest of
+; those, or the four pens as themselves.  tests/test_cga.py holds these to
+; the reference.
+                %ifdef AMSTRAD_PICTURES
+colour_value:   db      0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3
+                %else
+colour_value:   db      0, 0, 0, 2, 0, 1, 3, 3, 0, 0, 0, 2, 1, 1, 3, 3
+                %endif
+START_SELECT    equ 30h                 ; that trio on black, port 3D9h
+START_MODE      equ 0Ah                 ; and the mode, port 3D8h
+shown_select:   db      START_SELECT    ; the palette on the screen
+shown_mode:     db      START_MODE
+other_select:   db      START_SELECT    ; and the one a flashing pen changes to
+other_mode:     db      START_MODE
+flashing:       db      0
+flash_frames:   db      FLASH_FRAMES
+section .text
+
+; Put up the palette a screen starts in, before any picture.
+; Corrupts: AX, DX
+palette_start:
+                jmp     palette_out
 
 ; Put up the palette of picture AX and the values its colours come to: the two
 ; port bytes and four bytes of values it carries in front of its length.
@@ -233,12 +263,11 @@ picture_colours_set:
                 xor     ah, ah
                 add     ax, 2                   ; in front of the length
                 sub     si, ax
-                mov     al, [es:si + 1]         ; the mode, port 3D8h
-                mov     dx, 3D8h
-                out     dx, al
                 mov     al, [es:si]             ; the colour select, port 3D9h
-                inc     dx
-                out     dx, al
+                mov     [shown_select], al
+                mov     al, [es:si + 1]         ; and the mode, port 3D8h
+                mov     [shown_mode], al
+                call    palette_out
                 add     si, 2
                 mov     bx, colour_value
                 mov     cx, 4
@@ -257,7 +286,79 @@ picture_colours_set:
                 loop    .each_colour
                 pop     cx
                 loop    .each_byte
+                ; and the palette it flashes to, which is the same one when
+                ; nothing flashes
+                mov     al, [es:si]
+                mov     [other_select], al
+                mov     al, [es:si + 1]
+                mov     [other_mode], al
+                mov     byte [flash_frames], FLASH_FRAMES
+                cmp     al, [shown_mode]
+                jne     .flashes
+                mov     al, [other_select]
+                cmp     al, [shown_select]
+.flashes:
+                mov     al, 0
+                je      .still
+                inc     al
+.still:
+                mov     [flashing], al
 .none:
+                ret
+
+; Put up the palette in shown_select and shown_mode.
+; Corrupts: AX, DX
+palette_out:
+                mov     dx, 3D8h
+                mov     al, [shown_mode]
+                out     dx, al
+                inc     dx
+                mov     al, [shown_select]
+                out     dx, al
+                %ifdef TRANSCRIPT
+                jmp     transcript_palette      ; the ports cannot be read back
+                %endif
+                ret
+
+; A frame has gone by while the game waits for a key: every ten of them a
+; picture whose pens flash changes to its other palette, and back.  The
+; Amstrad's firmware changes a flashing ink every ten frames, and the original
+; never asks for anything else; and there, as here, it only happens while a
+; key is waited for.  It is done as the frame flyback starts, as the firmware
+; does it, or the top of one frame would come out in one palette and the
+; bottom in the other.  Nothing happens unless a pen flashes, which only one
+; off an Amstrad can: see cga_amstrad_flash in regac/devices.py.
+; Corrupts: AX
+flash_frame:
+                cmp     byte [flashing], 0
+                je      .done
+                dec     byte [flash_frames]
+                jnz     .done
+                mov     byte [flash_frames], FLASH_FRAMES
+                push    dx
+                mov     dx, CGA_STATUS
+.in_flyback:
+                in      al, dx
+                test    al, CGA_FLYBACK
+                jnz     .in_flyback
+.not_yet:
+                in      al, dx
+                test    al, CGA_FLYBACK
+                jz      .not_yet
+                mov     al, [shown_select]
+                xchg    al, [other_select]
+                mov     [shown_select], al
+                mov     al, [shown_mode]
+                xchg    al, [other_mode]
+                mov     [shown_mode], al
+                call    palette_out
+                pop     dx
+.done:
+                ret
+
+; What the machine does once a picture is drawn, which here is nothing: it is
+; drawn where it is seen.
+gfx_show:
                 ret
 
 ; The border.  In the CGA's 320 by 200 mode the border is the background, one
@@ -267,4 +368,6 @@ picture_colours_set:
 set_border:
                 ret
 
+section .data
 cga_rows:       times PICTURE_ROWS dw 0         ; see cga_rows_init
+section .text

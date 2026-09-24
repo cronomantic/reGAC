@@ -25,3 +25,5 @@ output = "salida"
 [targets.next]
 
 [targets.pcw]
+
+[targets.pc]

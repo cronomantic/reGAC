@@ -48,7 +48,9 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+import dosbox  # noqa: E402
 import emulator  # noqa: E402
+import pc_game  # noqa: E402
 from regac.binary import Database  # noqa: E402
 from test_game_z80 import glyph_table, screen, wait_screen  # noqa: E402
 
@@ -70,10 +72,15 @@ if pytest is not None:
     needs_tools = pytest.mark.skipif(
         not emulator.available(), reason="sjasmplus and ZEsarUX must be in tools/"
     )
+    needs_dosbox = pytest.mark.skipif(
+        not dosbox.available(), reason="NASM and DOSBox-X must be on the path"
+    )
 else:
 
     def needs_tools(func):
         return func
+
+    needs_dosbox = needs_tools
 
 
 def regac(*words):
@@ -105,7 +112,7 @@ def test_it_compiles_and_says_nothing_is_missing(tmp_path):
 
 
 def test_every_machine_it_names_comes_out(tmp_path):
-    """The project file names eight; a build writes eight media, and not one
+    """The project file names nine; a build writes nine media, and not one
     of them is empty."""
     where = str(tmp_path / "salida")
     regac("make", PROJECT, "--output", where)
@@ -114,7 +121,7 @@ def test_every_machine_it_names_comes_out(tmp_path):
         for name in os.listdir(os.path.join(where, folder)):
             made[folder] = os.path.getsize(os.path.join(where, folder, name))
     assert set(made) == {"spectrum48", "spectrum128", "plus3", "cpc464",
-                         "cpc6128", "msx", "next", "pcw"}, made
+                         "cpc6128", "msx", "next", "pcw", "pc"}, made
     assert all(size > 1024 for size in made.values()), made
 
 
@@ -145,6 +152,23 @@ def test_it_can_be_played_to_the_end(tmp_path):
     assert any(won in line for line in end), (
         f"the lamp was never lit: {end}"
     )
+
+
+@needs_dosbox
+def test_it_can_be_played_to_the_end_on_a_pc(tmp_path):
+    """The same walkthrough, typed at a PC."""
+    path, ddb = compiled(tmp_path)
+    won = ddb["messages"]["18"].split(".")[-1].strip()[:10]
+    folder = str(tmp_path / "pc")
+    os.makedirs(folder)
+    pc_game.build(ddb, folder)
+    # The game goes on after the lamp is lit, so it is stopped from outside
+    # once the walkthrough has had its time.
+    said, _ = pc_game.play(folder, "".join(order + ENTER
+                                           for order in WALKTHROUGH),
+                           seconds=45, stop=True)
+    assert "sendero" in said, f"it never described where it starts: {said}"
+    assert won in said, f"the lamp was never lit: {said}"
 
 
 if __name__ == "__main__":

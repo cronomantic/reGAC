@@ -193,6 +193,7 @@ run_extent:
 set_fill_pattern:
                 ret
 
+section .data
 fill_x:         db      0
 fill_seed_y:    db      0
 fill_y:         db      0
@@ -203,3 +204,4 @@ fill_seed:      db      0
 fill_seed_byte: db      0
 run_shift:      db      0
 run_start:      dw      0
+section .text

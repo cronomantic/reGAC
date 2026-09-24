@@ -93,6 +93,7 @@ settle_colours:
                 mov     [fill_byte], al
                 ret
 
+section .data
 ink_now:        db      0
 paper_now:      db      START_PAPER
 bright_now:     db      0
@@ -100,6 +101,7 @@ line_value:     db      0
 fill_value:     db      0
 line_byte:      db      0
 fill_byte:      db      0
+section .text
 
 ; -- the mask and the screen --------------------------------------------------
 
@@ -172,6 +174,8 @@ gfx_clear:
                 xor     al, al
                 jmp     paint_picture
 
+section .data
 ; The mask: a bit a pixel, thirty two bytes a row, as a Spectrum's screen
 ; would be for these rows.
 mask:           times MASK_BYTES db 0
+section .text

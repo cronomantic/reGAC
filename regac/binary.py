@@ -47,8 +47,9 @@ to hand need: none of them reaches 21K.
 
 import struct
 
-from .devices import (AMSTRAD_RULES, cga_amstrad_colours, cga_picture_colours,
-                      cpc_picture_colours, from_an_amstrad, text_ink_of)
+from .devices import (AMSTRAD_RULES, cga_amstrad_colours, cga_amstrad_flash,
+                      cga_picture_colours, cpc_picture_colours, from_an_amstrad,
+                      text_ink_of)
 from .opcodes import BY_NAME, GFX_CMDS
 from .glyphs import glyph_for
 from .text import TextStore, typed
@@ -80,8 +81,12 @@ PICTURE_INKS = 8
 # each of the sixteen colours of the original comes to, two bits a colour,
 # four colours to a byte and the first in the lowest bits.
 PICTURE_PENS = 4
-# And on a PC: the two port bytes of its CGA palette, and those four of pens.
-PC_PICTURE_HEAD = 2 + PICTURE_PENS
+# And on a PC: the two port bytes of its CGA palette, those four of pens, and
+# the two port bytes of the palette it flashes to.
+PC_PICTURE_HEAD = 2 + PICTURE_PENS + 2
+# The longest a section may be on a PC: sixty four kilobytes less the fifteen
+# bytes of a segment's start that a section may not begin on.
+PC_LONGEST_SECTION = 0x10000 - 16
 # What the firmware's inks are when the machine starts, which is what the
 # original's editor stored in a picture nobody gave a colour to: it asked the
 # firmware with SCR GET INK.  See doc/graficos.md.
@@ -344,7 +349,11 @@ class Database:
         A picture off an Amstrad has four pens and not sixteen colours, dealt
         out among the four values by cga_amstrad_colours off the inks it came
         with; the four are written four times over, so that the interpreter
-        looks an ink up as it is and its low two bits pick the pen."""
+        looks an ink up as it is and its low two bits pick the pen.
+
+        Last, the two port bytes of the palette a flashing pen shows half the
+        time, from cga_amstrad_flash; the same two again where nothing
+        flashes, which is every picture off a Spectrum."""
         gfx = self.ddb["gfx"]
         if from_an_amstrad(self.ddb):
             self.inks_of(key)                   # which says if they are wrong
@@ -352,11 +361,15 @@ class Database:
             header = inks.get(str(key), inks.get(int(key)))
             background, trio, pens = cga_amstrad_colours(gfx, key, header)
             values = [pens[colour & 3] for colour in range(16)]
+            flashed = cga_amstrad_flash(gfx, key, header,
+                                        (background, trio, pens))
         else:
             background, trio, values = cga_picture_colours(gfx, key)
+            flashed = (trio.select(background), trio.mode())
         out = bytearray((trio.select(background), trio.mode()))
         for four in range(0, 16, 4):
             out.append(sum(values[four + n] << (2 * n) for n in range(4)))
+        out += bytes(flashed)
         return bytes(out)
 
     def inks_of(self, key):
@@ -544,6 +557,15 @@ class Database:
         """
         blocks = self.sections()
         page = 1 << self.page_bits if self.page_bits else 0
+        if self.machine == "pc":
+            # A PC reaches a section at a segment and an offset under sixteen,
+            # so each has to fit in what is left of the sixty four kilobytes.
+            for index, block in enumerate(blocks):
+                if len(block) > PC_LONGEST_SECTION:
+                    raise BuildError(
+                        f"the {SECTION_NAMES[index]} section is {len(block)} "
+                        f"bytes and a PC reaches {PC_LONGEST_SECTION} of one"
+                    )
         resident = bytearray()
         placement = [None] * len(blocks)
         for index, block in enumerate(blocks):
@@ -587,8 +609,13 @@ class Database:
         # Banks are padded to a whole page, as they are on the machine, so
         # that bank n always starts at the same place.
         page = 1 << self.page_bits if self.page_bits else 0
-        for bank in banks:
-            image += bytes(bank) + bytes(page - len(bank))
+        for number, bank in enumerate(banks):
+            image += bytes(bank)
+            if self.machine == "pc" and number == len(banks) - 1:
+                # the padding after the last bank is not read, and on a PC it
+                # would only make the .EXE longer
+                break
+            image += bytes(page - len(bank))
         self.placement = placement
         self.header_size = len(header)
         self.resident_size = len(header) + len(resident)

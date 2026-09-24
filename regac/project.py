@@ -71,7 +71,8 @@ class Target:
 
     def __init__(self, machine, folder, source, database, banks="none",
                  defs=None, media=(), release=None, binary=None, boot=None,
-                 screen_bytes=0, screen_when="release", scales=(1,)):
+                 screen_bytes=0, screen_when="release", scales=(1,),
+                 assembler="sjasmplus"):
         self.machine = machine          # what regac build calls it
         self.folder = folder            # where its interpreter lives
         self.source = source            # and which file of it to assemble
@@ -85,6 +86,7 @@ class Target:
         self.screen_bytes = screen_bytes
         self.screen_when = screen_when  # "assembly" or "release"
         self.scales = scales            # the widths a picture may be drawn at
+        self.assembler = assembler      # sjasmplus, or NASM for the PC
 
     def at(self, *names):
         return os.path.join(self.folder, *names)
@@ -95,6 +97,7 @@ CPC = os.path.join("z80", "cpc")
 PCW = os.path.join("z80", "pcw")
 MSX = os.path.join("z80", "msx")
 NEXT = os.path.join("z80", "next")
+PC = "x86"
 
 # What each machine needs.  A tape is written by the assembler itself, because
 # on a Spectrum the medium is blocks of the very thing being assembled; a disk
@@ -148,6 +151,14 @@ TARGETS = {
         banks="16k", defs="banks.inc",
         release="pcw", binary="game_code.bin", boot="boot.bin",
         screen_bytes=2 * 16 * 720, scales=(1, 2),
+    ),
+    # A PC with a CGA, which is 8086 and not Z80: NASM makes a flat image with
+    # the database inside it, and regac puts the .EXE header in front.  The
+    # database is in banks of sixty four kilobytes, which on a PC is loading
+    # a segment -- see x86/database.asm.
+    "pc": Target(
+        machine="pc", folder=PC, source="game.asm", database="game.rgac",
+        banks="64k", release="pc", binary="game.bin", assembler="nasm",
     ),
 }
 
@@ -216,9 +227,23 @@ def find_assembler():
     return found
 
 
+def find_nasm():
+    """NASM, in tools/ or wherever the path has it: the PC's assembler."""
+    here = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                        "tools", "nasm.exe")
+    if os.path.isfile(here):
+        return here
+    found = shutil.which("nasm")
+    if not found:
+        raise ProjectError("nasm is not in tools/ and not on the path")
+    return found
+
+
 def assemble(target, root, defines=()):
     """Assemble one machine's interpreter where it sits."""
     folder = os.path.join(root, target.folder)
+    if target.assembler == "nasm":
+        return assemble_nasm(target, folder, defines)
     listing = os.path.splitext(target.source)[0] + ".lst"
     result = subprocess.run(
         [find_assembler(), f"--lst={listing}"]
@@ -229,6 +254,25 @@ def assemble(target, root, defines=()):
     if result.returncode != 0:
         raise ProjectError(
             f"{target.source} did not assemble:\n{result.stdout}\n{result.stderr}"
+        )
+    return os.path.join(folder, listing)
+
+
+def assemble_nasm(target, folder, defines):
+    """The PC's: a flat binary, with the database it names taken in whole.  A
+    define is a name, or a name and what it stands for."""
+    listing = os.path.splitext(target.source)[0] + ".lst"
+    command = [find_nasm(), "-f", "bin", "-I" + os.path.join(folder, ""),
+               "-o", target.binary, "-l", listing,
+               f'-DDATABASE="{target.database}"']
+    for define in defines:
+        command.append(f"-D{define}")
+    result = subprocess.run(command + [target.source], cwd=folder,
+                            capture_output=True, text=True)
+    if result.returncode != 0:
+        raise ProjectError(
+            f"{target.source} did not assemble:" + chr(10) + result.stdout
+            + chr(10) + result.stderr
         )
     return os.path.join(folder, listing)
 

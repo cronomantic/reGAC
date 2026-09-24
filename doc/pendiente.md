@@ -3611,7 +3611,7 @@ Una construcción lleva unas reglas u otras, nunca las dos, según
   un byte entero del valor de la semilla son cuatro puntos de un golpe.
 
 **Lo que lleva cada lámina en la base de datos del PC**: seis bytes delante de
-su longitud --el último byte de la configuración lo dice--: los de los puertos
+su longitud --ocho desde el parpadeo: ver «El intérprete de PC, entero»-- --el último byte de la configuración lo dice--: los de los puertos
 `3D9h` y `3D8h`, y en cuatro bytes el valor de cada uno de los dieciséis
 colores. Una lámina de Amstrad lleva ahí sus cuatro plumas **cuatro veces
 seguidas**, de modo que el intérprete busca una tinta tal cual y sus dos bits
@@ -3682,10 +3682,119 @@ casualidad de lo que DOSBox-X llama 315. Medirlo de verdad
 pide 86Box o MartyPC, que no están instalados. Y 4,77 MHz es el mínimo y no
 la máquina recomendada.
 
-**Lo que sigue en el PC**: el resto del intérprete --parser, condiciones,
-texto con las reglas del CPC, teclado, guardar y cargar, la base de datos en
-bancos de 64 KB--, el parpadeo de las aventuras de Amstrad --lo que se pueda,
-como quedó dicho--, el objetivo `pc` en `regac make`, y NASM en el manual.
+**Lo que seguía en el PC**, hecho en «El intérprete de PC, entero»: el resto
+del intérprete, el parpadeo, `regac make` y NASM en el manual.
+
+### El intérprete de PC, entero
+
+Juega. `x86/` tiene ya todo lo de `z80/common/` --la base de datos, la
+configuración, el desempaquetado de mensajes, el reparto de palabras entre
+líneas, la máquina de condiciones con todos sus opcodes, el parser y el
+turno--, cada fichero siguiendo al suyo rutina a rutina, y lo que es de la
+máquina: la pantalla de texto, el reloj, el teclado, el altavoz y guardar.
+`regac make` hace el `.EXE` con NASM --en `tools/` o en el PATH, como
+sjasmplus-- y el proyecto de ejemplo lo pide: `[targets.pc]`.
+
+**Tres decisiones, tomadas por el usuario antes de escribir nada:**
+
+- **Al acabar la partida**, la puntuación se queda en pantalla, una tecla, y a
+  DOS con la pantalla de texto como estaba. Las de 8 bits se quedan paradas;
+  en un PC eso obligaría a reiniciar.
+- **`SAVE` y `LOAD`**, un solo fichero junto al programa, con su nombre y
+  `.SAV` --`MEGACORP.EXE` guarda en `MEGACORP.SAV`, lo corran desde donde lo
+  corran--, sin preguntar nada, como el 6128 y el PCW. El nombre sale del
+  propio DOS, que dice al final del entorno dónde está el programa; un DOS de
+  antes del 3.0 no lo dice y guarda en `GAME.SAV`. Lo que se guarda son los
+  743 bytes de siempre, en el mismo orden que en las demás.
+- **El teclado, con las reglas de la ROM del Spectrum, como en todas**, y el
+  carácter de cada tecla el que diga la distribución de DOS (`KEYB SP` y las
+  demás). Para saber qué teclas están abajo se toma la interrupción del
+  teclado: anota cada tecla que baja o sube, llama a la del BIOS como siempre,
+  y saca de su búfer el carácter que ésta hizo. Las letras, en mayúsculas.
+
+**Los segmentos, como quedó decidido**: el código en `CS`, los datos en un
+segmento suyo detrás, la pila en el suyo --el de la cabecera--, y la base de
+datos detrás de todo, **en bancos de 64 KB**, con el texto y las láminas en
+ellos y lo demás residente, como en el 128, el 6128 o el Next. Pero en un PC
+no hay que traer un banco: el `.EXE` entero está en memoria, así que cada
+sección tiene su propio segmento, calculado al arrancar, y leerla es cargar
+`ES`. Una sección no puede pasar de 65520 bytes y `regac build` lo dice; el
+relleno detrás del último banco no viaja. Sin enlazador: NASM, con secciones
+`.text`, `.data` y `.database` una detrás de otra, cada una en un párrafo, y
+el párrafo de cada una calculado con etiquetas de fin de sección.
+
+**El reloj** es el contador 0 del temporizador, que cuenta igual en un XT a
+4,77 MHz que en un Pentium. Se deja dando al BIOS sus 18,2 tics de siempre y
+sólo se cambia al modo que cuenta de uno en uno, de modo que la diferencia
+entre dos lecturas es el tiempo entre ellas; al salir se deja como estaba. De
+ahí salen los **fotogramas de 1/50 s** que cuentan todas las máquinas --la
+espera de `HOLD`, la repetición de una tecla, el parpadeo-- y los medios
+periodos del altavoz.
+
+**El altavoz** es el motor del Spectrum 48 --un bit, la misma tabla, el tono
+que anda--, con las esperas contadas en ese reloj y no en ciclos: medio
+periodo de tono p son p·60/11 de sus cuentas, que es lo que dura en un
+Spectrum. El cuarto byte de un ruido se lee y no se usa, como allí. Hace clic
+en cada tecla, como el original.
+
+**El texto, como el del CPC**: cuarenta columnas, nueve filas bajo la lámina,
+`TEXT` y `PICT` igual. La tinta y el papel van en el valor al que su color
+llega en la lámina que está en pantalla --el papel, el negro de una aventura
+de Spectrum o la pluma cero de una de Amstrad--, así que se recalculan cada
+vez que una lámina trae los suyos. Antes de la primera, la paleta y los
+valores son los de la referencia para una pantalla sin lámina: cian, magenta
+y blanco sobre negro.
+
+**Lo que eso deja, dicho**: el texto ya escrito no cambia de valor cuando
+cambia la lámina, así que si en la nueva el negro cae en otro valor --en 11
+de las 196 láminas de Spectrum no cae en el cero--, el papel del texto viejo
+y el del nuevo se ven distintos hasta que el viejo se va. En el CPC no pasa
+porque el papel es siempre la pluma cero.
+
+**El parpadeo de las aventuras de Amstrad, lo que se pueda.** Cada lámina
+lleva ahora ocho bytes: los seis de antes y la segunda paleta, la que un
+color que parpadea enseña la mitad del tiempo, elegida por
+`cga_amstrad_flash`. La CGA sólo puede cambiar el fondo o el trío entero, y
+la regla es que **una pluma que no parpadea no se mueve**: la segunda paleta
+es la que acerca más las plumas que parpadean a su otra tinta sin cambiar el
+color de ninguna de las quietas. Mientras se espera una tecla, cada diez
+fotogramas, se alternan, al empezar el retrazo vertical como hace el
+firmware del Amstrad. Contado sobre las seis aventuras de Amstrad: **parpadean
+11 láminas de 187 en el Amstrad, y en el PC se ve el parpadeo en 2**
+--bangkok_fac #9 y bangkok_exp #27--. En las otras nueve la pluma que parpadea
+comparte el trío con plumas quietas, y la lámina se queda en su primera
+paleta.
+
+**Las pruebas**, que como en las otras máquinas juegan de verdad:
+
+| | qué |
+|---|---|
+| `test_game_pc.py` | MegaCorp: la clave, el inventario, una palabra que no conoce y una que sí, `FIN`; y el texto en los valores de la lámina |
+| `test_save_pc.py` | una partida guardada vuelve en otra, 743 bytes con la sala delante; un `LOAD` sin fichero no toca nada |
+| `test_textmode_pc.py` | un mensaje largo no pasa de sus nueve filas hasta `TEXT`; con `TEXT` una sala no dibuja |
+| `test_keyboard_pc.py` | teclas solapadas, dos a la vez, una mantenida (a los 35 fotogramas y luego cada 5), el rebote, y `HOLD` de 2 s |
+| `test_sound_pc.py` | el clic y los cinco ruidos duran lo que en un Spectrum |
+| `test_inks_pc.py` | la paleta de cada lámina y la que parpadea, y los valores del texto en aventuras de Amstrad y de Spectrum |
+| `test_example.py` | el faro, jugado de principio a fin también en el PC |
+
+Se juega **tecleando por el teclado de la máquina**: DOSBox-X tiene
+`AUTOTYPE`, que pulsa y suelta cada tecla por la interrupción de verdad. Lo
+que el juego escribe va además, en la construcción de pruebas
+(`-DTRANSCRIPT`), a `TRANSCR.TXT` según sale, confirmado en el disco carácter
+a carácter para que se pueda leer aunque se cuelgue; la tarjeta se vuelca a
+un fichero cada vez que pide una orden y al acabar, y cada paleta que se pone
+a `PALETTE.BIN`, porque los puertos no se pueden leer. Como `AUTOTYPE` sólo
+pulsa y suelta, las reglas del teclado se prueban con `x86/test_keys.asm`,
+que mueve las teclas desde un guion fotograma a fotograma por debajo de las
+mismas `next_key` y `wait_or_key`. Se ha visto fallar: con la demora de
+repetición a 30 fotogramas en vez de 35, y con el medio periodo del altavoz a
+57/11 en vez de 60/11.
+
+**Dos cosas de DOSBox-X que costaron**: con `AUTOTYPE` se estrella siempre al
+salir, después de que el programa ha escrito y cerrado sus ficheros, así que
+en esas corridas manda lo que salió y no cómo acabó; y el `dosbox-x` del PATH
+es un lanzador de scoop, y matarlo no mata al emulador, así que una corrida
+que se pasa de tiempo se corta con `taskkill /T`, el árbol entero.
 
 ## Cosas menores
 

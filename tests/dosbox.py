@@ -71,17 +71,65 @@ def assemble(source, output, include=None, defines=None):
     return output
 
 
-def run(folder, program, cycles=CYCLES):
+# What DOSBox-X's AUTOTYPE calls the keys that are not a letter or a digit.
+KEY_NAMES = {" ": "space", chr(13): "enter", ",": "comma", ".": "period",
+             "-": "minus", "/": "slash", ";": "semicolon", chr(8): "bksp"}
+# A pause, in AUTOTYPE's own terms: a comma where a key would be.
+PAUSE = ","
+
+
+def keys(text, pauses=6):
+    """What AUTOTYPE is told to type for `text`: a key a character, and a
+    run of pauses after every enter, for the picture of the room the order
+    leads to to be drawn before the next is typed."""
+    out = []
+    for character in text:
+        name = KEY_NAMES.get(character, character.lower())
+        out.append(name)
+        if character == chr(13):
+            out += [PAUSE] * pauses
+    return out
+
+
+def run(folder, program, cycles=CYCLES, typed=None, wait=3, pace=0.25,
+        seconds=None, stop=False):
     """Run one program in `folder`, which is drive C, and wait for DOSBox-X
     to go.  Whatever the program wrote is in `folder` afterwards.  `cycles` is
-    how fast: a number, or "max" when only what comes out matters."""
+    how fast: a number, or "max" when only what comes out matters.
+
+    `typed` is a list of keys for AUTOTYPE, which presses and lets go of each
+    through the machine's own keyboard -- the same interrupt a person's keys
+    come in by -- `wait` seconds after the program starts and `pace` seconds
+    apart.  A run that types exits with DOSBox-X falling over on its way out,
+    every time, after the program has gone and its files are written; so
+    there what came out is what says whether it went, and not how it ended.
+
+    With `stop`, a program that has not ended after `seconds` is stopped,
+    which is how a game that never ends is looked at."""
     conf = os.path.join(folder, "dosbox.conf")
     speed = cycles if cycles == "max" else f"fixed {cycles}"
+    typing = ""
+    if typed:
+        typing = f"autotype -w {wait} -p {pace} " + " ".join(typed) + "\n"
     with open(conf, "w") as f:
         f.write(f"[dosbox]\nmachine={MACHINE}\n"
                 f"[cpu]\ncycles={speed}\n"
-                f"[autoexec]\nmount c .\nc:\n{program}\nexit\n")
-    subprocess.run(
-        [find_dosbox(), "-conf", conf, "-fastlaunch", "-exit"],
-        cwd=folder, capture_output=True, timeout=RUN_SECONDS, check=True,
-    )
+                f"[autoexec]\nmount c .\nc:\n{typing}{program}\nexit\n")
+    command = [find_dosbox(), "-conf", conf, "-fastlaunch", "-exit"]
+    # A program that has not ended when its time is up is stopped from
+    # outside, the whole tree of it: what the path calls dosbox-x may be a
+    # shim that started the emulator, and killing the shim alone leaves the
+    # emulator running.
+    process = subprocess.Popen(command, cwd=folder, stdout=subprocess.DEVNULL,
+                               stderr=subprocess.DEVNULL)
+    try:
+        process.wait(timeout=seconds or RUN_SECONDS)
+    except subprocess.TimeoutExpired:
+        subprocess.run(["taskkill", "/F", "/T", "/PID", str(process.pid)],
+                       capture_output=True)
+        process.wait()
+        if not stop:
+            raise
+        return
+    if process.returncode and not typed:
+        raise subprocess.CalledProcessError(process.returncode, command)

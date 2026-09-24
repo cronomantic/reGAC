@@ -8,7 +8,7 @@
 ; the rules the build carries: draw.asm and fill.asm for an adventure off a
 ; Spectrum, amstrad.asm and amstrad_fill.asm for one off an Amstrad.
 ;
-; The commands are read out of the database's segment through ES, and the
+; The commands are read out of the pictures' segment through ES, and the
 ; primitives are free to take ES for the screen: the walk loads it again for
 ; every command it reads.
 
@@ -34,6 +34,7 @@ CMD_PENS        equ 14h
 picture_init:
                 mov     al, SECTION_GRAPHICS
                 call    db_section
+                mov     [gfx_seg], es
                 mov     [gfx_section], si
                 mov     ax, [es:si]
                 mov     [gfx_count], ax
@@ -50,7 +51,7 @@ picture_init:
 ; z80/common/picture.asm, where that was counted.
 ; Corrupts: BX
 picture_find:
-                mov     es, [db_seg]
+                mov     es, [gfx_seg]
                 cmp     ax, [gfx_known]
                 jne     .behind
                 mov     si, [gfx_known_at]
@@ -100,16 +101,18 @@ picture_find:
 ; Corrupts: everything but DS
 draw_picture:
                 push    ax
+                call    text_window_below       ; a picture takes its rows back
                 mov     byte [gfx_depth], 0
                 mov     byte [gfx_border_now], 0FFh     ; no colour yet
                 call    gfx_clear
                 pop     ax
                 push    ax
                 call    picture_colours_set     ; its palette and its pens
+                call    text_recolour           ; which the text is in as well
                 call    gfx_start_colours       ; what a picture starts in
                 pop     ax
                 call    run_picture
-                ret
+                jmp     gfx_show                ; and let the machine show it
 
 ; Draw picture AX without clearing first, which is what CALL needs.
 ; Corrupts: everything but DS
@@ -121,7 +124,7 @@ run_picture:
                 test    dx, dx
                 jz      .done
                 dec     dx
-                mov     es, [db_seg]
+                mov     es, [gfx_seg]
                 mov     al, [es:si]
                 inc     si
                 mov     cl, al
@@ -277,6 +280,8 @@ run_picture:
                 dec     byte [gfx_depth]
                 jmp     .next
 
+section .data
+gfx_seg:        dw      0
 gfx_section:    dw      0
 gfx_index:      dw      0
 gfx_count:      dw      0
@@ -300,3 +305,4 @@ gfx_pen1:       db      1
 gfx_pen2:       db      1
 gfx_bright:     db      0
 gfx_flash:      db      0
+section .text

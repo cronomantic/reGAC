@@ -105,7 +105,9 @@ GROUPS = {
     # them the AY's hiss came out shaped like a note on the Next, and was
     # right on its own; whether they were why is not known, but one at a time
     # they cost nothing.
-    "pc": ["test_graphics_pc", "test_media_pc"],
+    "pc": ["test_graphics_pc", "test_media_pc", "test_game_pc",
+           "test_save_pc", "test_textmode_pc", "test_keyboard_pc",
+           "test_sound_pc", "test_inks_pc"],
 }
 
 GROUP_OF = {module: group for group, modules in GROUPS.items()

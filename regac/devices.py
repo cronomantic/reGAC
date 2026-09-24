@@ -1002,6 +1002,44 @@ def cga_amstrad_colours(gfx, picture_id, header=None):
     return best[1], best[2], best[3]
 
 
+def cga_amstrad_flash(gfx, picture_id, header=None, chosen=None):
+    """The other palette of a picture off an Amstrad, the one a flashing pen
+    shows half the time: the background and the trio, in the two port bytes.
+
+    On the Amstrad a pen that flashes changes on its own.  A CGA can change
+    only its background or the whole of its trio, so this flashes what it
+    can: the second palette is the one that brings the flashing pens nearest
+    their other inks **without moving any pen that does not flash** -- every
+    value a still pen is written in shows exactly the same colour in both.
+    When nothing can move, the two are the same and nothing flashes.  The
+    pens stay dealt as they were: which value a pen is written in is in the
+    picture and cannot change with it.  `chosen` is what cga_amstrad_colours
+    said, when it has been asked already."""
+    background, trio, values = chosen or cga_amstrad_colours(gfx, picture_id,
+                                                             header)
+    if not header:
+        return trio.select(background), trio.mode()
+    shown = cga_colours(background, trio)
+    flashing = [pen for pen in range(4)
+                if header[pen * 2] & 0x1F != header[pen * 2 + 1] & 0x1F]
+    if not flashing:
+        return trio.select(background), trio.mode()
+    other = [CPC_HARDWARE_PALETTE[min(header[pen * 2] & 0x1F, 26)]
+             for pen in range(4)]
+    best = None
+    for candidate in CGA_TRIOS:
+        for back in range(16):
+            four = cga_colours(back, candidate)
+            if any(four[values[pen]] != shown[values[pen]]
+                   for pen in range(4) if pen not in flashing):
+                continue                # a still pen would move
+            cost = sum(distance(other[pen], four[values[pen]])
+                       for pen in flashing)
+            if best is None or cost < best[0]:
+                best = (cost, back, candidate)
+    return best[2].select(best[1]), best[2].mode()
+
+
 def cga_device(gfx=None, picture_id=None, ddb=None):
     """A picture as a CGA shows it, drawn with the rules of the GAC the
     adventure was written with.  The drawing is the Amstrad's or the

@@ -12,26 +12,32 @@
 ;   nasm -f bin -I x86/ -DDATABASE="picture.rgac" -o picture.bin
 ;        x86/test_picture.asm
 ;
-; with -DAMSTRAD_PICTURES as well for an adventure off an Amstrad.
-;
-; The image is one piece: code and data behind CS, which is also DS, and the
-; database behind them on a paragraph of its own, which is its segment.
+; with -DAMSTRAD_PICTURES as well for an adventure off an Amstrad.  Laid out
+; as the interpreter is -- see game.asm -- with the code, the data and the
+; database each on a paragraph of its own.
 
 bits 16
 cpu 8086
-org 0
 
 CGA_SCREEN_BYTES equ 4000h
 BIOS_SEGMENT    equ 40h
 BIOS_TICKS      equ 6Ch                 ; the clock's count, in the BIOS's data
 MOST_PICTURES   equ 1024
 
+section .text start=0
+section .data follows=.text align=16 vstart=0
+data_start:
+section .database follows=.data align=16 vstart=0
+database:
+                incbin  DATABASE
+section .text
+
 start:
                 mov     ax, cs
+                add     ax, DATA_PARAGRAPH
                 mov     ds, ax
-                mov     ax, (database - $$) >> 4
-                mov     bx, cs
-                add     ax, bx
+                mov     ax, cs
+                add     ax, DATABASE_PARAGRAPH
                 mov     [db_seg], ax
                 call    cga_rows_init
                 call    db_init
@@ -45,7 +51,7 @@ start:
                 jcxz    .finished
                 push    cx
                 push    si
-                mov     es, [db_seg]
+                mov     es, [gfx_seg]
                 mov     ax, [es:si]
                 push    ax
                 mov     bx, [times_at]
@@ -73,6 +79,11 @@ start:
                 int     10h
                 mov     ax, 4C00h
                 int     21h
+
+; What a picture asks of the text, which this build has none of.
+text_window_below:
+text_recolour:
+                ret
 
 ; Write the card's memory to a file named after picture AX.
 ; Corrupts: everything but DS
@@ -135,12 +146,14 @@ write_times:
 .failed:
                 ret
 
+section .data
 file_name:      db      "P0000.BIN", 0
 times_name:     db      "TIMES.BIN", 0
+hex_digits:     db      "0123456789ABCDEF"
 started:        dw      0
 times_at:       dw      0
 took:           times MOST_PICTURES * 2 dw 0
-hex_digits:     db      "0123456789ABCDEF"
+section .text
 
 %include "database.asm"
 %include "picture.asm"
@@ -158,6 +171,12 @@ hex_digits:     db      "0123456789ABCDEF"
 %include "fill.asm"
 %endif
 
-                align   16
-database:
-                incbin  DATABASE
+; Where the data and the database start, in paragraphs from the code: each
+; section begins on one, straight after the one before.
+section .text
+code_end:
+section .data
+data_end:
+section .text
+DATA_PARAGRAPH  equ (code_end - start + 15) >> 4
+DATABASE_PARAGRAPH equ DATA_PARAGRAPH + ((data_end - data_start + 15) >> 4)

@@ -148,6 +148,7 @@ order_ends:
                 ret
 %endif
 
+section .data
 lin_x0:         dw      0                       ; a line's two ends, before
 lin_y0:         dw      0                       ; they are brought inside
 lin_x1:         dw      0
@@ -158,3 +159,4 @@ line_dy:        db      0
 line_sx:        db      0
 line_sy:        db      0
 line_err:       db      0
+section .text
