@@ -372,7 +372,9 @@ con la letra de la ROM. Sin eso, imprimirían en blanco en todas las máquinas.
 - **Amstrad CPC 6128.** Disco y bancos: aquí caben las grandes.
 - **Amstrad PCW.** Disco que arranca solo, sin CP/M. Monocromo, 64 columnas.
 - **MSX.** Cinta, y la máquina entera en RAM.
-- **Spectrum Next.** `.nex`, en layer 2 y con color por píxel.
+- **Spectrum Next.** `.nex`, en layer 2 y con color por píxel. `SAVE` y
+  `LOAD` usan un fichero en la tarjeta, junto al `.nex`, con el nombre del
+  proyecto y `.SAV`: `faro.nex` guarda en `FARO.SAV`.
 - **PC con CGA.** Un `.EXE` de DOS con el nombre del proyecto, que corre en
   cualquier PC desde un XT a 4,77 MHz con una CGA o algo que haga su modo de
   320 por 200. Cuatro colores **elegidos para cada lámina** entre los que la

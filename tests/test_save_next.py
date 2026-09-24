@@ -18,23 +18,26 @@
 # The interpreters in z80/ are not part of this program and are given under
 # the MIT licence instead: see z80/LICENSE.
 #
-"""Saving and loading a game on a Spectrum Next, through the Spectrum's ROM.
+"""Saving and loading a game on a Spectrum Next, in a file on its card.
 
-The emulator plays tapes and does not record them, so the two directions are
-watched apart, as they are on the Amstrad and the MSX.  Writing is watched
-going out: the block is handed to the ROM and what is checked is that it comes
-back saying it wrote it.  Reading is watched coming in, off a real tape with a
-block of known bytes on it, compared one by one with what landed.
+La guerra de las vajillas is played, because it is the one of the eight whose
+first room has a way out: NORTE takes it from room one to room four and SUR
+back.  What is looked at is the room the game is in, the file on the card,
+and the question the adventure asks when a turn is over -- asking afresh is
+the only sign a save has finished, because nothing moves.
 
-What is this machine's own is that the ROM is not in the machine.  The first
-sixteen kilobytes are the window a bank of the database appears in, so each of
-these routines has to bring the ROM back, use it, and put the window back
-afterwards -- and both tests look at the register that owns that window when
-it is over, because a save that left the ROM there would take the database
-away with it and nothing would say so until the next room.
+Twice, two ways.  Once through the emulator's own stand-in for the system,
+which answers the calls from a folder of the computer the tests run on: that
+one is quick and is where the ways of going wrong are tried.  And once with
+the Next's own system, NextZXOS, booted off the card image the emulator comes
+with and starting the adventure the way a person does -- which is where it was
+found that the system takes no call without the ROM in place.
 """
 
+import json
 import os
+import shutil
+import subprocess
 import sys
 import time
 
@@ -48,140 +51,244 @@ sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import emulator  # noqa: E402
+from fat16 import Card  # noqa: E402
+from regac.binary import Database  # noqa: E402
+from test_game_next import glyph_table, screen  # noqa: E402
 
 NEXT = os.path.join(ROOT, "z80", "next")
-SOURCE = os.path.join(NEXT, "test_tape.asm")
-BINARY = os.path.join(NEXT, "tape.bin")
-LISTING = os.path.join(NEXT, "tape.lst")
-TAPE = os.path.join(NEXT, "save.tap")
-
-BLOCK_LEN = 64
-WINDOW_PAGE = 32                # what the build leaves in the window
-SAVING, LOADING = 0, 1
-
-# The ROM wants the machine it was written for.  A Next that has booted its
-# own operating system has one -- which is how a .nex is ever started -- but a
-# cold TBBlue in the emulator does not: nothing has set the variables the tape
-# routines read, and the one at the end of them sends the machine into BASIC
-# instead of back to us.  This is the emulator's way of giving us a machine
-# that has been through a boot, with all the Next's features still on.
-BOOTED = ("--tbblue-fast-boot-mode",)
+SOURCE = os.path.join(NEXT, "game.asm")
+DATABASE = os.path.join(NEXT, "game.rgac")
+DEFS = os.path.join(NEXT, "banks.inc")
+IMAGE = os.path.join(NEXT, "game.nex")
+LISTING = os.path.join(NEXT, "game.lst")
+VAJILLAS = os.path.join(ROOT, "snapshots", "vajillas1.json")
+SAVE = "VAJILLAS.SAV"
+# The card image ZEsarUX comes with: the Next's firmware and NextZXOS.
+CARD = os.path.join(ROOT, "tools", "ZEsarUX_windows-13.0", "tbblue.mmc")
+ENTER = chr(13)
 
 if pytest is not None:
     needs_tools = pytest.mark.skipif(
-        not emulator.available(),
-        reason="sjasmplus and ZEsarUX must be in tools/",
+        not emulator.available() or not os.path.exists(VAJILLAS),
+        reason="sjasmplus and ZEsarUX must be in tools/, and La guerra de las "
+               "vajillas in snapshots/",
+    )
+    needs_card = pytest.mark.skipif(
+        not os.path.exists(CARD), reason="ZEsarUX's tbblue.mmc must be in tools/"
     )
 else:
 
     def needs_tools(func):
         return func
 
-
-def build():
-    listing = emulator.assemble(SOURCE, listing=LISTING)
-    return {
-        name: emulator.label_address(listing, name)
-        for name in ("wanted", "ready_flag", "carry_seen", "mmu0_after",
-                     "done_flag", "block", "load_area")
-    }
+    needs_card = needs_tools
 
 
-def a_tape(data):
-    """A tape with one block of data on it, which is what a saved game is: the
-    mark that says data rather than header, the bytes, and the sum of them
-    all."""
-    body = bytes([0xFF]) + bytes(data)
-    check = 0
-    for byte in body:
-        check ^= byte
-    block = body + bytes([check])
-    return len(block).to_bytes(2, "little") + block
+def built():
+    """Vajillas for the Next, its game kept under its own name, the way
+    regac make says it; and where the room and the game are."""
+    subprocess.run(
+        [sys.executable, "-m", "regac", "build", VAJILLAS, DATABASE,
+         "-m", "next", "-b", "16k", "--defs", DEFS],
+        cwd=ROOT, check=True, capture_output=True,
+    )
+    listing = emulator.assemble(SOURCE, listing=LISTING,
+                                defines=(f'SAVE_NAME="{SAVE}"',))
+    with open(VAJILLAS, encoding="utf-8") as f:
+        ddb = json.load(f)
+    where = {name: emulator.label_address(listing, name)
+             for name in ("vm_location", "vm_state", "vm_state_end",
+                          "vm_seed", "vm_flags", "vm_counters", "obj_loc")}
+    return ddb, where
 
 
-LOADS_AT = 0x8000
+class Game:
+    """One machine with Vajillas on it, and what it is asked to do."""
 
+    def __init__(self, session, ddb, where):
+        self.session = session
+        self.where = where
+        self.glyphs = glyph_table(Database(ddb))
+        self.prompt = ddb["messages"]["240"].strip()
 
-def started(session, where, wanted):
-    """Put the build in the machine, say which of the two to do, and start it.
+    def room(self):
+        low, high = self.session.read(self.where["vm_location"], 2)
+        return low | high << 8
 
-    It is written in rather than loaded as a file, and that is not a detail:
-    loading anything over an inserted tape leaves the tape where the ROM can
-    no longer read it, which looks exactly like a routine that does not work.
-    """
-    # Waited for by looking and not by sleeping, which matters here because
-    # one of the two tests this serves has a tape inserted and running: a
-    # tape starts rolling when the emulator starts and does not wait, so
-    # every tenth of a second spent not looking is tape gone past -- and a
-    # block that has gone past leaves the ROM waiting for a leader that is
-    # never coming back.  This machine ends up in the same command loop a 48
-    # does, at about two and a half seconds; in between it is at $0038 doing
-    # its interrupt, which a look or two later has been and gone.
-    assert session.wait_in(0x1200, 0x16FF), "the ROM never finished booting"
-    with open(BINARY, "rb") as f:
-        blob = f.read()
-    for at in range(0, len(blob), 512):
-        session.command(
-            f"write-memory-raw {LOADS_AT + at} " + blob[at:at + 512].hex().upper()
+    def state(self, game=None):
+        """What a game is, the one playing or one out of a file: the room,
+        the weights, the flags and where every object is.  Not the counters
+        -- Vajillas counts its turns in one of them, so every order moves it,
+        a save or a load that does nothing as much as any other -- nor the
+        seed or the stack, which a turn uses as it goes."""
+        at = self.where["vm_state"]
+        if game is None:
+            game = bytes(self.session.read(at, self.where["vm_state_end"] - at))
+        part = {name: self.where[name] - at for name in self.where}
+        return (game[:part["vm_seed"]]
+                + game[part["vm_flags"]:part["vm_counters"]]
+                + game[part["obj_loc"]:])
+
+    def asking(self):
+        lines = [line for line in screen(self.session, self.glyphs) if line.strip()]
+        return bool(lines) and lines[-1].strip() == self.prompt
+
+    def settles_in(self, room, timeout=60.0):
+        """Whether it gets to that room and is asked for the next order."""
+        deadline = time.time() + emulator.longer(timeout)
+        while time.time() < deadline:
+            if self.room() == room and self.asking():
+                return True
+            time.sleep(0.5)
+        return False
+
+    def order(self, words, then_in, timeout=60.0):
+        self.session.type(words + ENTER)
+        time.sleep(emulator.longer(1.0))        # for the order to be taken
+        assert self.settles_in(then_in, timeout), (
+            f"after {words} it is in room {self.room()} and not {then_in}, or "
+            f"it never asked again: {screen(self.session, self.glyphs)}"
         )
-    session.command(f"write-memory-raw {where['wanted']} {wanted:02X}")
-    session.jump(LOADS_AT)
-    time.sleep(emulator.longer(1.0))
-    assert session.read(where["ready_flag"], 1)[0] == 1, "the build never started"
 
 
-def waited(session, where, seconds):
-    deadline = time.time() + seconds
-    while time.time() < deadline:
-        time.sleep(0.5)
-        if session.read(where["done_flag"], 1)[0] == 0xFF:
-            return True
-    return False
+@needs_tools
+def test_a_game_is_kept_in_a_file_beside_the_nex(tmp_path):
+    ddb, where = built()
+    folder = str(tmp_path)
+    nex = os.path.join(folder, "vajillas.nex")
+    shutil.copyfile(IMAGE, nex)
+    saved = os.path.join(folder, SAVE)
+    # Something under the name that is not a game: too short to be one.
+    with open(saved, "wb") as f:
+        f.write(bytes(10))
+    # The emulator, handed a .nex, answers the system's calls from the folder
+    # the file is in: that is its stand-in for the card.
+    session = emulator.Session(machine="TBBlue")
+    try:
+        session.load(nex)
+        game = Game(session, ddb, where)
+        start = ddb["init_loc"]
+        assert game.settles_in(start, 90.0), "the adventure never asked"
+        game.order("NORTE", 4)
+        # A file that is not a whole game leaves the game as it was.
+        before = game.state()
+        game.order("LOAD", 4)
+        assert game.state() == before, "a short file changed the game"
+        # A save makes the file anew, whatever it had, with the game in it.
+        game.order("SAVE", 4)
+        with open(saved, "rb") as f:
+            kept = f.read()
+        assert game.state(kept) == game.state(), (
+            f"what is in {SAVE} is not the game: {len(kept)} bytes, "
+            f"{kept[:8].hex()}"
+        )
+        game.order("SUR", start)
+        game.order("LOAD", 4)
+    finally:
+        session.close()
 
 
-def gave_the_window_back(session, where):
-    assert session.read(where["mmu0_after"], 1)[0] == WINDOW_PAGE, (
-        "the ROM was left where the database's window belongs"
+@needs_tools
+def test_a_game_with_no_file_to_load_goes_on(tmp_path):
+    ddb, where = built()
+    nex = str(tmp_path / "vajillas.nex")
+    shutil.copyfile(IMAGE, nex)
+    session = emulator.Session(machine="TBBlue")
+    try:
+        session.load(nex)
+        game = Game(session, ddb, where)
+        start = ddb["init_loc"]
+        assert game.settles_in(start, 90.0), "the adventure never asked"
+        before = game.state()
+        game.order("LOAD", start)
+        assert game.state() == before, "loading nothing changed the game"
+        game.order("NORTE", 4)
+    finally:
+        session.close()
+    assert os.listdir(str(tmp_path)) == ["vajillas.nex"], (
+        f"a LOAD made something: {os.listdir(str(tmp_path))}"
     )
 
 
+def plus3_basic(lines):
+    """A BASIC program as NextZXOS keeps one on its card: the +3's header
+    and the lines, which here are only dot commands and so need no
+    tokens."""
+    body = b""
+    for number, text in lines:
+        line = text.encode("ascii") + b"\r"
+        body += number.to_bytes(2, "big") + len(line).to_bytes(2, "little") + line
+    header = bytearray(128)
+    header[0:8] = b"PLUS3DOS"
+    header[8] = 0x1A                            # the end of a text file
+    header[9] = 1                               # issue and version
+    header[11:15] = (128 + len(body)).to_bytes(4, "little")
+    header[15] = 0                              # a program
+    header[16:18] = len(body).to_bytes(2, "little")
+    header[18:20] = lines[0][0].to_bytes(2, "little")   # run from the first
+    header[20:22] = len(body).to_bytes(2, "little")     # and no variables
+    header[127] = sum(header[:127]) & 0xFF
+    return bytes(header) + body
+
+
+# The firmware's own settings as they come on the card, but with a video mode
+# chosen: as the card comes, the first boot puts up a test card and waits for
+# somebody to press enter at it.
+CONFIG = b"ps2=0\ntiming=7\ndefault=0\n"
+
+
 @needs_tools
-def test_it_writes_a_block():
-    where = build()
-    session = emulator.Session(machine="TBBlue", extra=list(BOOTED))
+@needs_card
+def test_a_game_saved_and_loaded_on_nextzxos(tmp_path):
+    ddb, where = built()
+    folder = str(tmp_path)
+    card = os.path.join(folder, "card.mmc")
+    shutil.copyfile(CARD, card)
+    pieces = {
+        "vajillas.nex": (open(IMAGE, "rb").read(), "games/vajillas.nex"),
+        # What NextZXOS runs once it is up: into the folder, and the
+        # adventure started from there -- as the browser does when a person
+        # picks it, going into the folder first.
+        "autoexec.bas": (plus3_basic([(10, ".cd /games"),
+                                      (20, ".nexload vajillas.nex")]),
+                         "nextzxos/autoexec.bas"),
+        "config.ini": (CONFIG, "machines/next/config.ini"),
+    }
+    copied = []
+    for name, (data, on_card) in pieces.items():
+        path = os.path.join(folder, name)
+        with open(path, "wb") as f:
+            f.write(data)
+        copied += ["--copy-file-to-mmc", path, on_card]
+    session = emulator.Session(machine="TBBlue", extra=[
+        "--enable-mmc", "--enable-divmmc-ports", "--mmc-file", card,
+    ] + copied)
     try:
-        started(session, where, SAVING)
-        assert waited(session, where, 90), "the ROM never gave it back"
-        assert session.read(where["carry_seen"], 1)[0] == 1, "it says it did not write"
-        assert session.read(where["block"], BLOCK_LEN) == bytes(range(BLOCK_LEN)), (
-            "what it was asked to write came back changed"
+        game = Game(session, ddb, where)
+        start = ddb["init_loc"]
+        assert game.settles_in(start, 120.0), (
+            "NextZXOS never got the adventure going"
         )
-        gave_the_window_back(session, where)
+        game.order("SAVE", start)
+        game.order("NORTE", 4)
+        game.order("LOAD", start)
     finally:
         session.close()
-
-
-@needs_tools
-def test_it_reads_a_block_off_a_tape():
-    where = build()
-    wanted = bytes((index * 7 + 3) & 0xFF for index in range(BLOCK_LEN))
-    with open(TAPE, "wb") as f:
-        f.write(a_tape(wanted))
-
-    session = emulator.Session(machine="TBBlue",
-                               extra=["--tape", TAPE] + list(BOOTED))
-    try:
-        started(session, where, LOADING)
-        assert waited(session, where, 90), "nothing ever came off the tape"
-        assert session.read(where["carry_seen"], 1)[0] == 1, "it says it did not read"
-        assert session.read(where["load_area"], BLOCK_LEN) == wanted
-        gave_the_window_back(session, where)
-    finally:
-        session.close()
+    time.sleep(emulator.longer(1.0))
+    kept = Card(card).read("games/" + SAVE)
+    assert kept is not None, f"no {SAVE} beside the adventure on the card"
+    assert len(kept) == where["vm_state_end"] - where["vm_state"], len(kept)
+    assert kept[0] | kept[1] << 8 == start, (
+        f"the game on the card is not in room {start}: {kept[:8].hex()}"
+    )
 
 
 if __name__ == "__main__":
-    test_it_writes_a_block()
-    print("it writes a block")
-    test_it_reads_a_block_off_a_tape()
-    print("it reads a block off a tape")
+    import pathlib
+    import tempfile
+
+    for test in (test_a_game_is_kept_in_a_file_beside_the_nex,
+                 test_a_game_with_no_file_to_load_goes_on,
+                 test_a_game_saved_and_loaded_on_nextzxos):
+        test(pathlib.Path(tempfile.mkdtemp()))
+        print(test.__name__)

@@ -46,9 +46,8 @@ db_page:
 
 db_paged:       db      $FF             ; nothing has been asked for yet
 
-; The 48K ROM back where it always was, and then the window again.  This is
-; for the tape: the ROM is the only thing on this machine that knows how to
-; talk to one, and it expects to be at $0000 while it does.
+; The ROM back where it always was, and then the window again.  This is for
+; saving a game: the system answers its calls only with the ROM at $0000.
 ; Corrupts: AF
 the_rom_back:
                 ld      a, ROM_BACK

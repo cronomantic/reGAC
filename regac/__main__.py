@@ -532,6 +532,9 @@ def make_one(target, settings, ddb, name, root, output, where_regac_is,
         # them by a path from where it sits
         where = os.path.join(where_regac_is, "music", "noises.asm")
         defines.append(f'NOISES_FILE="{where.replace(os.sep, "/")}"')
+    if target.machine == "next":
+        # its game goes in a file named after it, beside the .nex
+        defines.append(f'SAVE_NAME="{dos_name(name)}.SAV"')
     if settings.get("screen"):
         screen = screen_for(target, settings["screen"], root)
         if target.screen_when == "assembly":

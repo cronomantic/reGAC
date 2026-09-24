@@ -5,10 +5,10 @@
 ; The map is the whole of what is this machine's own, and it is full:
 ;
 ;   $0000  the window a bank of the database appears in -- or the 48K ROM,
-;          for as long as a save takes
+;          for as long as a save takes, which is when the system answers
 ;   $4000  free: a Spectrum keeps its screen here, and this machine's screen
-;          is layer 2.  The tracker player and its tune lived here until the
-;          music was taken out, and nothing has moved in since
+;          is layer 2.  A game being loaded is read here first, and put over
+;          the one playing only once all of it has come
 ;   $5C00  left free, because that is where the ROM keeps its variables and
 ;          the ROM is borrowed to save a game
 ;   $5D00  what is resident of the database
@@ -183,7 +183,7 @@ done_flag:      db      0
 ; it rather than through the speaker: see spectrum/keyboard.asm.
                 DEFINE  WITH_AY 1
                 include "../spectrum/keyboard.asm"
-                include "tape.asm"
+                include "save.asm"
                 include "pixels.asm"
                 ; The rules of the GAC the adventure was written with: an
                 ; adventure off an Amstrad is built with -DAMSTRAD_PICTURES and
@@ -234,8 +234,8 @@ above_mask:
                 include "../common/picture.asm"
 past_mask:
                 ; Clear of the stack, with room for it to come down: a turn of
-                ; the interpreter does not go deep, but the tape routines call
-                ; the ROM and the ROM has its own ideas.
+                ; the interpreter does not go deep, but a save calls the
+                ; system and the system has its own ideas.
 STACK_ROOM      equ 512
                 ASSERT  past_mask <= STACK_AT - STACK_ROOM
 

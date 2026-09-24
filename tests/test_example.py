@@ -123,6 +123,9 @@ def test_every_machine_it_names_comes_out(tmp_path):
     assert set(made) == {"spectrum48", "spectrum128", "plus3", "cpc464",
                          "cpc6128", "msx", "next", "pcw", "pc"}, made
     assert all(size > 1024 for size in made.values()), made
+    # and the Next keeps its game under the project's name
+    with open(os.path.join(where, "next", "faro.nex"), "rb") as f:
+        assert b"FARO.SAV\0" in f.read(), "the Next's game is not in FARO.SAV"
 
 
 @needs_tools

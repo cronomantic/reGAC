@@ -371,8 +371,9 @@ kilobyte que libera está por debajo de la pared, donde ya sobra sitio—. Ahí
 vive `picture.asm`, y bajo la pared quedan quinientos bytes largos. Si hace
 falta más, se bajan más módulos.
 
-**Lo que queda de esta máquina**: nada urgente. Guardar en fichero por el API
-de NextZXOS, si alguna vez se quiere en vez de la cinta. El sonido ya está,
+**Lo que queda de esta máquina**: nada urgente. ~~Guardar en fichero por el API
+de NextZXOS, si alguna vez se quiere en vez de la cinta.~~ Hecho: ver «El Next
+guarda en la tarjeta», más abajo. El sonido ya está,
 por su AY compatible —ruidos y clic de tecla—, **sin interrupción ninguna**:
 la de modo 2 era del reproductor de música y se fue con él.
 
@@ -4056,6 +4057,54 @@ en vez de `SOL` una vez --la primera tecla de las solapadas, perdida--. No se
 ha tocado nada del PCW ni de `z80/common/`, y a solas pasó tres de tres. Queda
 apuntada: es de las que dependen del ritmo con que ZEsarUX recibe las teclas,
 como las del teclado de las otras máquinas, y si vuelve hay que mirarla.
+
+## El Next guarda en la tarjeta
+
+**Decidido por el usuario**: `SAVE` y `LOAD` del Next van a un fichero de la
+tarjeta, y la cinta se quita; el fichero se llama como el proyecto, con
+`.SAV` --`faro.nex` guarda en `FARO.SAV`--, como en el PC. No se pregunta
+nombre, como en el 6128, el PCW y el PC. `regac make` lo pasa al ensamblador
+como `SAVE_NAME`, en 8.3 (`dos_name`); una construcción a la que nadie se lo
+dice guarda en `GAME.SAV`. El nombre no lleva carpeta, así que va a la carpeta
+en la que está el sistema, que es la del `.nex` cuando se arranca desde el
+navegador.
+
+Un `.nex` siempre lo arranca NextZXOS, y NextZXOS contesta las llamadas de
+esxDOS: `RST $08` y un byte detrás (`F_OPEN`, `F_READ`, `F_WRITE`,
+`F_CLOSE`). Está en `z80/next/save.asm`, que sustituye a `tape.asm`. Dos
+cosas de esta máquina:
+
+- **El sistema no contesta sin la ROM en `$0000`**, y ahí está la ventana de
+  la base de datos. Se trae la ROM mientras duran las llamadas y se devuelve
+  la ventana, como hacía la cinta. Quitándolo, la máquina se pierde en `SAVE`:
+  visto con NextZXOS de verdad.
+- **Una carga se lee primero aparte**, en la memoria libre de `$4000`, y sólo
+  se copia encima de la partida cuando ha llegado entera: un fichero que no
+  está, o más corto que una partida, deja la partida como estaba.
+
+Se sospechó una tercera y **no era**: que el sistema, al volver, paginara los
+16 K de arriba como un 128 a partir de sus variables --que el `.nex` pone a
+cero, porque lleva el banco 5 entero--, y ahí está la parte de layer 2 que se
+dibuja. Se guardaron y repusieron los dos registros; quitándolo todo sigue
+igual con NextZXOS, así que se quitó.
+
+Las pruebas, en `test_save_next.py`, juegan Vajillas --`NORTE` lleva de la 1
+a la 4 y `SUR` de vuelta-- de dos maneras:
+
+- Con el sustituto que ZEsarUX pone al abrir un `.nex`, que contesta las
+  llamadas desde la carpeta del fichero. Rápido, y ahí se prueban los fallos:
+  sin fichero, `LOAD` no cambia nada; con un fichero de diez bytes, tampoco;
+  `SAVE` lo rehace con la partida dentro, y un `LOAD` después vuelve a ella.
+  Se ha visto fallar leyendo directamente sobre la partida: acaba en la sala 0.
+- Con **NextZXOS de verdad**, arrancado de la imagen `tbblue.mmc` que trae
+  ZEsarUX, copiada: se pone en ella el `.nex` en `/games`, un `autoexec.bas`
+  que hace `.cd /games` y `.nexload vajillas.nex`, que es lo que hace el
+  navegador, y un `config.ini` con el modo de vídeo elegido, porque tal como
+  viene el primer arranque saca una carta de ajuste y espera un Enter. Después
+  se lee la tarjeta desde fuera (`tests/fat16.py`) y `/games/VAJILLAS.SAV`
+  tiene 743 bytes, empezando por la sala. Se ha visto fallar sin la ROM.
+
+`test_example` mira además que el `.nex` que hace `make` lleve `FARO.SAV`.
 
 ## Cosas menores
 
