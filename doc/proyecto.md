@@ -1,12 +1,13 @@
 # El fichero de proyecto
 
+*[Read in English](en/project.md)*
+
 Una aventura no dice nada de bancos, ni de pantallas de carga, ni de a qué
 tamaño se dibujan sus láminas. Eso son decisiones sobre **a dónde va**, no
-sobre lo que es, y estaban repartidas por una docena de líneas de comando.
-Ahora van juntas en un fichero, y un solo comando construye todo lo que ese
-fichero nombre:
+sobre lo que es, y van juntas en un fichero; un solo comando construye todo lo
+que ese fichero nombre:
 
-    python -m regac make megacorp.toml
+    python -m regac make faro.toml
 
 Es el mismo principio que separa el fuente `.gac` de la máquina destino, y que
 ya estaba escrito en [`formato-fuente.md`](formato-fuente.md): *lo que es de la
@@ -18,10 +19,9 @@ proyecto*.
 TOML, que lee la biblioteca estándar de Python desde la 3.11 y no obliga a
 instalar nada:
 
-    name    = "megacorp"         # cómo se llaman los medios que salen
-    source  = "megacorp.json"    # la aventura: .json hoy, .gac también
+    name    = "faro"             # cómo se llaman los medios que salen
+    source  = "faro.gac"         # la aventura: un fuente .gac o un .json
     output  = "salida"           # dónde se dejan, una carpeta por máquina
-    effects = "efectos.asm"      # el banco de efectos, si lo hay
 
     [targets.spectrum48]
 
@@ -31,23 +31,25 @@ instalar nada:
     [targets.plus3]
     screen = "carga.scr"
 
-    [targets.cpc]
+    [targets.cpc6128]
     screen = "carga.cpc"
 
     [targets.pcw]
     screen = "carga.pcw"
-    scale  = [2, 1]
+    scale  = 2
 
-Las rutas se cuentan desde el propio fichero de proyecto. Las máquinas se
-llaman `spectrum48`, `spectrum128`, `plus3`, `cpc`, `msx`, `next` y `pcw`.
+Las rutas se cuentan desde el propio fichero de proyecto. `name` y `source`
+hay que decirlos; `output`, si no se dice, es `release`. Las máquinas se llaman
+`spectrum48`, `spectrum128`, `plus3`, `cpc464`, `cpc6128`, `msx`, `next`,
+`pcw` y `pc`.
 
 ## Las perillas
 
 | clave | qué dice | por defecto |
 |---|---|---|
-| `banks` | tamaño de banco: `none`, `8k` o `16k` | lo que esa máquina suele usar |
+| `banks` | tamaño de banco: `none`, `8k`, `16k` o `64k` | lo que esa máquina suele usar |
 | `screen` | el volcado de pantalla que se ve mientras carga | ninguna |
-| `scale` | a cuántos píxeles de la máquina sale un punto de la lámina | 1, y 2 en el PCW |
+| `scale` | a cuántos píxeles de la máquina sale un punto de la lámina: un número, o dos como `[2, 1]` | 1 |
 
 Las tres son de una máquina. Arriba del todo, del proyecto entero, sólo van
 `name`, `source`, `output` y `targets`.
@@ -76,6 +78,8 @@ fichero de cada árbol hay que ensamblar: eso son hechos de la máquina y viven
 en la tabla de `regac/project.py` o en el fuente de la propia máquina. El
 fichero de proyecto elige entre lo que la máquina ofrece; no la reinventa.
 
+Tampoco los ruidos: los que pide una aventura van en su fuente, en `/SOUND`.
+
 ## Qué hace por cada máquina
 
 1. **La base de datos** que esa máquina lee, con los bancos que se le pidan, y
@@ -83,18 +87,25 @@ fichero de proyecto elige entre lo que la máquina ofrece; no la reinventa.
 2. **La pantalla de carga**, si la hay: comprobada, y puesta donde haga falta
    —junto al fuente cuando el medio lo escribe el ensamblador, o entregada a
    `release` cuando lo escribe él—.
-3. **El intérprete**, ensamblado con lo que el proyecto haya dicho.
+3. **El intérprete**, ensamblado con lo que el proyecto haya dicho y con lo
+   que la aventura use: `DO`, los huecos del texto, los ruidos.
 4. **El medio**, en `salida/<máquina>/`. Cada máquina en su carpeta, que es
    necesario: todas llaman igual a sus ficheros.
 
-Con `-t` se construye una sola:
+Con `-t` se construye una sola, y con `--zip` lo construido va además a un
+zip, una carpeta por máquina:
 
-    python -m regac make megacorp.toml -t pcw
+    python -m regac make faro.toml -t pcw
+    python -m regac make faro.toml --zip faro.zip
 
 ## Lo que sale
 
-    cpc          -> cpc\megacorp.dsk, cpc\megacorp.cdt
-    pcw          -> pcw\megacorp.dsk
-    plus3        -> plus3\megacorp.dsk
-    spectrum128  -> spectrum128\megacorp.tap
-    spectrum48   -> spectrum48\megacorp.tap
+    cpc464       -> cpc464\faro.cdt
+    cpc6128      -> cpc6128\faro.dsk
+    msx          -> msx\faro.cas
+    next         -> next\faro.nex
+    pc           -> pc\FARO.EXE
+    pcw          -> pcw\faro.dsk
+    plus3        -> plus3\faro.dsk
+    spectrum128  -> spectrum128\faro.tap
+    spectrum48   -> spectrum48\faro.tap

@@ -210,9 +210,11 @@ def wide(scale):
     """A scale as a pair, whether it was written as one number or as two."""
     if isinstance(scale, int):
         return scale, 1
-    if len(scale) != 2:
-        raise ProjectError(f"a scale is one number or two, not {scale}")
-    return int(scale[0]), int(scale[1])
+    if (not isinstance(scale, list) or len(scale) != 2
+            or not all(isinstance(n, int) for n in scale)):
+        raise ProjectError(f"a scale is one number or two, as scale = 2 or "
+                           f"scale = [2, 1], not {scale!r}")
+    return scale[0], scale[1]
 
 
 def find_assembler():

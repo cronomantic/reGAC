@@ -1,5 +1,7 @@
 # Formato fuente ReGAC (`.gac`)
 
+*[Read in English](en/source-format.md)*
+
 Formato de texto intermedio del proyecto. Es el punto en el que una aventura
 deja de ser un volcado binario y pasa a ser algo editable, versionable y
 recompilable para cualquiera de las máquinas destino.
@@ -94,6 +96,7 @@ puede escribir pegado.
 | `/LOC`   | Una por localidad, con conexiones y condiciones locales      |
 | `/HIGH`  | Condiciones de alta prioridad                               |
 | `/LOW`   | Condiciones de baja prioridad                               |
+| `/PROC`  | Una tabla de condiciones con número, que corre `DO`          |
 | `/GFX`   | Gráficos vectoriales                                        |
 | `/FONT`  | Fuente redefinida                                           |
 | `/SOUND` | Los ruidos que pide                                         |
@@ -189,11 +192,12 @@ ninguno de los dos, y allí la palabra se lee y se toca el tono. Una línea sin
 ella es un tono, de modo que un fuente escrito antes de que esto existiera
 sigue valéndose tal cual.
 
-Los hace **el chip de sonido en las seis máquinas que lo tienen** —128, +3,
-Amstrad, MSX y Next— y el altavoz de un bit en el Spectrum 48, que es la única
-sin chip. Una sola tabla y dos motores: un tono es medio ciclo del altavoz y la
-mitad de eso como periodo del chip, de modo que el mismo número dura lo mismo y
-suena a lo mismo en las siete. El PCW no tiene con qué, y allí `SOUND` no hace
+Los hace **el chip de sonido en las máquinas que lo tienen** —128, +3, los dos
+Amstrad, MSX y Next— y el altavoz de un bit en el Spectrum 48 y en el PC, que
+no tienen chip. Una sola tabla y dos motores: un tono es medio ciclo del
+altavoz y la mitad de eso como periodo del chip, de modo que el mismo número
+dura lo mismo y suena a lo mismo en todas; en el PC, contado en el reloj del
+sistema y no en el procesador. El PCW no tiene con qué, y allí `SOUND` no hace
 nada. Una aventura que no diga nada aquí se queda con los cinco que trae el
 intérprete.
 
@@ -382,7 +386,7 @@ intérprete necesita para imprimir el 137 y nada más. Está contado en
 
 ## Lo que es sólo para algunas máquinas
 
-Una aventura es un fuente y cinco máquinas, y de vez en cuando las cinco no
+Una aventura es un fuente y nueve máquinas, y de vez en cuando no todas
 quieren lo mismo. Un Spectrum de 48K puede tener que quedarse sin lo que en las
 demás cabe, las plumas del Amstrad no son los colores del Spectrum, y a una
 máquina sin chip de sonido no le hace falta la línea que arranca una melodía.
@@ -457,8 +461,8 @@ silencio, sin nada que diga por qué.
 
 Se mira todo lo que apunta: mensajes, localidades, objetos, contadores,
 palabras del vocabulario, láminas —incluida una lámina que llama a otra—, por
-dónde se sale de cada sitio, dónde empieza cada objeto, y las melodías que la
-aventura dice tener. Lo que no se puede saber no se dice: `MESS ( CTR 3 )`
+dónde se sale de cada sitio, dónde empieza cada objeto, los ruidos que la
+aventura dice tener y las tablas que corre `DO`. Lo que no se puede saber no se dice: `MESS ( CTR 3 )`
 cambia en cada partida y ahí no hay nada que comprobar. Lo que es dudoso sale
 como aviso; lo que no puede ser otra cosa que un fallo, como fallo.
 
@@ -468,6 +472,9 @@ máquina.
 
 Es lo que encontró un fallo de 1987: **Los pájaros de Bangkok** dice `MESS 130`
 en una habitación de su primera parte y ese mensaje no se escribió nunca.
+
+Y al revés, lo que está y nada usa —una sala a la que no lleva nada, un objeto
+que nada coge, un mensaje que nadie imprime— lo dice `regac lint`.
 
 ## Nombres para los números
 

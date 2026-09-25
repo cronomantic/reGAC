@@ -1,5 +1,7 @@
 # El lenguaje GAC: referencia completa
 
+*[Read in English](en/gac.md)*
+
 El **Graphic Adventure Creator** lo publicó Incentive en 1986. Su manual
 explicaba cómo se tecleaba una aventura dentro de la máquina; esto explica
 **el lenguaje**, entero, para escribir una hoy.
@@ -223,7 +225,7 @@ sitio **cuando se dibuja la lámina siguiente**. Medido en el original.
 
 Estos dos son añadidos de este proyecto, no de GAC. Los hace el chip de sonido
 donde lo hay —128, +3, Amstrad, MSX y Next— y el altavoz de un bit en el
-Spectrum 48; los dos motores leen la misma tabla y duran lo mismo. Una máquina
+Spectrum 48 y en el PC; los motores leen la misma tabla y duran lo mismo. Una máquina
 que no tenga con qué sonar —el PCW— los lee y no hace nada, de modo que **la
 misma aventura vale para todas las máquinas**.
 
@@ -297,6 +299,10 @@ orden.
 **A oscuras** —marcadores 1 y 2 a cero— no se describe nada: se borra la
 ventana de la lámina, se dice el mensaje 251 y **no se pone el marcador 0**,
 porque no se ha descrito.
+
+El marcador 1 está puesto desde el principio. Una aventura que guarde en él
+una bandera suya —una puerta abierta— se la encuentra abierta antes de que
+nadie la abra: las banderas de una aventura empiezan en la 4.
 
 ---
 
@@ -373,12 +379,12 @@ celda de ocho por ocho, con la limitación de atributos del Spectrum.
 Los tres rellenos se propagan desde un punto y los frenan **los píxeles ya
 encendidos** y los bordes del área de imagen.
 
-Tres cosas que conviene saber al dibujar, medidas en el original:
+Cosas que conviene saber al dibujar, medidas en el original:
 
 - **Un hueco de un píxel en una pared deja escapar el relleno**, pero sólo por
-  esa fila: sale un rayo de un píxel de alto hasta el borde de la lámina y no
-  se ensancha. Si una pared tuya tiene un agujero, se va a notar como una
-  raya, no como una mancha.
+  esa fila: sale un rayo de un píxel de alto hasta lo siguiente que lo pare, y
+  no se ensancha. Si una pared tuya tiene un agujero, se va a notar como una
+  raya, no como una mancha. `regac draw` lo avisa.
 - **Un pasillo de un píxel de ancho sí se rellena.**
 - **Una diagonal por pared no deja pasar**: el relleno se para en la escalera.
 - Y si la semilla cae **encima de un píxel encendido**, no pasa nada en
@@ -430,4 +436,5 @@ anterior. Eso no es una conducta, es un accidente de su memoria.
 | si buscas | mira |
 |---|---|
 | construir tu primera aventura | [`manual.md`](manual.md) |
+| el formato del fuente, sección a sección | [`formato-fuente.md`](formato-fuente.md) |
 | una aventura entera escrita para leerse | [`../ejemplo/faro.gac`](../ejemplo/faro.gac) |

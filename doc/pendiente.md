@@ -4151,6 +4151,51 @@ Y dos cosas vistas por el camino, sin hacer:
 - ~~**`doc/gac.md` dice «ocho máquinas»** en sus secciones 8 y 10, y son
   nueve.~~ Corregido.
 
+## La herramienta, en su release y en dos idiomas
+
+**Pedido por el usuario**, después de la 0.2.1: una release que sea la
+herramienta, no sólo el ejemplo, y el README, la documentación y los mensajes
+en inglés y en español. **Decidido por el usuario**: la herramienta va como un
+paquete listo para usar --no un ejecutable ni un paquete de pip--.
+
+- **El paquete** es `regac-<versión>.zip`, que el flujo de la release saca con
+  `git archive` de las rutas que dice `.github/release-files`: `regac/`,
+  `z80/`, `x86/`, `runGAC`, `deGAC`, `disk.py`, `grab.py`, el ejemplo, las
+  guías, `editors/`, las licencias y los README; y de `tests/` sólo
+  `emulator.py`, el que maneja ZEsarUX, porque lo usan `grab.py` y la medida
+  de `regac draw`. Ni las pruebas ni el diario. El ejemplo construido sigue
+  aparte, y se llama ahora `example-faro-<versión>.zip`, que decía `faro`
+  sin más y confundía. `test_the_release_builds_every_machine` construye las
+  nueve con lo que el paquete lleva y nada más.
+- **El README** está en inglés (`README.md`) y en español (`LEEME.md`), cada
+  uno con el camino al otro, y con cómo se instala el paquete.
+- **La documentación** de uso está en inglés en `doc/en/`: `manual.md`,
+  `gac.md`, `source-format.md` y `project.md`, traducidas y enlazadas con las
+  españolas. El resto de `doc/`, que es el diario y cómo se hizo cada pieza,
+  se queda en español. `test_docs.py` mira que ningún enlace vaya a nada y que
+  cada página lleve a la de la otra lengua.
+
+**Lo que salió al traducir**, que estaba mal en español y se ha corregido en
+los dos:
+
+- `proyecto.md` nombraba una clave `effects` que ya no existe y las máquinas
+  de antes (`cpc`, sin el PC); y no decía que `output` es `release` si no se
+  dice.
+- **El manual ponía `scale = "2x"`, y eso se caía** con una traza de Python: la
+  escala es un número o una pareja. Además lo ponía en el Spectrum 128, que
+  sólo dibuja a 1. Ahora el ejemplo es `scale = 2` en el PCW, y una escala mal
+  escrita da un error que se entiende; está en `test_project.py`.
+- `gac.md` y `formato-fuente.md` no contaban el PC entre las máquinas que
+  suenan por el altavoz, y el segundo seguía hablando de cinco máquinas y no
+  tenía `/PROC` en su tabla de secciones.
+- `gac.md` dice ahora que las banderas de una aventura empiezan en la 4, que
+  es lo que le pasó al faro, y que el rayo de un relleno llega hasta lo
+  siguiente que lo pare, no siempre al borde.
+- El manual decía que sjasmplus tiene que estar en `tools/`; también vale en
+  el PATH, que es como lo encuentra la release.
+
+Quedan los mensajes de la herramienta, que es la parte más grande.
+
 ## `DO` y `/PROC`
 
 **Decidido por el usuario**, las cuatro cosas:

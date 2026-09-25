@@ -124,6 +124,9 @@ def test_it_says_what_is_wrong_with_a_project(tmp_path):
          "cannot draw"),
         ('name = "x"\nsource = "megacorp.json"\nsalida = "x"\n[targets.cpc464]\n',
          "salida"),
+        # as the manual wrote it for a long time, and it fell over in Python
+        ('name = "x"\nsource = "megacorp.json"\n[targets.pcw]\nscale = "2x"\n',
+         "one number or two"),
     ):
         path = a_project(where, body, screens=False)
         try:

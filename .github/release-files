@@ -6,6 +6,7 @@
 # tests/test_example.py builds the example out of it.
 LICENSE
 README.md
+LEEME.md
 pyproject.toml
 poetry.lock
 regac
@@ -22,4 +23,5 @@ doc/manual.md
 doc/gac.md
 doc/formato-fuente.md
 doc/proyecto.md
+doc/en
 tests/emulator.py

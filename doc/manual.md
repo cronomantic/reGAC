@@ -1,5 +1,7 @@
 # Manual de reGAC
 
+*[Read in English](en/manual.md)*
+
 Esto y [`gac.md`](gac.md) son todo lo que hace falta. Entre los dos está el
 camino entero: qué instalar, cómo se escribe una aventura, cómo se comprueba y
 cómo se construye para nueve máquinas.
@@ -36,12 +38,13 @@ disco o una instantánea de 1986.
 
 - **Python 3.11 o más nuevo.** Desde el 3.11 la biblioteca estándar lee TOML,
   que es lo que usan los ficheros de proyecto.
-- **`sjasmplus` en `tools/`**, que ensambla los intérpretes. Sin él se puede
-  escribir y comprobar una aventura, pero no construirla.
+- **`sjasmplus`, en `tools/` o en el PATH**, que ensambla los intérpretes.
+  Sin él se puede escribir y comprobar una aventura, pero no construirla.
 - **NASM en `tools/` o en el PATH**, sólo para el PC, que es 8086 y no Z80.
   Es un zip de algo más de medio mega en nasm.us; basta con `nasm.exe`.
-- **ZEsarUX en `tools/`**, sólo para correr el banco de pruebas, y
-  **DOSBox-X** en el PATH para las del PC.
+- **ZEsarUX en `tools/`**, sólo para correr el banco de pruebas, para sacar
+  una aventura de su máquina con `grab.py` y para medir una lámina en `regac
+  draw`; y **DOSBox-X** en el PATH para las pruebas del PC.
 
 `tools/` es donde va **todo programa que no es de este proyecto**, y no
 entra en el repositorio: además de esos dos están ahí los decompiladores
@@ -114,7 +117,9 @@ Cada destino puede llevar lo suyo:
 
     [targets.spectrum128]
     screen = "carga.scr"        # pantalla de carga
-    scale  = "2x"               # a qué tamaño se dibujan las láminas
+
+    [targets.pcw]
+    scale  = 2                  # a qué tamaño se dibujan las láminas
 
 ---
 
