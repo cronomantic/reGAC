@@ -4375,7 +4375,13 @@ pide lo que queda a la vista de la sala; se ha pasado dos veces seguidas.
 - **La release**: **decidido por el usuario**, un script local y no un flujo
   de GitHub. Es `regac make proyecto.toml --zip faro.zip`: lo construido, una
   carpeta por máquina, en un zip para subirlo a mano. Lo mira
-  `test_every_machine_it_names_comes_out`.
+  `test_every_machine_it_names_comes_out`. **Y cambiado después por el
+  usuario**, con la 0.2.0 ya etiquetada: ahora lo hace GitHub,
+  `.github/workflows/release.yml`. Al subir una etiqueta `v*` --o a mano desde
+  Actions, para una que ya está-- instala NASM de la distribución y compila
+  sjasmplus de su repositorio, en la v1.23.1 que se usa aquí y sin Lua, que
+  nada de esto usa; construye el faro con ese mismo `--zip` y lo adjunta a la
+  release de la etiqueta, que crea si no la hay.
 
 **La CI se simuló aquí antes de subirla**, y encontró tres fallos que ya
 estaban y que en esta máquina no se veían, porque aquí están `tools/` y

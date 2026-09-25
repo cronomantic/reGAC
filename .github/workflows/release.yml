@@ -1,0 +1,65 @@
+# A release for every tag: the example adventure built for the nine machines,
+# in a zip, attached to the release of the tag.
+#
+# What building takes is the two assemblers and nothing else -- no emulator:
+# NASM from the distribution, and sjasmplus built from its own repository at
+# the version the project uses, without Lua, which nothing here needs.  regac
+# finds them both on the path.
+#
+# It runs when a tag v* is pushed, and it can be run by hand from Actions for
+# a tag that is there already.  A release that exists keeps its notes and has
+# the zip put on it again.
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "the tag to make the release of, v0.2.0 for one"
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  SJASMPLUS: v1.23.1
+
+jobs:
+  example:
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ github.event.inputs.tag || github.ref_name }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - name: The assemblers
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y nasm
+          git clone --depth 1 --branch "$SJASMPLUS" \
+            https://github.com/z00m128/sjasmplus.git "$RUNNER_TEMP/sjasmplus"
+          make -C "$RUNNER_TEMP/sjasmplus" USE_LUA=0 -j4
+          echo "$RUNNER_TEMP/sjasmplus/build/release" >> "$GITHUB_PATH"
+      - name: reGAC
+        run: python -m pip install -e .
+      - name: The example, for the nine machines
+        run: |
+          sjasmplus --version || true
+          nasm -v
+          python -m regac make ejemplo/faro.toml --output "$RUNNER_TEMP/salida" \
+            --zip "faro-$TAG.zip"
+      - name: The release
+        run: |
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            gh release upload "$TAG" "faro-$TAG.zip" --clobber
+          else
+            gh release create "$TAG" "faro-$TAG.zip" --title "reGAC ${TAG#v}" \
+              --generate-notes
+          fi
