@@ -96,3 +96,19 @@ def test_the_score_without_its_messages_still_comes_out():
     # between them where the messages would be
     last = said.rstrip().splitlines()[-1]
     assert ended and last.isdigit() and last.startswith("0"), said[-60:]
+
+
+def test_the_door_of_the_example_wants_its_key():
+    """It did not: the example kept its door in marker 1, which is the
+    interpreter's and says there is light, and is set from the start -- so
+    the door was open before anybody opened it, and the one puzzle of the
+    example was no puzzle.  Found adding its greeting."""
+    ended, said = play(read_adventure(EXAMPLE, "spectrum"), ["NORTE", "NORTE"])
+    assert "cerrada" in said, said
+    assert "zaguán" not in said, said
+
+
+def test_the_example_greets_once():
+    ended, said = play(read_adventure(EXAMPLE, "spectrum"),
+                       ["MIRA", "MIRA", "MIRA"])
+    assert said.count("una aventura de ejemplo") == 1, said

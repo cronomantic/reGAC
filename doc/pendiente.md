@@ -4228,7 +4228,21 @@ el suyo.
 - **El saludo del faro no sale nunca.** El mensaje 10, `SALUDO` --«EL FARO DE
   SANTA BÁRBARA -- una aventura de ejemplo. Escribe...»--, está escrito desde
   el primer día y nada lo imprime: el faro no tiene tabla `/HIGH`. Lo dijo
-  `lint`. **Sin tocar**: cambia cómo empieza el ejemplo, y es del usuario.
+  `lint`. ~~**Sin tocar**: cambia cómo empieza el ejemplo, y es del usuario.~~
+  **Decidido por el usuario, y hecho**: el faro tiene ahora una tabla `/HIGH`
+  que lo dice una vez, debajo de la primera sala, con una bandera y no
+  preguntando si el turno es el cero, porque la cuenta da la vuelta a los 256.
+  Lleva un `LF` delante: sin él salía pegado a la lista de objetos, en el
+  Spectrum y en Python.
+
+  **Y al añadirlo salió otro, peor: el enigma del faro no lo era.** Guardaba
+  la puerta en la bandera 1 y la lente en la 2, que son del intérprete --la 1
+  dice que el sitio tiene luz, y está puesta desde el principio--, así que
+  `SET? PUERTA_ABIERTA` era cierto antes de abrir nada: `NORTE`, `NORTE` sin
+  la llave llevaba al zaguán. La solución no lo notaba porque abre la puerta
+  antes de pasar. Las banderas del faro van ahora de la 4 en adelante, dicho
+  en el fuente, y `test_play.py` pide la llave y el saludo una sola vez; la
+  de la puerta se ha visto fallar con la bandera en el 1.
 - **En `runGAC.py`, un `EXIT` en la tabla de una sala no acababa la
   partida**: la tabla baja corría después y devolvía `finished` a falso. El
   faro gana con un `EXIT` en su última sala y seguía preguntando. En las

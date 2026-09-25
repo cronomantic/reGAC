@@ -32,8 +32,13 @@
 .def CANDIL_ENCENDIDO   3
 .def LA_CARACOLA        4
 
-.def PUERTA_ABIERTA     1       ; la bandera del único enigma
-.def LENTE_ENCENDIDA    2
+; Las banderas de la aventura empiezan en la 4: de la 0 a la 3 son del
+; intérprete -- la 1 dice que el sitio tiene luz, y está puesta desde el
+; principio --, y una aventura que las use para lo suyo se encuentra la puerta
+; abierta sin haberla abierto.  Esta lo hacía.
+.def PUERTA_ABIERTA     4       ; la bandera del único enigma
+.def LENTE_ENCENDIDA    5
+.def YA_SALUDADO        6
 
 .def RUIDO_CERRADURA    1       ; los de /SOUND, contados desde uno
 .def RUIDO_CHIRRIDO     2
@@ -267,6 +272,16 @@ en el centro.
   /LOCAL
     IF ( VERB VERBO_ENCIENDE AND NOUN NOMBRE_LENTE AND CARR CANDIL_ENCENDIDO ) SET LENTE_ENCENDIDA SOUND RUIDO_FARO MESS VICTORIA EXIT END
     IF ( VERB VERBO_ENCIENDE AND NOUN NOMBRE_LENTE AND NOT CARR CANDIL_ENCENDIDO ) MESS SIN_LUZ WAIT END
+
+; -- al empezar cada turno ---------------------------------------------------
+;
+; La tabla alta corre al principio de cada turno, antes de pedir la orden, y
+; la primera vez justo después de describir la sala en la que se empieza.  El
+; saludo sale una sola vez, y lo dice una bandera: preguntar si el turno es el
+; cero no vale, porque la cuenta de turnos da la vuelta a los 256.
+
+/HIGH
+IF ( RES? YA_SALUDADO ) SET YA_SALUDADO LF MESS SALUDO END
 
 ; -- lo que vale en cualquier sala -------------------------------------------
 ;
