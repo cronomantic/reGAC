@@ -4252,6 +4252,9 @@ un cuadradito de cada uno. La extensión apaga eso para el lenguaje GAC
 (`editor.colorDecorators` y `editor.defaultColorDecorators`), y el usuario
 vio que ya no salen. Está en `test_editor.py`.
 
+**La 0.3.2**, pedida por el usuario, es la 0.3.1 con ese arreglo del
+resaltador.
+
 **La 0.3.0**, pedida por el usuario, es la primera release con la
 herramienta dentro (`regac-v0.3.0.zip`), las guías en dos idiomas y los
 mensajes en español o en inglés.
