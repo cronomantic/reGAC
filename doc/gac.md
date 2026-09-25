@@ -363,7 +363,7 @@ celda de ocho por ocho, con la limitación de atributos del Spectrum.
 | `PLOT x y` | enciende un píxel |
 | `LINE x1 y1 x2 y2` | recta entre dos puntos |
 | `RECT x1 y1 x2 y2` | contorno de un rectángulo |
-| `ELLIPSE x1 y1 x2 y2` | elipse inscrita en ese rectángulo |
+| `ELLIPSE x y x2 y2` | elipse con centro en x y; el segundo punto da los radios, que son lo que dista de él |
 | `FILL x y` | colorea la región, sin tocar los píxeles |
 | `BGFILL x y` | colorea la región y además apaga sus píxeles |
 | `SHADE x y` | rellena la región con una trama de medio tono |

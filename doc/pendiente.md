@@ -4252,6 +4252,23 @@ el suyo.
   que el faro no tiene. En las máquinas un mensaje que no hay no escribe nada
   y los números salen igual; ahora aquí también.
 
+## Las elipses del faro, y lo que `gac.md` decía de ellas
+
+Al empezar el editor de láminas, que tiene que saber qué punto de una
+`ELLIPSE` se arrastra: `gac.md` decía que `ELLIPSE x1 y1 x2 y2` es la elipse
+**inscrita en ese rectángulo**, y no lo es. Lo que el renderer leyó en el
+original, en `$88FE`, es que **el primer par es el centro y el segundo un
+punto que da los radios**, lo que dista del centro. Y el faro no seguía ni lo
+uno ni lo otro: sus cinco elipses llevaban los radios sueltos --`ELLIPSE 128
+140 10 8`--, que con la regla de verdad son radios de 118 y 132. La lámina 1
+tenía una elipse que llenaba la pantalla donde iba la luz de la linterna, y la
+5 unos anillos de lente que se salían del marco. Nadie lo había mirado: las
+pruebas comparan las máquinas con el renderer, y el renderer dibujaba lo que
+estaba escrito.
+
+Corregidas las cinco, con los radios que su autor quiso, y `gac.md`. Vistas
+las láminas 1 y 5 antes y después.
+
 ## La distribución
 
 - **`regac` como orden**: `[project.scripts]` en `pyproject.toml`, y se instala
