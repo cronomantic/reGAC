@@ -21,6 +21,8 @@
 import struct
 import zlib
 
+from .i18n import _
+
 SIGNATURE = bytes((137, 80, 78, 71, 13, 10, 26, 10))
 
 
@@ -64,7 +66,7 @@ def unfilter(raw, height, stride, step):
     out = bytearray()
     at = 0
     previous = bytearray(stride)
-    for _ in range(height):
+    for _row in range(height):
         kind, at = raw[at], at + 1
         line = bytearray(raw[at:at + stride])
         at += stride
@@ -86,7 +88,8 @@ def unfilter(raw, height, stride, step):
                     above if db <= dc else corner)
                 line[index] = (line[index] + nearest) & 0xFF
             elif kind:
-                raise ImageError(f"a row of this image is filtered with {kind}")
+                raise ImageError(_("a row of this image is filtered with "
+                                   "{kind}", kind=kind))
         out += line
         previous = line
     return out
@@ -117,7 +120,7 @@ def read_image(blob):
     in any two colours works without being asked which is which.
     """
     if blob[:len(SIGNATURE)] != SIGNATURE:
-        raise ImageError("this is not a PNG")
+        raise ImageError(_("this is not a PNG"))
     at = len(SIGNATURE)
     width = height = depth = colour = interlace = 0
     palette = alpha = b""
@@ -128,7 +131,7 @@ def read_image(blob):
         body = blob[at + 8:at + 8 + length]
         at += 12 + length
         if tag == b"IHDR":
-            width, height, depth, colour, _, _, interlace = struct.unpack(
+            width, height, depth, colour, _pack, _filter, interlace = struct.unpack(
                 ">IIBBBBB", body[:13])
         elif tag == b"PLTE":
             palette = body
@@ -139,9 +142,11 @@ def read_image(blob):
         elif tag == b"IEND":
             break
     if interlace:
-        raise ImageError("this PNG is interlaced, and this reader is not")
+        raise ImageError(_("this PNG is interlaced, and this reader is "
+                           "not"))
     if colour not in CHANNELS:
-        raise ImageError(f"this PNG is of a kind ({colour}) this cannot read")
+        raise ImageError(_("this PNG is of a kind ({colour}) this cannot "
+                           "read", colour=colour))
     count = CHANNELS[colour]
     stride = (width * count * depth + 7) // 8
     rows = unfilter(zlib.decompress(bytes(data)), height, stride,

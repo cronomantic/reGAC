@@ -49,7 +49,9 @@ import argparse
 import struct
 import sys
 
-SECTOR_BASES = {0xC1: "data", 0x41: "system", 0x01: "ibm"}
+from regac.i18n import N_, _, argparse_speaks
+
+SECTOR_BASES = {0xC1: N_("data"), 0x41: N_("system"), 0x01: N_("ibm")}
 
 
 def tracks(data):
@@ -61,7 +63,7 @@ def tracks(data):
         count = data[0x30] * data[0x31]
         sizes = [data[0x34 + n] * 256 for n in range(count)]
     else:
-        raise ValueError("not a CPC disk image")
+        raise ValueError(_("not a CPC disk image"))
     out, at = [], 0x100
     for size in sizes:
         out.append(data[at:at + size] if size else None)
@@ -164,7 +166,8 @@ def memory(blob, at=None):
     """A 64K image with the file laid where it loads, or where it is told."""
     head = header(blob)
     if not head:
-        raise ValueError("the file has no AMSDOS header, so where it goes is unknown")
+        raise ValueError(_("the file has no AMSDOS header, so where it "
+                           "goes is unknown"))
     body = blob[128:128 + head["length"]]
     where = head["load"] if at is None else at
     image = bytearray(0x10000)
@@ -248,14 +251,19 @@ def raw_memory(stream, base):
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("image", help="the disk image")
-    parser.add_argument("name", nargs="?", help="the file to take off it")
-    parser.add_argument("output", nargs="?", help="where to write the memory image")
+    argparse_speaks()
+    parser = argparse.ArgumentParser(description=_(
+        "Take a file off a CPC disk image, and put it where it belongs in "
+        "memory."))
+    parser.add_argument("image", help=_("the disk image"))
+    parser.add_argument("name", nargs="?", help=_("the file to take off it"))
+    parser.add_argument("output", nargs="?",
+                        help=_("where to write the memory image"))
     parser.add_argument("--at", type=lambda n: int(n, 0), default=None,
-                        help="lay it at this address instead of its own")
+                        help=_("lay it at this address instead of its own"))
     parser.add_argument("--part", type=int, default=None,
-                        help="which adventure to take off a disk with no directory")
+                        help=_("which adventure to take off a disk with no "
+                               "directory"))
     args = parser.parse_args(argv)
 
     data = open(args.image, "rb").read()
@@ -269,40 +277,51 @@ def main(argv=None):
         stream = raw_stream(data)
         where = adventures(stream)
         if not 1 <= args.part <= len(where):
-            print(f"the disk has {len(where)} of them", file=sys.stderr)
+            print(_("the disk has {n} of them", n=len(where)),
+                  file=sys.stderr)
             return 1
         base = where[args.part - 1]
         with open(out, "wb") as f:
             f.write(raw_memory(stream, base))
-        print(f"adventure {args.part} of {len(where)} laid where it loads, "
-              f"from ${base:04X} of the raw tracks, in {out}")
+        print(_("adventure {part} of {n} laid where it loads, from "
+                "${base} of the raw tracks, in {out}", part=args.part,
+                n=len(where), base=f"{base:04X}", out=out))
         return 0
 
     if not args.name:
         first = sectors(tracks(data)[0])
-        kind = SECTOR_BASES.get(min(s[0] for s in first), "unknown") if first else "unknown"
-        print(f"{len(listing)} files, {kind} format")
+        kind = (SECTOR_BASES.get(min(s[0] for s in first), N_("unknown"))
+                if first else N_("unknown"))
+        print(_("{n} files, {kind} format", n=len(listing), kind=_(kind)))
         if not listing:
             where = adventures(raw_stream(data))
-            print(f"  no directory, but {len(where)} adventures in the raw "
-                  f"tracks: take them with --part")
+            print(_("  no directory, but {n} adventures in the raw tracks: "
+                    "take them with --part", n=len(where)))
         for name, pieces in listing.items():
             blob = contents(area, pieces)
             head = header(blob)
-            where = (f"loads at ${head['load']:04X}, ${head['length']:04X} bytes"
-                     if head else "no header")
-            print(f"  {name:14s} {len(blob):6d} bytes  {where}")
+            where = (_("loads at ${load}, ${length} bytes",
+                       load=f"{head['load']:04X}",
+                       length=f"{head['length']:04X}")
+                     if head else _("no header"))
+            print(_("  {name} {size} bytes  {where}", name=f"{name:14s}",
+                    size=f"{len(blob):6d}", where=where))
         return 0
 
     if args.name not in listing:
-        print(f"no {args.name} on the disk", file=sys.stderr)
+        print(_("no {name} on the disk", name=args.name), file=sys.stderr)
         return 1
     image, head = memory(contents(area, listing[args.name]), args.at)
     out = args.output or args.name.replace(".", "_") + ".mem"
     with open(out, "wb") as f:
         f.write(image)
-    how = " after moving itself there" if head["moved"] else ""
-    print(f"{args.name} laid at ${head['laid']:04X}{how} in {out}")
+    if head["moved"]:
+        said = _("{name} laid at ${at} after moving itself there in {out}",
+                 name=args.name, at=f"{head['laid']:04X}", out=out)
+    else:
+        said = _("{name} laid at ${at} in {out}", name=args.name,
+                 at=f"{head['laid']:04X}", out=out)
+    print(said)
     return 0
 
 

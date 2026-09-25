@@ -50,6 +50,7 @@ import struct
 from .devices import (AMSTRAD_RULES, cga_amstrad_colours, cga_amstrad_flash,
                       cga_picture_colours, cpc_picture_colours, from_an_amstrad,
                       text_ink_of)
+from .i18n import _
 from .opcodes import BY_NAME, GFX_CMDS
 from .glyphs import glyph_for
 from .text import HOLE_OBJECT, TextStore, commands_of, expand, typed
@@ -167,13 +168,14 @@ def assemble_conditions(code):
         if name == "PUSH":
             value = instruction[1]
             if not 0 <= value <= 0x7FFF:
-                raise BuildError(f"constant {value} does not fit")
+                raise BuildError(_("constant {value} does not fit",
+                                   value=value))
             out.append(PUSH_MARK | (value >> 8))
             out.append(value & 0xFF)
             continue
         op = BY_NAME.get(name)
         if op is None:
-            raise BuildError(f"unknown opcode {name!r}")
+            raise BuildError(_("unknown opcode {name!r}", name=name))
         out.append(op.code)
     out.append(CONDITION_END)
     return bytes(out)
@@ -209,18 +211,18 @@ class Database:
     def __init__(self, ddb, machine="spectrum48", page_bits=0, music_buffer=0,
                  music_mode=MUSIC_COPY):
         if machine not in MACHINES:
-            raise BuildError(f"unknown machine {machine!r}")
+            raise BuildError(_("unknown machine {machine!r}", machine=machine))
         if from_an_amstrad(ddb) and machine not in AMSTRAD_RULES:
             # Its pictures are pens and not the Spectrum's inks and papers,
             # and are drawn with the Amstrad's rules on any machine: one that
             # does not know them would draw them wrong, so it is said instead.
             # See doc/pendiente.md.
             knowing = sorted(AMSTRAD_RULES & set(MACHINES))
-            raise BuildError(
-                f"this adventure was written on an Amstrad, and its pictures "
-                f"are drawn with the Amstrad's rules; {machine} does not know "
-                f"them; {', '.join(knowing[:-1])} and {knowing[-1]} do"
-            )
+            raise BuildError(_(
+                "this adventure was written on an Amstrad, and its pictures "
+                "are drawn with the Amstrad's rules; {machine} does not know "
+                "them; {some} and {last} do", machine=machine,
+                some=", ".join(knowing[:-1]), last=knowing[-1]))
         self.ddb = ddb
         self.machine = machine
         self.page_bits = page_bits
@@ -241,10 +243,11 @@ class Database:
         for o in self.objects:
             # a name may say a counter, but not a name, which could be its
             # own: an interpreter printing it would print it for ever
-            if any(which == HOLE_OBJECT for which, _, _ in
+            if any(which == HOLE_OBJECT for which, *rest in
                    commands_of(expand(self.ddb["objects"][o]["name"]))):
-                raise BuildError(f"object {o} names an object in its name, "
-                                 "which an object's name may not do")
+                raise BuildError(_("object {object} names an object in its "
+                                   "name, which an object's name may not do",
+                                   object=o))
         texts += [self.ddb["locations"][l]["desc"] for l in self.locations]
         self.no_objs_index = len(texts)
         texts.append(self.ddb.get("no_objs_msg", "Nothing"))
@@ -389,11 +392,13 @@ class Database:
         if found is None:
             return START_INKS
         if len(found) != PICTURE_INKS:
-            raise BuildError(f"picture {key} has {len(found)} inks where an "
-                             f"Amstrad picture has {PICTURE_INKS}")
+            raise BuildError(_("picture {picture} has {inks} inks where an "
+                               "Amstrad picture has {wanted}", picture=key,
+                               inks=len(found), wanted=PICTURE_INKS))
         if any(not 0 <= ink <= 26 for ink in found):
-            raise BuildError(f"picture {key} has an ink that is not one of "
-                             "the Amstrad's, which go from 0 to 26")
+            raise BuildError(_("picture {picture} has an ink that is not one "
+                               "of the Amstrad's, which go from 0 to 26",
+                               picture=key))
         return tuple(found)
 
     def vocabulary(self):
@@ -413,10 +418,10 @@ class Database:
             plain = typed(word)
             clash = seen.setdefault((kind, plain), word)
             if clash != word:
-                raise BuildError(
-                    f"{word!r} and {clash!r} are the same word once the marks "
-                    "come off, and a player types them the same way"
-                )
+                raise BuildError(_(
+                    "{word!r} and {other!r} are the same word once the marks "
+                    "come off, and a player types them the same way",
+                    word=word, other=clash))
             out += u8(kind) + u8(wid) + u8(len(plain))
             for c in plain:
                 out += u8(self.code_of(c))
@@ -536,7 +541,8 @@ class Database:
             for command in gfx[key]:
                 name = command[0]
                 if name not in GFX_CMDS:
-                    raise BuildError(f"unknown graphics command {name!r}")
+                    raise BuildError(_("unknown graphics command {name!r}",
+                                       name=name))
                 code, argc = GFX_CMDS[name]
                 picture += u8(code)
                 for n, argument in enumerate(command[1:]):
@@ -580,10 +586,10 @@ class Database:
             # so each has to fit in what is left of the sixty four kilobytes.
             for index, block in enumerate(blocks):
                 if len(block) > PC_LONGEST_SECTION:
-                    raise BuildError(
-                        f"the {SECTION_NAMES[index]} section is {len(block)} "
-                        f"bytes and a PC reaches {PC_LONGEST_SECTION} of one"
-                    )
+                    raise BuildError(_(
+                        "the {section} section is {size} bytes and a PC "
+                        "reaches {most} of one", section=SECTION_NAMES[index],
+                        size=len(block), most=PC_LONGEST_SECTION))
         resident = bytearray()
         placement = [None] * len(blocks)
         for index, block in enumerate(blocks):
@@ -595,10 +601,10 @@ class Database:
             if placement[index] is not None:
                 continue
             if len(block) > page:
-                raise BuildError(
-                    f"the {SECTION_NAMES[index]} section is {len(block)} bytes "
-                    f"and a bank holds {page}"
-                )
+                raise BuildError(_(
+                    "the {section} section is {size} bytes and a bank holds "
+                    "{page}", section=SECTION_NAMES[index], size=len(block),
+                    page=page))
             for number, bank in enumerate(banks):
                 if len(bank) + len(block) <= page:
                     placement[index] = (number, len(bank), len(block))
@@ -657,7 +663,7 @@ class Reader:
 
     def __init__(self, image):
         if image[:4] != MAGIC:
-            raise BuildError("not a reGAC database")
+            raise BuildError(_("not a reGAC database"))
         self.image = image
         self.version = image[4]
         self.machine = image[5]

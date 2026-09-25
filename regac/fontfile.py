@@ -44,6 +44,7 @@ which is what the rest of this reads a font by -- to its eight bytes.
 
 import re
 
+from .i18n import _
 from .png import read_image
 
 GLYPH_ROWS = 8
@@ -153,18 +154,16 @@ def from_listing(written):
     """The bytes of a listing, which is a font written out as source."""
     values = numbers_in(written)
     if not values:
-        raise FontError("there are no bytes in this at all")
+        raise FontError(_("there are no bytes in this at all"))
     big = [v for v in values if v > 255]
     if big:
-        raise FontError(
-            f"this has {big[0]} in it, which is not a byte: it does not look "
-            "like a font written out as source"
-        )
+        raise FontError(_(
+            "this has {value} in it, which is not a byte: it does not look "
+            "like a font written out as source", value=big[0]))
     if len(values) % GLYPH_ROWS:
-        raise FontError(
-            f"a font is eight bytes a letter and this listing has "
-            f"{len(values)}, which is not a whole number of them"
-        )
+        raise FontError(_(
+            "a font is eight bytes a letter and this listing has {count}, "
+            "which is not a whole number of them", count=len(values)))
     return bytes(values)
 
 
@@ -206,13 +205,15 @@ def strip_header(blob):
         each = int.from_bytes(blob[20:24], "little")
         height = int.from_bytes(blob[24:28], "little")
         if height != GLYPH_ROWS or each != GLYPH_ROWS:
-            raise FontError(f"this console font is {height} rows tall, not eight")
+            raise FontError(_("this console font is {rows} rows tall, not "
+                              "eight", rows=height))
         # What follows the glyphs is a table of what each one means, and it is
         # not glyphs: it is left where it is.
         return blob[head:head + glyphs * each], 0
     if blob[:len(PSF1_MAGIC)] == PSF1_MAGIC:
         if blob[3] != GLYPH_ROWS:
-            raise FontError(f"this console font is {blob[3]} rows tall, not eight")
+            raise FontError(_("this console font is {rows} rows tall, not "
+                              "eight", rows=blob[3]))
         glyphs = 512 if blob[2] & 1 else 256
         return blob[4:4 + glyphs * GLYPH_ROWS], 0
     if len(blob) > DOS_HEADER and (len(blob) - DOS_HEADER) in PLAIN:
@@ -253,7 +254,8 @@ def from_bdf(written):
         elif rows is not None:
             rows.append(int(word[0][:2], 16))        # eight pixels wide
     if not slots:
-        raise FontError("this says it is a BDF but there are no glyphs in it")
+        raise FontError(_("this says it is a BDF but there are no glyphs "
+                          "in it"))
     return slots
 
 
@@ -265,7 +267,8 @@ def from_vdu(blob):
     for at in range(0, len(blob), 10):
         piece = blob[at:at + 10]
         if len(piece) < 10 or piece[0] != 23:
-            raise FontError("this stops looking like VDU 23 commands part way in")
+            raise FontError(_("this stops looking like VDU 23 commands part "
+                              "way in"))
         slots[piece[1]] = bytes(piece[2:])
     return slots
 
@@ -285,17 +288,17 @@ def from_symbols(written):
         if len(values) == 1 + GLYPH_ROWS:
             slots[values[0]] = bytes(values[1:])
     if not slots:
-        raise FontError("this has SYMBOL in it but no character it redefines")
+        raise FontError(_("this has SYMBOL in it but no character it "
+                          "redefines"))
     return slots
 
 
 def glyphs_of(blob, first):
     """The glyphs of a dump, against the slot each one stands for."""
     if len(blob) % GLYPH_ROWS:
-        raise FontError(
-            f"a font is eight bytes a letter and this is {len(blob)} bytes, "
-            "which is not a whole number of them"
-        )
+        raise FontError(_(
+            "a font is eight bytes a letter and this is {count} bytes, which "
+            "is not a whole number of them", count=len(blob)))
     return {first + n: bytes(blob[n * GLYPH_ROWS:(n + 1) * GLYPH_ROWS])
             for n in range(len(blob) // GLYPH_ROWS)}
 
@@ -332,10 +335,10 @@ def cell_size(width, height, wanted):
         if width % side == 0 and height % side == 0:
             if (width // side) * (height // side) == wanted:
                 return side
-    raise FontError(
-        f"this sheet is {width} by {height}, which is no way to lay out "
-        f"{wanted} cells of eight by eight or a whole multiple of them"
-    )
+    raise FontError(_(
+        "this sheet is {width} by {height}, which is no way to lay out "
+        "{wanted} cells of eight by eight or a whole multiple of them",
+        width=width, height=height, wanted=wanted))
 
 
 def from_image(blob, wanted=None):
@@ -344,10 +347,9 @@ def from_image(blob, wanted=None):
     width, height, ink = read_image(blob)
     side = cell_size(width, height, wanted)
     if width % side or height % side:
-        raise FontError(
-            f"a sheet of letters is a whole number of cells and this one is "
-            f"{width} by {height}"
-        )
+        raise FontError(_(
+            "a sheet of letters is a whole number of cells and this one is "
+            "{width} by {height}", width=width, height=height))
     step = side // GLYPH_ROWS
     across = width // side
     slots = {}
@@ -374,11 +376,13 @@ def read(path, first=None, order="ascii", layout=None):
     `order` says which machine's order the glyphs are in.
     """
     if order not in ORDERS:
-        raise FontError(f"no font is kept in {order!r} order; "
-                        f"try one of {', '.join(sorted(ORDERS))}")
+        raise FontError(_("no font is kept in {order} order; try one of "
+                          "{known}", order=repr(order),
+                          known=", ".join(sorted(ORDERS))))
     if layout is not None and layout not in LAYOUTS:
-        raise FontError(f"there is no {layout!r} layout; "
-                        f"try one of {', '.join(sorted(LAYOUTS))}")
+        raise FontError(_("there is no {layout} layout; try one of "
+                          "{known}", layout=repr(layout),
+                          known=", ".join(sorted(LAYOUTS))))
     starts, holds = LAYOUTS.get(layout, (None, None))
     with open(path, "rb") as f:
         blob = f.read()
@@ -401,15 +405,14 @@ def read(path, first=None, order="ascii", layout=None):
         if start is None:
             start = PLAIN.get(len(body)) if starts is None else starts
         if start is None:
-            raise FontError(
-                f"{len(body)} bytes is not a font this knows: say how it is "
+            raise FontError(_(
+                "{count} bytes is not a font this knows: say how it is "
                 "laid out with layout=, or where its first letter stands "
-                "with first="
+                "with first=", count=len(body))
             )
         if holds is not None and len(body) != holds * GLYPH_ROWS:
-            raise FontError(
-                f"a {layout} font is {holds * GLYPH_ROWS} bytes and this is "
-                f"{len(body)}"
-            )
+            raise FontError(_(
+                "a {layout} font is {wanted} bytes and this is {count}",
+                layout=layout, wanted=holds * GLYPH_ROWS, count=len(body)))
         slots = glyphs_of(body, start)
     return in_order(slots, ORDERS[order])

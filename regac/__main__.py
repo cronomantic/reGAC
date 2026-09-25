@@ -32,6 +32,7 @@ from .check import problems_of
 from .binary import MACHINES, SECTION_NAMES, BuildError, Database, Reader
 from .devices import DEVICES, device_for, from_an_amstrad, make
 from .gfx import Renderer
+from .i18n import _, argparse_speaks
 from .media import (MSX_SCREEN_BYTES, PCW_SCREEN_BYTES, banks_of, cpc6128_disk,
                     cpc_low_tape, cpc_tape, msx_screen, msx_tape,
                     pcw_release, CPC_LOW_CODE_AT, CPC_LOW_ROOM,
@@ -76,7 +77,7 @@ def cmd_compile(args):
         ddb = parse(source, name, os.path.dirname(os.path.abspath(args.input)),
                     machine=args.machine)
     except SourceError as e:
-        sys.exit(f"ERROR: {e}")
+        sys.exit(_("ERROR: {what}", what=e))
     write_json(args.output, ddb)
     print(f"{args.input} -> {args.output}")
 
@@ -95,13 +96,14 @@ def cmd_check(args):
     try:
         rebuilt = json.loads(json.dumps(parse(generate(original, name), name)))
     except SourceError as e:
-        sys.exit(f"ERROR: {e}")
+        sys.exit(_("ERROR: {what}", what=e))
     if rebuilt == original:
-        print(f"{name}: round trip exact")
+        print(_("{name}: round trip exact", name=name))
     else:
         differing = sorted(k for k in set(original) | set(rebuilt)
                            if original.get(k) != rebuilt.get(k))
-        print(f"{name}: round trip differs in {', '.join(differing)}")
+        print(_("{name}: round trip differs in {parts}", name=name,
+                parts=", ".join(differing)))
         wrong = True
 
     found = problems_of(original)
@@ -109,10 +111,10 @@ def cmd_check(args):
     for problem in found:
         print(f"{name}: {problem}")
     if found:
-        print(f"{name}: {len(faults)} faults and {len(found) - len(faults)}"
-              f" warnings")
+        print(_("{name}: {faults} faults and {warnings} warnings", name=name,
+                faults=len(faults), warnings=len(found) - len(faults)))
     else:
-        print(f"{name}: nothing points anywhere it should not")
+        print(_("{name}: nothing points anywhere it should not", name=name))
     if wrong or faults:
         sys.exit(1)
 
@@ -127,17 +129,18 @@ def cmd_render(args):
     else:
         wanted = sorted(gfx, key=int)
     if not os.path.isdir(args.output) and len(wanted) > 1:
-        sys.exit(f"ERROR: {args.output} must be a directory for more than one picture")
+        sys.exit(_("ERROR: {output} must be a directory for more than one "
+                   "picture", output=args.output))
     for pid in wanted:
         if pid not in gfx:
-            sys.exit(f"ERROR: there is no picture {pid}")
+            sys.exit(_("ERROR: there is no picture {picture}", picture=pid))
         picture = Renderer(gfx, device_for(machine, gfx, pid, ddb)).run(int(pid))
         if os.path.isdir(args.output):
             path = os.path.join(args.output, f"{pid}.png")
         else:
             path = args.output
         save_picture(path, picture, scale=args.scale)
-        print(f"picture {pid} -> {path}")
+        print(_("picture {picture} -> {path}", picture=pid, path=path))
 
 
 def cmd_draw(args):
@@ -146,12 +149,13 @@ def cmd_draw(args):
     from .viewer import SPECTRUM_MACHINES, run
 
     if args.machine is not None and args.machine not in SPECTRUM_MACHINES:
-        sys.exit(f"ERROR: there is nothing to draw {args.machine} with; "
-                 f"try one of {', '.join(SPECTRUM_MACHINES)}")
+        sys.exit(_("ERROR: there is nothing to draw {machine} with; try one "
+                   "of {machines}", machine=args.machine,
+                   machines=", ".join(SPECTRUM_MACHINES)))
     try:
         run(args.input, args.picture, args.machine, args.scale, args.trace)
     except ValueError as e:
-        sys.exit(f"ERROR: {e}")
+        sys.exit(_("ERROR: {what}", what=e))
 
 
 def cmd_map(args):
@@ -162,7 +166,7 @@ def cmd_map(args):
     try:
         ddb = read_adventure(args.input, args.machine)
     except (SourceError, OSError, ValueError) as e:
-        sys.exit(f"ERROR: {e}")
+        sys.exit(_("ERROR: {what}", what=e))
     with open(args.output, "w", encoding="utf-8") as f:
         f.write(svg(ddb, os.path.basename(args.input)))
     print(f"{args.input} -> {args.output}")
@@ -180,17 +184,17 @@ def cmd_play(args):
             orders = orders_of(f.read())
         ended, said = play(ddb, orders)
     except (SourceError, OSError, ValueError) as e:
-        sys.exit(f"ERROR: {e}")
+        sys.exit(_("ERROR: {what}", what=e))
     sys.stdout.write(said)
     won = ended and (args.expect is None or args.expect in said)
     if not ended:
-        print("\n-- the orders ran out with the game still asking",
+        print("\n" + _("-- the orders ran out with the game still asking"),
               file=sys.stderr)
     elif args.expect is not None and not won:
-        print(f"\n-- the game ended without saying {args.expect!r}",
-              file=sys.stderr)
+        print("\n" + _("-- the game ended without saying {expected!r}",
+                        expected=args.expect), file=sys.stderr)
     else:
-        print("\n-- the game ended", file=sys.stderr)
+        print("\n" + _("-- the game ended"), file=sys.stderr)
     sys.exit(0 if won else 1)
 
 
@@ -202,12 +206,12 @@ def cmd_lint(args):
     try:
         ddb = read_adventure(args.input, args.machine)
     except (SourceError, OSError, ValueError) as e:
-        sys.exit(f"ERROR: {e}")
+        sys.exit(_("ERROR: {what}", what=e))
     notes = notes_of(ddb)
     for note in notes:
         print(note)
     if not notes:
-        print("nothing that nothing uses")
+        print(_("nothing that nothing uses"))
 
 
 def cmd_checkgfx(args):
@@ -222,8 +226,9 @@ def cmd_checkgfx(args):
     gfx = ddb["gfx"]
     name = os.path.basename(args.input)
     if from_an_amstrad(ddb):
-        sys.exit(f"{name} was written on an Amstrad: its pictures are drawn with "
-                 "the Amstrad's rules and there is no Spectrum to compare them with")
+        sys.exit(_("{name} was written on an Amstrad: its pictures are drawn "
+                   "with the Amstrad's rules and there is no Spectrum to "
+                   "compare them with", name=name))
     suspect = 0
     for pid in sorted(gfx, key=int):
         reference = Renderer(gfx, make("spectrum"))
@@ -233,7 +238,8 @@ def cmd_checkgfx(args):
         ref_area = reference.device.width * reference.device.height
         out_area = target.device.width * target.device.height
         if len(reference.fill_coverage) != len(target.fill_coverage):
-            print(f"  picture {pid}: the two runs filled a different number of times")
+            print(_("  picture {picture}: the two runs filled a different "
+                    "number of times", picture=pid))
             suspect += 1
             continue
         for n, (a, b) in enumerate(
@@ -242,14 +248,16 @@ def cmd_checkgfx(args):
             share_a = a / ref_area
             share_b = b / out_area
             if abs(share_a - share_b) > args.tolerance:
-                print(
-                    f"  picture {pid}, fill {n}: covers {share_a:.0%} of the screen "
-                    f"on the spectrum but {share_b:.0%} on the {args.machine}"
-                )
+                print(_("  picture {picture}, fill {fill}: covers {there:.0%} "
+                        "of the screen on the spectrum but {here:.0%} on the "
+                        "{machine}", picture=pid, fill=n, there=share_a,
+                        here=share_b, machine=args.machine))
                 suspect += 1
     if suspect:
-        sys.exit(f"{name}: {suspect} fills differ on the {args.machine}")
-    print(f"{name}: every fill covers the same ground on the {args.machine}")
+        sys.exit(_("{name}: {fills} fills differ on the {machine}", name=name,
+                   fills=suspect, machine=args.machine))
+    print(_("{name}: every fill covers the same ground on the {machine}",
+            name=name, machine=args.machine))
 
 
 def cmd_text(args):
@@ -261,13 +269,15 @@ def cmd_text(args):
     texts = [t for t in texts if t]
     store = TextStore(texts)
     print(f"{os.path.basename(args.input)}")
-    print(f"  characters      {store.raw_size}")
-    print(f"  packed          {store.packed_size}")
-    print(f"  pair table      {store.packer.table_bytes} ({len(store.packer)} pairs)")
-    print(f"  total           {store.total_size}  ({store.ratio:.0%} of the original)")
-    print(f"  glyphs needed   {len(store.charset)}")
-    print(f"  spare codes     {store.charset.spare}")
-    print(f"  unpacking stack {store.packer.depth()} bytes")
+    print(_("  characters      {n}", n=store.raw_size))
+    print(_("  packed          {n}", n=store.packed_size))
+    print(_("  pair table      {n} ({pairs} pairs)", n=store.packer.table_bytes,
+            pairs=len(store.packer)))
+    print(_("  total           {n}  ({ratio:.0%} of the original)",
+            n=store.total_size, ratio=store.ratio))
+    print(_("  glyphs needed   {n}", n=len(store.charset)))
+    print(_("  spare codes     {n}", n=store.charset.spare))
+    print(_("  unpacking stack {n} bytes", n=store.packer.depth()))
 
 
 BANK_SIZES = {"none": 0, "8k": 13, "16k": 14, "64k": 16}
@@ -315,14 +325,14 @@ def cmd_build(args):
         )
         image = database.build()
     except BuildError as e:
-        sys.exit(f"ERROR: {e}")
+        sys.exit(_("ERROR: {what}", what=e))
     with open(args.output, "wb") as f:
         f.write(image)
     noises = ddb.get("sounds") or []
     if noises and args.noises:
         noises_source(noises, args.noises)
         print(f"{args.input} -> {args.noises}")
-        print(f"  noises      {len(noises)}")
+        print(_("  noises      {n}", n=len(noises)))
     if args.defs:
         # What an assembler needs to cut the image up: where the banks start
         # and how many there are.  Which of the machine's own pages they go
@@ -340,13 +350,13 @@ def cmd_build(args):
         with open(args.defs, "w", encoding="utf-8") as f:
             f.write("\n".join(lines) + "\n")
     print(f"{args.input} -> {args.output}")
-    print(f"  machine     {args.machine}")
-    print(f"  image       {len(image)} bytes")
-    print(f"  resident    {database.resident_size} bytes")
-    print(f"  banks       {len(database.banks)}")
+    print(_("  machine     {machine}", machine=args.machine))
+    print(_("  image       {n} bytes", n=len(image)))
+    print(_("  resident    {n} bytes", n=database.resident_size))
+    print(_("  banks       {n}", n=len(database.banks)))
     for index, name in enumerate(SECTION_NAMES):
         bank, offset, size = database.placement[index]
-        where = "resident" if bank == 0xFF else f"bank {bank}"
+        where = _("resident") if bank == 0xFF else _("bank {bank}", bank=bank)
         print(f"  {name:<12}{size:7}  {where}")
 
 
@@ -359,12 +369,13 @@ def write_media(machine, code, where, name, load, entry, screen=None,
         # A machine that starts itself: no operating system, no loader in
         # BASIC, just the sector it boots from and the pieces behind it.
         if boot is None or banks is None:
-            sys.exit("ERROR: a pcw release wants --boot and --database")
+            sys.exit(_("ERROR: a pcw release wants --boot and --database"))
         path = os.path.join(where, name.lower() + ".dsk")
         with open(path, "wb") as f:
             f.write(pcw_release(boot, code, banks, screen))
         written.append(path)
-        how = f"nothing: the machine starts it, with {len(banks)} banks behind it"
+        how = _("nothing: the machine starts it, with {banks} banks behind it",
+                banks=len(banks))
     elif machine == "msx":
         # A machine with a cassette and no banks: the interpreter is a file
         # and the database is the blocks behind it, which the interpreter
@@ -373,22 +384,25 @@ def write_media(machine, code, where, name, load, entry, screen=None,
         with open(path, "wb") as f:
             f.write(msx_tape(code, database or b"", screen, load, entry, name))
         written.append(path)
-        how = (f'BLOAD"CAS:",R, with {"a screen and " if screen else ""}'
-               f'{len(database or b"")} bytes behind it')
+        how = (_('BLOAD"CAS:",R, with a screen and {n} bytes behind it',
+                 n=len(database or b"")) if screen else
+               _('BLOAD"CAS:",R, with {n} bytes behind it',
+                 n=len(database or b"")))
     elif machine == "cpc6128":
         # A disk and another sixty four kilobytes: every piece is a file with
         # its own header, and the loader pages before each bank goes in.  The
         # resident half travels the same way, through the window, in the bank
         # that is there when nothing has been paged.
         if database is None:
-            sys.exit("ERROR: a cpc6128 release wants --database")
+            sys.exit(_("ERROR: a cpc6128 release wants --database"))
         resident = database[:Reader(database).resident_size]
         path = os.path.join(where, name.lower() + ".dsk")
         with open(path, "wb") as f:
             f.write(cpc6128_disk(code, resident, banks or [], name, screen,
                                  ))
         written.append(path)
-        how = f'RUN"{name}" on the disk, with {len(banks or [])} banks behind it'
+        how = _('RUN"{name}" on the disk, with {banks} banks behind it',
+                name=name, banks=len(banks or []))
     elif machine == "cpc464":
         # A tape and sixty four kilobytes: the loader is in BASIC, and what
         # it runs is whatever comes first, so RUN and nothing else.
@@ -403,9 +417,8 @@ def write_media(machine, code, where, name, load, entry, screen=None,
             else:
                 f.write(cpc_tape(code, name, load, entry, screen))
         written.append(path)
-        how = 'RUN"" on the tape'
-        if entry == CPC_LOW_CODE_AT:
-            how += ", with the interpreter under the database"
+        how = (_('RUN"" on the tape, with the interpreter under the database')
+               if entry == CPC_LOW_CODE_AT else _('RUN"" on the tape'))
     else:
         path = os.path.join(where, name.lower() + ".dsk")
         with open(path, "wb") as f:
@@ -415,10 +428,11 @@ def write_media(machine, code, where, name, load, entry, screen=None,
                 # interpreter in one file.
                 f.write(plus3_banked_disk(boot, code, banks or [], screen,
                                           ))
-                how = f"the Loader entry of its menu, and {len(banks or [])} banks"
+                how = _("the Loader entry of its menu, and {banks} banks",
+                        banks=len(banks or []))
             else:
                 f.write(plus3_disk(code, load, screen))
-                how = "the Loader entry of the machine's own menu"
+                how = _("the Loader entry of the machine's own menu")
         written.append(path)
     return written, how
 
@@ -441,8 +455,9 @@ def cmd_release(args):
         if args.machine == "msx":
             screen = msx_screen(screen)
         if len(screen) != wanted:
-            sys.exit(f"ERROR: a {args.machine} screen is {wanted} bytes and "
-                     f"{args.screen} is {len(screen)}")
+            sys.exit(_("ERROR: a {machine} screen is {wanted} bytes and "
+                       "{screen} is {size}", machine=args.machine,
+                       wanted=wanted, screen=args.screen, size=len(screen)))
     boot = banks = database = None
     if args.boot:
         with open(args.boot, "rb") as f:
@@ -455,8 +470,8 @@ def cmd_release(args):
                                args.entry or load, screen, boot, banks,
                                database)
     print(f"{args.input} -> " + ", ".join(written))
-    print(f"  loads at    ${load:04X}, {len(code)} bytes")
-    print(f"  starts with {how}")
+    print(_("  loads at    ${load:04X}, {n} bytes", load=load, n=len(code)))
+    print(_("  starts with {how}", how=how))
 
 
 def write_database(ddb, path, machine, banks, defs=None):
@@ -506,7 +521,7 @@ def cmd_make(args):
     try:
         project = read_project(args.input)
     except ProjectError as e:
-        sys.exit(f"ERROR: {e}")
+        sys.exit(_("ERROR: {what}", what=e))
     root = os.path.dirname(os.path.abspath(args.input)) or "."
     source = os.path.join(root, project["source"])
     written_source = None
@@ -526,7 +541,8 @@ def cmd_make(args):
     for which in wanted:
         settings = project["targets"].get(which)
         if settings is None:
-            sys.exit(f"ERROR: the project says nothing about {which}")
+            sys.exit(_("ERROR: the project says nothing about {machine}",
+                       machine=which))
         # A source is read again for every machine, because it may keep some
         # of itself back for some of them; a JSON has no such thing in it and
         # is read once.
@@ -540,13 +556,13 @@ def cmd_make(args):
                             os.path.dirname(os.path.abspath(source)),
                             machine=which)
             except SourceError as e:
-                sys.exit(f"ERROR: {e}")
+                sys.exit(_("ERROR: {what}", what=e))
         try:
             noises = make_noises(ddb, tree)
             written = make_one(TARGETS[which], settings, ddb, name, root, output,
                                tree, noises)
         except (ProjectError, BuildError) as e:
-            sys.exit(f"ERROR: {which}: {e}")
+            sys.exit(_("ERROR: {machine}: {what}", machine=which, what=e))
         print(f"{which:12} -> " + ", ".join(
             os.path.relpath(path, output) for path in written))
         everything += written
@@ -596,7 +612,7 @@ def has_holes(ddb):
     texts += [room.get("desc", "") for room in (ddb.get("locations") or {}).values()]
     texts += [one.get("name", "") for one in (ddb.get("objects") or {}).values()]
     return any(which != INK_CHAR
-               for text in texts for which, _, _ in commands_of(expand(text)))
+               for text in texts for which, *rest in commands_of(expand(text)))
 
 
 def uses(ddb, names):
@@ -648,7 +664,7 @@ def make_one(target, settings, ddb, name, root, output, where_regac_is,
                 f.write(screen)
             defines.append("SCREEN")
     if settings.get("scale"):
-        across, _ = wide(settings["scale"])
+        across = wide(settings["scale"])[0]
         defines.append(f"PICTURE_SCALE={across}")
     low = False
     try:
@@ -663,8 +679,8 @@ def make_one(target, settings, ddb, name, root, output, where_regac_is,
             raise
         assemble(target, where_regac_is, list(defines) + ["LOW_CODE"])
         low = True
-        print(f"  {target.machine:12} does not fit the usual way round: the "
-              "interpreter goes under the database")
+        print(_("  {machine:12} does not fit the usual way round: the "
+                "interpreter goes under the database", machine=target.machine))
 
     where = os.path.join(output, target.machine if target.release is None
                          else target.release)
@@ -701,149 +717,149 @@ def make_one(target, settings, ddb, name, root, output, where_regac_is,
         load = entry = CPC_LOW_CODE_AT
     else:
         entry = load
-    written, _ = write_media(target.release, code, where, name, load, entry,
-                             screen, boot, banks, image)
-    return written
+    return write_media(target.release, code, where, name, load, entry,
+                       screen, boot, banks, image)[0]
 
 
 def main():
-    parser = argparse.ArgumentParser("regac", description=f"ReGAC {VERSION}")
+    argparse_speaks()
+    parser = argparse.ArgumentParser("regac", description=_("ReGAC {version}", version=VERSION))
     sub = parser.add_subparsers(dest="command", required=True)
 
-    p = sub.add_parser("decompile", help="JSON database -> .gac source")
-    p.add_argument("input", help="JSON database")
-    p.add_argument("output", help="source file to write")
+    p = sub.add_parser("decompile", help=_("JSON database -> .gac source"))
+    p.add_argument("input", help=_("JSON database"))
+    p.add_argument("output", help=_("source file to write"))
     p.set_defaults(func=cmd_decompile)
 
-    p = sub.add_parser("compile", help=".gac source -> JSON database")
-    p.add_argument("input", help="source file")
-    p.add_argument("output", help="JSON database to write")
+    p = sub.add_parser("compile", help=_(".gac source -> JSON database"))
+    p.add_argument("input", help=_("source file"))
+    p.add_argument("output", help=_("JSON database to write"))
     p.add_argument("-m", "--machine", choices=sorted(MACHINE_LABELS),
-                   help="which machine to read it for, for a source that "
-                        "keeps some lines for some of them")
+                   help=_("which machine to read it for, for a source that "
+                          "keeps some lines for some of them"))
     p.set_defaults(func=cmd_compile)
 
-    p = sub.add_parser("render", help="draw the pictures of an adventure as PNG")
-    p.add_argument("input", help="JSON database")
-    p.add_argument("output", help="PNG file, or a directory for several")
-    p.add_argument("-p", "--picture", type=int, help="one picture id (default: all)")
-    p.add_argument("-s", "--scale", type=int, default=2, help="pixel scale")
+    p = sub.add_parser("render", help=_("draw the pictures of an adventure as PNG"))
+    p.add_argument("input", help=_("JSON database"))
+    p.add_argument("output", help=_("PNG file, or a directory for several"))
+    p.add_argument("-p", "--picture", type=int, help=_("one picture id (default: all)"))
+    p.add_argument("-s", "--scale", type=int, default=2, help=_("pixel scale"))
     p.add_argument(
         "-m",
         "--machine",
         default="spectrum",
         choices=sorted(DEVICES),
-        help="which machine to draw for (default: spectrum)",
+        help=_("which machine to draw for (default: spectrum)"),
     )
     p.set_defaults(func=cmd_render)
 
-    p = sub.add_parser("draw", help="look at a picture in a window, drawn "
-                                    "again whenever the source is saved")
-    p.add_argument("input", help="source file, or JSON database")
+    p = sub.add_parser("draw", help=_("look at a picture in a window, drawn "
+                                      "again whenever the source is saved"))
+    p.add_argument("input", help=_("source file, or JSON database"))
     p.add_argument("picture", type=int, nargs="?",
-                   help="which picture (default: the first)")
+                   help=_("which picture (default: the first)"))
     p.add_argument("-m", "--machine",
-                   help="which machine to draw it as: spectrum, cpc, msx, "
-                        "pcw, next or cga, which is the PC's (default: the "
-                        "first the adventure can be drawn on)")
-    p.add_argument("-s", "--scale", type=int, default=3, help="pixel scale")
-    p.add_argument("--trace", help="an image to draw over, or a folder with "
-                                   "one to each picture, named 12.png")
+                   help=_("which machine to draw it as: spectrum, cpc, msx, "
+                          "pcw, next or cga, which is the PC's (default: the "
+                          "first the adventure can be drawn on)"))
+    p.add_argument("-s", "--scale", type=int, default=3, help=_("pixel scale"))
+    p.add_argument("--trace", help=_("an image to draw over, or a folder with "
+                                     "one to each picture, named 12.png"))
     p.set_defaults(func=cmd_draw)
 
-    p = sub.add_parser("play", help="play a file of orders, and say whether "
-                                    "the game ended")
-    p.add_argument("input", help="source file, or JSON database")
-    p.add_argument("orders", help="a file of orders, one a line")
-    p.add_argument("--expect", help="and it has to have said this")
+    p = sub.add_parser("play", help=_("play a file of orders, and say whether "
+                                      "the game ended"))
+    p.add_argument("input", help=_("source file, or JSON database"))
+    p.add_argument("orders", help=_("a file of orders, one a line"))
+    p.add_argument("--expect", help=_("and it has to have said this"))
     p.add_argument("-m", "--machine", default="spectrum48",
                    choices=sorted(MACHINE_LABELS),
-                   help="which machine to read a source for")
+                   help=_("which machine to read a source for"))
     p.set_defaults(func=cmd_play)
 
-    p = sub.add_parser("lint", help="what the adventure has that nothing "
-                                    "uses: rooms, objects, words, messages")
-    p.add_argument("input", help="source file, or JSON database")
+    p = sub.add_parser("lint", help=_("what the adventure has that nothing "
+                                      "uses: rooms, objects, words, messages"))
+    p.add_argument("input", help=_("source file, or JSON database"))
     p.add_argument("-m", "--machine", default="spectrum48",
                    choices=sorted(MACHINE_LABELS),
-                   help="which machine to read a source for")
+                   help=_("which machine to read a source for"))
     p.set_defaults(func=cmd_lint)
 
-    p = sub.add_parser("map", help="the map of an adventure, as SVG")
-    p.add_argument("input", help="source file, or JSON database")
-    p.add_argument("output", help="SVG file to write")
+    p = sub.add_parser("map", help=_("the map of an adventure, as SVG"))
+    p.add_argument("input", help=_("source file, or JSON database"))
+    p.add_argument("output", help=_("SVG file to write"))
     p.add_argument("-m", "--machine", default="spectrum48",
                    choices=sorted(MACHINE_LABELS),
-                   help="which machine to read a source for, for one that "
-                        "keeps some lines for some of them")
+                   help=_("which machine to read a source for, for one that "
+                          "keeps some lines for some of them"))
     p.set_defaults(func=cmd_map)
 
     p = sub.add_parser(
-        "checkgfx", help="compare the pictures on a machine against the Spectrum"
+        "checkgfx", help=_("compare the pictures on a machine against the Spectrum")
     )
-    p.add_argument("input", help="JSON database")
+    p.add_argument("input", help=_("JSON database"))
     p.add_argument("-m", "--machine", required=True, choices=sorted(DEVICES))
     p.add_argument(
         "-t",
         "--tolerance",
         type=float,
         default=0.05,
-        help="how much of the screen a fill may differ by (default: 0.05)",
+        help=_("how much of the screen a fill may differ by (default: 0.05)"),
     )
     p.set_defaults(func=cmd_checkgfx)
 
-    p = sub.add_parser("build", help="write the binary database for a machine")
-    p.add_argument("input", help="JSON database")
-    p.add_argument("output", help="binary file to write")
+    p = sub.add_parser("build", help=_("write the binary database for a machine"))
+    p.add_argument("input", help=_("JSON database"))
+    p.add_argument("output", help=_("binary file to write"))
     p.add_argument("-m", "--machine", default="spectrum48", choices=sorted(MACHINES))
     p.add_argument(
         "-b",
         "--banks",
         default="none",
         choices=sorted(BANK_SIZES),
-        help="size of a memory bank, or none to keep everything resident",
+        help=_("size of a memory bank, or none to keep everything resident"),
     )
     p.add_argument("--noises",
-                   help="write the source that says what noises there are, "
-                        "for the assembler to include")
+                   help=_("write the source that says what noises there are, "
+                          "for the assembler to include"))
     p.add_argument(
         "--defs",
-        help="write an assembler include saying where the banks start",
+        help=_("write an assembler include saying where the banks start"),
     )
     p.set_defaults(func=cmd_build)
 
-    p = sub.add_parser("release", help="put an assembled interpreter on a disk and a tape")
-    p.add_argument("input", help="the binary the assembler wrote")
-    p.add_argument("output", help="where to write the disk and the tape")
+    p = sub.add_parser("release", help=_("put an assembled interpreter on a disk and a tape"))
+    p.add_argument("input", help=_("the binary the assembler wrote"))
+    p.add_argument("output", help=_("where to write the disk and the tape"))
     p.add_argument("-m", "--machine", default="cpc464", choices=sorted(LOADS_AT))
-    p.add_argument("--name", default="JUEGO", help="what the files are called")
+    p.add_argument("--name", default="JUEGO", help=_("what the files are called"))
     p.add_argument("--load", type=lambda n: int(n, 0), default=None,
-                   help="where the binary loads, if not where that machine has it")
+                   help=_("where the binary loads, if not where that machine has it"))
     p.add_argument("--entry", type=lambda n: int(n, 0), default=None,
-                   help="where it starts, if not where it loads")
-    p.add_argument("--boot", help="the assembled loader, for a +3 with banks")
-    p.add_argument("--database", help="the built database the banks come from")
-    p.add_argument("--screen", help="a dump of the machine's screen, to show "
-                                    "while the rest loads")
+                   help=_("where it starts, if not where it loads"))
+    p.add_argument("--boot", help=_("the assembled loader, for a +3 with banks"))
+    p.add_argument("--database", help=_("the built database the banks come from"))
+    p.add_argument("--screen", help=_("a dump of the machine's screen, to show "
+                                      "while the rest loads"))
     p.set_defaults(func=cmd_release)
 
-    p = sub.add_parser("make", help="build an adventure for every machine a "
-                                    "project file names")
-    p.add_argument("input", help="the project file")
-    p.add_argument("-o", "--output", help="where the media go, if not where "
-                                          "the project says")
+    p = sub.add_parser("make", help=_("build an adventure for every machine a "
+                                      "project file names"))
+    p.add_argument("input", help=_("the project file"))
+    p.add_argument("-o", "--output", help=_("where the media go, if not where "
+                                            "the project says"))
     p.add_argument("-t", "--target", action="append",
-                   help="only this machine, and again for more than one")
-    p.add_argument("--zip", help="and everything it built in this zip file, "
-                                 "a folder a machine")
+                   help=_("only this machine, and again for more than one"))
+    p.add_argument("--zip", help=_("and everything it built in this zip file, "
+                                   "a folder a machine"))
     p.set_defaults(func=cmd_make)
 
-    p = sub.add_parser("text", help="report what the text costs once packed")
-    p.add_argument("input", help="JSON database")
+    p = sub.add_parser("text", help=_("report what the text costs once packed"))
+    p.add_argument("input", help=_("JSON database"))
     p.set_defaults(func=cmd_text)
 
-    p = sub.add_parser("check", help="verify that a database survives a round trip")
-    p.add_argument("input", help="JSON database")
+    p = sub.add_parser("check", help=_("verify that a database survives a round trip"))
+    p.add_argument("input", help=_("JSON database"))
     p.set_defaults(func=cmd_check)
 
     args = parser.parse_args()

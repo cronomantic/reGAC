@@ -38,6 +38,7 @@ it on the machine, in an emulator -- see measure.py.
 """
 
 from .gfx import Renderer, SOURCE_WIDTH
+from .i18n import _
 from .opcodes import GFX_CMDS
 
 FILLS = ("FILL", "BGFILL", "SHADE")
@@ -125,14 +126,19 @@ def cautions(ddb, picture, machine):
     for step, rows in sorted(fills_of(ddb, picture, machine).items()):
         order = described(steps[step])
         if not rows:
-            out.append((step, f"{order}: fills nothing, its seed is on a "
-                              f"pixel already set"))
+            out.append((step, _("{order}: fills nothing, its seed is on "
+                                "a pixel already set", order=order)))
         for y, left, right, side in rays(rows):
-            reach = right if side == "right" else left
-            out.append((step, f"{order}: got out at y {y}, {side} to x "
-                              f"{reach}, by a gap a pixel high"))
+            if side == "right":
+                said = _("{order}: got out at y {y}, right to x {x}, by a gap "
+                         "a pixel high", order=order, y=y, x=right)
+            else:
+                said = _("{order}: got out at y {y}, left to x {x}, by a gap "
+                         "a pixel high", order=order, y=y, x=left)
+            out.append((step, said))
     own = gfx.get(str(picture)) or []
     every = sum(picture_bytes(orders) + 4 for orders in gfx.values())
-    out.append((None, f"#{picture} takes {picture_bytes(own) + 4} bytes; "
-                      f"all the pictures, {every}"))
+    out.append((None, _("#{picture} takes {bytes} bytes; all the "
+                        "pictures, {every}", picture=picture,
+                        bytes=picture_bytes(own) + 4, every=every)))
     return out

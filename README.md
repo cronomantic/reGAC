@@ -35,6 +35,9 @@ it is the same, or `poetry install`.
 The release also carries `example-faro-<version>.zip`: the example adventure
 already built for the nine machines, to load in an emulator straight away.
 
+The tools speak English or Spanish, whichever the system is set to; the
+variable `REGAC_LANG`, `en` or `es`, chooses one whatever the system says.
+
 ## In five minutes
 
     regac make ejemplo/faro.toml

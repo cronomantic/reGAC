@@ -35,6 +35,9 @@ de al lado, `z80/` y `x86/`. Desde una copia del repositorio es igual, o
 La release trae además `example-faro-<versión>.zip`: la aventura de ejemplo
 ya construida para las nueve máquinas, para cargarla en un emulador sin más.
 
+Las herramientas hablan en español o en inglés, según esté el sistema; la
+variable `REGAC_LANG`, `es` o `en`, elige una diga lo que diga el sistema.
+
 ## En cinco minutos
 
     regac make ejemplo/faro.toml

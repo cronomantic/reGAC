@@ -39,6 +39,8 @@ one from the other.
 
 import struct
 
+from .i18n import _
+
 DIRECTORY_ENTRY = 32
 RECORD = 128                    # what CP/M counts a file in
 EMPTY = 0xE5                    # a formatted but unused byte, and a free entry
@@ -126,9 +128,10 @@ BOOT_SUM = 0xFF
 def filename(name):
     """A name as the directory holds it: eight and three, padded out, in
     capitals and with the attribute bits clear."""
-    stem, _, suffix = name.strip().upper().partition(".")
+    stem, _dot, suffix = name.strip().upper().partition(".")
     if len(stem) > 8 or len(suffix) > 3:
-        raise DiskError(f"{name} does not fit in eight and three")
+        raise DiskError(_("{name} does not fit in eight and three",
+                          name=name))
     return (stem.ljust(8) + suffix.ljust(3)).encode("ascii")
 
 
@@ -164,7 +167,7 @@ class Disk:
         sixteen kilobytes when the blocks are small."""
         fcb = filename(name)
         if self.find(fcb, user) is not None:
-            raise DiskError(f"{name} is on the disk already")
+            raise DiskError(_("{name} is on the disk already", name=name))
         blocks = self.lay_down(blob)
         records = (len(blob) + RECORD - 1) // RECORD
         piece = 0
@@ -182,7 +185,7 @@ class Disk:
         taken = []
         for at in range(0, len(blob), self.format.block_size):
             if self.next_block >= self.blocks:
-                raise DiskError("the disk is full")
+                raise DiskError(_("the disk is full"))
             piece = bytes(blob[at:at + self.format.block_size])
             piece += bytes([FILLER]) * (self.format.block_size - len(piece))
             self.contents[self.next_block] = piece
@@ -224,7 +227,7 @@ class Disk:
         """
         at = self.find(filename(name), user)
         if at is None:
-            raise DiskError(f"{name} is not on the disk")
+            raise DiskError(_("{name} is not on the disk", name=name))
         block = self.directory[at + 16]
         if self.wide:
             block |= self.directory[at + 17] << 8
@@ -236,7 +239,7 @@ class Disk:
         for at in range(0, len(self.directory), DIRECTORY_ENTRY):
             if self.directory[at] == EMPTY:
                 return at
-        raise DiskError("the directory is full")
+        raise DiskError(_("the directory is full"))
 
     def find(self, fcb, user=0):
         """Where a file's first entry is, or nothing if it is not here."""
@@ -260,13 +263,14 @@ class Disk:
         """
         spare = self.format.sector_size - (BOOT_CODE_AT - BOOT_AT) - 1
         if len(code) > spare:
-            raise DiskError(f"the boot code is {len(code)} bytes and {spare} fit")
+            raise DiskError(_("the boot code is {count} bytes and {spare} "
+                              "fit", count=len(code), spare=spare))
         sector = bytearray(self.format.sector_size)
         sector[0:10] = self.format.specification()
         sector[16:16 + len(code)] = code
         if table:
             if table_at is None:
-                raise DiskError("a table has to be told where it goes")
+                raise DiskError(_("a table has to be told where it goes"))
             sector[table_at:table_at + len(table)] = table
         sector[-1] = (machine - sum(sector[:-1])) & 0xFF
         self.boot_sector = bytes(sector)
@@ -277,7 +281,8 @@ class Disk:
         a file: the loader reads these by position."""
         where = track * self.format.sectors + (sector - 1)
         if not 0 <= where < self.sector_count:
-            raise DiskError(f"there is no track {track} sector {sector}")
+            raise DiskError(_("there is no track {track} sector {sector}",
+                              track=track, sector=sector))
         self.raw[where] = bytes(blob).ljust(self.format.sector_size, bytes(1))
 
     # -- writing it out -----------------------------------------------------

@@ -40,6 +40,7 @@ arrow at the end it goes to.
 import collections
 import html
 
+from .i18n import _
 from .text import expand, plain, typed
 
 # The points of the compass, as the words that name them, and which way each
@@ -126,7 +127,7 @@ def lay_out(ddb):
                     spot = (at[0] + dx, at[1] + dy)
                     if max(abs(dx), abs(dy)) == radius and spot not in taken:
                         return spot
-        raise RuntimeError("no room left on the map")
+        raise RuntimeError(_("no room left on the map"))
 
     def walk(start, at):
         put(start, at)

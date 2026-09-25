@@ -41,6 +41,8 @@ nothing else.
 
 import collections
 import re
+
+from .i18n import _
 import unicodedata
 
 MAX_CODES = 256
@@ -154,27 +156,27 @@ def expand(text):
         if found.group(2) is not None:
             colour = int(found.group(2))
             if colour >= INK_COLOURS:
-                raise ValueError(
-                    rf"\ink {colour} asks for a colour there is not: they run"
-                    f" from 0 to {INK_COLOURS - 1}"
-                )
+                raise ValueError(_(
+                    "\\ink {colour} asks for a colour there is not: they run "
+                    "from 0 to {last}", colour=colour, last=INK_COLOURS - 1))
             return INK_CHAR + chr(INK_ARG_FIRST + colour)
         if found.group(3):
             value = int(found.group(4))
             if found.group(3) == "ctr":
                 if value >= COUNTERS:
-                    raise ValueError(
-                        rf"\ctr {value} asks for a counter there is not: they"
-                        f" run from 0 to {COUNTERS - 1}")
+                    raise ValueError(_(
+                        "\\ctr {value} asks for a counter there is not: they "
+                        "run from 0 to {last}", value=value, last=COUNTERS - 1))
                 return INK_CHAR + HOLE_COUNTER + number_chars(value)
             if not 1 <= value < OBJECTS:
-                raise ValueError(
-                    rf"\obj {value} asks for an object there cannot be: they"
-                    f" run from 1 to {OBJECTS - 1}")
+                raise ValueError(_(
+                    "\\obj {value} asks for an object there cannot be: they "
+                    "run from 1 to {last}", value=value, last=OBJECTS - 1))
             return INK_CHAR + HOLE_OBJECT + number_chars(value)
         if found.group(5):
             return INK_CHAR + HOLE_TURNS
-        raise ValueError(rf"\{found.group(6)} is not a text command")
+        raise ValueError(_("\\{command} is not a text command",
+                           command=found.group(6)))
     return COMMAND.sub(one, text)
 
 
@@ -294,12 +296,11 @@ class Charset:
             used.update(text)
         stranger = sorted(c for c in used if code_of(c) is None)
         if stranger:
-            raise ValueError(
-                "there is no place in the character set for "
-                + ", ".join(f"{c!r}" for c in stranger[:8])
-                + f" ({len(stranger)} in all); what fits is ASCII and "
-                + f"{SPECIALS!r}"
-            )
+            raise ValueError(_(
+                "there is no place in the character set for {some} ({all} in "
+                "all); what fits is ASCII and {specials!r}",
+                some=", ".join(f"{c!r}" for c in stranger[:8]),
+                all=len(stranger), specials=SPECIALS))
         self.codes = {c: code_of(c) for c in sorted(used, key=code_of)}
         self.chars = {code: c for c, code in self.codes.items()}
         # The font carries letters and nothing else.  A change of ink has a
@@ -328,7 +329,8 @@ class Charset:
         try:
             return bytes(self.codes[c] for c in text)
         except KeyError as e:
-            raise KeyError(f"character {e.args[0]!r} is not in the character set")
+            raise KeyError(_("character {char!r} is not in the character set",
+                             char=e.args[0]))
 
     def decode(self, data):
         return "".join(self.chars[b] for b in data)

@@ -65,6 +65,11 @@ It is installed pointing at the folder and not copied from it, because the
 interpreters it builds with are the folders beside it, `z80/` and `x86/`:
 that is why it is not on PyPI. A release of reGAC is that folder, zipped.
 
+What the tools say --the errors, the warnings, the help of each command, what
+`regac draw` puts under the picture-- comes out in English or in Spanish, in
+the language of the system. The variable `REGAC_LANG` chooses one over it:
+`REGAC_LANG=es` for Spanish, `REGAC_LANG=en` for English.
+
 ---
 
 ## 3. In five minutes

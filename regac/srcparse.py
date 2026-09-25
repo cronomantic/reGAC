@@ -30,6 +30,7 @@ from .png import ImageError
 
 QUOTES = "'\""
 from .opcodes import BY_NAME, GFX_CMDS
+from .i18n import _
 from .text import INK_COLOURS
 
 NOWHERE = 0
@@ -80,7 +81,8 @@ def parse_strings(text):
             i += 1
             continue
         if c != '"':
-            raise SourceError(f"expected a quoted string, found {text[i:]!r}")
+            raise SourceError(_("expected a quoted string, found {found!r}",
+                                found=text[i:]))
         i += 1
         buf = []
         while i < len(text) and text[i] != '"':
@@ -91,7 +93,7 @@ def parse_strings(text):
                 buf.append(text[i])
                 i += 1
         if i >= len(text):
-            raise SourceError("unterminated string")
+            raise SourceError(_("unterminated string"))
         i += 1
         out.append("".join(buf))
     return out
@@ -128,7 +130,8 @@ def pointed(name, lineno, message, line=None, column=None, meant=None):
     whatever reads it -- a person, an editor -- can find its way.
     """
     if meant:
-        message = f"{message} -- did you mean {meant}?"
+        message = _("{message} -- did you mean {meant}?", message=message,
+                    meant=meant)
     out = [f"{name}:{lineno}: {message}"]
     if line is not None and line.strip():
         out.append("    " + line.rstrip())
@@ -241,7 +244,7 @@ def read_source(text, name, folder, machine, defs=None, lines=None,
 
     for number, line in enumerate(text.splitlines(), 1):
         word = directive(line)
-        taking = all(t for t, _ in keeping)
+        taking = all(t for t, taken in keeping)
         if word is None:
             keep(line if taking else "", number)
             continue
@@ -250,19 +253,21 @@ def read_source(text, name, folder, machine, defs=None, lines=None,
                 said = words_of(line)
                 if len(said) != 3:
                     raise SourceError(pointed(
-                        name, number, ".def gives a name to a number: "
-                        ".def PUERTA_ABIERTA 5", line))
-                _, given, value = said
+                        name, number, _(".def gives a name to a number: "
+                                        ".def DOOR_OPEN 5"), line))
+                given, value = said[1], said[2]
                 if not NAME.match(given):
                     raise SourceError(pointed(
                         name, number,
-                        f"{given!r} is not a name: letters, digits and "
-                        f"underscores, and not starting with a digit",
+                        _("{name!r} is not a name: letters, digits and "
+                          "underscores, and not starting with a digit",
+                          name=given),
                         line, line.find(given) + 1))
                 if given in BY_NAME or given.upper() in GFX_CMDS:
                     raise SourceError(pointed(
                         name, number,
-                        f"{given!r} is a word of the language already",
+                        _("{name!r} is a word of the language already",
+                          name=given),
                         line, line.find(given) + 1))
                 try:
                     defs[given] = int(value, 0)
@@ -270,8 +275,9 @@ def read_source(text, name, folder, machine, defs=None, lines=None,
                     if value not in defs:
                         raise SourceError(pointed(
                             name, number,
-                            f"{value!r} is neither a number nor a name given "
-                            f"to one", line, line.find(value) + 1,
+                            _("{value!r} is neither a number nor a name "
+                              "given to one", value=value), line,
+                            line.find(value) + 1,
                             nearest(value, defs))) from None
                     defs[given] = defs[value]
             keep("", number)
@@ -282,19 +288,22 @@ def read_source(text, name, folder, machine, defs=None, lines=None,
                 if len(said) != 2:
                     raise SourceError(pointed(
                         name, number,
-                        '.include takes one file: .include "comun.gac"', line))
+                        _('.include takes one file: .include "common.gac"'),
+                        line))
                 wanted = said[1].strip('"\'')
                 whole = os.path.normpath(os.path.join(folder, wanted))
                 if len(seen) >= MOST_INCLUDES or whole in seen:
                     raise SourceError(pointed(
                         name, number,
-                        f"{wanted} is being included from itself", line))
+                        _("{file} is being included from itself",
+                          file=wanted), line))
                 try:
                     with open(whole, encoding="utf-8") as f:
                         inside = f.read()
                 except OSError as e:
                     raise SourceError(pointed(
-                        name, number, f"{wanted} cannot be read: {e.strerror}",
+                        name, number, _("{file} cannot be read: {why}",
+                                        file=wanted, why=e.strerror),
                         line)) from None
                 keep("", number)
                 read_source(inside, os.path.basename(whole),
@@ -306,34 +315,39 @@ def read_source(text, name, folder, machine, defs=None, lines=None,
         if word == IF:
             wanted = words_of(line)[1:]
             if not wanted:
-                raise SourceError(f"{name}:{number}: .if what?  Name a machine")
+                raise SourceError(_("{file}:{line}: .if what?  Name a machine",
+                                    file=name, line=number))
             strange = [w for w in wanted if w.lower() not in EVERY_LABEL]
             if strange:
                 meant = nearest(strange[0], EVERY_LABEL)
-                said = f"there is no machine called {strange[0]!r}"
+                said = _("there is no machine called {name!r}",
+                         name=strange[0])
                 if not meant:       # no guess, so say what there is instead
-                    said += "; what there is: " + ", ".join(sorted(EVERY_LABEL))
+                    said = _("there is no machine called {name!r}; what there "
+                             "is: {machines}", name=strange[0],
+                             machines=", ".join(sorted(EVERY_LABEL)))
                 raise SourceError(pointed(name, number, said, line,
                                           line.find(strange[0]) + 1, meant))
             if machine is None:
-                raise SourceError(
-                    f"{name}:{number}: this source keeps some lines for some "
-                    f"machines, so it has to be read for one of them: say "
-                    f"which with -m"
-                )
+                raise SourceError(_(
+                    "{file}:{line}: this source keeps some lines for some "
+                    "machines, so it has to be read for one of them: say "
+                    "which with -m", file=name, line=number))
             keeping.append([any(w.lower() in labels for w in wanted)] * 2)
         elif word == ELSE:
             if not keeping:
-                raise SourceError(f"{name}:{number}: .else without .if")
+                raise SourceError(_("{file}:{line}: .else without .if",
+                                    file=name, line=number))
             was, taken = keeping[-1]
             keeping[-1] = [not taken, True]
         else:
             if not keeping:
-                raise SourceError(f"{name}:{number}: .end without .if")
+                raise SourceError(_("{file}:{line}: .end without .if",
+                                    file=name, line=number))
             keeping.pop()
         keep("", number)
     if keeping:
-        raise SourceError(f"{name}: a .if was never ended")
+        raise SourceError(_("{file}: a .if was never ended", file=name))
     return lines, origins, defs
 
 
@@ -430,7 +444,8 @@ class Parser:
         if word in self.defs:
             return self.defs[word]
         column = self.starts_at(line, str(word)) if line is not None else None
-        self.fail(f"{word!r} is not {what}, and no .def gives it one",
+        self.fail(_("{word!r} is not {what}, and no .def gives it one",
+                    word=word, what=what),
                   column=column, meant=nearest(word, self.defs),
                   lineno=lineno, line=line)
 
@@ -470,7 +485,8 @@ class Parser:
                 break
             head = self.cur().strip()
             if not head.startswith("/"):
-                self.fail(f"expected a section marker, found {head[:32]!r}")
+                self.fail(_("expected a section marker, found {found!r}",
+                            found=head[:32]))
             tag = head.split()[0].upper()
             if tag == "/LOC":
                 self.loc(head)
@@ -481,7 +497,7 @@ class Parser:
             handler = handlers.get(tag)
             if handler is None:
                 known = list(handlers) + ["/LOC"]
-                self.fail(f"there is no section called {tag}",
+                self.fail(_("there is no section called {tag}", tag=tag),
                           column=self.starts_at(self.cur()),
                           meant=nearest(tag, known))
             self.i += 1
@@ -494,13 +510,13 @@ class Parser:
             resolved = []
             for word, dest in exits:
                 if word.isdigit() or word in self.defs:
-                    vid = self.number(word, "a verb")
+                    vid = self.number(word, _("a verb"))
                 elif word in self.ddb["verbs"]:
                     vid = self.ddb["verbs"][word]
                 else:
-                    raise SourceError(
-                        f"location {lid}: {word!r} is not a verb of the vocabulary"
-                    )
+                    raise SourceError(_(
+                        "location {room}: {word!r} is not a verb of the "
+                        "vocabulary", room=lid, word=word))
                 resolved.append({"dir": vid, "dest": dest})
             self.ddb["locations"][lid]["exits"] = resolved
         if self.font_chars:
@@ -523,7 +539,7 @@ class Parser:
             self.i += 1
             if not st:
                 continue
-            key, _, value = st.partition(" ")
+            key, space, value = st.partition(" ")
             key = key.lower()
             value = value.strip()
             if key == "model":
@@ -537,9 +553,9 @@ class Parser:
                 self.charset = value
             elif key == "start":
                 self.ddb["init_loc"] = self.number(
-                    value, "a room", lineno, raw)
+                    value, _("a room"), lineno, raw)
             elif key == "width":
-                self.width = self.number(value, "a number",
+                self.width = self.number(value, _("a number"),
                                          lineno, raw)
             elif key == "punct":
                 self.ddb["punctuation"] = parse_strings(value)
@@ -552,17 +568,18 @@ class Parser:
                 # and text the colour of the paper is no text, so nought is
                 # left to mean "nothing said" -- which is what a source that
                 # does not give this gets, and then each machine uses its own.
-                colour = self.number(value, "a number", lineno, raw)
+                colour = self.number(value, _("a number"), lineno, raw)
                 if not 1 <= colour <= INK_COLOURS - 1:
-                    self.fail(f"{colour} is not an ink: they run from 1 to "
-                              f"{INK_COLOURS - 1}, and nought would be the "
-                              "colour of the paper", lineno=lineno, line=raw,
+                    self.fail(_("{colour} is not an ink: they run from 1 to "
+                                "{last}, and nought would be the colour of "
+                                "the paper", colour=colour,
+                                last=INK_COLOURS - 1), lineno=lineno, line=raw,
                               column=self.starts_at(raw, value))
                 self.ddb["ink"] = colour
             elif key == "nothing":
                 self.ddb["no_objs_msg"] = parse_strings(value)[0]
             else:
-                self.fail(f"unknown /CTL setting {key!r}")
+                self.fail(_("unknown /CTL setting {key!r}", key=key))
 
     def voc(self):
         buckets = {"verb": "verbs", "noun": "nouns", "adverb": "adverbs"}
@@ -574,13 +591,14 @@ class Parser:
             raw = self.lines[self.i - 1]
             parts = st.split()
             if len(parts) != 3:
-                self.fail("a vocabulary entry is: word id type",
+                self.fail(_("a vocabulary entry is: word id type"),
                           column=self.starts_at(raw), lineno=self.i,
                           line=raw)
             word, kind = parts[0], parts[2].lower()
-            wid = self.number(parts[1], "a number for a word")
+            wid = self.number(parts[1], _("a number for a word"))
             if kind not in buckets:
-                self.fail(f"there is no word type called {kind!r}",
+                self.fail(_("there is no word type called {kind!r}",
+                            kind=kind),
                           column=self.starts_at(raw, parts[2]),
                           meant=nearest(kind, buckets), lineno=self.i,
                           line=raw)
@@ -602,9 +620,10 @@ class Parser:
                 self.i += 1
                 continue
             if not st.startswith("#"):
-                self.fail(f"expected an entry starting with #, found {st[:32]!r}")
+                self.fail(_("expected an entry starting with #, found "
+                            "{found!r}", found=st[:32]))
             head = strip_comment(st[1:]).split(None, 1)
-            eid = self.number(head[0], "the number of an entry")
+            eid = self.number(head[0], _("the number of an entry"))
             rest = head[1] if len(head) > 1 else ""
             self.i += 1
             body = []
@@ -615,7 +634,7 @@ class Parser:
             yield eid, rest, body, first
 
     def msg(self):
-        for mid, _, body, _first in self.entries():
+        for mid, rest, body, _first in self.entries():
             self.ddb["messages"][mid] = join_text(text_of(b) for b in body)
 
     @staticmethod
@@ -632,16 +651,16 @@ class Parser:
             start = a.get("start", "0")
             start = {"nowhere": NOWHERE, "carried": CARRIED}.get(start, start)
             self.ddb["objects"][oid] = {
-                "weight": self.number(a.get("weight", 0), "a weight"),
-                "initial_loc": self.number(start, "a room"),
+                "weight": self.number(a.get("weight", 0), _("a weight")),
+                "initial_loc": self.number(start, _("a room")),
                 "name": join_text(text_of(b) for b in body),
             }
 
     def loc(self, head):
         parts = strip_comment(head).split()
         if len(parts) < 2 or not parts[1].startswith("#"):
-            self.fail("a location header is: /LOC #id [gfx=n]")
-        lid = self.number(parts[1][1:], "the number of a room")
+            self.fail(_("a location header is: /LOC #id [gfx=n]"))
+        lid = self.number(parts[1][1:], _("the number of a room"))
         a = self.attrs(" ".join(parts[2:]))
         self.i += 1
         desc = []
@@ -649,7 +668,7 @@ class Parser:
             desc.append(text_of(self.cur()))
             self.i += 1
         self.ddb["locations"][lid] = {
-            "graphic_id": self.number(a.get("gfx", 0), "a picture"),
+            "graphic_id": self.number(a.get("gfx", 0), _("a picture")),
             "exits": [],
             "desc": join_text(desc),
         }
@@ -670,13 +689,13 @@ class Parser:
         """A table of conditions of its own, run where DO names it."""
         parts = strip_comment(head).split()
         if len(parts) != 2 or not parts[1].startswith("#"):
-            self.fail("a procedure header is: /PROC #id")
-        pid = self.number(parts[1][1:], "the number of a procedure")
+            self.fail(_("a procedure header is: /PROC #id"))
+        pid = self.number(parts[1][1:], _("the number of a procedure"))
         if not 0 <= pid <= PROC_MOST:
-            self.fail(f"a procedure is numbered 0 to {PROC_MOST}")
+            self.fail(_("a procedure is numbered 0 to {most}", most=PROC_MOST))
         procs = self.ddb.setdefault("procs", {})
         if pid in procs:
-            self.fail(f"there is a /PROC #{pid} already")
+            self.fail(_("there is a /PROC #{number} already", number=pid))
         self.i += 1
         procs[pid] = self.cond_lines()
 
@@ -689,8 +708,8 @@ class Parser:
                 continue
             parts = st.split()
             if len(parts) != 2:
-                self.fail("a connection is: direction destination")
-            exits.append((parts[0], self.number(parts[1], "a room")))
+                self.fail(_("a connection is: direction destination"))
+            exits.append((parts[0], self.number(parts[1], _("a room"))))
         if exits:
             self.pending_exits[lid] = exits
 
@@ -737,19 +756,23 @@ class Parser:
                 parts = st.split()
                 cmd = parts[0].upper()
                 if cmd not in GFX_CMDS:
-                    self.fail(f"there is no drawing command called {cmd!r}",
+                    self.fail(_("there is no drawing command called "
+                                "{order!r}", order=cmd),
                               column=self.starts_at(raw, parts[0]),
                               meant=nearest(cmd, GFX_CMDS),
                               lineno=lineno, line=raw)
                 argc = GFX_CMDS[cmd][1]
                 if len(parts) - 1 != argc:
-                    many = "one number" if argc == 1 else f"{argc} numbers"
-                    self.fail(f"{cmd} takes {many}, and here it has "
-                              f"{len(parts) - 1}",
+                    self.fail(_("{order} takes one number, and here it has "
+                                "{got}", order=cmd, got=len(parts) - 1)
+                              if argc == 1 else
+                              _("{order} takes {wanted} numbers, and here it "
+                                "has {got}", order=cmd, wanted=argc,
+                                got=len(parts) - 1),
                               column=self.starts_at(raw, parts[0]),
                               lineno=lineno, line=raw)
-                insts.append([cmd] + [self.number(p, "a number for a "
-                                                  "drawing command")
+                insts.append([cmd] + [self.number(p, _("a number for a "
+                                                    "drawing command"))
                                       for p in parts[1:]])
                 place["orders"].append(self.origins[lineno - 1])
             self.ddb["gfx"][gid] = insts
@@ -760,19 +783,19 @@ class Parser:
         firmware's numbers, from 0 to 26."""
         pens = written.split(",")
         if len(pens) != 4:
-            self.fail(f"inks= is four pens, one to each comma, and here there "
-                      f"are {len(pens)}")
+            self.fail(_("inks= is four pens, one to each comma, and here "
+                        "there are {pens}", pens=len(pens)))
         out = []
         for pen in pens:
             colours = pen.split("/")
             if len(colours) > 2:
-                self.fail(f"a pen flashes between two colours, not "
-                          f"{len(colours)}: {pen!r}")
-            numbers = [self.number(c, "an ink") for c in colours]
+                self.fail(_("a pen flashes between two colours, not "
+                            "{colours}: {pen!r}", colours=len(colours), pen=pen))
+            numbers = [self.number(c, _("an ink")) for c in colours]
             for ink in numbers:
                 if not 0 <= ink <= 26:
-                    self.fail(f"{ink} is not one of the Amstrad's inks, which "
-                              "go from 0 to 26")
+                    self.fail(_("{ink} is not one of the Amstrad's inks, "
+                                "which go from 0 to 26", ink=ink))
             out += numbers if len(numbers) == 2 else numbers * 2
         return out
 
@@ -809,25 +832,28 @@ class Parser:
                 continue
             parts = said.split()
             if not 3 <= len(parts) <= 4:
-                self.fail("a noise is: pitch steps step, and then tone, noise "
-                          "or both, which may be left off", lineno=lineno,
+                self.fail(_("a noise is: pitch steps step, and then tone, "
+                            "noise or both, which may be left off"),
+                          lineno=lineno,
                           line=raw, column=self.starts_at(raw))
             out_of = TONE
             if len(parts) == 4:
                 word = parts[3].lower()
                 if word not in SOUND_CHANNELS:
-                    self.fail(f"{parts[3]} is not what a noise comes out of: "
-                              "it is tone, noise or both", lineno=lineno,
+                    self.fail(_("{word} is not what a noise comes out of: "
+                                "it is tone, noise or both", word=parts[3]),
+                              lineno=lineno,
                               line=raw, column=self.starts_at(raw, parts[3]))
                 out_of = SOUND_CHANNELS[word]
-            pitch, steps, step = (self.number(p, "a number", lineno, raw)
+            pitch, steps, step = (self.number(p, _("a number"), lineno, raw)
                                   for p in parts[:3])
-            for value, what, low, high in ((pitch, "a pitch", 1, 255),
-                                           (steps, "a length", 1, 255),
-                                           (step, "a step", -128, 127)):
+            for value, what, low, high in ((pitch, _("a pitch"), 1, 255),
+                                           (steps, _("a length"), 1, 255),
+                                           (step, _("a step"), -128, 127)):
                 if not low <= value <= high:
-                    self.fail(f"{value} is not {what}: they run from {low} to "
-                              f"{high}", lineno=lineno, line=raw,
+                    self.fail(_("{value} is not {what}: they run from {low} to "
+                                "{high}", value=value, what=what, low=low,
+                                high=high), lineno=lineno, line=raw,
                               column=self.starts_at(raw, str(value)))
             noises.append([pitch, steps, step, out_of])
 
@@ -859,7 +885,8 @@ class Parser:
                     a["layout"].strip(QUOTES) if "layout" in a else None,
                 )
             except (OSError, FontError, ImageError) as trouble:
-                self.fail(f"the font {whole}: {trouble}")
+                self.fail(_("the font {file}: {trouble}", file=whole,
+                            trouble=trouble))
             for code, glyph in glyphs.items():
                 data = self.room_for(data, code * 8 + 8)
                 data[code * 8 : code * 8 + 8] = glyph
@@ -869,12 +896,13 @@ class Parser:
             if not st:
                 continue
             if not st.startswith("#"):
-                self.fail("a font entry is: #code followed by 8 hex bytes")
+                self.fail(_("a font entry is: #code followed by 8 hex bytes"))
             parts = st[1:].split()
             code = self.char_code(parts[0])
             row = [int(b, 16) for b in parts[1:]]
             if len(row) != 8:
-                self.fail(f"character {code} needs 8 bytes, found {len(row)}")
+                self.fail(_("character {code} needs 8 bytes, found {found}",
+                            code=code, found=len(row)))
             data = self.room_for(data, code * 8 + 8)
             data[code * 8 : code * 8 + 8] = row
         self.font_chars = len(data) // 8
@@ -894,7 +922,7 @@ class Parser:
         if word.startswith('"') or word.startswith("'"):
             letter = word.strip("\"'")
             if len(letter) != 1:
-                self.fail(f"{word} is not one character")
+                self.fail(_("{word} is not one character", word=word))
             return ord(letter)
         return int(word)
 

@@ -47,7 +47,15 @@ are marked `serial` and left out of the parallel run:
     pytest -m serial                                 # and these on their own
 """
 
+import os
+
 import pytest
+
+# The tests read what the tools say, and they read it in English, whatever
+# the language of the machine they run on: see regac/i18n.py.  It is set in
+# the environment so that a tool started as a program by a test says it in
+# English as well.
+os.environ["REGAC_LANG"] = "en"
 
 # What each test module builds, so that the ones that build the same thing
 # stay in the same worker.  A module that is not here builds nothing of its

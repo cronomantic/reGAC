@@ -50,6 +50,7 @@ import subprocess
 import sys
 import tomllib
 
+from .i18n import _
 from .media import MSX_SCREEN_BYTES, NEXT_SCREEN_BYTES, msx_screen
 
 
@@ -176,31 +177,35 @@ def read(path):
         project = tomllib.load(f)
     strange = set(project) - PROJECT_KEYS
     if strange:
-        raise ProjectError(f"{path}: {', '.join(sorted(strange))} means nothing here")
+        raise ProjectError(_("{path}: {keys} means nothing here", path=path,
+                             keys=", ".join(sorted(strange))))
     for wanted in ("name", "source"):
         if wanted not in project:
-            raise ProjectError(f"{path}: it does not say what {wanted} is")
+            raise ProjectError(_("{path}: it does not say what {key} is",
+                                 path=path, key=wanted))
     targets = project.get("targets") or {}
     if not targets:
-        raise ProjectError(f"{path}: it does not say which machines to build for")
+        raise ProjectError(_("{path}: it does not say which machines to "
+                             "build for", path=path))
     for name, settings in targets.items():
         if name not in TARGETS:
-            raise ProjectError(
-                f"{path}: there is no {name}; try one of {', '.join(sorted(TARGETS))}"
-            )
+            raise ProjectError(_("{path}: there is no {machine}; try one of "
+                                 "{machines}", path=path, machine=name,
+                                 machines=", ".join(sorted(TARGETS))))
         strange = set(settings) - TARGET_KEYS
         if strange:
-            raise ProjectError(
-                f"{path}: {name} says {', '.join(sorted(strange))}, which means nothing"
-            )
+            raise ProjectError(_("{path}: {machine} says {keys}, which means "
+                                 "nothing", path=path, machine=name,
+                                 keys=", ".join(sorted(strange))))
         scale = settings.get("scale")
         if scale is not None:
             across, down = wide(scale)
             if across not in TARGETS[name].scales or down != 1:
-                raise ProjectError(
-                    f"{path}: {name} cannot draw at {across} by {down}; "
-                    f"it draws at {', '.join(str(s) for s in TARGETS[name].scales)} "
-                    "across and one down"
+                raise ProjectError(_(
+                    "{path}: {machine} cannot draw at {across} by {down}; it "
+                    "draws at {scales} across and one down", path=path,
+                    machine=name, across=across, down=down,
+                    scales=", ".join(str(s) for s in TARGETS[name].scales))
                 )
     project.setdefault("output", "release")
     return project
@@ -212,8 +217,8 @@ def wide(scale):
         return scale, 1
     if (not isinstance(scale, list) or len(scale) != 2
             or not all(isinstance(n, int) for n in scale)):
-        raise ProjectError(f"a scale is one number or two, as scale = 2 or "
-                           f"scale = [2, 1], not {scale!r}")
+        raise ProjectError(_("a scale is one number or two, as scale = 2 or "
+                             "scale = [2, 1], not {scale!r}", scale=scale))
     return scale[0], scale[1]
 
 
@@ -225,7 +230,7 @@ def find_assembler():
         return here
     found = shutil.which("sjasmplus")
     if not found:
-        raise ProjectError("sjasmplus is not in tools/ and not on the path")
+        raise ProjectError(_("sjasmplus is not in tools/ and not on the path"))
     return found
 
 
@@ -237,7 +242,7 @@ def find_nasm():
         return here
     found = shutil.which("nasm")
     if not found:
-        raise ProjectError("nasm is not in tools/ and not on the path")
+        raise ProjectError(_("nasm is not in tools/ and not on the path"))
     return found
 
 
@@ -262,8 +267,8 @@ def sjasmplus(folder, source, defines=()):
     )
     if result.returncode != 0:
         raise ProjectError(
-            f"{source} did not assemble:\n{result.stdout}\n{result.stderr}"
-        )
+            _("{source} did not assemble:", source=source) + "\n"
+            + result.stdout + "\n" + result.stderr)
     return os.path.join(folder, listing)
 
 
@@ -280,9 +285,8 @@ def assemble_nasm(target, folder, defines):
                             capture_output=True, text=True)
     if result.returncode != 0:
         raise ProjectError(
-            f"{target.source} did not assemble:" + chr(10) + result.stdout
-            + chr(10) + result.stderr
-        )
+            _("{source} did not assemble:", source=target.source) + chr(10)
+            + result.stdout + chr(10) + result.stderr)
     return os.path.join(folder, listing)
 
 
@@ -293,8 +297,8 @@ def screen_for(target, path, root):
     if target.machine == "msx":
         screen = msx_screen(screen)
     if len(screen) != target.screen_bytes:
-        raise ProjectError(
-            f"{path} is {len(screen)} bytes and a {target.machine} screen is "
-            f"{target.screen_bytes}"
-        )
+        raise ProjectError(_("{path} is {size} bytes and a {machine} screen "
+                             "is {wanted}", path=path, size=len(screen),
+                             machine=target.machine,
+                             wanted=target.screen_bytes))
     return screen

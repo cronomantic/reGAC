@@ -42,6 +42,7 @@ compiler nor the machine will say so.
 from .gfx import PICTURE_BOTTOM, PICTURE_TOP
 from .opcodes import (ADVERB, BY_NAME, CTR, FLAG, MSG, NOUN, OBJ, PROC, ROOM,
                       VERB)
+from .i18n import N_, _
 from .text import HOLE_OBJECT, commands_of, expand, typed
 
 COUNTERS = 128                  # what the interpreters have, in every machine
@@ -51,21 +52,21 @@ NOWHERE = 0
 # What the interpreter says for itself, and cannot do without.  The numbers
 # are the original's and are the same on every machine: see z80/common.
 NEEDED = {
-    240: "to ask the player for an order",
-    241: "to say an order cannot be done",
-    242: "to say an order was not understood",
+    240: N_("to ask the player for an order"),
+    241: N_("to say an order cannot be done"),
+    242: N_("to say an order was not understood"),
 }
 # And the ones it only reaches for in certain circumstances, which an
 # adventure may honestly not want.
 WANTED = {
-    243: "to ask for a key",
-    244: "to ask whether the player is sure",
-    246: "to say the player has not got it",
-    247: "to say there is nothing like that here",
-    248: "to say the player is carrying too much",
-    251: "to say it is dark",
-    253: "to introduce what can be seen",
-    254: "to say it is done",
+    243: N_("to ask for a key"),
+    244: N_("to ask whether the player is sure"),
+    246: N_("to say the player has not got it"),
+    247: N_("to say there is nothing like that here"),
+    248: N_("to say the player is carrying too much"),
+    251: N_("to say it is dark"),
+    253: N_("to introduce what can be seen"),
+    254: N_("to say it is done"),
 }
 
 
@@ -80,8 +81,10 @@ class Problem:
         self.fault = fault              # or only a warning
 
     def __str__(self):
-        mark = "" if self.fault else "warning: "
-        return f"{mark}{self.where}: {self.message}"
+        if self.fault:
+            return f"{self.where}: {self.message}"
+        return _("warning: {where}: {message}", where=self.where,
+                 message=self.message)
 
 
 def ys_of(command):
@@ -130,7 +133,7 @@ def walked(code):
             stack.clear() if name == "END" else None
             continue
         taken = []
-        for _ in range(op.argc):
+        for _arg in range(op.argc):
             taken.append(stack.pop() if stack else None)
         taken.reverse()
         yield op, taken
@@ -158,41 +161,46 @@ def follow(problems, where, code, ddb):
             if value is None:           # worked out while it plays
                 continue
             if kind is MSG and value not in messages:
-                problems.append(Problem(
-                    where, f"{op.name} {value}, and there is no message {value}"))
+                problems.append(Problem(where, _(
+                    "{op} {value}, and there is no message {value}",
+                    op=op.name, value=value)))
             elif kind is ROOM and value not in rooms and value not in (NOWHERE,
                                                                        CARRIED):
-                problems.append(Problem(
-                    where, f"{op.name} {value}, and there is no room {value}"))
+                problems.append(Problem(where, _(
+                    "{op} {value}, and there is no room {value}",
+                    op=op.name, value=value)))
             elif kind is PROC and value not in procs:
-                problems.append(Problem(
-                    where, f"{op.name} {value}, and there is no /PROC {value}"))
+                problems.append(Problem(where, _(
+                    "{op} {value}, and there is no /PROC {value}",
+                    op=op.name, value=value)))
             elif kind is OBJ and value not in objects:
-                problems.append(Problem(
-                    where, f"{op.name} {value}, and there is no object {value}"))
+                problems.append(Problem(where, _(
+                    "{op} {value}, and there is no object {value}",
+                    op=op.name, value=value)))
             elif kind is CTR and not 0 <= value < COUNTERS:
-                problems.append(Problem(
-                    where, f"{op.name} {value}, and there are {COUNTERS} "
-                           f"counters, numbered 0 to {COUNTERS - 1}"))
+                problems.append(Problem(where, _(
+                    "{op} {value}, and there are {counters} counters, "
+                    "numbered 0 to {last}", op=op.name, value=value,
+                    counters=COUNTERS, last=COUNTERS - 1)))
             elif kind is FLAG and not 0 <= value <= 255:
-                problems.append(Problem(
-                    where, f"{op.name} {value}, and there are 256 flags, "
-                           f"numbered 0 to 255"))
+                problems.append(Problem(where, _(
+                    "{op} {value}, and there are 256 flags, numbered 0 to "
+                    "255", op=op.name, value=value)))
             elif kind in words and value and value not in words[kind]:
-                problems.append(Problem(
-                    where, f"{op.name} {value}, and no word of the vocabulary"
-                           f" has that number", fault=False))
+                problems.append(Problem(where, _(
+                    "{op} {value}, and no word of the vocabulary has that "
+                    "number", op=op.name, value=value), fault=False))
         if op.name == "SOUND" and taken[0] is not None:
             if taken[0] < 1:
                 problems.append(Problem(
-                    where, "SOUND 0, and effects are numbered from one"))
+                    where, _("SOUND 0, and effects are numbered from one")))
             elif noises and taken[0] > noises:
                 # Only when the adventure says what its noises are: a bank
                 # exported from the tracker is assembly and nothing here can
                 # count what is in it.
-                problems.append(Problem(
-                    where, f"SOUND {taken[0]}, and this adventure says what "
-                           f"{noises} noises it has"))
+                problems.append(Problem(where, _(
+                    "SOUND {value}, and this adventure says what {noises} "
+                    "noises it has", value=taken[0], noises=noises)))
 
 
 def problems_of(ddb):
@@ -205,68 +213,69 @@ def problems_of(ddb):
     # The holes in the text: an object's name it asks for has to be there,
     # and an object's own name may not ask for one.
     objects = numbered(ddb.get("objects", {}))
-    texts = [(f"message {n}", text)
+    texts = [(_("message {n}", n=n), text, False)
              for n, text in (ddb.get("messages") or {}).items()]
-    texts += [(f"room {n}", room.get("desc", ""))
+    texts += [(_("room {n}", n=n), room.get("desc", ""), False)
               for n, room in (ddb.get("locations") or {}).items()]
-    texts += [(f"object {n}", one.get("name", ""))
+    texts += [(_("object {n}", n=n), one.get("name", ""), True)
               for n, one in (ddb.get("objects") or {}).items()]
-    for where, text in texts:
+    for where, text, a_name in texts:
         try:
             commands = list(commands_of(expand(text)))
         except ValueError as e:
             found.append(Problem(where, str(e)))
             continue
-        for which, value, _ in commands:
+        for which, value, _rest in commands:
             if which != HOLE_OBJECT:
                 continue
-            if where.startswith("object"):
-                found.append(Problem(where, rf"\obj {value} in the name of an "
-                                     "object, which may not name one"))
+            if a_name:
+                found.append(Problem(where, _(
+                    "\\obj {value} in the name of an object, which may not "
+                    "name one", value=value)))
             elif value not in objects:
-                found.append(Problem(where, rf"\obj {value}, and there is no "
-                                     f"object {value}"))
+                found.append(Problem(where, _(
+                    "\\obj {value}, and there is no object {value}",
+                    value=value)))
 
-    follow(found, "the high priority conditions", ddb.get("hpcs", []), ddb)
-    follow(found, "the low priority conditions", ddb.get("lpcs", []), ddb)
+    follow(found, _("the high priority conditions"), ddb.get("hpcs", []), ddb)
+    follow(found, _("the low priority conditions"), ddb.get("lpcs", []), ddb)
     for lid, code in (ddb.get("lcs") or {}).items():
-        follow(found, f"the local conditions of room {lid}", code, ddb)
+        follow(found, _("the local conditions of room {n}", n=lid), code, ddb)
     for pid, code in (ddb.get("procs") or {}).items():
-        follow(found, f"procedure {pid}", code, ddb)
+        follow(found, _("procedure {n}", n=pid), code, ddb)
 
     # Where the player starts, and where every way out goes.
     start = ddb.get("init_loc")
     if start is not None and int(start) not in rooms:
-        found.append(Problem("the control section",
-                             f"the player starts in room {start}, which is not "
-                             f"there"))
+        found.append(Problem(_("the control section"), _(
+            "the player starts in room {room}, which is not there",
+            room=start)))
     for lid, room in (ddb.get("locations") or {}).items():
         for way in room.get("exits", []):
             if way["dest"] not in rooms:
-                found.append(Problem(
-                    f"room {lid}", f"a way out goes to room {way['dest']}, "
-                                   f"which is not there"))
+                found.append(Problem(_("room {n}", n=lid), _(
+                    "a way out goes to room {room}, which is not there",
+                    room=way["dest"])))
         picture = room.get("graphic_id") or 0
         if picture and picture not in pictures:
-            found.append(Problem(
-                f"room {lid}", f"it shows picture {picture}, which is not "
-                               f"there"))
+            found.append(Problem(_("room {n}", n=lid), _(
+                "it shows picture {picture}, which is not there",
+                picture=picture)))
 
     # Where every object starts.
     for oid, obj in (ddb.get("objects") or {}).items():
         start = obj.get("initial_loc", NOWHERE)
         if start not in (NOWHERE, CARRIED) and start not in rooms:
-            found.append(Problem(
-                f"object {oid}", f"it starts in room {start}, which is not "
-                                 f"there"))
+            found.append(Problem(_("object {n}", n=oid), _(
+                "it starts in room {room}, which is not there", room=start)))
 
     # A picture that calls another.
     for pid, drawing in (ddb.get("gfx") or {}).items():
         for command in drawing:
             if command[0] == "CALL" and command[1] not in pictures:
-                found.append(Problem(
-                    f"picture {pid}", f"it calls picture {command[1]}, which "
-                                      f"is not there"))
+                found.append(Problem(_("picture {n}", n=pid), _(
+                    "it calls picture {picture}, which is not there",
+                    picture=command[1])))
 
     # A picture that draws outside the frame.  Ours draws what fits; the
     # original stopped drawing that picture there and left the rest of it
@@ -278,13 +287,12 @@ def problems_of(ddb):
             outside = [y for y in ys_of(command)
                        if not PICTURE_BOTTOM <= y <= PICTURE_TOP]
             if outside:
-                found.append(Problem(
-                    f"picture {pid}",
-                    f"its order {number}, {command[0]}, goes to y={outside[0]},"
-                    f" outside the frame ({PICTURE_BOTTOM} to {PICTURE_TOP}):"
-                    f" this draws what fits, where the original would have"
-                    f" stopped drawing the picture there",
-                    fault=False))
+                found.append(Problem(_("picture {n}", n=pid), _(
+                    "its order {number}, {order}, goes to y={y}, outside the "
+                    "frame ({bottom} to {top}): this draws what fits, where "
+                    "the original would have stopped drawing the picture "
+                    "there", number=number, order=command[0], y=outside[0],
+                    bottom=PICTURE_BOTTOM, top=PICTURE_TOP), fault=False))
 
     # A fill started outside the frame.  Ours lays nothing; the original does
     # not agree, and not in one way: asked of it with a box and a seed above
@@ -301,45 +309,51 @@ def problems_of(ddb):
             if PICTURE_BOTTOM <= y <= PICTURE_TOP:
                 continue
             if y < PICTURE_BOTTOM:
-                theirs = ("filled from there upwards, into the text window "
-                          "as well")
+                said = _("its order {number}, {order}, starts at y={y}, "
+                         "outside the frame ({bottom} to {top}): this lays "
+                         "nothing, where the original filled from there "
+                         "upwards, into the text window as well",
+                         number=number, order=command[0], y=y,
+                         bottom=PICTURE_BOTTOM, top=PICTURE_TOP)
             else:
-                theirs = ("filled from the top of the picture down, or did "
-                          "nothing, or hung, depending on how far above")
-            found.append(Problem(
-                f"picture {pid}",
-                f"its order {number}, {command[0]}, starts at y={y}, outside"
-                f" the frame ({PICTURE_BOTTOM} to {PICTURE_TOP}): this lays"
-                f" nothing, where the original {theirs}",
-                fault=False))
+                said = _("its order {number}, {order}, starts at y={y}, "
+                         "outside the frame ({bottom} to {top}): this lays "
+                         "nothing, where the original filled from the top of "
+                         "the picture down, or did nothing, or hung, "
+                         "depending on how far above", number=number,
+                         order=command[0], y=y, bottom=PICTURE_BOTTOM,
+                         top=PICTURE_TOP)
+            found.append(Problem(_("picture {n}", n=pid), said, fault=False))
 
     # What the interpreter says for itself.
     for number, what in NEEDED.items():
         if number not in messages:
-            found.append(Problem("the messages",
-                                 f"message {number} is missing, and the "
-                                 f"interpreter needs it {what}"))
+            found.append(Problem(_("the messages"), _(
+                "message {number} is missing, and the interpreter needs it "
+                "{what}", number=number, what=_(what))))
     for number, what in WANTED.items():
         if number not in messages:
-            found.append(Problem("the messages",
-                                 f"message {number} is missing, which the "
-                                 f"interpreter reaches for {what}",
-                                 fault=False))
+            found.append(Problem(_("the messages"), _(
+                "message {number} is missing, which the interpreter reaches "
+                "for {what}", number=number, what=_(what)), fault=False))
 
     # And the typeface, which is the one thing an adventure can be missing
     # without anything complaining: every letter is then eight noughts, so it
     # builds, runs, and prints blank lines.  The example adventure did exactly
     # that until it was given one.
     if not any(ddb.get("font") or []):
-        found.append(Problem("the font",
-                             "there is not one: every letter would print "
-                             "blank.  A source says /FONT file=\"...\", or "
-                             "draws the letters it wants one at a time",
-                             fault=False))
+        found.append(Problem(_("the font"), _(
+            "there is not one: every letter would print blank.  A source "
+            "says /FONT file=\"...\", or draws the letters it wants one at "
+            "a time"), fault=False))
 
     found += said_twice(ddb)
 
     return sorted(found, key=lambda p: (not p.fault, p.where, p.message))
+
+
+KINDS = {"verbs": N_("the verbs"), "nouns": N_("the nouns"),
+         "adverbs": N_("the adverbs")}
 
 
 def said_twice(ddb):
@@ -360,11 +374,11 @@ def said_twice(ddb):
             same = typed(str(word)).upper()
             if same in folded and folded[same][1] != number:
                 first, its = folded[same]
-                out.append(Problem(
-                    f"the {kind[:-1]}s",
-                    f"{word} ({number}) is the same word as {first} ({its}) "
-                    f"once the marks come off, so only the first can ever be "
-                    f"typed", fault=False))
+                out.append(Problem(_(KINDS[kind]), _(
+                    "{word} ({number}) is the same word as {first} ({its}) "
+                    "once the marks come off, so only the first can ever be "
+                    "typed", word=word, number=number, first=first, its=its),
+                    fault=False))
             else:
                 folded.setdefault(same, (word, number))
     return out

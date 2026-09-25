@@ -4194,7 +4194,48 @@ los dos:
 - El manual decía que sjasmplus tiene que estar en `tools/`; también vale en
   el PATH, que es como lo encuentra la release.
 
-Quedan los mensajes de la herramienta, que es la parte más grande.
+**Los mensajes de la herramienta.** **Decidido por el usuario**: en el idioma
+del sistema, español o inglés, y con `REGAC_LANG` para elegir uno por encima.
+
+- Cada mensaje se escribe en el código en inglés, dentro de `_()`, con sus
+  números y nombres como huecos con nombre: `_("there is no picture {n}",
+  n=12)`. `regac/i18n.py` busca ese inglés en `regac/es.py` si toca español.
+  Sin gettext, sin `.po` ni `.mo` que compilar: el catálogo es un dict de
+  Python, y un mensaje que no tenga traducción sale en inglés.
+- El idioma: `REGAC_LANG` si está; si no, en Windows el de la interfaz
+  (`GetUserDefaultUILanguage`), y en los demás LANGUAGE, LC_ALL, LC_MESSAGES
+  y LANG, como los mira gettext. Español si empieza por `es`; inglés para
+  todo lo demás.
+- Las frases que se guardan en una tabla y se dicen después --lo que el
+  intérprete necesita de cada mensaje propio, las teclas del editor-- llevan
+  `N_()`, que no traduce y sólo las marca.
+- **argparse** dice lo suyo (`usage:`, `options`, sus errores) con gettext;
+  `argparse_speaks()` hace que lo diga con `_`, y esas frases están en el
+  catálogo como las demás. Son las de Python 3.14; en otra versión alguna
+  puede salir en inglés.
+- `tests/test_i18n.py` recorre el código con `ast`: que cada frase de `_()` y
+  `N_()` tenga su español, que el catálogo no guarde ninguna que ya no diga
+  nadie, que los huecos sean los mismos en los dos, y que ninguna función que
+  habla use `_` para tirar un valor (`key, _, value = ...`), que la dejaba
+  sin palabra: pasó en `srcparse`, `check`, `viewer`, `gfxedit`, `dsk`, `png`
+  y en los `main` de runGAC y deGAC, que tenían gettext sin catálogo ninguno
+  y ahora usan el de reGAC. Las pruebas corren en inglés (`conftest.py` pone
+  `REGAC_LANG=en`), así que ninguna depende del sistema en el que corran.
+- Las palabras son las de la documentación en español: sala, lámina, orden,
+  relleno, tinta, tipografía, bandera, contador, fuente.
+
+**Lo que sigue en inglés, a propósito:**
+
+- Los comentarios de la fuente que escribe `decompile` (`; word id type`...):
+  es un fichero, y el mismo JSON tiene que dar la misma fuente en cualquier
+  sistema.
+- En runGAC, `ILLEGAL COMMAND` e `INVALID OPCODE`, que son del intérprete y no
+  de la herramienta.
+- Los docstrings, los comentarios y este diario.
+
+**Visto al probarlo, y sin tocar:** `regac check` y `regac text` esperan la
+base de datos JSON, como dicen su ayuda y el README; con un `.gac` se caen con
+una traza de `json` en vez de decirlo. Ya pasaba antes.
 
 ## `DO` y `/PROC`
 

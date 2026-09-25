@@ -28,12 +28,12 @@ import pygame
 import threading
 import queue
 import argparse
-import gettext
 import json
 
 from regac.devices import SpectrumDevice
 from regac.gfx import SOURCE_ROWS as PICTURE_ROWS
 from regac.gfx import Renderer
+from regac.i18n import _, argparse_speaks
 from regac.text import INK_ARG_FIRST, INK_CHAR
 
 GFX_CHAR_WIDTH = SpectrumDevice.char_width
@@ -464,12 +464,7 @@ if __name__ == "__main__":
     program = "runGAC" + version
     exec = "runGAC"
 
-    gettext.bindtextdomain(
-        exec, os.path.join(os.path.abspath(os.path.dirname(__file__)), "locale")
-    )
-    gettext.textdomain(exec)
-    _ = gettext.gettext
-
+    argparse_speaks()
     arg_parser = argparse.ArgumentParser(sys.argv[0], description=program)
     arg_parser.add_argument(
         "input_path",
@@ -481,15 +476,15 @@ if __name__ == "__main__":
     try:
         args = arg_parser.parse_args()
     except FileNotFoundError as f1:
-        sys.exit(_("ERROR: File not found:") + f"{f1}")
+        sys.exit(_("ERROR: File not found: {name}", name=f1))
     except NotADirectoryError as f2:
-        sys.exit(_("ERROR: Not a valid path:") + f"{f2}")
+        sys.exit(_("ERROR: Not a valid path: {name}", name=f2))
 
     with open(args.input_path) as f:
         ddb = json.load(f)
 
     ddb = GAC_Interpreter_Pygame(ddb)
     if not ddb.start_adventure():
-        sys.exit("Invalid Database")
+        sys.exit(_("Invalid Database"))
     else:
         ddb.run()

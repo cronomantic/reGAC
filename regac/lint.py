@@ -35,6 +35,7 @@ is said instead: better silent than wrong.
 """
 
 from .check import walked
+from .i18n import N_, _
 
 # The messages the interpreter prints by itself: see doc/gac.md.
 OWN_MESSAGES = set(range(240, 256))
@@ -54,12 +55,12 @@ class Note:
 
 def tables_of(ddb):
     """Every table of conditions, with what to call it."""
-    yield "the high priority conditions", ddb.get("hpcs") or []
-    yield "the low priority conditions", ddb.get("lpcs") or []
+    yield _("the high priority conditions"), ddb.get("hpcs") or []
+    yield _("the low priority conditions"), ddb.get("lpcs") or []
     for room, code in (ddb.get("lcs") or {}).items():
-        yield f"room {room}", code
+        yield _("room {n}", n=room), code
     for proc, code in (ddb.get("procs") or {}).items():
-        yield f"procedure {proc}", code
+        yield _("procedure {n}", n=proc), code
 
 
 def asked_for(ddb):
@@ -68,7 +69,7 @@ def asked_for(ddb):
     objects that come to hand some other way than GET: a SWAP puts one where
     the other was, which may be the hand, and a TO may send one there."""
     constant, worked_out, to_hand = {}, set(), set()
-    for _, code in tables_of(ddb):
+    for _where, code in tables_of(ddb):
         for op, taken in walked(code):
             for value in taken:
                 if value is None:
@@ -84,6 +85,23 @@ def asked_for(ddb):
 
 def keys(table):
     return {int(k) for k in (table or {})}
+
+
+# What is said of a word, by its kind: whole sentences, as a kind is not a
+# word that can be put in one the same way in both languages.
+UNSEEN = {
+    "verb": N_("a {op} works its word out while the game plays, so no verb "
+               "is said to be unused"),
+    "noun": N_("a {op} works its word out while the game plays, so no noun "
+               "is said to be unused"),
+    "adverb": N_("a {op} works its word out while the game plays, so no "
+                 "adverb is said to be unused"),
+}
+UNASKED = {
+    "verb": N_("the verb {word} ({number}): no condition asks for it"),
+    "noun": N_("the noun {word} ({number}): no condition asks for it"),
+    "adverb": N_("the adverb {word} ({number}): no condition asks for it"),
+}
 
 
 def notes_of(ddb):
@@ -110,12 +128,14 @@ def notes_of(ddb):
                 reached.add(dest)
                 frontier.append(dest)
     if "GOTO" in worked_out:
-        notes.append(Note("rooms", "a GOTO works its room out while the game "
-                          "plays, so which rooms are reached is not looked at"))
+        notes.append(Note(_("rooms"), _(
+            "a GOTO works its room out while the game plays, so which rooms "
+            "are reached is not looked at")))
     else:
         for room in sorted(rooms - reached):
-            notes.append(Note("rooms", f"room {room}: no way out leads here "
-                              f"and no GOTO names it"))
+            notes.append(Note(_("rooms"), _(
+                "room {room}: no way out leads here and no GOTO names it",
+                room=room)))
 
     # Objects nothing can pick up: no GET names one, and a GET of a noun
     # typed takes the object with that noun's number.  One that a SWAP or a
@@ -129,10 +149,14 @@ def notes_of(ddb):
             continue
         if takes_a_noun and number in nouns:
             continue
-        why = ("and no noun has its number for a GET of what is typed"
-               if takes_a_noun else "and no GET names it")
-        notes.append(Note("objects", f"object {number} cannot be picked up: "
-                          f"it does not start carried, {why}"))
+        if takes_a_noun:
+            said = _("object {number} cannot be picked up: it does not start "
+                     "carried, and no noun has its number for a GET of what "
+                     "is typed", number=number)
+        else:
+            said = _("object {number} cannot be picked up: it does not start "
+                     "carried, and no GET names it", number=number)
+        notes.append(Note(_("objects"), said))
 
     # Words no condition asks for.  A verb is also asked for by being a way
     # out, and a noun by being an object's number when a GET, a DROP or
@@ -146,24 +170,24 @@ def notes_of(ddb):
                 "FIND", "SWAP", "TO", "IN", "WEIG"} else set()),
             ("adverb", "adverbs", "ADVE", set())):
         if op in worked_out or (kind == "verb" and "VBNO" in constant_ops(ddb)):
-            notes.append(Note("words", f"a {op} works its word out while the "
-                              f"game plays, so no {kind} is said to be unused"))
+            notes.append(Note(_("words"), _(UNSEEN[kind], op=op)))
             continue
         for word, number in sorted((ddb.get(table) or {}).items(),
                                    key=lambda w: (w[1], w[0])):
             if number and number not in used[op] and number not in also:
-                notes.append(Note("words", f"the {kind} {word} ({number}): no "
-                                  f"condition asks for it"))
+                notes.append(Note(_("words"), _(UNASKED[kind], word=word,
+                                                number=number)))
 
     # Messages nobody prints: MESS names them, and so does nothing else.
     if "MESS" in worked_out:
-        notes.append(Note("messages", "a MESS works its message out while the "
-                          "game plays, so which are printed is not looked at"))
+        notes.append(Note(_("messages"), _(
+            "a MESS works its message out while the game plays, so which are "
+            "printed is not looked at")))
     else:
         for number in sorted(keys(ddb.get("messages")) - used["MESS"]
                              - OWN_MESSAGES):
-            notes.append(Note("messages", f"message {number}: nothing prints "
-                              f"it"))
+            notes.append(Note(_("messages"), _(
+                "message {number}: nothing prints it", number=number)))
 
     # Pictures no room shows and no picture calls.
     pictures = keys(ddb.get("gfx"))
@@ -172,25 +196,27 @@ def notes_of(ddb):
     for drawing in (ddb.get("gfx") or {}).values():
         shown.update(int(order[1]) for order in drawing if order[0] == "CALL")
     for number in sorted(pictures - shown):
-        notes.append(Note("pictures", f"picture {number}: no room shows it "
-                          f"and no picture calls it"))
+        notes.append(Note(_("pictures"), _(
+            "picture {number}: no room shows it and no picture calls it",
+            number=number)))
 
     # Tables no DO runs.
     procs = keys(ddb.get("procs"))
     if "DO" in worked_out:
         if procs:
-            notes.append(Note("procedures", "a DO works its table out while "
-                              "the game plays, so which run is not looked at"))
+            notes.append(Note(_("procedures"), _(
+                "a DO works its table out while the game plays, so which run "
+                "is not looked at")))
     else:
         for number in sorted(procs - used["DO"]):
-            notes.append(Note("procedures", f"procedure {number}: no DO runs "
-                              f"it"))
+            notes.append(Note(_("procedures"), _(
+                "procedure {number}: no DO runs it", number=number)))
     return notes
 
 
 def constant_ops(ddb):
     """The names of every opcode an adventure uses at all."""
     names = set()
-    for _, code in tables_of(ddb):
+    for _where, code in tables_of(ddb):
         names.update(step[0] for step in code)
     return names

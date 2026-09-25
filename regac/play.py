@@ -38,6 +38,8 @@ import importlib.util
 import io
 import os
 
+from .i18n import _
+
 
 def interpreter_class():
     """runGAC is a program rather than a module, beside this package, so it
@@ -78,7 +80,8 @@ def play(ddb, orders):
     with contextlib.redirect_stdout(said):
         game = Scripted(ddb)
         if not game.start_adventure():
-            raise ValueError("the interpreter would not start this adventure")
+            raise ValueError(_("the interpreter would not start this "
+                               "adventure"))
         while not game.main_loop():
             pass
         if not ran_out:

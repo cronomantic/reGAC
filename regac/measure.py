@@ -43,6 +43,7 @@ import tempfile
 import time
 
 from .devices import from_an_amstrad
+from .i18n import _
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -75,10 +76,11 @@ def harness():
 def why_not(machine):
     """Why a picture cannot be measured on that machine, or None."""
     if machine not in MACHINES:
-        return (f"the time is measured on spectrum, cpc and msx, which have a "
-                f"build that draws one picture, and not on {machine}")
+        return _("the time is measured on spectrum, cpc and msx, which have "
+                 "a build that draws one picture, and not on {machine}",
+                 machine=machine)
     if not harness().available():
-        return "measuring needs sjasmplus and ZEsarUX in tools/"
+        return _("measuring needs sjasmplus and ZEsarUX in tools/")
     return None
 
 
@@ -109,14 +111,16 @@ def measure(ddb, picture, machine):
             session.load(os.path.join(folder, spec["snapshot"]))
             # it draws one picture of its own accord, which says it is up
             if not session.wait_for(where["done_flag"], 0xFF, timeout=60.0):
-                raise RuntimeError(f"the {machine} never got going")
+                raise RuntimeError(_("the {machine} never got going",
+                                     machine=machine))
         else:
             time.sleep(emulator.longer(spec["settle"]))
             with open(os.path.join(folder, spec["binary"]), "rb") as f:
                 blob = f.read()
             if not session.start_code(blob, spec["at"], where["done_flag"],
                                       timeout=spec["timeout"]):
-                raise RuntimeError(f"the {machine} never got going")
+                raise RuntimeError(_("the {machine} never got going",
+                                     machine=machine))
         number = int(picture)
         session.command(f"write-memory {where['picture_wanted']} "
                         f"{number & 255} {number >> 8}")

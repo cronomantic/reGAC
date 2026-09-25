@@ -53,6 +53,7 @@ ROOT = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(ROOT, "tests"))
 
 import emulator  # noqa: E402
+from regac.i18n import _, argparse_speaks  # noqa: E402
 
 
 def grab(image, machine, wait, keys=None, start=0, size=0x10000, boot=None,
@@ -93,13 +94,20 @@ def looks_like_gac(image, table=0x4000):
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("image", help="the disk, tape or snapshot to load")
-    parser.add_argument("output", help="where to write the memory image")
-    parser.add_argument("--machine", default="CPC464", help="which machine to load it on")
-    parser.add_argument("--wait", type=float, default=60.0, help="seconds to let it load")
-    parser.add_argument("--boot", type=float, default=None, help="seconds to let the machine boot")
-    parser.add_argument("--keys", default=None, help="what to type once it has booted")
+    argparse_speaks()
+    parser = argparse.ArgumentParser(description=_(
+        "Take a memory image out of an adventure that is loading from disk or "
+        "tape."))
+    parser.add_argument("image", help=_("the disk, tape or snapshot to load"))
+    parser.add_argument("output", help=_("where to write the memory image"))
+    parser.add_argument("--machine", default="CPC464",
+                        help=_("which machine to load it on"))
+    parser.add_argument("--wait", type=float, default=60.0,
+                        help=_("seconds to let it load"))
+    parser.add_argument("--boot", type=float, default=None,
+                        help=_("seconds to let the machine boot"))
+    parser.add_argument("--keys", default=None,
+                        help=_("what to type once it has booted"))
     parser.add_argument("--start", type=lambda n: int(n, 0), default=0)
     parser.add_argument("--size", type=lambda n: int(n, 0), default=0x10000)
     args = parser.parse_args(argv)
@@ -108,13 +116,16 @@ def main(argv=None):
                  args.size, args.boot)
     with open(args.output, "wb") as f:
         f.write(image)
-    print(f"{len(image)} bytes of {args.machine} memory in {args.output}")
+    print(_("{n} bytes of {machine} memory in {output}", n=len(image),
+            machine=args.machine, output=args.output))
     if args.start == 0:
         pointers = looks_like_gac(image)
         if pointers:
-            print("looks like GAC: " + " ".join(f"{p:04X}" for p in pointers))
+            print(_("looks like GAC: {pointers}",
+                    pointers=" ".join(f"{p:04X}" for p in pointers)))
         else:
-            print("no GAC tables at $4000; give it longer, or type something to start it")
+            print(_("no GAC tables at $4000; give it longer, or type "
+                    "something to start it"))
     return 0
 
 

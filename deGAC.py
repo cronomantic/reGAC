@@ -21,8 +21,10 @@
 import sys
 import os
 import argparse
-import gettext
 import json
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from regac.i18n import _, argparse_speaks  # noqa: E402
 
 SEEKPOS = 0x1C1B  # Number of bytes to skip in a Spectrum snapshot
 MEM_BASE = 0x5C00  # First address it holds
@@ -184,9 +186,10 @@ def settled(sysram, name):
     be, which means the image is not laid where the machine lays it."""
     use_machine(name)
     if not tables_look_right(sysram, name):
-        print(f"The {name} tables at ${MACHINES[name]['nouns']:04X} do not "
-              "look like pointers; is this image laid where the machine "
-              "would have it?", file=sys.stderr)
+        print(_("The {machine} tables at ${address} do not look like "
+                "pointers; is this image laid where the machine would have "
+                "it?", machine=name,
+                address=f"{MACHINES[name]['nouns']:04X}"), file=sys.stderr)
     return sysram
 
 
@@ -265,7 +268,7 @@ def load_file(file_path, machine=None):
         # block of memory by name and takes what follows it.
         at = blob[:256].find(b"C64MEM")
         if at < 0:
-            sys.exit("No C64MEM block in that snapshot")
+            sys.exit(_("No C64MEM block in that snapshot"))
         return settled(list(blob[at + 0x1A:at + 0x1A + 0x10000]) + [0] * 0x10000,
                        machine or "c64")
 
@@ -276,10 +279,11 @@ def load_file(file_path, machine=None):
     if len(blob) >= 0x10000:
         # A plain image of the memory, where a byte's address is where it sits
         if machine is None:
-            sys.exit("Say which machine that memory image is from, with -m")
+            sys.exit(_("Say which machine that memory image is from, with "
+                       "-m"))
         return settled(list(blob[:0x10000]), machine)
 
-    sys.exit("Invalid file size")
+    sys.exit(_("Invalid file size"))
 
 
 def peek1(sysram, addr):
@@ -865,8 +869,8 @@ def stand_in_font():
     regac/moderndos.py.  The machine's own are in its ROM and not ours."""
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     from regac.moderndos import letters
-    print("This adventure printed with its machine's own letters, which are "
-          "not in it: it gets Modern DOS 8x8 instead")
+    print(_("This adventure printed with its machine's own letters, which "
+            "are not in it: it gets Modern DOS 8x8 instead"))
     return letters()
 
 
@@ -970,17 +974,17 @@ def get_database(sysram):
     database["init_loc"] = peek2(sysram, STARTROOM_ADDR)
     database["no_objs_msg"] = word_for_nothing(sysram)
 
-    print(f"font {len(font)}")
-    print(f"verbs {len(verbs)}")
-    print(f"nouns {len(nouns)}")
-    print(f"adverbs {len(adverbs)}")
-    print(f"messages {len(messages)}")
-    print(f"objects  {len(objects)}")
-    print(f"locations {len(rooms)}")
-    print(f"hpcs {len(hpcs)}")
-    print(f"lpcs {len(lpcs)}")
-    print(f"lcs {len(lcs)}")
-    print(f"gfx {len(gfx)}")
+    print(_("font {n}", n=len(font)))
+    print(_("verbs {n}", n=len(verbs)))
+    print(_("nouns {n}", n=len(nouns)))
+    print(_("adverbs {n}", n=len(adverbs)))
+    print(_("messages {n}", n=len(messages)))
+    print(_("objects  {n}", n=len(objects)))
+    print(_("locations {n}", n=len(rooms)))
+    print(_("hpcs {n}", n=len(hpcs)))
+    print(_("lpcs {n}", n=len(lpcs)))
+    print(_("lcs {n}", n=len(lcs)))
+    print(_("gfx {n}", n=len(gfx)))
 
     return database
 
@@ -993,12 +997,7 @@ def main():
     program = "GAC decoder " + version
     exec = "deGAC"
 
-    gettext.bindtextdomain(
-        exec, os.path.join(os.path.abspath(os.path.dirname(__file__)), "locale")
-    )
-    gettext.textdomain(exec)
-    _ = gettext.gettext
-
+    argparse_speaks()
     arg_parser = argparse.ArgumentParser(sys.argv[0], description=program)
     arg_parser.add_argument(
         "input_path",
@@ -1022,19 +1021,19 @@ def main():
     try:
         args = arg_parser.parse_args()
     except FileNotFoundError as f1:
-        sys.exit(_("ERROR: File not found:") + f"{f1}")
+        sys.exit(_("ERROR: File not found: {name}", name=f1))
     except NotADirectoryError as f2:
-        sys.exit(_("ERROR: Not a valid path:") + f"{f2}")
+        sys.exit(_("ERROR: Not a valid path: {name}", name=f2))
 
-    print(f"Processing file {args.input_path}...")
+    print(_("Processing file {name}...", name=args.input_path))
 
     sysram = load_file(args.input_path, args.machine)
-    print(f"Reading it as {MACHINE['model']}")
+    print(_("Reading it as {model}", model=MACHINE["model"]))
 
     # The 8 bytes that should be at PUNCTUATION. UnGAC uses this as a magic number  to detect a GAC database.
     punc_magic = list("\0 .,-!?:".encode(encoding="ascii"))
     if (sysram[PUNCTUATION_ADDR : PUNCTUATION_ADDR + len(punc_magic)]) != punc_magic:
-        sys.exit("Magic characters not found")
+        sys.exit(_("Magic characters not found"))
 
     ddb = get_database(sysram)
     ddb_json = json.dumps(ddb)

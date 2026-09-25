@@ -36,6 +36,7 @@ others without anybody having said so.
 
 import os
 
+from .i18n import _
 from .srcparse import SourceError, directive, parse_with_places
 
 # Which numbers of an order are a point that can be dragged, as the places of
@@ -82,7 +83,8 @@ class Picture:
         self.head = None
         self.orders = []
         if not path.lower().endswith(".gac"):
-            self.why_not = "a JSON is only looked at: open the source to draw"
+            self.why_not = _("a JSON is only looked at: open the source to "
+                             "draw")
             return
         with open(path, encoding="utf-8", newline="") as f:
             self.text = f.read()
@@ -90,20 +92,21 @@ class Picture:
         self.lines = self.text.split(self.newline)
         name = os.path.basename(path)
         try:
-            _, places = parse_with_places(
+            _ddb, places = parse_with_places(
                 self.text, name, os.path.dirname(os.path.abspath(path)), machine)
         except SourceError as e:
-            self.why_not = f"the source does not read: {e}"
+            self.why_not = _("the source does not read: {error}", error=e)
             return
         place = places.get(self.picture)
         if place is None:
-            self.why_not = f"there is no picture {self.picture} in the source"
+            self.why_not = _("there is no picture {n} in the source",
+                             n=self.picture)
             return
         files = {place["head"][0]} | {f for f, _ in place["orders"]}
         if files != {name}:
             other = sorted(files - {name}) or sorted(files)
-            self.why_not = (f"picture {self.picture} is written in "
-                            f"{other[0]}: open that one to draw in it")
+            self.why_not = _("picture {n} is written in {file}: open that "
+                             "one to draw in it", n=self.picture, file=other[0])
             return
         self.head = place["head"][1]
         self.orders = [number for _, number in place["orders"]]
@@ -114,8 +117,9 @@ class Picture:
             if said.startswith("#") or said.startswith("/"):
                 break
             if directive(line) is not None:
-                self.why_not = (f"picture {self.picture} keeps lines for some "
-                                f"machines, with .if: draw in it by hand")
+                self.why_not = _("picture {n} keeps lines for some "
+                                 "machines, with .if: draw in it by hand",
+                                 n=self.picture)
                 return
             at += 1
 

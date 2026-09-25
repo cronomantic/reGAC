@@ -39,6 +39,7 @@ import struct
 from .cdt import BASIC, BINARY, File, tape
 from .binary import Reader
 from .dsk import Disk
+from .i18n import _
 
 # The three words the loader is made of, as Locomotive BASIC keeps them, plus
 # what marks a number written in hexadecimal and what separates statements.
@@ -291,7 +292,8 @@ def pcw_disk(boot, pieces, entry=PCW_CODE_AT, save=PCW_SAVE_SECTORS):
     header = bytes(disk.where(PCW_PAYLOAD)) + struct.pack("<H", entry)
     table = header + bytes(table)
     if len(table) > PCW_SAVE_ENTRY:
-        raise ValueError("too many pieces to fit in the boot sector's table")
+        raise ValueError(_("too many pieces to fit in the boot sector's "
+                           "table"))
     table = table.ljust(PCW_SAVE_ENTRY, b"\0")
     if save:
         disk.add(PCW_SAVE, bytes(save * PCW_SECTOR))
@@ -359,11 +361,10 @@ def cpc_low_tape(code, database, name=NAME, screen=None):
     own."""
     room = CPC_LOW_ROOM
     if len(database) > room:
-        raise ValueError(
-            f"the database is {len(database)} bytes and {room} fit under the "
-            + "island"
-            + ", even with the interpreter out of the way"
-        )
+        raise ValueError(_(
+            "the database is {count} bytes and {room} fit under the island, "
+            "even with the interpreter out of the way", count=len(database),
+            room=room))
     files = [File(name, low_loader("!", "!" if screen else None,
                                    ),
                   kind=BASIC, load=BASIC_AT)]
@@ -449,10 +450,9 @@ def cpc6128_disk(code, resident, banks, name=NAME, screen=None):
     it goes on last.
     """
     if len(banks) > len(CPC6128_PAGES):
-        raise ValueError(
-            f"a 6128 has {len(CPC6128_PAGES)} banks to give and this wants "
-            f"{len(banks)}"
-        )
+        raise ValueError(_(
+            "a 6128 has {given} banks to give and this wants {wanted}",
+            given=len(CPC6128_PAGES), wanted=len(banks)))
     binary = f"{name}.BIN"
     held = f"{name}.RES"
     picture = f"{name}.SCR" if screen else None
@@ -482,10 +482,9 @@ def told_where_to_save(code, where):
     writing into it would break it, so it is refused."""
     at = CPC6128_SAVE_WHERE
     if bytes(code[:at]) != bytes((0x18, 3)):
-        raise ValueError(
+        raise ValueError(_(
             "the 6128's interpreter should start by jumping over the three "
-            "bytes that say where the saved game is, and this one does not"
-        )
+            "bytes that say where the saved game is, and this one does not"))
     track, record = where
     out = bytearray(code)
     out[at:at + 3] = bytes((track, record, CPC6128_SAVE_SECTORS))
@@ -613,7 +612,8 @@ def mz_exe(image, entry=0, stack=MZ_STACK_BYTES, memory=0, most=MZ_ALL):
     paragraphs more if it has them: all of it, unless told otherwise.
     """
     if not 0 < stack <= 0x10000 or stack % 2:
-        raise ValueError(f"a stack of {stack} bytes is not one DOS can set up")
+        raise ValueError(_("a stack of {stack} bytes is not one DOS can "
+                           "set up", stack=stack))
     head = paragraphs(MZ_HEADER_BYTES)
     size = head * MZ_PARAGRAPH + len(image)
     needed = paragraphs(memory) + paragraphs(stack)

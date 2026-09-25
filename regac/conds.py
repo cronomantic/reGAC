@@ -71,7 +71,7 @@ def render_block(code, strict=False):
     def take():
         if not stack:
             if strict:
-                raise RenderError("stack underflow")
+                raise RenderError(_("stack underflow"))
             return Node("?")
         node = stack.pop()
         items.remove(node)
@@ -97,7 +97,7 @@ def render_block(code, strict=False):
         op = BY_NAME.get(name)
         if op is None:
             if strict:
-                raise RenderError(f"unknown opcode name {name!r}")
+                raise RenderError(_("unknown opcode name {name!r}", name=name))
             plain(f"; <{name}>")
             continue
 
@@ -132,6 +132,7 @@ def render_block(code, strict=False):
 import difflib
 import re
 
+from .i18n import _
 from .opcodes import BY_NAME as _OPS
 
 _TOKEN_RE = re.compile(r"[()]|[^\s()]+")
@@ -204,7 +205,8 @@ class _Assembler:
     def next(self):
         tok = self.peek()
         if tok is None:
-            raise CompileError("the condition stops in the middle", self.where())
+            raise CompileError(_("the condition stops in the middle"),
+                               self.where())
         self.pos += 1
         return tok
 
@@ -212,7 +214,8 @@ class _Assembler:
         at = self.where()
         got = self.next()
         if got != tok:
-            raise CompileError(f"expected {tok!r}, found {got!r}", at)
+            raise CompileError(_("expected {wanted!r}, found {got!r}",
+                                 wanted=tok, got=got), at)
 
     def emit(self, *ins):
         self.code.append(list(ins))
@@ -261,7 +264,7 @@ class _Assembler:
             return
         op = _OPS.get(tok)
         if op is None:
-            raise CompileError(f"unknown word {tok!r}", at,
+            raise CompileError(_("unknown word {word!r}", word=tok), at,
                                nearest(tok, list(_OPS) + list(self.defs)))
         if op.form == "nullary":
             self.emit(op.name)
@@ -270,8 +273,8 @@ class _Assembler:
             self.operand()
             self.emit(op.name)
             return
-        raise CompileError(
-            f"{op.name} goes between two things, so it cannot start one", at)
+        raise CompileError(_("{op} goes between two things, so it cannot "
+                             "start one", op=op.name), at)
 
 
 def compile_line(text, defs=None):
@@ -289,5 +292,5 @@ def compile_block(lines, defs=None):
         try:
             code.extend(compile_line(line, defs))
         except CompileError as e:
-            raise CompileError(f"line {n}: {e}") from None
+            raise CompileError(_("line {n}: {what}", n=n, what=e)) from None
     return code

@@ -65,6 +65,11 @@ Se instala apuntando al repositorio y no copiándolo, porque los intérpretes
 con los que construye son las carpetas de al lado, `z80/` y `x86/`: por eso no
 está en PyPI.
 
+Lo que dicen las herramientas --los errores, los avisos, la ayuda de cada
+orden, lo que pone `regac draw` bajo la lámina-- sale en español o en inglés,
+según el idioma del sistema. La variable `REGAC_LANG` elige uno por encima de
+él: `REGAC_LANG=en` para el inglés, `REGAC_LANG=es` para el español.
+
 ---
 
 ## 3. En cinco minutos

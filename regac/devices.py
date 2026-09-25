@@ -39,6 +39,7 @@ from .gfx import (
     Device,
     shaded,
 )
+from .i18n import _
 
 # The colours of the original, which is what the commands are written in.
 SPECTRUM_PALETTE = [
@@ -1142,7 +1143,8 @@ def from_an_amstrad(ddb):
 
 def make(name):
     if name not in DEVICES:
-        raise KeyError(f"unknown machine {name!r}; try one of {sorted(DEVICES)}")
+        raise KeyError(_("unknown machine {name}; try one of {known}",
+                         name=repr(name), known=sorted(DEVICES)))
     return DEVICES[name]()
 
 

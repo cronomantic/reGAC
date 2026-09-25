@@ -21,11 +21,11 @@
 import sys
 import os
 import argparse
-import gettext
 import json
 import random
 import platform
 
+from regac.i18n import _, argparse_speaks
 from regac.text import expand, filled, plain, typed
 
 
@@ -1190,7 +1190,7 @@ class GAC_Interpreter:
             # The machines say nothing when a save fails, because the tape or
             # the drive is saying it instead.  Here nothing would just look
             # like it worked.
-            self.print("Could not save: %s\n" % why)
+            self.print(_("Could not save: {why}", why=why) + "\n")
 
     def load_game(self):
         name = self.save_name("Name of the game: ")
@@ -1200,7 +1200,7 @@ class GAC_Interpreter:
             with open(name, encoding="utf-8") as f:
                 game = json.load(f)
             if game.get("version") != self.SAVE_VERSION:
-                raise ValueError("not a game saved by this version")
+                raise ValueError(_("not a game saved by this version"))
             location = int(game["location"])
             flags = [False] * len(self.flags)
             for n in game["flags"]:
@@ -1212,7 +1212,7 @@ class GAC_Interpreter:
             # what the machines do: their LOAD does not look at whether the
             # block came in, it just goes on with the condition.  So nothing
             # above this line has touched anything yet.
-            self.print("Could not load: %s\n" % why)
+            self.print(_("Could not load: {why}", why=why) + "\n")
             return
         self.current_loc = location
         self.max_weight = int(game["max_weight"])
@@ -1251,12 +1251,7 @@ def main():
     program = "runGAC" + version
     exec = "runGAC"
 
-    gettext.bindtextdomain(
-        exec, os.path.join(os.path.abspath(os.path.dirname(__file__)), "locale")
-    )
-    gettext.textdomain(exec)
-    _ = gettext.gettext
-
+    argparse_speaks()
     arg_parser = argparse.ArgumentParser(sys.argv[0], description=program)
     arg_parser.add_argument(
         "input_path",
@@ -1268,16 +1263,16 @@ def main():
     try:
         args = arg_parser.parse_args()
     except FileNotFoundError as f1:
-        sys.exit(_("ERROR: File not found:") + f"{f1}")
+        sys.exit(_("ERROR: File not found: {name}", name=f1))
     except NotADirectoryError as f2:
-        sys.exit(_("ERROR: Not a valid path:") + f"{f2}")
+        sys.exit(_("ERROR: Not a valid path: {name}", name=f2))
 
     with open(args.input_path) as f:
         ddb = json.load(f)
 
     ddb = GAC_Interpreter(ddb, 32)
     if not ddb.start_adventure():
-        sys.exit("Invalid Database")
+        sys.exit(_("Invalid Database"))
     else:
         ddb.run()
 

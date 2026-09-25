@@ -38,6 +38,8 @@ rather than what the manuals round them to.
 
 import struct
 
+from .i18n import _
+
 BLOCK = 2048                    # the most one block of a file holds
 SEGMENT = 256                   # and the lump each checksum covers
 HEADER_SYNC = 0x2C
@@ -68,7 +70,8 @@ class File:
 
     def __init__(self, name, data, kind=BINARY, load=0, entry=0):
         if len(name) > 16:
-            raise ValueError(f"{name} is longer than a tape name can be")
+            raise ValueError(_("{name} is longer than a tape name can be",
+                               name=name))
         self.name = name.upper()
         self.data = bytes(data)
         self.kind = kind

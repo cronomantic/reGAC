@@ -43,6 +43,7 @@ import os
 
 from .devices import device_for, from_an_amstrad
 from .gfx import MAX_Y, SOURCE_ROWS, SOURCE_WIDTH, Renderer
+from .i18n import N_, _
 
 # The machines a picture can be looked at on: the ones there is an
 # interpreter for, by the name of their device.  The PC's is its CGA.  An
@@ -193,7 +194,9 @@ def described(step):
     depth, picture, number, order = step
     words = " ".join(str(part) for part in order)
     if depth:
-        return f"{words}    (#{picture}, order {number}, called {depth} deep)"
+        return _("{words}    (#{picture}, order {number}, called {depth} "
+                 "deep)", words=words, picture=picture, number=number,
+                 depth=depth)
     return words
 
 
@@ -270,12 +273,13 @@ class Viewer:
                 return self.reload()
         pictures = pictures_of(ddb)
         if not pictures:
-            self.error = "the adventure has no pictures"
+            self.error = _("the adventure has no pictures")
             self.steps = None
             return
         if self.picture is None or str(self.picture) not in pictures:
             if not first and self.picture is not None:
-                self.error = f"there is no picture {self.picture} any more"
+                self.error = _("there is no picture {n} any more",
+                               n=self.picture)
             self.picture = int(pictures[0])
         at_the_end = first or self.steps is None or \
             self.steps.count == len(self.steps.steps)
@@ -372,10 +376,10 @@ class Viewer:
         """Take out the order at the cursor, if it is the picture's own."""
         if not self.steps.count:
             return
-        depth, _, number, _ = self.steps.steps[self.steps.count - 1]
+        depth, _picture, number, _order = self.steps.steps[self.steps.count - 1]
         if depth:
-            self.error = ("that order is the picture's it calls: take it out "
-                          "of that one")
+            self.error = _("that order is the picture's it calls: take it "
+                           "out of that one")
             return
         if self.write(lambda p: p.deleted(number - 1)):
             self.cursor_to(number - 1)
@@ -398,7 +402,8 @@ class Viewer:
         with open(self.path, encoding="utf-8", newline="") as f:
             now = f.read()
         if now != after:
-            self.error = "the source was changed since: nothing taken back"
+            self.error = _("the source was changed since: nothing taken "
+                           "back")
             self.taken_back.clear()
             return
         with open(self.path, "w", encoding="utf-8", newline="") as f:
@@ -507,7 +512,7 @@ class Viewer:
             try:
                 seconds = measure(ddb, asked[0], asked[1])
             except Exception as e:      # the emulator's, whatever it was
-                seconds = f"it could not be measured: {e}"
+                seconds = _("it could not be measured: {error}", error=e)
             self.measured = (asked[0], asked[1], seconds, stamp)
             self.measuring = None
 
@@ -525,20 +530,24 @@ class Viewer:
 
         if self.measuring:
             picture, machine = self.measuring
-            return f"time: measuring #{picture} on {machine}...", 0
+            return _("time: measuring #{picture} on {machine}...",
+                     picture=picture, machine=machine), 0
         if not self.measured:
-            return "time: c measures it on the machine", 0
+            return _("time: c measures it on the machine"), 0
         picture, machine, seconds, stamp = self.measured
         if isinstance(seconds, str):
-            return f"time: #{picture} on {machine}: {seconds}", 2
+            return _("time: #{picture} on {machine}: {said}", picture=picture,
+                     machine=machine, said=seconds), 2
         if seconds is None:
-            return f"time: #{picture} on {machine} never finished", 2
-        old = "  (before the last change)" if stamp != self.stamp else ""
+            return _("time: #{picture} on {machine} never finished",
+                     picture=picture, machine=machine), 2
+        old = _("  (before the last change)") if stamp != self.stamp else ""
         bad = 2 if seconds > TOO_SLOW else 1 if seconds > SLOW else 0
-        verdict = ("more than a player will wait" if bad == 2 else
-                   "slow" if bad == 1 else "within the budget")
-        return (f"time: #{picture} on {machine}, {seconds:.2f} s -- "
-                f"{verdict}{old}"), bad
+        verdict = (_("more than a player will wait") if bad == 2 else
+                   _("slow") if bad == 1 else _("within the budget"))
+        return _("time: #{picture} on {machine}, {seconds} s -- {verdict}"
+                 "{old}", picture=picture, machine=machine,
+                 seconds=f"{seconds:.2f}", verdict=verdict, old=old), bad
 
     # -- tracing ------------------------------------------------------------
     #
@@ -565,53 +574,60 @@ class Viewer:
         if not self.trace:
             return ""
         if not self.trace_on:
-            return "trace: hidden (t shows it)"
+            return _("trace: hidden (t shows it)")
         found = self.trace_file()
         if found is None:
-            return f"trace: nothing for #{self.picture} in {self.trace}"
-        return (f"trace: {os.path.basename(found)} at "
-                f"{round(self.trace_alpha * 100)}%  (t hides it, +/- more "
-                f"or less of it)")
+            return _("trace: nothing for #{picture} in {where}",
+                     picture=self.picture, where=self.trace)
+        return _("trace: {image} at {percent}%  (t hides it, +/- more or less "
+                 "of it)", image=os.path.basename(found),
+                 percent=round(self.trace_alpha * 100))
 
     # -- what is said about it --------------------------------------------
 
     def lines(self, pointer=None):
         """What goes under the picture, a line each."""
         steps = self.steps
-        out = [f"#{self.picture} on {'pc' if self.machine == 'cga' else self.machine}"
-               f"    order {steps.count} of {len(steps.steps)}"]
+        out = [_("#{picture} on {machine}    order {count} of {orders}",
+                 picture=self.picture,
+                 machine="pc" if self.machine == "cga" else self.machine,
+                 count=steps.count, orders=len(steps.steps))]
         if steps.count:
-            out.append("last: " + described(steps.steps[steps.count - 1]))
+            out.append(_("last: {order}",
+                         order=described(steps.steps[steps.count - 1])))
         else:
-            out.append("last: nothing drawn yet")
+            out.append(_("last: nothing drawn yet"))
         if steps.count < len(steps.steps):
-            out.append("next: " + described(steps.steps[steps.count]))
+            out.append(_("next: {order}",
+                         order=described(steps.steps[steps.count])))
         else:
-            out.append("next: the picture is finished")
+            out.append(_("next: the picture is finished"))
         out.append(f"x {pointer[0]}  y {pointer[1]}" if pointer else "")
         return out
 
 
 KEYS_HELP = (
-    "left/right an order (shift ten, ctrl a hundred)  home/end  "
-    "page up/down a picture  m machine  h light  q quit",
-    "draw: l line  r rect  e ellipse  p plot  f fill  b bgfill  s shade  "
-    "v move points",
-    "g snap to cells  del take out  enter write an order  ctrl-z undo  "
-    "right button or esc: let go",
-    "n the next caution  c time it on the machine  t trace  +/- more or "
-    "less of it",
+    N_("left/right an order (shift ten, ctrl a hundred)  home/end  "
+       "page up/down a picture  m machine  h light  q quit"),
+    N_("draw: l line  r rect  e ellipse  p plot  f fill  b bgfill  s shade  "
+       "v move points"),
+    N_("g snap to cells  del take out  enter write an order  ctrl-z undo  "
+       "right button or esc: let go"),
+    N_("n the next caution  c time it on the machine  t trace  +/- more or "
+       "less of it"),
 )
 TOOL_KEYS = {"l": "LINE", "r": "RECT", "e": "ELLIPSE", "p": "PLOT",
              "f": "FILL", "b": "BGFILL", "s": "SHADE", "v": SELECT}
-WHAT_NEXT = {SELECT: "drag a point to move it",
-             "LINE": "click the two ends", "RECT": "click two corners",
-             "ELLIPSE": "click the centre, then how far it reaches",
-             "PLOT": "click the point", "FILL": "click where it starts",
-             "BGFILL": "click where it starts", "SHADE": "click where it starts"}
+WHAT_NEXT = {SELECT: N_("drag a point to move it"),
+             "LINE": N_("click the two ends"), "RECT": N_("click two corners"),
+             "ELLIPSE": N_("click the centre, then how far it reaches"),
+             "PLOT": N_("click the point"), "FILL": N_("click where it starts"),
+             "BGFILL": N_("click where it starts"),
+             "SHADE": N_("click where it starts")}
 # and once the first point is down
-SECOND = {"LINE": "click the other end", "RECT": "click the other corner",
-          "ELLIPSE": "click how far it reaches"}
+SECOND = {"LINE": N_("click the other end"),
+          "RECT": N_("click the other corner"),
+          "ELLIPSE": N_("click how far it reaches")}
 RUBBER = (255, 220, 0)          # what is being drawn, before it is
 CAUTION = (255, 150, 40)
 TIME_OK = (120, 220, 120)
@@ -757,13 +773,14 @@ def run(path, picture=None, machine=None, scale=3, trace=None):
         if found:
             image = traced(found)
             if isinstance(image, Exception):
-                viewer.error = f"{os.path.basename(found)} will not read: {image}"
+                viewer.error = _("{image} will not read: {error}",
+                                 image=os.path.basename(found), error=image)
             else:
                 image[0].set_alpha(round(viewer.trace_alpha * 255))
                 screen.blit(image[0], image[1])
         # the points that can be dragged, and what is being drawn
         if viewer.tool == SELECT:
-            for _, _, point in viewer.handles():
+            for _step, _which, point in viewer.handles():
                 x, y = on_screen(point)
                 pygame.draw.rect(screen, HANDLE, (x - 3, y - 3, 7, 7), 1)
         if viewer.dragging and pointer:
@@ -788,9 +805,9 @@ def run(path, picture=None, machine=None, scale=3, trace=None):
             y += line
         tool = viewer.tool if viewer.tool == SELECT else viewer.tool.lower()
         what = SECOND[viewer.tool] if viewer.pending else WHAT_NEXT[viewer.tool]
-        doing = (f"write an order: {typing}_" if typing is not None else
-                 f"{tool}: {what}"
-                 + ("  (snapping to cells)" if viewer.snap else ""))
+        doing = (_("write an order: {typing}_", typing=typing)
+                 if typing is not None else f"{tool}: {_(what)}"
+                 + (_("  (snapping to cells)") if viewer.snap else ""))
         screen.blit(font.render(doing, True, RUBBER), (6, y))
         y += line
         screen.blit(font.render(viewer.trace_said(), True, HANDLE), (6, y))
@@ -801,7 +818,8 @@ def run(path, picture=None, machine=None, scale=3, trace=None):
                 if step is not None and step == viewer.steps.count - 1]
         many = sum(1 for step, _ in said if step is not None)
         whole = [what for step, what in said if step is None]
-        summary = (f"cautions: {many}" + ("  (n goes to the next)" if many else "")
+        summary = (_("cautions: {many}", many=many)
+                   + (_("  (n goes to the next)") if many else "")
                    + ("  |  " + whole[0] if whole else ""))
         screen.blit(font.render(summary, True, (230, 230, 230)), (6, y))
         y += line
@@ -816,7 +834,7 @@ def run(path, picture=None, machine=None, scale=3, trace=None):
             screen.blit(font.render(viewer.error, True, (255, 90, 90)), (6, y))
         y += line
         for text in KEYS_HELP:
-            screen.blit(font.render(text, True, (140, 140, 140)), (6, y))
+            screen.blit(font.render(_(text), True, (140, 140, 140)), (6, y))
             y += line
         pygame.display.flip()
 
