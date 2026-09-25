@@ -4390,7 +4390,10 @@ pide lo que queda a la vista de la sala; se ha pasado dos veces seguidas.
   de su arranque (`boot_source`) y `make` lo ensambla. Y para que no vuelva a
   pasar con otra cosa, `test_a_clean_checkout_builds_every_machine` copia lo
   que hay en git --y sjasmplus, que no está-- a otra carpeta y construye ahí
-  las nueve; se ha visto fallar sin el arreglo.
+  las nueve; se ha visto fallar sin el arreglo. **Decidido por el usuario**: el arreglo
+  sale como 0.2.1, porque el flujo construye desde la etiqueta y la v0.2.0 no
+  lo tiene; la v0.2.0 queda como etiqueta sin página de release. La v0.2.1 se
+  construyó sola al subir su etiqueta: release con `faro-v0.2.1.zip`, 76 KB.
 
 **La CI se simuló aquí antes de subirla**, y encontró tres fallos que ya
 estaban y que en esta máquina no se veían, porque aquí están `tools/` y
