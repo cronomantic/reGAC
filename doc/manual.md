@@ -393,6 +393,22 @@ el número de la lámina (`12.png`, `12.jpg`), que cambia sola al pasar de
 lámina. La imagen se hace tan grande como quepa **sin deformarse**, y se
 centra. `t` la esconde y la enseña, y `+` y `-` dejan ver más o menos de ella.
 
+Mientras se dibuja, la ventana **avisa**:
+
+- de un relleno que **se escapa** por un hueco o un pasillo de un píxel de
+  alto, que en GAC sale como un rayo de una fila hasta lo siguiente que lo
+  pare;
+- de un relleno que **no rellena nada**, porque su semilla cae en un píxel ya
+  pintado;
+- y de **cuántos bytes** ocupa la lámina y todas juntas.
+
+`n` lleva el cursor a la siguiente orden de la que hay algo que decir. Y `c`
+**mide cuánto tarda la lámina en dibujarse** en la máquina que se mira —el
+Spectrum, el CPC o el MSX—, con el intérprete de verdad en el emulador, en
+segundos de la máquina real, contra el tope de 4 o 5: tarda lo que tarda en
+arrancar el emulador, unos quince segundos, y necesita `tools/`, como las
+pruebas.
+
 ### `/FONT` — la tipografía
 
 Entera, con `file`, o letra a letra.

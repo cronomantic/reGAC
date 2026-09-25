@@ -4283,8 +4283,9 @@ medio dibujar. **Sin ver en una pantalla de verdad**: todo se ha probado con
 el controlador de vídeo `dummy` de SDL.
 
 Lo que quedaba propuesto de la herramienta: ~~el calco sobre una imagen de
-fondo~~ (hecho: ver abajo), los avisos mientras se dibuja --fugas de un
-relleno, bytes, tiempo contra el tope de 4-5 s-- e importar SVG.
+fondo~~ (hecho: ver abajo), ~~los avisos mientras se dibuja --fugas de un
+relleno, bytes, tiempo contra el tope de 4-5 s--~~ (hechos: ver abajo) e
+importar SVG.
 
 ### El calco
 
@@ -4303,6 +4304,38 @@ de un píxel: con la imagen roja encima está a medio camino entre el rojo y lo
 de debajo, escondida es lo de debajo, con `+` es más rojo, y fuera de la
 imagen centrada no cambia nada. Vista en una captura, la lámina 5 del faro
 calcada sobre la 2.
+
+### Los avisos, y el tiempo medido
+
+En `regac/cautions.py`, sin ventana, y en el visor debajo de la lámina:
+
+- **Un relleno que se escapa.** Se busca la forma que tiene en GAC: el
+  relleno recorre la columna de su semilla y tiende una fila en cada altura,
+  así que por un hueco de un píxel sale **una sola fila**, que sobresale de
+  la de arriba y la de abajo. Lo que se mira es eso, una fila que va al menos
+  ocho píxeles más allá, por el mismo lado, que sus dos vecinas. Para saber
+  hasta dónde llega cada fila, el dispositivo se envuelve y, antes de tender
+  cada una, se mira hasta dónde podría llegar. Visto en dos de MegaCorp: son
+  de verdad, pasillos de una fila por los que el relleno cruza la lámina, y
+  el original los hace igual, porque el renderer es fiel.
+- **Un relleno que no hace nada**, con la semilla en un píxel ya puesto.
+  MegaCorp los tiene a docenas: el mismo `FILL` repetido.
+- **Los bytes** de la lámina y de todas: dos de largo, uno por orden y uno por
+  número, dos el de `CALL`, y cuatro en el índice.
+- **El tiempo: decidido por el usuario, medido y no estimado.** `c` manda la
+  lámina a la construcción de cada máquina que dibuja una lámina y para,
+  `test_picture.asm`, en ZEsarUX, y cuenta los ciclos del Z80, como las
+  pruebas lentas: en `regac/measure.py`, que usa `tests/emulator.py` desde
+  donde está. Spectrum, CPC y MSX, que son las que tienen esa construcción.
+  Tarda entre 13 y 18 s de reloj, así que va en un hilo aparte y la ventana
+  sigue. Dice si la medida es de antes del último cambio. La lámina 1 de
+  MegaCorp: 2,30 s en el Spectrum, 2,22 en el CPC y 2,16 en el MSX.
+
+Pruebas en `tests/test_cautions.py`: una caja con un agujero de un píxel en
+la pared se escapa y dice por dónde, sin el agujero no dice nada, una semilla
+en la pared no rellena, una pared inclinada no es un rayo, el faro no dice nada
+más que sus bytes, `n` lleva al relleno, y la primera lámina del faro medida
+en el Spectrum de verdad, dentro del tope.
 
 ## Las elipses del faro, y lo que `gac.md` decía de ellas
 

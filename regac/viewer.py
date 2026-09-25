@@ -218,6 +218,9 @@ class Viewer:
         self.dragging = None            # (step, which point) being dragged
         self.snap = False               # points to the corners of cells
         self.taken_back = []            # (before, after) of every edit
+        self.said = None                # the cautions, worked out once a picture
+        self.measuring = None           # (picture, machine) being timed
+        self.measured = None            # (picture, machine, seconds or why, stamp)
         self.reload()
         if self.ddb is None:
             raise ValueError(self.error)
@@ -281,6 +284,7 @@ class Viewer:
 
     def show(self, count=None):
         """The picture on the machine, drawn to that order, or whole."""
+        self.said = None
         self.steps = Steps(self.ddb, self.picture, self.machine)
         self.steps.go(len(self.steps.steps) if count is None else count)
 
@@ -467,6 +471,75 @@ class Viewer:
         self.pending = None
         self.dragging = None
 
+    # -- cautions and the time -----------------------------------------------
+
+    def cautions(self):
+        """What is worth saying about the picture: see cautions.py."""
+        if self.said is None:
+            from .cautions import cautions
+
+            self.said = cautions(self.ddb, self.picture, self.machine)
+        return self.said
+
+    def next_caution(self):
+        """The cursor on the next order that has something said about it."""
+        steps = sorted({step for step, _ in self.cautions() if step is not None})
+        if not steps:
+            return
+        later = [step for step in steps if step >= self.steps.count]
+        self.steps.go((later or steps)[0] + 1)
+
+    def start_measuring(self, threaded=True):
+        """Time the picture on the machine, in the emulator: see measure.py."""
+        from .measure import measure, why_not
+
+        wrong = why_not(self.machine)
+        if wrong:
+            self.error = wrong
+            return
+        if self.measuring:
+            return
+        asked = (self.picture, self.machine)
+        ddb, stamp = json.loads(json.dumps(self.ddb)), self.stamp
+        self.measuring = asked
+
+        def work():
+            try:
+                seconds = measure(ddb, asked[0], asked[1])
+            except Exception as e:      # the emulator's, whatever it was
+                seconds = f"it could not be measured: {e}"
+            self.measured = (asked[0], asked[1], seconds, stamp)
+            self.measuring = None
+
+        if threaded:
+            import threading
+
+            threading.Thread(target=work, daemon=True).start()
+        else:
+            work()
+
+    def time_said(self):
+        """What the last measure said, and how it stands against the budget:
+        (text, how bad), how bad being 0 fine, 1 slow and 2 too slow."""
+        from .measure import SLOW, TOO_SLOW
+
+        if self.measuring:
+            picture, machine = self.measuring
+            return f"time: measuring #{picture} on {machine}...", 0
+        if not self.measured:
+            return "time: c measures it on the machine", 0
+        picture, machine, seconds, stamp = self.measured
+        if isinstance(seconds, str):
+            return f"time: #{picture} on {machine}: {seconds}", 2
+        if seconds is None:
+            return f"time: #{picture} on {machine} never finished", 2
+        old = "  (before the last change)" if stamp != self.stamp else ""
+        bad = 2 if seconds > TOO_SLOW else 1 if seconds > SLOW else 0
+        verdict = ("more than a player will wait" if bad == 2 else
+                   "slow" if bad == 1 else "within the budget")
+        return (f"time: #{picture} on {machine}, {seconds:.2f} s -- "
+                f"{verdict}{old}"), bad
+
     # -- tracing ------------------------------------------------------------
     #
     # An image laid over the picture, half seen through, to draw on top of:
@@ -526,6 +599,8 @@ KEYS_HELP = (
     "v move points",
     "g snap to cells  del take out  enter write an order  ctrl-z undo  "
     "right button or esc: let go",
+    "n the next caution  c time it on the machine  t trace  +/- more or "
+    "less of it",
 )
 TOOL_KEYS = {"l": "LINE", "r": "RECT", "e": "ELLIPSE", "p": "PLOT",
              "f": "FILL", "b": "BGFILL", "s": "SHADE", "v": SELECT}
@@ -538,6 +613,8 @@ WHAT_NEXT = {SELECT: "drag a point to move it",
 SECOND = {"LINE": "click the other end", "RECT": "click the other corner",
           "ELLIPSE": "click how far it reaches"}
 RUBBER = (255, 220, 0)          # what is being drawn, before it is
+CAUTION = (255, 150, 40)
+TIME_OK = (120, 220, 120)
 HANDLE = (0, 200, 255)
 
 
@@ -551,7 +628,7 @@ def run(path, picture=None, machine=None, scale=3, trace=None):
     width, height = SOURCE_WIDTH * scale, SOURCE_ROWS * scale
     font = pygame.font.Font(None, 22)
     line = font.get_linesize()
-    panel = line * 11 + 8
+    panel = line * 14 + 8
     screen = pygame.display.set_mode((width, height + panel))
     pygame.display.set_caption(f"regac draw {os.path.basename(path)}")
     clock = pygame.time.Clock()
@@ -646,6 +723,10 @@ def run(path, picture=None, machine=None, scale=3, trace=None):
                     viewer.snap = not viewer.snap
                 elif key == pygame.K_t:
                     viewer.trace_on = not viewer.trace_on
+                elif key == pygame.K_n:
+                    viewer.next_caution()
+                elif key == pygame.K_c:
+                    viewer.start_measuring()
                 elif key in (pygame.K_PLUS, pygame.K_KP_PLUS, pygame.K_EQUALS):
                     viewer.stronger_trace(0.1)
                 elif key in (pygame.K_MINUS, pygame.K_KP_MINUS):
@@ -664,7 +745,7 @@ def run(path, picture=None, machine=None, scale=3, trace=None):
         state = (viewer.steps, viewer.steps.count, viewer.highlight, pointer,
                  viewer.error, viewer.tool, viewer.pending, viewer.dragging,
                  viewer.snap, typing, viewer.picture, viewer.trace_on,
-                 viewer.trace_alpha)
+                 viewer.trace_alpha, viewer.measuring, viewer.measured)
         if state == drawn:
             continue
         drawn = state
@@ -713,6 +794,23 @@ def run(path, picture=None, machine=None, scale=3, trace=None):
         screen.blit(font.render(doing, True, RUBBER), (6, y))
         y += line
         screen.blit(font.render(viewer.trace_said(), True, HANDLE), (6, y))
+        y += line
+        # the cautions: how many, and the one about the order at the cursor
+        said = viewer.cautions()
+        here = [what for step, what in said
+                if step is not None and step == viewer.steps.count - 1]
+        many = sum(1 for step, _ in said if step is not None)
+        whole = [what for step, what in said if step is None]
+        summary = (f"cautions: {many}" + ("  (n goes to the next)" if many else "")
+                   + ("  |  " + whole[0] if whole else ""))
+        screen.blit(font.render(summary, True, (230, 230, 230)), (6, y))
+        y += line
+        if here:
+            screen.blit(font.render(here[0], True, CAUTION), (6, y))
+        y += line
+        text, bad = viewer.time_said()
+        screen.blit(font.render(text, True, (TIME_OK, CAUTION, (255, 90, 90))[bad]),
+                    (6, y))
         y += line
         if viewer.error:
             screen.blit(font.render(viewer.error, True, (255, 90, 90)), (6, y))

@@ -67,7 +67,9 @@ GROUPS = {
         "test_wrapping_z80",
     ],
     "spectrum-conditions": ["test_conditions_z80", "test_ink_z80"],
-    "spectrum-picture": ["test_all_pictures", "test_graphics_z80"],
+    "spectrum-picture": ["test_all_pictures", "test_graphics_z80",
+                         # regac draw times a picture with the same build
+                         "test_cautions"],
     "spectrum-parser": ["test_parser_z80"],
     "spectrum-beep": ["test_beep_z80"],
     # the three machines that have a chip as well as a speaker, all built the
