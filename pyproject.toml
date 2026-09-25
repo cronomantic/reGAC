@@ -1,6 +1,6 @@
 [project]
 name = "regac"
-version = "0.2.0"
+version = "0.2.1"
 description = "GAC interpreter"
 authors = [
     {name = "Cronomantic",email = "cronomantic@gmail.com"}

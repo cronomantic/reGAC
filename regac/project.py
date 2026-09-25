@@ -68,7 +68,7 @@ class Target:
     def __init__(self, machine, folder, source, database, banks="none",
                  defs=None, media=(), release=None, binary=None, boot=None,
                  screen_bytes=0, screen_when="release", scales=(1,),
-                 assembler="sjasmplus"):
+                 assembler="sjasmplus", boot_source=None):
         self.machine = machine          # what regac build calls it
         self.folder = folder            # where its interpreter lives
         self.source = source            # and which file of it to assemble
@@ -79,6 +79,11 @@ class Target:
         self.release = release          # or the machine regac release knows
         self.binary = binary            # what it puts on the medium
         self.boot = boot                # and the loader that goes in front
+        # the source of that loader, when it is a file of its own that the
+        # interpreter's assembly does not write: the PCW's.  A clean checkout
+        # has no boot.bin, and make read one only because the tests had left
+        # it behind -- found by the release built on GitHub.
+        self.boot_source = boot_source
         self.screen_bytes = screen_bytes
         self.screen_when = screen_when  # "assembly" or "release"
         self.scales = scales            # the widths a picture may be drawn at
@@ -146,6 +151,7 @@ TARGETS = {
         machine="pcw", folder=PCW, source="game.asm", database="game.rgac",
         banks="16k", defs="banks.inc",
         release="pcw", binary="game_code.bin", boot="boot.bin",
+        boot_source="boot.asm",
         screen_bytes=2 * 16 * 720, scales=(1, 2),
     ),
     # A PC with a CGA, which is 8086 and not Z80: NASM makes a flat image with
@@ -238,16 +244,23 @@ def assemble(target, root, defines=()):
     folder = os.path.join(root, target.folder)
     if target.assembler == "nasm":
         return assemble_nasm(target, folder, defines)
-    listing = os.path.splitext(target.source)[0] + ".lst"
+    if target.boot_source:
+        sjasmplus(folder, target.boot_source)
+    return sjasmplus(folder, target.source, defines)
+
+
+def sjasmplus(folder, source, defines=()):
+    """Assemble one file where it sits; the listing it wrote."""
+    listing = os.path.splitext(source)[0] + ".lst"
     result = subprocess.run(
         [find_assembler(), f"--lst={listing}"]
         + [f"-D{name}" for name in defines]
-        + [target.source],
+        + [source],
         cwd=folder, capture_output=True, text=True,
     )
     if result.returncode != 0:
         raise ProjectError(
-            f"{target.source} did not assemble:\n{result.stdout}\n{result.stderr}"
+            f"{source} did not assemble:\n{result.stdout}\n{result.stderr}"
         )
     return os.path.join(folder, listing)
 

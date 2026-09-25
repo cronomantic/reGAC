@@ -35,6 +35,7 @@ real Spectrum.
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -203,3 +204,26 @@ if __name__ == "__main__":
     print("every machine it names comes out")
     test_it_can_be_played_to_the_end(folder)
     print("it can be played to the end")
+
+
+@needs_assemblers
+def test_a_clean_checkout_builds_every_machine(tmp_path):
+    """From what is in git and nothing else, as on GitHub: a build that
+    only worked here because the tests had left something behind in the
+    tree is a build that does not work.  The PCW's loader was one, and the
+    release built on GitHub found it."""
+    listed = subprocess.run(["git", "ls-files"], cwd=ROOT, check=True,
+                            capture_output=True, text=True).stdout.split("\n")
+    clean = tmp_path / "reGAC"
+    for name in filter(None, listed):
+        target = clean / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(os.path.join(ROOT, name), target)
+    # the assembler, where the tests keep it: it is not in git
+    (clean / "tools").mkdir()
+    shutil.copyfile(emulator.find_sjasmplus(), clean / "tools" / "sjasmplus.exe")
+    where = str(tmp_path / "salida")
+    subprocess.run([sys.executable, "-m", "regac", "make",
+                    str(clean / "ejemplo" / "faro.toml"), "--output", where],
+                   cwd=str(clean), check=True, capture_output=True, text=True)
+    assert len(os.listdir(where)) == 9, os.listdir(where)

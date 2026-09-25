@@ -4383,6 +4383,15 @@ pide lo que queda a la vista de la sala; se ha pasado dos veces seguidas.
   nada de esto usa; construye el faro con ese mismo `--zip` y lo adjunta a la
   release de la etiqueta, que crea si no la hay.
 
+  **Su primera vuelta encontró un fallo de `make`**: en el PCW leía
+  `z80/pcw/boot.bin` y nunca lo ensamblaba. Aquí funcionaba porque las pruebas
+  del PCW lo dejan hecho, y el árbol de trabajo nunca está limpio; en GitHub,
+  que parte de lo que hay en git, no estaba. Ahora el destino dice el fuente
+  de su arranque (`boot_source`) y `make` lo ensambla. Y para que no vuelva a
+  pasar con otra cosa, `test_a_clean_checkout_builds_every_machine` copia lo
+  que hay en git --y sjasmplus, que no está-- a otra carpeta y construye ahí
+  las nueve; se ha visto fallar sin el arreglo.
+
 **La CI se simuló aquí antes de subirla**, y encontró tres fallos que ya
 estaban y que en esta máquina no se veían, porque aquí están `tools/` y
 `snapshots/`: lo que va al repositorio se copió a una carpeta aparte y se
