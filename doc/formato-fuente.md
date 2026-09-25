@@ -410,7 +410,7 @@ Se puede nombrar la máquina y la familia a la que pertenece:
 | `amstrad` | `cpc`, `pcw` |
 | `msx` | `msx`, `msx2` |
 
-y sueltas quedan `next` y `sam`. Un nombre que no exista es un error y se dice:
+y sueltas quedan `next`, `pc` y `sam`. Un nombre que no exista es un error y se dice:
 una errata que se lleve por delante media aventura en silencio es lo peor que
 podría pasar aquí. Lo mismo un `.if` sin cerrar, un `.else` suelto o un `.if`
 sin máquinas.

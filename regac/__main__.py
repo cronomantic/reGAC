@@ -466,6 +466,7 @@ def cmd_make(args):
     # interpreters sit where reGAC itself is installed.
     tree = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     wanted = args.target or sorted(project["targets"])
+    everything = []
     for which in wanted:
         settings = project["targets"].get(which)
         if settings is None:
@@ -492,6 +493,16 @@ def cmd_make(args):
             sys.exit(f"ERROR: {which}: {e}")
         print(f"{which:12} -> " + ", ".join(
             os.path.relpath(path, output) for path in written))
+        everything += written
+    if args.zip:
+        # What was built, a folder a machine as it is on the disk, in one
+        # file to hand out: a release, for one.
+        import zipfile
+
+        with zipfile.ZipFile(args.zip, "w", zipfile.ZIP_DEFLATED) as bundle:
+            for path in everything:
+                bundle.write(path, os.path.relpath(path, output))
+        print(f"{'':12} -> {args.zip}")
 
 
 def make_noises(ddb, where_regac_is):
@@ -738,6 +749,8 @@ def main():
                                           "the project says")
     p.add_argument("-t", "--target", action="append",
                    help="only this machine, and again for more than one")
+    p.add_argument("--zip", help="and everything it built in this zip file, "
+                                 "a folder a machine")
     p.set_defaults(func=cmd_make)
 
     p = sub.add_parser("text", help="report what the text costs once packed")

@@ -15,6 +15,12 @@ dependencies = [
     "pygame-ce (>=2.5.8,<3.0.0)",
 ]
 
+# `regac` as a command, the same as `python -m regac`.  It is installed from
+# the checkout itself (`poetry install`, or `pip install -e .`), because the
+# interpreters it builds with are the folders beside it, z80/ and x86/.
+[project.scripts]
+regac = "regac.__main__:main"
+
 [project.optional-dependencies]
 dev = [
     "pytest (>=8.0)",

@@ -90,9 +90,11 @@ def a_game():
     """The interpreter with an adventure in it, part way through a game: the
     state moved off every one of its starting values, so that a save that
     quietly missed one of them would show."""
-    with open(os.path.join(ROOT, "snapshots", "megacorp1.json"),
-              encoding="utf-8") as f:
-        ddb = json.load(f)
+    # The example, which is in the repository: it was MegaCorp, which is
+    # not, and these failed wherever the originals are not.
+    from regac.viewer import read_adventure
+
+    ddb = read_adventure(os.path.join(ROOT, "ejemplo", "faro.gac"), "spectrum")
     game = interpreter()(ddb)
     game.start_adventure()
     game.current_loc = 7

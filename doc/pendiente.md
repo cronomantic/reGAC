@@ -4133,19 +4133,22 @@ cambia lo que hacen las máquinas:
    pueden coger, palabras y mensajes que no usa nadie), `regac play` con un
    guion que dice si la aventura se gana, y el resaltado de sintaxis de
    `.gac` para VS Code.
-5. **La distribución**: una orden `regac` instalable (`[project.scripts]`,
+5. ~~**La distribución**: una orden `regac` instalable (`[project.scripts]`,
    que `pyproject.toml` no tiene), CI en GitHub Actions con las pruebas que no
    piden emulador, y el faro construido para las nueve máquinas adjunto a la
-   release.
+   release.~~ Hecho: ver «La distribución», abajo.
 
 Y dos cosas vistas por el camino, sin hacer:
 
-- **`.if pc` no existe.** `MACHINE_LABELS`, en `regac/srcparse.py`, no tiene
+- ~~**`.if pc` no existe.** `MACHINE_LABELS`, en `regac/srcparse.py`, no tiene
   el PC: un fuente que lo nombra da «there is no machine called 'pc'», y la
   construcción del PC lee el fuente sin etiqueta ninguna, así que de un `.if`
   sólo le llega el `.else`. Añadirlo no cambia ningún fuente que hoy se lea,
-  porque hoy nombrarlo es un error; pero es cosa de decidir.
-- **`doc/gac.md` dice «ocho máquinas»** en sus secciones 8 y 10, y son nueve.
+  porque hoy nombrarlo es un error; pero es cosa de decidir.~~ **Decidido por
+  el usuario, y hecho**: `pc` es una etiqueta suelta, como `next`. Prueba en
+  `test_conditional.py`.
+- ~~**`doc/gac.md` dice «ocho máquinas»** en sus secciones 8 y 10, y son
+  nueve.~~ Corregido.
 
 ## `DO` y `/PROC`
 
@@ -4194,6 +4197,40 @@ que se llama a sí misma y sale ocho veces exactas, un `DO` a una tabla que no
 hay, y la pila conservada. Se han visto fallar las del Z80 quitando el `ret`
 de después del `vm_done` y quitando la subida de la base, y la del PC quitando
 el suyo.
+
+## La distribución
+
+- **`regac` como orden**: `[project.scripts]` en `pyproject.toml`, y se instala
+  desde el repositorio (`poetry install` o `pip install -e .`), apuntando a él
+  y no copiándolo, porque `make` construye con `z80/` y `x86/`, que están al
+  lado del paquete. Por eso no va a PyPI. Probado con `poetry install
+  --only-root`: `regac -h` responde desde otra carpeta.
+- **CI**: `.github/workflows/tests.yml`, en Ubuntu con Python 3.11 y el último,
+  las pruebas `not serial`. Sin `tools/` ni `snapshots/`, que no están en el
+  repositorio, las que piden emulador o las aventuras originales se saltan
+  solas.
+- **La release**: **decidido por el usuario**, un script local y no un flujo
+  de GitHub. Es `regac make proyecto.toml --zip faro.zip`: lo construido, una
+  carpeta por máquina, en un zip para subirlo a mano. Lo mira
+  `test_every_machine_it_names_comes_out`.
+
+**La CI se simuló aquí antes de subirla**, y encontró tres fallos que ya
+estaban y que en esta máquina no se veían, porque aquí están `tools/` y
+`snapshots/`: lo que va al repositorio se copió a una carpeta aparte y se
+pasaron las pruebas con un PATH sin NASM ni DOSBox-X. Salían 32 fallos:
+
+- `test_latin.py` sacaba la fuente de la que construye las letras con marca
+  de `snapshots/megacorp2.json`, en 29 pruebas que no tienen nada que ver con
+  MegaCorp. Ahora usa la del faro, que está en el repositorio; las 34 siguen
+  pasando.
+- `test_interpreter.py` guardaba y cargaba una partida de MegaCorp; ahora del
+  faro, que tiene cuatro objetos.
+- `test_every_machine_it_names_comes_out` construía sin mirar si había
+  ensambladores; ahora se salta sin sjasmplus o sin NASM.
+
+Con eso, la simulación da 181 pasadas y 302 saltadas. **Lo que no se ha
+podido probar** es Linux ni Python 3.11, que aquí no hay: lo dirá la primera
+vuelta de verdad en GitHub.
 
 ## Los huecos del texto
 

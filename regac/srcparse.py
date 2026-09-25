@@ -182,6 +182,9 @@ MACHINE_LABELS = {
     "msx2": ("msx2", "msx"),
     "next": ("next",),
     "sam": ("sam",),
+    # The PC, which was built reading its source with no name at all, so
+    # that a `.if` gave it only its `.else` and nothing could be kept for it.
+    "pc": ("pc",),
 }
 EVERY_LABEL = {label for labels in MACHINE_LABELS.values() for label in labels}
 

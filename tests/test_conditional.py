@@ -104,6 +104,16 @@ def test_the_text_a_machine_gets():
         assert read(machine)["messages"][2] == "Siempre."
 
 
+def test_the_pc_has_a_name_of_its_own():
+    """It had none: the PC's build read its source with no name, so a `.if`
+    gave it only its `.else`, and `.if pc` was a mistake."""
+    source = SOURCE.replace(".if cpc msx", ".if pc")
+    assert parse(source, "test.gac", machine="pc")["messages"][1] == (
+        "Un ruido seco y nada mas.")
+    assert parse(source, "test.gac", machine="cpc")["messages"][1] == (
+        "Un ruido seco y la pantalla parpadea.")
+
+
 def test_a_family_takes_in_its_machines():
     """`amstrad` is the CPC and the PCW, `spectrum` the three Sinclairs: a
     line for a family is a line for each of them and for nobody else."""

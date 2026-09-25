@@ -91,9 +91,13 @@ else:
 
 
 def a_font():
-    """A font to build the letters out of: the one Megacorp carries."""
-    with open(ADVENTURE, encoding="utf-8") as f:
-        return json.load(f)["font"]
+    """A font to build the letters out of: the example's, which is in the
+    repository.  It was MegaCorp's, which is not, and every test here that
+    has nothing to do with MegaCorp failed where the originals are not."""
+    from regac.viewer import read_adventure
+
+    return read_adventure(os.path.join(ROOT, "ejemplo", "faro.gac"),
+                          "spectrum")["font"]
 
 
 def adventure(messages, nouns=None):

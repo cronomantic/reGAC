@@ -335,7 +335,7 @@ Del 240 al 255 los dice el intérprete por su cuenta. Escríbelos todos:
 ## 8. Las láminas
 
 No son mapas de bits: son **listas de órdenes de dibujo**. Por eso una
-aventura entera cabe en una cinta y por eso la misma lámina sale en ocho
+aventura entera cabe en una cinta y por eso la misma lámina sale en nueve
 máquinas distintas.
 
 ### El lienzo
@@ -414,7 +414,7 @@ está encima y no cambia lo de debajo:
 - **tablas propias**, con `/PROC` y `DO`;
 - **huecos en el texto**, `\ctr n`, `\obj n` y `\turns`, que escriben un
   contador, el nombre de un objeto o los turnos donde están;
-- **ocho máquinas**;
+- **nueve máquinas**;
 - **un fuente de texto** que se guarda en un control de versiones, en lugar de
   teclear la aventura dentro de la máquina.
 

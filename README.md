@@ -42,6 +42,11 @@ order and why. It is not reference material.
 * x86: The PC's interpreter, in 8086 assembler for NASM. `regac make` puts it
   and the adventure together in one DOS .EXE named after the project.
 
+`poetry install` (or `pip install -e .`) in the checkout makes `regac` a
+command of its own, the same as `python -m regac` from anywhere; it is
+installed pointing at the checkout, because the interpreters it builds with
+are the folders beside it.
+
 What has to be installed besides Python -- sjasmplus for the Z80 machines,
 NASM for the PC, and ZEsarUX and DOSBox-X only to run the tests -- is in
 [doc/manual.md](doc/manual.md).
@@ -55,6 +60,7 @@ python -m regac draw      game.gac  12 -m cpc
 python -m regac checkgfx  game.json -m cpc
 python -m regac text      game.json
 python -m regac make      game.toml
+python -m regac make      game.toml --zip game.zip
 python -m regac build     game.json game.rgac -m spectrum128 -b 16k
 python -m regac build     game.json game.rgac -m pc -b 64k
 python -m regac release   game.bin  release/ -m cpc

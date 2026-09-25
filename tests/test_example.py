@@ -75,12 +75,17 @@ if pytest is not None:
     needs_dosbox = pytest.mark.skipif(
         not dosbox.available(), reason="NASM and DOSBox-X must be on the path"
     )
+    # What building every machine takes, and no emulator: the two assemblers.
+    needs_assemblers = pytest.mark.skipif(
+        not (emulator.find_sjasmplus() and dosbox.find_nasm()),
+        reason="sjasmplus must be in tools/ and NASM on the path",
+    )
 else:
 
     def needs_tools(func):
         return func
 
-    needs_dosbox = needs_tools
+    needs_dosbox = needs_assemblers = needs_tools
 
 
 def regac(*words):
@@ -111,11 +116,13 @@ def test_it_compiles_and_says_nothing_is_missing(tmp_path):
     assert any(b for b in ddb["font"]), "an adventure without a font prints blanks"
 
 
+@needs_assemblers
 def test_every_machine_it_names_comes_out(tmp_path):
     """The project file names nine; a build writes nine media, and not one
-    of them is empty."""
+    of them is empty; and all nine in the zip, as they are on the disk."""
     where = str(tmp_path / "salida")
-    regac("make", PROJECT, "--output", where)
+    bundle = str(tmp_path / "faro.zip")
+    regac("make", PROJECT, "--output", where, "--zip", bundle)
     made = {}
     for folder in sorted(os.listdir(where)):
         for name in os.listdir(os.path.join(where, folder)):
@@ -126,6 +133,12 @@ def test_every_machine_it_names_comes_out(tmp_path):
     # and the Next keeps its game under the project's name
     with open(os.path.join(where, "next", "faro.nex"), "rb") as f:
         assert b"FARO.SAV\0" in f.read(), "the Next's game is not in FARO.SAV"
+    import zipfile
+
+    with zipfile.ZipFile(bundle) as z:
+        zipped = {name.split("/")[0]: z.getinfo(name).file_size
+                  for name in z.namelist()}
+    assert zipped == made, f"the zip holds {zipped}"
 
 
 @needs_tools

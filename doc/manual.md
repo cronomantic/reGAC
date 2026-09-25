@@ -53,6 +53,15 @@ Todo se llama con `python -m regac`, **desde la raíz del proyecto**. Desde otra
 carpeta dirá `No module named regac`; los ficheros que le pases sí pueden
 estar donde quieras.
 
+O se instala como orden, **desde el propio repositorio**, y entonces vale
+`regac` a secas desde cualquier carpeta:
+
+    poetry install          # o bien: pip install -e .
+
+Se instala apuntando al repositorio y no copiándolo, porque los intérpretes
+con los que construye son las carpetas de al lado, `z80/` y `x86/`: por eso no
+está en PyPI.
+
 ---
 
 ## 3. En cinco minutos
@@ -63,7 +72,8 @@ objetos y un enigma, comentada de arriba abajo para leerse como un tutorial.
     python -m regac make ejemplo/faro.toml
 
 Construye las nueve máquinas y las deja en `ejemplo/salida/`, una carpeta por
-destino. Cárgala en el emulador que tengas y ya está jugando.
+destino. Cárgala en el emulador que tengas y ya está jugando. Con `--zip
+faro.zip` las mete además en un zip, igual que en el disco, para repartirlas.
 
 Y para verla sin emulador ninguno:
 
