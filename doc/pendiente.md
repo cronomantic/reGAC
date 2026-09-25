@@ -4269,6 +4269,13 @@ estaba escrito.
 Corregidas las cinco, con los radios que su autor quiso, y `gac.md`. Vistas
 las láminas 1 y 5 antes y después.
 
+Y una prueba que el saludo del faro había dejado torcida:
+`test_it_can_be_played_to_the_end` esperaba ver «sendero» en la pantalla del
+Spectrum al empezar, y la ventana de texto son ocho líneas: con el saludo
+debajo, la primera línea de la sala se sale por arriba. Pasó el día del saludo
+porque miró antes de que se escribiera. Ahora espera al final del saludo y
+pide lo que queda a la vista de la sala; se ha pasado dos veces seguidas.
+
 ## La distribución
 
 - **`regac` como orden**: `[project.scripts]` en `pyproject.toml`, y se instala

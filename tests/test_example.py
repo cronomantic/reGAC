@@ -155,8 +155,13 @@ def test_it_can_be_played_to_the_end(tmp_path):
     session = emulator.Session()
     try:
         session.load(SNAPSHOT)
-        opening = wait_screen(session, glyphs, "sendero", timeout=60.0)
-        assert any("sendero" in line for line in opening), (
+        # The greeting comes after the room, and the window is eight lines:
+        # by the time it is over the first line of the room has gone up out
+        # of it, and what is still there of the room is its end.  Looking
+        # for its first word passed only when the look came before the
+        # greeting did.
+        opening = wait_screen(session, glyphs, "empezar", timeout=60.0)
+        assert any("tojos" in line for line in opening), (
             f"it never described where it starts: {opening}"
         )
         for order in WALKTHROUGH:
