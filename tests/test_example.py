@@ -193,6 +193,51 @@ def test_it_can_be_played_to_the_end_on_a_pc(tmp_path):
     assert won in said, f"the lamp was never lit: {said}"
 
 
+
+def released():
+    """What the release of the tool carries: the paths .github/release-files
+    lists, as git has them."""
+    with open(os.path.join(ROOT, ".github", "release-files"),
+              encoding="utf-8") as f:
+        wanted = [line.strip() for line in f
+                  if line.strip() and not line.startswith("#")]
+    listed = subprocess.run(["git", "ls-files", "--"] + wanted, cwd=ROOT,
+                            check=True, capture_output=True, text=True)
+    return wanted, [name for name in listed.stdout.splitlines() if name]
+
+
+def test_the_release_carries_what_a_person_needs():
+    """Every path it lists is in git, and the tests and the diary are not
+    carried but for the driver of the emulator."""
+    wanted, carried = released()
+    for path in wanted:
+        assert any(name == path or name.startswith(path + "/")
+                   for name in carried), f"{path} is not in git"
+    assert "doc/pendiente.md" not in carried
+    assert [n for n in carried if n.startswith("tests/")] == ["tests/emulator.py"]
+
+
+@needs_assemblers
+def test_the_release_builds_every_machine(tmp_path):
+    """From what the release carries and nothing else, as it is on GitHub: a
+    build that only worked here because the tests had left something behind
+    in the tree is a build that does not work.  The PCW's loader was one, and
+    the release built on GitHub found it."""
+    clean = tmp_path / "reGAC"
+    for name in released()[1]:
+        target = clean / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(os.path.join(ROOT, name), target)
+    # the assembler, where the tests keep it: it is not in git
+    (clean / "tools").mkdir()
+    shutil.copyfile(emulator.find_sjasmplus(), clean / "tools" / "sjasmplus.exe")
+    where = str(tmp_path / "salida")
+    subprocess.run([sys.executable, "-m", "regac", "make",
+                    str(clean / "ejemplo" / "faro.toml"), "--output", where],
+                   cwd=str(clean), check=True, capture_output=True, text=True)
+    assert len(os.listdir(where)) == 9, os.listdir(where)
+
+
 if __name__ == "__main__":
     import pathlib
     import tempfile
@@ -205,25 +250,3 @@ if __name__ == "__main__":
     test_it_can_be_played_to_the_end(folder)
     print("it can be played to the end")
 
-
-@needs_assemblers
-def test_a_clean_checkout_builds_every_machine(tmp_path):
-    """From what is in git and nothing else, as on GitHub: a build that
-    only worked here because the tests had left something behind in the
-    tree is a build that does not work.  The PCW's loader was one, and the
-    release built on GitHub found it."""
-    listed = subprocess.run(["git", "ls-files"], cwd=ROOT, check=True,
-                            capture_output=True, text=True).stdout.split("\n")
-    clean = tmp_path / "reGAC"
-    for name in filter(None, listed):
-        target = clean / name
-        target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(os.path.join(ROOT, name), target)
-    # the assembler, where the tests keep it: it is not in git
-    (clean / "tools").mkdir()
-    shutil.copyfile(emulator.find_sjasmplus(), clean / "tools" / "sjasmplus.exe")
-    where = str(tmp_path / "salida")
-    subprocess.run([sys.executable, "-m", "regac", "make",
-                    str(clean / "ejemplo" / "faro.toml"), "--output", where],
-                   cwd=str(clean), check=True, capture_output=True, text=True)
-    assert len(os.listdir(where)) == 9, os.listdir(where)

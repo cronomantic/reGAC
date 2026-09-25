@@ -1,5 +1,6 @@
-# A release for every tag: the example adventure built for the nine machines,
-# in a zip, attached to the release of the tag.
+# A release for every tag, with two zips attached: the tool itself, ready to
+# use -- what .github/release-files lists, as git has it at the tag -- and the
+# example adventure built for the nine machines.
 #
 # What building takes is the two assemblers and nothing else -- no emulator:
 # NASM from the distribution, and sjasmplus built from its own repository at
@@ -54,12 +55,18 @@ jobs:
           sjasmplus --version || true
           nasm -v
           python -m regac make ejemplo/faro.toml --output "$RUNNER_TEMP/salida" \
-            --zip "faro-$TAG.zip"
+            --zip "example-faro-$TAG.zip"
+      - name: The tool
+        run: |
+          paths=$(grep -v '^#' .github/release-files | grep -v '^$')
+          git archive --format=zip --prefix="regac-$TAG/" \
+            -o "regac-$TAG.zip" HEAD $paths
       - name: The release
         run: |
+          zips="regac-$TAG.zip example-faro-$TAG.zip"
           if gh release view "$TAG" > /dev/null 2>&1; then
-            gh release upload "$TAG" "faro-$TAG.zip" --clobber
+            gh release upload "$TAG" $zips --clobber
           else
-            gh release create "$TAG" "faro-$TAG.zip" --title "reGAC ${TAG#v}" \
+            gh release create "$TAG" $zips --title "reGAC ${TAG#v}" \
               --generate-notes
           fi

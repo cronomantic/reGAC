@@ -1,0 +1,25 @@
+# What the release of the tool carries, a path a line: everything a person
+# needs to write an adventure and build it, and nothing that is only the
+# project's -- the tests, the diary, the notes on how the pieces were made.
+# The one file of tests/ is the driver of ZEsarUX, which grab.py and the
+# timing in regac draw use.  .github/workflows/release.yml reads this, and
+# tests/test_example.py builds the example out of it.
+LICENSE
+README.md
+pyproject.toml
+poetry.lock
+regac
+z80
+x86
+runGAC.py
+runGAC_pygame.py
+deGAC.py
+disk.py
+grab.py
+ejemplo
+editors
+doc/manual.md
+doc/gac.md
+doc/formato-fuente.md
+doc/proyecto.md
+tests/emulator.py
