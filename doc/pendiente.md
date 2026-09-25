@@ -4237,6 +4237,10 @@ del sistema, español o inglés, y con `REGAC_LANG` para elegir uno por encima.
 base de datos JSON, como dicen su ayuda y el README; con un `.gac` se caen con
 una traza de `json` en vez de decirlo. Ya pasaba antes.
 
+**La 0.3.0**, pedida por el usuario, es la primera release con la
+herramienta dentro (`regac-v0.3.0.zip`), las guías en dos idiomas y los
+mensajes en español o en inglés.
+
 ## `DO` y `/PROC`
 
 **Decidido por el usuario**, las cuatro cosas:
