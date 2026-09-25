@@ -4106,6 +4106,74 @@ a la 4 y `SUR` de vuelta-- de dos maneras:
 
 `test_example` mira además que el `.nex` que hace `make` lleve `FARO.SAV`.
 
+## Lo que viene, en cola
+
+Pedido por el usuario el 2026-09-25, después de la 0.1.0. En este orden, y
+cada ampliación del lenguaje se concreta con él antes de hacerla, porque
+cambia lo que hacen las máquinas:
+
+1. ~~**El visor de láminas**, `regac draw`.~~ Hecho: ver «El visor de
+   láminas», abajo.
+2. **`DO n`**: una tabla de condiciones con número, llamada desde cualquier
+   condición, para no copiar lo repetido en cada sala.
+3. **Huecos en los mensajes**: un marcador que escriba dentro del texto el
+   nombre de un objeto o lo que vale un contador, como ya hace `\ink` con el
+   color.
+4. **Utilidades para quien escribe**: `regac map` (el mapa de salas y
+   salidas), `regac lint` (salas a las que no se llega, objetos que no se
+   pueden coger, palabras y mensajes que no usa nadie), `regac play` con un
+   guion que dice si la aventura se gana, y el resaltado de sintaxis de
+   `.gac` para VS Code.
+5. **La distribución**: una orden `regac` instalable (`[project.scripts]`,
+   que `pyproject.toml` no tiene), CI en GitHub Actions con las pruebas que no
+   piden emulador, y el faro construido para las nueve máquinas adjunto a la
+   release.
+
+Y dos cosas vistas por el camino, sin hacer:
+
+- **`.if pc` no existe.** `MACHINE_LABELS`, en `regac/srcparse.py`, no tiene
+  el PC: un fuente que lo nombra da «there is no machine called 'pc'», y la
+  construcción del PC lee el fuente sin etiqueta ninguna, así que de un `.if`
+  sólo le llega el `.else`. Añadirlo no cambia ningún fuente que hoy se lea,
+  porque hoy nombrarlo es un error; pero es cosa de decidir.
+- **`doc/gac.md` dice «ocho máquinas»** en sus secciones 8 y 10, y son nueve.
+
+## El visor de láminas
+
+`regac draw fuente.gac 12 -m cpc`, en `regac/viewer.py`: la lámina en una
+ventana de pygame-ce, que ya era dependencia, dibujada con el mismo
+renderer que `render` y que el de las comparaciones con los intérpretes, en
+el dispositivo de la máquina elegida (`device_for`, como `render`). Mira el
+fuente y lo que hay a su lado tres veces por segundo y lo vuelve a leer al
+guardarse, para la máquina que se ve, porque un `.if` puede darle otra
+lámina. Si no se lee, lo dice y deja la última buena. Las máquinas son las
+que tienen intérprete; una aventura de Amstrad, sólo donde están sus reglas
+(`cpc`, `next` y `cga`).
+
+Se recorre orden a orden, con lo que puso la última en magenta, y un `CALL`
+se abre en su sitio hasta la misma hondura que dibuja el renderer. **Hacia
+delante dibuja sobre lo que hay; hacia atrás vuelve a empezar**, porque un
+relleno no se deshace: medido, una lámina entera tarda hasta 1,4 s en
+Python (Vajillas #12 en el CPC, que además elige sus tintas dibujándola
+entera), y redibujar desde el principio a cada paso no se podía. El
+dispositivo limpio se hace una vez y se copia.
+
+Un `PLOT` del Spectrum enciende 64 puntos en magenta, y no es un error: la
+celda entera cambia de color, que es el choque de atributos, y se ve.
+
+Pruebas en `tests/test_viewer.py`: recorrida orden a orden, adelante y atrás,
+la lámina sale exactamente como la dibuja el renderer entera, en las seis
+máquinas, con el faro y con una lámina hecha con todas las órdenes. Esa
+segunda hizo falta: el faro sólo tiene un relleno, y un recorrido que se
+saltaba los `FILL` pasaba con él solo; con ella falla. Además, que sigue al
+fuente y guarda la última buena, las coordenadas del ratón, y la ventana
+entera corriendo sin pantalla con teclas que se le dan.
+
+**Lo que no hace, apuntado**: no pinta el borde. `BORDER` se recorre y se
+dice, pero cada dispositivo guarda el borde a su manera --un color del
+Spectrum, una entrada de paleta, una pluma-- y ponerlo alrededor de la lámina
+pide traducir cada uno.
+
 ## Cosas menores
 
 ### Lo residente del 128 y del +3, que nadie vigilaba

@@ -118,6 +118,7 @@ ensamblador:
     python -m regac checkgfx faro.json -m cpc       # ¿se sale alguna lámina?
     python -m regac text     faro.json              # ¿cuánto ocupan los textos?
     python -m regac render   faro.json laminas/     # las láminas como PNG
+    python -m regac draw     faro.gac 1             # una lámina, en vivo
     python -m regac make     faro.toml              # construir
 
 **`compile`** convierte el fuente en la base de datos y se queja de lo que no
@@ -264,6 +265,23 @@ están en [`gac.md`](gac.md).
       PAPER 5
       LINE 128 159 128 79
       CALL 1000
+
+Para dibujar, **`regac draw`** abre la lámina en una ventana y la vuelve a
+pintar cada vez que se guarda el fuente, así que se escribe en el editor y se
+mira al lado:
+
+    python -m regac draw faro.gac 1 -m cpc
+
+Sale como la enseña esa máquina —`spectrum`, `cpc`, `msx`, `pcw`, `next` o
+`cga`, que es la del PC—, y la `m` pasa a la siguiente. Las flechas la
+recorren orden a orden (con mayúsculas de diez en diez, con control de cien
+en cien), y lo que acaba de poner la última orden sale en magenta: un relleno
+que se escapa por un hueco dice por dónde. Lo que llama `CALL` se recorre
+dentro, en su sitio. Abajo pone la orden de antes y la de después, y **dónde
+está el ratón en las coordenadas de las órdenes**, `x` desde la izquierda e
+`y` desde abajo, que es lo que hay que escribir. Re Pág y Av Pág cambian de
+lámina. Si el fuente guardado tiene un error, lo dice y deja la última lámina
+buena.
 
 ### `/FONT` — la tipografía
 

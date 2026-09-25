@@ -51,6 +51,7 @@ python -m regac decompile game.json game.gac
 python -m regac compile   game.gac  game.json
 python -m regac check     game.json
 python -m regac render    game.json pictures/ -m spectrum
+python -m regac draw      game.gac  12 -m cpc
 python -m regac checkgfx  game.json -m cpc
 python -m regac text      game.json
 python -m regac make      game.toml

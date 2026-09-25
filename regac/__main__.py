@@ -140,6 +140,20 @@ def cmd_render(args):
         print(f"picture {pid} -> {path}")
 
 
+def cmd_draw(args):
+    """Look at a picture in a window, drawn again whenever the source is
+    saved.  See regac/viewer.py."""
+    from .viewer import SPECTRUM_MACHINES, run
+
+    if args.machine is not None and args.machine not in SPECTRUM_MACHINES:
+        sys.exit(f"ERROR: there is nothing to draw {args.machine} with; "
+                 f"try one of {', '.join(SPECTRUM_MACHINES)}")
+    try:
+        run(args.input, args.picture, args.machine, args.scale)
+    except ValueError as e:
+        sys.exit(f"ERROR: {e}")
+
+
 def cmd_checkgfx(args):
     """Compare the pictures on a target machine against the Spectrum.
 
@@ -632,6 +646,18 @@ def main():
         help="which machine to draw for (default: spectrum)",
     )
     p.set_defaults(func=cmd_render)
+
+    p = sub.add_parser("draw", help="look at a picture in a window, drawn "
+                                    "again whenever the source is saved")
+    p.add_argument("input", help="source file, or JSON database")
+    p.add_argument("picture", type=int, nargs="?",
+                   help="which picture (default: the first)")
+    p.add_argument("-m", "--machine",
+                   help="which machine to draw it as: spectrum, cpc, msx, "
+                        "pcw, next or cga, which is the PC's (default: the "
+                        "first the adventure can be drawn on)")
+    p.add_argument("-s", "--scale", type=int, default=3, help="pixel scale")
+    p.set_defaults(func=cmd_draw)
 
     p = sub.add_parser(
         "checkgfx", help="compare the pictures on a machine against the Spectrum"
