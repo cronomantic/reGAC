@@ -4391,9 +4391,11 @@ pasaron las pruebas con un PATH sin NASM ni DOSBox-X. Salían 32 fallos:
 - `test_every_machine_it_names_comes_out` construía sin mirar si había
   ensambladores; ahora se salta sin sjasmplus o sin NASM.
 
-Con eso, la simulación da 181 pasadas y 302 saltadas. **Lo que no se ha
+Con eso, la simulación da 181 pasadas y 302 saltadas. ~~**Lo que no se ha
 podido probar** es Linux ni Python 3.11, que aquí no hay: lo dirá la primera
-vuelta de verdad en GitHub.
+vuelta de verdad en GitHub.~~ **Probado**: la primera vuelta, con la subida de
+la 0.2.0 (`28a9b1d`), salió verde en Ubuntu con Python 3.11 y con el último,
+instalación y pruebas.
 
 ## Los huecos del texto
 
