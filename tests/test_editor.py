@@ -113,3 +113,13 @@ def test_the_extension_says_where_its_parts_are():
                  contributes["grammars"][0]["path"]):
         assert os.path.isfile(os.path.join(EDITOR, path)), path
     assert ".gac" in contributes["languages"][0]["extensions"]
+
+
+def test_an_entry_is_not_taken_for_a_colour():
+    """#242, a message of the interpreter's, is also a colour written in
+    hex, and VS Code put a square of it in front of every one."""
+    with open(os.path.join(EDITOR, "package.json"), encoding="utf-8") as f:
+        package = json.load(f)
+    defaults = package["contributes"]["configurationDefaults"]["[gac]"]
+    assert defaults["editor.colorDecorators"] is False
+    assert defaults["editor.defaultColorDecorators"] == "never"

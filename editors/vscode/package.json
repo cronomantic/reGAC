@@ -25,6 +25,12 @@
         "configuration": "./language-configuration.json"
       }
     ],
+    "configurationDefaults": {
+      "[gac]": {
+        "editor.colorDecorators": false,
+        "editor.defaultColorDecorators": "never"
+      }
+    },
     "grammars": [
       {
         "language": "gac",

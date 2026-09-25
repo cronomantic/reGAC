@@ -4244,6 +4244,14 @@ se hace una con `regac compile`, sin traza. Está en `test_check.py`.
 
 **La 0.3.1**, pedida por el usuario, es la 0.3.0 con ese arreglo.
 
+**El resaltador, probado en VS Code 1.139** con el faro y con un fuente de
+`/PROC`, `DO`, `.if` y los huecos `\ctr`, `\obj` y `\turns`: todo sale con
+su color. Lo que salió mal no era de la gramática: VS Code tomaba las
+entradas `#242`...`#254` por colores escritos en hexadecimal y ponía delante
+un cuadradito de cada uno. La extensión apaga eso para el lenguaje GAC
+(`editor.colorDecorators` y `editor.defaultColorDecorators`), y el usuario
+vio que ya no salen. Está en `test_editor.py`.
+
 **La 0.3.0**, pedida por el usuario, es la primera release con la
 herramienta dentro (`regac-v0.3.0.zip`), las guías en dos idiomas y los
 mensajes en español o en inglés.
