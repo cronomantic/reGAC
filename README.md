@@ -16,7 +16,7 @@ Two documents, in Spanish, and between them they are the whole of it:
   an adventure is written block by block, how it is checked and how it is
   built for every machine.
 * **[doc/gac.md](doc/gac.md)** -- the GAC language in full: the turn, all
-  sixty seven opcodes, the parser, the reserved markers and messages, and
+  sixty eight opcodes, the parser, the reserved markers and messages, and
   every drawing command.
 
 The rest of `doc/` is the development diary -- what was measured, in what

@@ -518,9 +518,15 @@ def makes_a_noise(ddb):
     project set long ago -- what an adventure does not do does not travel
     with it.
     """
+    return uses(ddb, ("SOUND", "QUIET"))
+
+
+def uses(ddb, names):
+    """Whether any table of the adventure has one of those opcodes."""
     tables = [ddb.get("hpcs") or [], ddb.get("lpcs") or []]
     tables += list((ddb.get("lcs") or {}).values())
-    return any(step and step[0] in ("SOUND", "QUIET")
+    tables += list((ddb.get("procs") or {}).values())
+    return any(step and step[0] in names
                for table in tables for step in table)
 
 
@@ -538,6 +544,10 @@ def make_one(target, settings, ddb, name, root, output, where_regac_is,
     defines = list(noises)
     if makes_a_noise(ddb):
         defines.append("NOISES")
+    if uses(ddb, ("DO",)):
+        # DO and what it needs travel only when the adventure says it, by
+        # the same rule as the noises
+        defines.append("PROCS")
     if target.machine in ("cpc", "next", "pc") and from_an_amstrad(ddb):
         # drawn with the rules of the GAC it was written with
         defines.append("AMSTRAD_PICTURES")

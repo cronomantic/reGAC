@@ -150,6 +150,10 @@ class BuildError(Exception):
 # ---------------------------------------------------------------------------
 
 
+# What marks a table DO runs in the list of the rooms' own tables.
+PROC_KEY = 0x8000
+
+
 def assemble_conditions(code):
     """Turn a condition block into bytes.
 
@@ -437,8 +441,15 @@ class Database:
     def conditions(self):
         high = assemble_conditions(self.ddb.get("hpcs", []))
         low = assemble_conditions(self.ddb.get("lpcs", []))
-        locals_ = {k: assemble_conditions(v) for k, v in self.ddb.get("lcs", {}).items()}
-        order = sorted(locals_, key=int)
+        locals_ = {int(k): assemble_conditions(v)
+                   for k, v in self.ddb.get("lcs", {}).items()}
+        # The tables DO runs go in the same list, under their number with the
+        # top bit set, which no room has: a room is a constant of the
+        # bytecode and those have fifteen bits.  An interpreter looking for
+        # a room never finds one, and an adventure with none is as it was.
+        for k, v in (self.ddb.get("procs") or {}).items():
+            locals_[PROC_KEY | int(k)] = assemble_conditions(v)
+        order = sorted(locals_)
         head = 6
         body = bytearray()
         off_high = head
@@ -451,7 +462,7 @@ class Database:
         # room number, then where its block starts, ending with room zero
         data_start = off_local + 4 * len(order) + 2
         for room in order:
-            index += u16(int(room)) + u16(data_start + len(blocks))
+            index += u16(room) + u16(data_start + len(blocks))
             blocks += locals_[room]
         index += u16(0)
         return u16(off_high) + u16(off_low) + u16(off_local) + bytes(body + index + blocks)
@@ -695,15 +706,19 @@ class Reader:
         high = disassemble_conditions(data[off_high:off_low])
         low = disassemble_conditions(data[off_low:off_local])
         locals_ = {}
+        procs = {}
         p = off_local
         while True:
             room = struct.unpack_from("<H", data, p)[0]
             if room == 0:
                 break
             start = struct.unpack_from("<H", data, p + 2)[0]
-            locals_[str(room)] = disassemble_conditions(data[start:])
+            if room & PROC_KEY:
+                procs[str(room & ~PROC_KEY)] = disassemble_conditions(data[start:])
+            else:
+                locals_[str(room)] = disassemble_conditions(data[start:])
             p += 4
-        return high, low, locals_
+        return high, low, locals_, procs
 
     def objects(self):
         data = self.section(S_OBJECTS)

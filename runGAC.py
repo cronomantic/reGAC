@@ -72,6 +72,7 @@ class GAC_Interpreter:
     CANTFIND = 252
     OBJHERE = 253
     OKAY = 254
+    PROC_DEPTH = 8                  # how deep DO may go
     TURNS = 255
 
     NOTHING_LOC = 0
@@ -161,7 +162,13 @@ class GAC_Interpreter:
         )
         if not isinstance(ddb, dict):
             return False
-        if set(ddb.keys()) != default_keys:
+        # What a source may bring besides, and a decompiled adventure never
+        # does: this asked for exactly the keys above, and turned away every
+        # adventure compiled from a source with noises in it, the example's
+        # own among them.
+        optional_keys = {"charset", "gfx_inks", "ink", "procs", "sounds",
+                         "width"}
+        if not default_keys <= set(ddb) <= default_keys | optional_keys:
             return False
         for k in default_keys:
             v = ddb[k]
@@ -351,6 +358,8 @@ class GAC_Interpreter:
         self.hpcs = self.ddb["hpcs"]
         self.lpcs = self.ddb["lpcs"]
         self.lcs = {int(k): v for (k, v) in self.ddb["lcs"].items()}
+        self.procs = {int(k): v for (k, v) in (self.ddb.get("procs") or {}).items()}
+        self.proc_depth = 0
         self.model = self.ddb["model"]
         self.gfx = {int(k): v for (k, v) in self.ddb["gfx"].items()}
         self.separators = self.ddb["separators"]
@@ -888,6 +897,25 @@ class GAC_Interpreter:
                     self.stack.pop()
                 elif cmd == "QUIET":
                     pass
+                elif cmd == "DO":
+                    # The table runs as if it were written here: what comes
+                    # out true in it has taken the order, and what ends the
+                    # turn in it ends this table too.  What this table had
+                    # on the stack is still there when it comes back.  Eight
+                    # deep at most, as a picture calls another, and past
+                    # that it does nothing.
+                    table = self.procs.get(self.stack.pop())
+                    if table is not None and self.proc_depth < self.PROC_DEPTH:
+                        kept = self.stack
+                        self.proc_depth += 1
+                        try:
+                            ended, over, took = self.__perfom_conditions(table, True)
+                        finally:
+                            self.proc_depth -= 1
+                            self.stack = kept
+                        finished = finished or ended
+                        if_true = if_true or took
+                        done = done or over or ended
                 else:
                     self.print(f"INVALID OPCODE {cmd}.\n")
         return (finished, done, if_true)

@@ -124,8 +124,11 @@ vm_init:
 
 ; -- the operand stack -------------------------------------------------------
 
+; Empty is down to the base, which is the foot of the stack except while DO
+; runs a table: then it is where the stack stood, so that what the table that
+; ran it had there is left alone.
 vm_reset_stack:
-                ld      hl, vm_stack
+                ld      hl, (vm_stack_base)
                 ld      (vm_sp), hl
                 ret
 
@@ -147,7 +150,7 @@ vm_push:
 vm_pop:
                 push    de
                 ld      hl, (vm_sp)
-                ld      de, vm_stack
+                ld      de, (vm_stack_base)
                 or      a
                 sbc     hl, de
                 jr      z, .empty               ; nothing there: give back zero
@@ -353,6 +356,7 @@ obj_find_location:
 
 vm_code:        dw      0
 vm_sp:          dw      0
+vm_stack_base:  dw      vm_stack
 vm_arg:         dw      0
 find_id:        dw      0
 vm_skip:        db      0

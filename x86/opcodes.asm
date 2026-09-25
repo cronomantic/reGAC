@@ -5,7 +5,7 @@
 ; original it was measured, is written there against each of them.
 
 OP_END          equ 3Fh
-OP_LAST         equ 42h
+OP_LAST         equ 43h
 
 ; -- small helpers -----------------------------------------------------------
 
@@ -741,6 +741,40 @@ op_sound:
 op_quiet:
                 jmp     vm_loop
 
+; DO n: the table /PROC n, run as if it were written here -- see
+; z80/common/opcodes.asm, which is the same step for step.  What ends the turn
+; in it ends this table too; what this table had on the stack is kept under
+; the base the other one starts from.  A table there is not, or DO more than
+; PROC_DEPTH deep, does nothing.  Always here: a PC does not count bytes the
+; way a 464 does.
+PROC_DEPTH      equ 8
+
+op_do:
+                call    vm_pop
+                cmp     byte [vm_depth], PROC_DEPTH
+                jae     .nothing                ; too deep
+                or      ah, 80h                 ; how the list keys it
+                call    keyed_table
+                jc      .nothing                ; no such table
+                inc     byte [vm_depth]
+                push    word [vm_code]          ; where this table was
+                push    word [vm_stack_base]
+                mov     ax, [vm_sp]
+                mov     [vm_stack_base], ax     ; what is there stays there
+                call    run_conditions
+                mov     ax, [vm_stack_base]
+                mov     [vm_sp], ax             ; the stack as DO found it
+                pop     word [vm_stack_base]
+                pop     word [vm_code]
+                dec     byte [vm_depth]
+                mov     byte [vm_skip], 0       ; DO is only ever obeyed
+                cmp     byte [vm_done], 0
+                jne     .over
+.nothing:
+                jmp     vm_loop
+.over:
+                ret                             ; it ended the turn: so does this
+
 op_if:
                 call    vm_pop
                 test    ax, ax
@@ -855,4 +889,5 @@ vm_table:
                 dw      op_nop          ; 40h, which MUSIC was
                 dw      op_sound        ; 41h
                 dw      op_quiet        ; 42h
+                dw      op_do           ; 43h
 section .text

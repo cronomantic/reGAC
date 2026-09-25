@@ -97,7 +97,7 @@ el orden en que quieres que se evalúen.
 
 ## 4. Los opcodes, todos
 
-Sesenta y siete. Agrupados por lo que hacen, con lo que toman y lo que dejan.
+Sesenta y ocho. Agrupados por lo que hacen, con lo que toman y lo que dejan.
 
 ### Estructura de una línea
 
@@ -247,12 +247,31 @@ tono barrido que el resto de la línea describe. La aventura no cambia.
 tabla** no se mira siquiera. `QUIT` lee una sola tecla: `N` lo cancela y
 cualquier otra cosa —una letra, un espacio, el enter— sigue adelante.
 
+### Tablas propias
+
+| | |
+|---|---|
+| `DO n` | ejecuta la tabla `/PROC n` como si estuviera escrita aquí |
+
+Añadido de este proyecto, no de GAC: lo que se repite en varias salas se
+escribe una vez en un bloque `/PROC #n` y se llama con `DO n`.
+
+- **Es como si estuviera escrita en su sitio.** Lo que sale cierto dentro
+  cuenta como que la orden se entendió, y lo que acaba el turno dentro
+  —`WAIT`, `OKAY`, `EXIT`, una negativa de `GET`— lo acaba también fuera: la
+  tabla que hizo `DO` no sigue.
+- Lo que la tabla de fuera tenía en la pila sigue ahí cuando vuelve.
+- Una tabla puede llamar a otra, o a sí misma, **hasta ocho de hondo**, lo
+  mismo que una lámina a otra; más allá, `DO` no hace nada. Un `DO` de una
+  tabla que no existe tampoco, y `regac check` lo avisa.
+- Sólo viaja en el intérprete de una aventura que lo usa, como los ruidos.
+
 ### Sin uso
 
 `NOP` y `NOP29` no hacen nada. Están porque el original los tenía.
 
 Y uno más que no se escribe nunca: `ENDTABLE` es la marca de fin de tabla que
-pone el compilador. Con él, sesenta y siete.
+pone el compilador. Con él, sesenta y ocho.
 
 ---
 
@@ -391,7 +410,8 @@ contesta a una palabra que no conoce, en qué orden mira las tablas. Lo añadido
 está encima y no cambia lo de debajo:
 
 - **acentos y eñes**, que el original no tenía;
-- **ruidos**, con `SOUND` y `QUIET`, que son los dos opcodes nuevos;
+- **ruidos**, con `SOUND` y `QUIET`;
+- **tablas propias**, con `/PROC` y `DO`;
 - **ocho máquinas**;
 - **un fuente de texto** que se guarda en un control de versiones, en lugar de
   teclear la aventura dentro de la máquina.

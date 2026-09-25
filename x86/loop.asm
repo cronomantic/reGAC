@@ -36,11 +36,16 @@ cond_table:
 ; has none.
 ; Corrupts: AX, ES
 local_table:
+                mov     ax, [vm_location]
+; The table of the list that is keyed AX, at offset BX: a room's, or one DO
+; runs, whose key is its number with the top bit set.  Carry set if there is
+; none.
+; Corrupts: ES
+keyed_table:
                 mov     es, [cond_seg]
                 mov     bx, [cond_section]
                 mov     bx, [es:bx + 4]
                 add     bx, [cond_section]      ; the list of rooms that have some
-                mov     ax, [vm_location]
 .each:
                 cmp     word [es:bx], 0
                 je      .none                   ; the list ends with room nought

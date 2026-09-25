@@ -40,7 +40,8 @@ compiler nor the machine will say so.
 """
 
 from .gfx import PICTURE_BOTTOM, PICTURE_TOP
-from .opcodes import ADVERB, BY_NAME, CTR, FLAG, MSG, NOUN, OBJ, ROOM, VERB
+from .opcodes import (ADVERB, BY_NAME, CTR, FLAG, MSG, NOUN, OBJ, PROC, ROOM,
+                      VERB)
 from .text import typed
 
 COUNTERS = 128                  # what the interpreters have, in every machine
@@ -142,6 +143,7 @@ def follow(problems, where, code, ddb):
     messages = numbered(ddb.get("messages", {}))
     rooms = numbered(ddb.get("locations", {}))
     objects = numbered(ddb.get("objects", {}))
+    procs = numbered(ddb.get("procs") or {})
     # Nought is not a word of the vocabulary but what the parser says when it
     # knew none of them, so a condition may well ask for it.
     words = {
@@ -162,6 +164,9 @@ def follow(problems, where, code, ddb):
                                                                        CARRIED):
                 problems.append(Problem(
                     where, f"{op.name} {value}, and there is no room {value}"))
+            elif kind is PROC and value not in procs:
+                problems.append(Problem(
+                    where, f"{op.name} {value}, and there is no /PROC {value}"))
             elif kind is OBJ and value not in objects:
                 problems.append(Problem(
                     where, f"{op.name} {value}, and there is no object {value}"))
@@ -201,6 +206,8 @@ def problems_of(ddb):
     follow(found, "the low priority conditions", ddb.get("lpcs", []), ddb)
     for lid, code in (ddb.get("lcs") or {}).items():
         follow(found, f"the local conditions of room {lid}", code, ddb)
+    for pid, code in (ddb.get("procs") or {}).items():
+        follow(found, f"procedure {pid}", code, ddb)
 
     # Where the player starts, and where every way out goes.
     start = ddb.get("init_loc")

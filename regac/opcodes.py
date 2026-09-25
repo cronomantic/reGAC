@@ -46,6 +46,7 @@ VERB = "verb"
 NOUN = "noun"
 ADVERB = "adverb"
 COND = "cond"
+PROC = "proc"
 
 
 class Op:
@@ -143,6 +144,10 @@ OPS = [
     # from before this reads as an opcode that does nothing.
     Op("SOUND",    0x41, PREFIX,  (NUM,)),
     Op("QUIET",    0x42, NULLARY),
+    # Runs the table of conditions /PROC n as if it were written here: what
+    # comes out true in it has taken the order, and what ends the turn in it
+    # ends the turn.
+    Op("DO",       0x43, PREFIX,  (PROC,)),
 ]
 # fmt: on
 

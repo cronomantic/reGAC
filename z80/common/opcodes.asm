@@ -1032,6 +1032,56 @@ op_lf:
                 call    new_line
                 jp      vm_loop
 
+; DO n: the table /PROC n, run as if it were written here.  Not the
+; original's.  What comes out true in it has taken the order, because IF says
+; so in the same place whichever table it is in; what ends the turn in it
+; sets vm_done and comes back, and then this table goes no further either.
+; What this table had on the stack is kept under the base the other one
+; starts from.  A table there is not, or DO more than PROC_DEPTH deep, does
+; nothing.  It travels only in a build whose adventure has DO in it, which
+; regac says with -DPROCS: the 464 counts its bytes.
+                IFDEF   PROCS
+PROC_DEPTH      equ 8
+
+op_do:
+                call    vm_pop
+                ld      a, (vm_depth)
+                cp      PROC_DEPTH
+                jp      nc, vm_loop             ; too deep: nothing
+                set     7, h                    ; how the list keys it
+                ld      b, h
+                ld      c, l
+                call    keyed_table
+                jp      c, vm_loop              ; no such table: nothing
+                ex      de, hl
+                ld      hl, vm_depth
+                inc     (hl)
+                ld      hl, (vm_code)           ; where this table was
+                push    hl
+                ld      hl, (vm_stack_base)
+                push    hl
+                ld      hl, (vm_sp)
+                ld      (vm_stack_base), hl     ; what is there stays there
+                ex      de, hl
+                call    run_conditions
+                ld      hl, (vm_stack_base)
+                ld      (vm_sp), hl             ; the stack as DO found it
+                pop     hl
+                ld      (vm_stack_base), hl
+                pop     hl
+                ld      (vm_code), hl
+                ld      hl, vm_depth
+                dec     (hl)
+                xor     a
+                ld      (vm_skip), a            ; DO is only ever obeyed
+                ld      a, (vm_done)
+                or      a
+                ret     nz                      ; it ended the turn: so does this
+                jp      vm_loop
+
+vm_depth:       db      0
+                ENDIF
+
 ; SOUND and QUIET: which noise of the adventure's own table to make, and
 ; silence.  There used to be two ways of making one -- the tracker's player
 ; where there was music and the speaker where there was not -- and now there
@@ -1174,3 +1224,8 @@ vm_table:
                 dw      op_nop          ; $40, which MUSIC was
                 dw      op_sound        ; $41
                 dw      op_quiet        ; $42
+                IFDEF   PROCS
+                dw      op_do           ; $43
+                ELSE
+                dw      op_nop          ; $43, DO, in a build with none
+                ENDIF

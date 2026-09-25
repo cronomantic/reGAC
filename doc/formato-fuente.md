@@ -186,7 +186,7 @@ intérprete.
 
 Una condición por línea, terminada en `END`. La sintaxis es la del manual. El
 bytecode es una máquina de pila postfija, pero el fuente se escribe en la forma
-prefija e infija original y el compilador reordena. Los 64 opcodes, su forma y
+prefija e infija original y el compilador reordena. Los opcodes, su forma y
 el tipo de sus operandos están en [`regac/opcodes.py`](../regac/opcodes.py),
 que es la única fuente de verdad del lenguaje.
 
@@ -198,6 +198,19 @@ un operador infijo es a su vez una expresión infija, va entre paréntesis.
 Alguna aventura original deja valores apilados que nunca consume. El
 decompilador los escribe como un número suelto en el lugar en que se apilaron,
 para no alterar el código al recompilar.
+
+### `/PROC`
+
+    /PROC #7
+    IF ( AT 3 ) MESS 20 END
+    IF ( AT 4 ) MESS 21 WAIT END
+
+Una tabla de condiciones con número, escrita como `/HIGH` o `/LOW`, que corre
+donde una condición diga `DO 7`. El número puede ser un nombre de `.def`, y
+va de 0 a 32767. Cómo se comporta está en [`gac.md`](gac.md), «Tablas
+propias». En la base de datos va en la misma lista que las condiciones de
+cada sala, con el número y el bit de arriba puesto, que ninguna sala tiene: una
+aventura sin `/PROC` sale exactamente igual que antes.
 
 ### `/GFX`
 
@@ -408,7 +421,7 @@ palabra está *casi* bien —que es lo que pasa siempre—, qué se quiso decir:
         IF ( VERB 7 ) MESSS 14 END
                       ^
 
-El lenguaje son sesenta y siete palabras, así que adivinar la que era sale casi
+El lenguaje son sesenta y ocho palabras, así que adivinar la que era sale casi
 gratis y ahorra la búsqueda. Si la palabra no se parece a ninguna no se adivina
 nada, que una sugerencia mala manda a mirar donde no es.
 

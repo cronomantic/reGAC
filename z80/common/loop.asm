@@ -37,6 +37,11 @@ cond_table:
 ; The conditions of the room the player is in, in HL.  Carry set if it has none.
 ; Corrupts: AF, BC, DE
 local_table:
+                ld      bc, (vm_location)
+; The table of the list that is keyed BC, in HL: a room's, or one DO runs,
+; whose key is its number with the top bit set.  Carry set if there is none.
+; Corrupts: AF, BC, DE
+keyed_table:
                 ld      hl, (cond_section)
                 ld      de, 4
                 add     hl, de
@@ -45,7 +50,6 @@ local_table:
                 ld      d, (hl)
                 ld      hl, (cond_section)
                 add     hl, de                  ; the list of rooms that have some
-                ld      bc, (vm_location)
 .each:
                 ld      e, (hl)
                 inc     hl

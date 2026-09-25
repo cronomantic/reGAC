@@ -88,8 +88,15 @@ vm_init:
 
 ; -- the operand stack -------------------------------------------------------
 
+; Empty is down to the base, which is the foot of the stack except while DO
+; runs a table: then it is where the stack stood, so that what the table that
+; ran it had there is left alone.
+; Corrupts: nothing
 vm_reset_stack:
-                mov     word [vm_sp], vm_stack
+                push    ax
+                mov     ax, [vm_stack_base]
+                mov     [vm_sp], ax
+                pop     ax
                 ret
 
 ; Push AX.
@@ -110,7 +117,7 @@ vm_push:
 vm_pop:
                 push    bx
                 mov     bx, [vm_sp]
-                cmp     bx, vm_stack
+                cmp     bx, [vm_stack_base]
                 je      .empty
                 sub     bx, 2
                 mov     [vm_sp], bx
@@ -258,6 +265,8 @@ obj_find_location:
 section .data
 vm_code:        dw      0
 vm_sp:          dw      0
+vm_stack_base:  dw      vm_stack
+vm_depth:       db      0                       ; how many DO deep
 vm_arg:         dw      0
 vm_arg2:        dw      0
 obj_seg:        dw      0

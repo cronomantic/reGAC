@@ -254,7 +254,7 @@ def test_binary_database_round_trips(path):
     database, reader, texts = read_back(ddb)
     assert texts == database.texts
 
-    high, low, locals_ = reader.conditions()
+    high, low, locals_, _ = reader.conditions()
     assert high == through_json(ddb["hpcs"])
     assert low == through_json(ddb["lpcs"])
     assert locals_ == {k: through_json(v) for k, v in ddb["lcs"].items()}

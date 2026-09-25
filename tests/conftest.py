@@ -58,6 +58,8 @@ GROUPS = {
         # it builds the same game and plays it beside the original's own
         "test_mirror_z80",
         "test_statements_z80", "test_latin", "test_spectrum",
+        # DO, played on this build as well as on the PC's and in Python
+        "test_proc",
         "test_media_plus3", "test_tape_z80",
         "test_textmode_z80",
         # it lays text out through test_markers_z80's own game

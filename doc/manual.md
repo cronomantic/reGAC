@@ -250,6 +250,19 @@ Una condición por línea, terminada en `END`. Los opcodes, todos, están en
     /HIGH
     IF ( CTR 126 = 0 ) MESS 1 SET 5 END
 
+Lo que se repite en varias salas se escribe una vez, en una tabla con
+número, y se llama con `DO`:
+
+    /LOW
+    IF ( VERB VERBO_MIRA ) DO DESCRIBE_EL_MAR END
+
+    /PROC #DESCRIBE_EL_MAR
+    IF ( AT SENDERO ) MESS EL_MAR END
+    IF ( AT ESCALERA ) MESS NADA_QUE_VER END
+
+Corre como si estuviera escrita donde está el `DO`: si dentro hay un `WAIT`,
+el turno se acaba ahí. El detalle, en [`gac.md`](gac.md).
+
 GAC **no tiene precedencia**: evalúa estrictamente de izquierda a derecha. Por
 eso el operando de un operador prefijo no es voraz, y `NOT VERB 1 AND NOUN 2`
 niega sólo la comprobación del verbo. Cuando el operando derecho de un

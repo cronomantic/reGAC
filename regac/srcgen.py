@@ -88,6 +88,7 @@ class SourceWriter:
         self.loc()
         self.conds("HIGH", self.ddb.get("hpcs", []))
         self.conds("LOW", self.ddb.get("lpcs", []))
+        self.procs()
         self.gfx()
         self.font()
         self.sound()
@@ -167,6 +168,13 @@ class SourceWriter:
                 self.w("  /LOCAL")
                 for line in render_block(local):
                     self.w(f"    {line}")
+            self.w()
+
+    def procs(self):
+        for pid, code in _ids(self.ddb.get("procs") or {}):
+            self.w(f"/PROC #{pid}")
+            for line in render_block(code):
+                self.w(line)
             self.w()
 
     def conds(self, section, block):

@@ -118,11 +118,11 @@ def picture_area_after(orders, settle=6.0):
         deadline = time.time() + 30.0
         while time.time() < deadline and session.read(ready, 1)[0] != 1:
             time.sleep(0.2)
-        time.sleep(settle + 4.0)
+        time.sleep(emulator.longer(settle + 4.0))
         out.append(picture_area(session))
         for order in orders:
             session.type_keys(order + ENTER)
-            time.sleep(settle)
+            time.sleep(emulator.longer(settle))
             out.append(picture_area(session))
     finally:
         session.close()

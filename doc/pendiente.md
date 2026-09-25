@@ -4058,6 +4058,14 @@ ha tocado nada del PCW ni de `z80/common/`, y a solas pasó tres de tres. Queda
 apuntada: es de las que dependen del ritmo con que ZEsarUX recibe las teclas,
 como las del teclado de las otras máquinas, y si vuelve hay que mirarla.
 
+Y otra del mismo pie, en el lote en paralelo después de `DO`:
+`test_textmode_cpc.py::test_a_picture_clears_what_the_text_left_either_side_of_it`
+vio las filas de la lámina vacías después de `TEXTO`, como si el texto no
+hubiera llegado. A solas pasó tres de tres, y el CPC se construye sin `PROCS`.
+Lo que tenía era una espera fija, `settle` segundos después de teclear, sin el
+`emulator.longer()` con que crecen las demás cuando hay cuatro emuladores a la
+vez; ahora lo lleva.
+
 ## El Next guarda en la tarjeta
 
 **Decidido por el usuario**: `SAVE` y `LOAD` del Next van a un fichero de la
@@ -4114,8 +4122,9 @@ cambia lo que hacen las máquinas:
 
 1. ~~**El visor de láminas**, `regac draw`.~~ Hecho: ver «El visor de
    láminas», abajo.
-2. **`DO n`**: una tabla de condiciones con número, llamada desde cualquier
-   condición, para no copiar lo repetido en cada sala.
+2. ~~**`DO n`**: una tabla de condiciones con número, llamada desde cualquier
+   condición, para no copiar lo repetido en cada sala.~~ Hecho: ver «`DO` y
+   `/PROC`», abajo.
 3. **Huecos en los mensajes**: un marcador que escriba dentro del texto el
    nombre de un objeto o lo que vale un contador, como ya hace `\ink` con el
    color.
@@ -4137,6 +4146,54 @@ Y dos cosas vistas por el camino, sin hacer:
   sólo le llega el `.else`. Añadirlo no cambia ningún fuente que hoy se lea,
   porque hoy nombrarlo es un error; pero es cosa de decidir.
 - **`doc/gac.md` dice «ocho máquinas»** en sus secciones 8 y 10, y son nueve.
+
+## `DO` y `/PROC`
+
+**Decidido por el usuario**, las cuatro cosas:
+
+- Las tablas se escriben en un bloque propio, `/PROC #n`, y no se toman de
+  las salas.
+- Lo que acaba el turno dentro --`WAIT`, `OKAY`, `EXIT`, una negativa de
+  `GET`-- lo acaba también fuera: la tabla que hizo `DO` no sigue. Lo que sale
+  cierto dentro cuenta como entendido.
+
+Y lo que se eligió al hacerlo, dicho en `gac.md`: la pila de la tabla de fuera
+se conserva, `DO` de una tabla que no hay no hace nada (y `check` lo avisa), y
+se puede anidar hasta ocho de hondo, como `CALL` en las láminas; más allá no
+hace nada. Es el opcode `$43`.
+
+**En la base de datos no cambia nada para quien no lo usa.** Las tablas van
+en la lista de las condiciones de cada sala, con el número y el bit 15
+puesto: una sala es una constante del bytecode, de quince bits, así que
+ninguna sala da con una, y la lista sigue acabando en la sala cero. El
+decompilador las separa por ese bit.
+
+**En el Z80** (`z80/common/`) la búsqueda de la tabla de una sala pasa a ser
+`keyed_table`, con la clave en BC, y `local_table` entra en ella con la sala.
+La pila de la máquina virtual tiene ahora una base, `vm_stack_base`: vacía es
+llegar a ella, y `DO` la sube a donde estaba la pila antes de correr la otra
+tabla y la baja al volver. Un `WAIT` hace `ret` a quien llamó a la tabla, que
+es `op_do`; y como todo lo que acaba el turno pone `vm_done` antes --se miró
+uno por uno: `op_okay`, `op_wait` y `end_turn`, que usan `GET`, `DROP`, `BRIN`
+y `FIND`--, `op_do` sabe si seguir o volver él también. Sólo viaja con
+`-DPROCS`, que `regac make` pone cuando alguna tabla tiene `DO`: el 464 cuenta
+los bytes, y una aventura que no lo usa sale como antes. **En el PC**
+(`x86/`) es lo mismo en 8086, y va siempre.
+
+**En `runGAC.py`** va también, y al hacerlo salió un fallo que ya estaba: pedía
+exactamente las claves de una aventura decompilada y **rechazaba el faro**,
+que trae `sounds` --`start_adventure` daba `False`--, cuando el manual pone
+justo `python runGAC.py faro.json` de ejemplo. Ahora admite las que un fuente
+puede traer de más: `charset`, `gfx_inks`, `ink`, `procs`, `sounds` y `width`.
+
+Pruebas en `tests/test_proc.py`: el fuente y su vuelta, el binario, `check`, y
+**la misma aventura jugada en Python, en el Spectrum y en el PC**, que tiene
+que decir lo mismo en los tres: que vuelve y sigue, que un `WAIT` dentro corta
+la tabla de fuera sin que salga «no puedes», una tabla sin nada cierto, una
+que se llama a sí misma y sale ocho veces exactas, un `DO` a una tabla que no
+hay, y la pila conservada. Se han visto fallar las del Z80 quitando el `ret`
+de después del `vm_done` y quitando la subida de la base, y la del PC quitando
+el suyo.
 
 ## El visor de láminas
 

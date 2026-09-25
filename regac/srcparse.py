@@ -195,6 +195,7 @@ DIRECTIVES = (IF, ELSE, END, DEF, INCLUDE)
 # What a name may look like, which is what an assembler would allow: letters,
 # digits and underscores, and not beginning with a digit.
 NAME = re.compile(r"[A-Za-z_]\w*$")
+PROC_MOST = 0x7FFF              # what a constant of the bytecode can say
 MOST_INCLUDES = 16              # deep enough for anybody, shallow enough to
                                 # catch a file that takes itself in
 
@@ -467,6 +468,9 @@ class Parser:
             if tag == "/LOC":
                 self.loc(head)
                 continue
+            if tag == "/PROC":
+                self.proc(head)
+                continue
             handler = handlers.get(tag)
             if handler is None:
                 known = list(handlers) + ["/LOC"]
@@ -654,6 +658,20 @@ class Parser:
                     self.ddb["lcs"][lid] = code
             else:
                 break
+
+    def proc(self, head):
+        """A table of conditions of its own, run where DO names it."""
+        parts = strip_comment(head).split()
+        if len(parts) != 2 or not parts[1].startswith("#"):
+            self.fail("a procedure header is: /PROC #id")
+        pid = self.number(parts[1][1:], "the number of a procedure")
+        if not 0 <= pid <= PROC_MOST:
+            self.fail(f"a procedure is numbered 0 to {PROC_MOST}")
+        procs = self.ddb.setdefault("procs", {})
+        if pid in procs:
+            self.fail(f"there is a /PROC #{pid} already")
+        self.i += 1
+        procs[pid] = self.cond_lines()
 
     def conn(self, lid):
         exits = []
