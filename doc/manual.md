@@ -383,6 +383,16 @@ máquinas con `.if`, que se retoca a mano; y lo que se dibuja pertenece a la
 lámina que se está mirando, aunque el cursor esté dentro de otra que ella
 llama.
 
+Para **calcar**, una imagen encima de la lámina, vista a medias:
+
+    python -m regac draw faro.gac 1 --trace boceto.png
+    python -m regac draw faro.gac 1 --trace bocetos/
+
+Un fichero va encima de todas las láminas; una carpeta, la que se llame como
+el número de la lámina (`12.png`, `12.jpg`), que cambia sola al pasar de
+lámina. La imagen se hace tan grande como quepa **sin deformarse**, y se
+centra. `t` la esconde y la enseña, y `+` y `-` dejan ver más o menos de ella.
+
 ### `/FONT` — la tipografía
 
 Entera, con `file`, o letra a letra.

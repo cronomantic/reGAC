@@ -4282,9 +4282,27 @@ y la ventana entera con el ratón. Visto en una captura, con un rectángulo a
 medio dibujar. **Sin ver en una pantalla de verdad**: todo se ha probado con
 el controlador de vídeo `dummy` de SDL.
 
-Lo que quedaba propuesto de la herramienta: el calco sobre una imagen de fondo,
-los avisos mientras se dibuja --fugas de un relleno, bytes, tiempo contra el
-tope de 4-5 s-- e importar SVG.
+Lo que quedaba propuesto de la herramienta: ~~el calco sobre una imagen de
+fondo~~ (hecho: ver abajo), los avisos mientras se dibuja --fugas de un
+relleno, bytes, tiempo contra el tope de 4-5 s-- e importar SVG.
+
+### El calco
+
+`regac draw fuente.gac 12 --trace boceto.png`, o `--trace bocetos/`.
+**Decidido por el usuario**: la imagen se escala **sin deformarse**, tan
+grande como quepa, y centrada; y vale una imagen para todas las láminas o una
+carpeta con una a cada una, por su número (`12.png`, y `.jpg`, `.bmp` o
+`.gif`), que cambia sola al pasar de lámina. Va **encima** de la lámina, vista
+a medias --empieza al 50 %--, para que se vean las dos: `t` la esconde, `+` y
+`-` la dejan ver más o menos, de diez en diez entre el 10 % y el 90 %. Son `+`
+y `-` y no corchetes porque en un teclado español los corchetes piden AltGr.
+
+Pruebas en `tests/test_trace.py`: dónde cabe una imagen cuadrada y una
+demasiado ancha, cuál se coge de la carpeta, y la ventana, mirando el color
+de un píxel: con la imagen roja encima está a medio camino entre el rojo y lo
+de debajo, escondida es lo de debajo, con `+` es más rojo, y fuera de la
+imagen centrada no cambia nada. Vista en una captura, la lámina 5 del faro
+calcada sobre la 2.
 
 ## Las elipses del faro, y lo que `gac.md` decía de ellas
 

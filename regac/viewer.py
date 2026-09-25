@@ -56,6 +56,19 @@ SOURCE_LABEL = {"spectrum": "spectrum48", "cpc": "cpc", "msx": "msx",
 
 HIGHLIGHT = (255, 0, 255)       # what the last order laid is lit up in
 
+# What an image to trace can be, and how much of it is seen at first.
+TRACE_TYPES = (".png", ".jpg", ".jpeg", ".bmp", ".gif")
+TRACE_ALPHA = 0.5
+
+
+def fitted(wide, high, area_wide, area_high):
+    """Where an image goes in an area, as (x, y, wide, high): as big as it
+    fits without being put out of shape, and centred."""
+    scale = min(area_wide / wide, area_high / high)
+    out_wide, out_high = round(wide * scale), round(high * scale)
+    return ((area_wide - out_wide) // 2, (area_high - out_high) // 2,
+            out_wide, out_high)
+
 # What a click does: moves a point, or draws one of these.  The keys that
 # choose them are their initials, and B for the fill that wipes.
 SELECT = "select"
@@ -188,8 +201,11 @@ class Viewer:
     """What is being looked at, and what the keys do to it.  Nothing here
     draws: `run` does, from what this says."""
 
-    def __init__(self, path, picture=None, machine=None):
+    def __init__(self, path, picture=None, machine=None, trace=None):
         self.path = path
+        self.trace = trace              # an image, or a folder of them
+        self.trace_on = True
+        self.trace_alpha = TRACE_ALPHA
         self.error = None
         self.ddb = None
         self.machine = machine
@@ -451,6 +467,39 @@ class Viewer:
         self.pending = None
         self.dragging = None
 
+    # -- tracing ------------------------------------------------------------
+    #
+    # An image laid over the picture, half seen through, to draw on top of:
+    # a sketch, a photo, the picture of the original.  One image for every
+    # picture, or a folder with one to each, named by its number.
+
+    def trace_file(self):
+        """The image laid over this picture, or None."""
+        if not self.trace:
+            return None
+        if os.path.isdir(self.trace):
+            for name in sorted(os.listdir(self.trace)):
+                stem, ext = os.path.splitext(name)
+                if stem == str(self.picture) and ext.lower() in TRACE_TYPES:
+                    return os.path.join(self.trace, name)
+            return None
+        return self.trace
+
+    def stronger_trace(self, by):
+        self.trace_alpha = min(0.9, max(0.1, round(self.trace_alpha + by, 1)))
+
+    def trace_said(self):
+        if not self.trace:
+            return ""
+        if not self.trace_on:
+            return "trace: hidden (t shows it)"
+        found = self.trace_file()
+        if found is None:
+            return f"trace: nothing for #{self.picture} in {self.trace}"
+        return (f"trace: {os.path.basename(found)} at "
+                f"{round(self.trace_alpha * 100)}%  (t hides it, +/- more "
+                f"or less of it)")
+
     # -- what is said about it --------------------------------------------
 
     def lines(self, pointer=None):
@@ -492,24 +541,39 @@ RUBBER = (255, 220, 0)          # what is being drawn, before it is
 HANDLE = (0, 200, 255)
 
 
-def run(path, picture=None, machine=None, scale=3):
+def run(path, picture=None, machine=None, scale=3, trace=None):
     """The window, until it is closed."""
     import pygame
 
-    viewer = Viewer(path, picture, machine)
+    viewer = Viewer(path, picture, machine, trace)
     pygame.init()
     pygame.key.set_repeat(300, 40)
     width, height = SOURCE_WIDTH * scale, SOURCE_ROWS * scale
     font = pygame.font.Font(None, 22)
     line = font.get_linesize()
-    panel = line * 10 + 8
+    panel = line * 11 + 8
     screen = pygame.display.set_mode((width, height + panel))
     pygame.display.set_caption(f"regac draw {os.path.basename(path)}")
     clock = pygame.time.Clock()
     pointer = None
+    images = {}                         # an image to trace, by its file
     typing = None                       # an order being written, or None
     drawn = None                        # what the window was drawn from
     idle = 0
+
+    def traced(found):
+        """The image, sized to lie over the picture, or None if it will
+        not read."""
+        if found not in images:
+            try:
+                whole = pygame.image.load(found)
+            except (pygame.error, OSError) as e:
+                images[found] = e
+            else:
+                x, y, wide, high = fitted(*whole.get_size(), width, height)
+                images[found] = (pygame.transform.smoothscale(
+                    whole.convert(), (wide, high)), (x, y))
+        return images[found]
 
     def on_screen(point):
         x, y = point
@@ -580,6 +644,12 @@ def run(path, picture=None, machine=None, scale=3):
                     viewer.highlight = not viewer.highlight
                 elif key == pygame.K_g:
                     viewer.snap = not viewer.snap
+                elif key == pygame.K_t:
+                    viewer.trace_on = not viewer.trace_on
+                elif key in (pygame.K_PLUS, pygame.K_KP_PLUS, pygame.K_EQUALS):
+                    viewer.stronger_trace(0.1)
+                elif key in (pygame.K_MINUS, pygame.K_KP_MINUS):
+                    viewer.stronger_trace(-0.1)
                 elif key == pygame.K_DELETE:
                     viewer.delete()
                 elif key == pygame.K_RETURN:
@@ -593,13 +663,23 @@ def run(path, picture=None, machine=None, scale=3):
                 drawn = None
         state = (viewer.steps, viewer.steps.count, viewer.highlight, pointer,
                  viewer.error, viewer.tool, viewer.pending, viewer.dragging,
-                 viewer.snap, typing)
+                 viewer.snap, typing, viewer.picture, viewer.trace_on,
+                 viewer.trace_alpha)
         if state == drawn:
             continue
         drawn = state
         screen.fill((0, 0, 0))
         screen.blit(pygame.transform.scale(picture_surface(pygame, viewer),
                                            (width, height)), (0, 0))
+        # the image being traced, over the picture and half seen through
+        found = viewer.trace_file() if viewer.trace_on else None
+        if found:
+            image = traced(found)
+            if isinstance(image, Exception):
+                viewer.error = f"{os.path.basename(found)} will not read: {image}"
+            else:
+                image[0].set_alpha(round(viewer.trace_alpha * 255))
+                screen.blit(image[0], image[1])
         # the points that can be dragged, and what is being drawn
         if viewer.tool == SELECT:
             for _, _, point in viewer.handles():
@@ -631,6 +711,8 @@ def run(path, picture=None, machine=None, scale=3):
                  f"{tool}: {what}"
                  + ("  (snapping to cells)" if viewer.snap else ""))
         screen.blit(font.render(doing, True, RUBBER), (6, y))
+        y += line
+        screen.blit(font.render(viewer.trace_said(), True, HANDLE), (6, y))
         y += line
         if viewer.error:
             screen.blit(font.render(viewer.error, True, (255, 90, 90)), (6, y))

@@ -149,7 +149,7 @@ def cmd_draw(args):
         sys.exit(f"ERROR: there is nothing to draw {args.machine} with; "
                  f"try one of {', '.join(SPECTRUM_MACHINES)}")
     try:
-        run(args.input, args.picture, args.machine, args.scale)
+        run(args.input, args.picture, args.machine, args.scale, args.trace)
     except ValueError as e:
         sys.exit(f"ERROR: {e}")
 
@@ -747,6 +747,8 @@ def main():
                         "pcw, next or cga, which is the PC's (default: the "
                         "first the adventure can be drawn on)")
     p.add_argument("-s", "--scale", type=int, default=3, help="pixel scale")
+    p.add_argument("--trace", help="an image to draw over, or a folder with "
+                                   "one to each picture, named 12.png")
     p.set_defaults(func=cmd_draw)
 
     p = sub.add_parser("play", help="play a file of orders, and say whether "
