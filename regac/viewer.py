@@ -56,6 +56,12 @@ SOURCE_LABEL = {"spectrum": "spectrum48", "cpc": "cpc", "msx": "msx",
 
 HIGHLIGHT = (255, 0, 255)       # what the last order laid is lit up in
 
+# What a click does: moves a point, or draws one of these.  The keys that
+# choose them are their initials, and B for the fill that wipes.
+SELECT = "select"
+ONE_POINT = ("PLOT", "FILL", "BGFILL", "SHADE")
+TWO_POINTS = ("LINE", "RECT", "ELLIPSE")
+
 
 def machines_for(ddb):
     return AMSTRAD_MACHINES if from_an_amstrad(ddb) else SPECTRUM_MACHINES
@@ -191,6 +197,11 @@ class Viewer:
         self.highlight = True
         self.stamp = None
         self.steps = None
+        self.tool = SELECT              # what a click does
+        self.pending = None             # the first point of a two point order
+        self.dragging = None            # (step, which point) being dragged
+        self.snap = False               # points to the corners of cells
+        self.taken_back = []            # (before, after) of every edit
         self.reload()
         if self.ddb is None:
             raise ValueError(self.error)
@@ -285,6 +296,161 @@ class Viewer:
             self.error = str(e)
         self.show(count)
 
+    # -- drawing ------------------------------------------------------------
+    #
+    # What is drawn is written into the source at once, as a line of the
+    # picture's entry, and the source read again: the window shows what the
+    # source says and nothing else.  A new order goes after the one the
+    # cursor is on -- a fill depends on what is drawn before it -- and belongs
+    # to the picture being looked at, even when the cursor is inside one it
+    # calls: that goes after the CALL.  Only the picture's own orders can be
+    # dragged or taken out; one of a picture it calls is changed in that one.
+
+    def editable(self):
+        from .gfxedit import Picture
+
+        return Picture(self.path, self.picture,
+                       SOURCE_LABEL.get(self.machine, self.machine))
+
+    def at_cursor(self):
+        """How many of the picture's own orders are drawn at the cursor,
+        which is where a new one goes."""
+        drawn = 0
+        for depth, _, number, _ in self.steps.steps[:self.steps.count]:
+            if depth == 0:
+                drawn = number
+        return drawn
+
+    def cursor_to(self, number):
+        """The cursor just after the picture's own order `number`."""
+        for at, (depth, _, n, _) in enumerate(self.steps.steps):
+            if depth == 0 and n == number:
+                self.steps.go(at + 1)
+                return
+        self.steps.go(0)
+
+    def write(self, make):
+        """Write what `make` makes of the picture's lines into the source,
+        keep it to be taken back, and read the source again."""
+        picture = self.editable()
+        if picture.why_not:
+            self.error = picture.why_not
+            return False
+        text = make(picture)
+        self.taken_back.append((picture.text, text))
+        picture.write(text)
+        self.reload()
+        return self.error is None
+
+    def add(self, text):
+        """An order, as it is written, after the one at the cursor."""
+        at = self.at_cursor()
+        if self.write(lambda p: p.inserted(at, text)):
+            self.cursor_to(at + 1)
+
+    def delete(self):
+        """Take out the order at the cursor, if it is the picture's own."""
+        if not self.steps.count:
+            return
+        depth, _, number, _ = self.steps.steps[self.steps.count - 1]
+        if depth:
+            self.error = ("that order is the picture's it calls: take it out "
+                          "of that one")
+            return
+        if self.write(lambda p: p.deleted(number - 1)):
+            self.cursor_to(number - 1)
+
+    def move(self, step, which, point):
+        """Put point `which` of the order of step `step` at `point`."""
+        from .gfxedit import moved, written
+
+        depth, _, number, order = self.steps.steps[step]
+        count = self.steps.count
+        if self.write(lambda p: p.rewritten(
+                number - 1, written(moved(order, which, point)))):
+            self.steps.go(count)
+
+    def take_back(self):
+        """Undo the last edit, if the source is still what it left."""
+        if not self.taken_back:
+            return
+        before, after = self.taken_back.pop()
+        with open(self.path, encoding="utf-8", newline="") as f:
+            now = f.read()
+        if now != after:
+            self.error = "the source was changed since: nothing taken back"
+            self.taken_back.clear()
+            return
+        with open(self.path, "w", encoding="utf-8", newline="") as f:
+            f.write(before)
+        count = self.steps.count
+        self.reload()
+        self.steps.go(count)
+
+    def handles(self):
+        """The points that can be dragged: (step, which, point), of the
+        picture's own orders drawn so far."""
+        from .gfxedit import points_of
+
+        out = []
+        for at, (depth, _, _, order) in enumerate(
+                self.steps.steps[:self.steps.count]):
+            if depth == 0:
+                out += [(at, which, point)
+                        for which, point in enumerate(points_of(order))]
+        return out
+
+    def handle_at(self, point, reach=4):
+        """The handle nearest `point`, the latest order first, within
+        `reach` of it in the coordinates of the orders."""
+        best = None
+        for handle in reversed(self.handles()):
+            far = max(abs(handle[2][0] - point[0]), abs(handle[2][1] - point[1]))
+            if far <= reach and (best is None or far < best[0]):
+                best = (far, handle)
+        return best[1] if best else None
+
+    def snapped(self, point):
+        """A point, to the corner of its cell of eight if snapping."""
+        x, y = point
+        if self.snap:
+            x = min(SOURCE_WIDTH - 1, round(x / 8) * 8)
+            y = MAX_Y - min(SOURCE_ROWS - 1, round((MAX_Y - y) / 8) * 8)
+        return x, y
+
+    def choose(self, tool):
+        self.tool = tool
+        self.pending = None
+        self.dragging = None
+
+    def press(self, point):
+        """The button went down on `point`."""
+        x, y = self.snapped(point)
+        if self.tool == SELECT:
+            self.dragging = self.handle_at(point)
+        elif self.tool in ONE_POINT:
+            self.add(f"{self.tool} {x} {y}")
+        elif self.pending is None:
+            self.pending = (x, y)
+        else:
+            x0, y0 = self.pending
+            self.pending = None
+            self.add(f"{self.tool} {x0} {y0} {x} {y}")
+
+    def release(self, point):
+        """The button came up on `point`: the end of a drag."""
+        if self.dragging is None:
+            return
+        step, which, was = self.dragging
+        self.dragging = None
+        point = self.snapped(point)
+        if point != was:
+            self.move(step, which, point)
+
+    def cancel(self):
+        self.pending = None
+        self.dragging = None
+
     # -- what is said about it --------------------------------------------
 
     def lines(self, pointer=None):
@@ -304,8 +470,26 @@ class Viewer:
         return out
 
 
-KEYS_HELP = ("left/right an order (shift ten, ctrl a hundred)  home/end  "
-             "page up/down a picture  m machine  h light  q quit")
+KEYS_HELP = (
+    "left/right an order (shift ten, ctrl a hundred)  home/end  "
+    "page up/down a picture  m machine  h light  q quit",
+    "draw: l line  r rect  e ellipse  p plot  f fill  b bgfill  s shade  "
+    "v move points",
+    "g snap to cells  del take out  enter write an order  ctrl-z undo  "
+    "right button or esc: let go",
+)
+TOOL_KEYS = {"l": "LINE", "r": "RECT", "e": "ELLIPSE", "p": "PLOT",
+             "f": "FILL", "b": "BGFILL", "s": "SHADE", "v": SELECT}
+WHAT_NEXT = {SELECT: "drag a point to move it",
+             "LINE": "click the two ends", "RECT": "click two corners",
+             "ELLIPSE": "click the centre, then how far it reaches",
+             "PLOT": "click the point", "FILL": "click where it starts",
+             "BGFILL": "click where it starts", "SHADE": "click where it starts"}
+# and once the first point is down
+SECOND = {"LINE": "click the other end", "RECT": "click the other corner",
+          "ELLIPSE": "click how far it reaches"}
+RUBBER = (255, 220, 0)          # what is being drawn, before it is
+HANDLE = (0, 200, 255)
 
 
 def run(path, picture=None, machine=None, scale=3):
@@ -318,66 +502,142 @@ def run(path, picture=None, machine=None, scale=3):
     width, height = SOURCE_WIDTH * scale, SOURCE_ROWS * scale
     font = pygame.font.Font(None, 22)
     line = font.get_linesize()
-    panel = line * 6 + 8
+    panel = line * 10 + 8
     screen = pygame.display.set_mode((width, height + panel))
     pygame.display.set_caption(f"regac draw {os.path.basename(path)}")
     clock = pygame.time.Clock()
     pointer = None
+    typing = None                       # an order being written, or None
     drawn = None                        # what the window was drawn from
     idle = 0
+
+    def on_screen(point):
+        x, y = point
+        return (int((x + 0.5) * width / SOURCE_WIDTH),
+                int((MAX_Y - y + 0.5) * height / SOURCE_ROWS))
+
     while True:
         for event in pygame.event.get():
+            drawn = None
             if event.type == pygame.QUIT:
                 pygame.quit()
                 return
             if event.type == pygame.MOUSEMOTION:
                 pointer = gac_point(*event.pos, width, height)
-            if event.type != pygame.KEYDOWN:
-                continue
-            shift = event.mod & pygame.KMOD_SHIFT
-            stride = 100 if event.mod & pygame.KMOD_CTRL else 10 if shift else 1
-            key = event.key
-            if key in (pygame.K_q, pygame.K_ESCAPE):
-                pygame.quit()
-                return
-            elif key == pygame.K_RIGHT:
-                viewer.step(stride)
-            elif key == pygame.K_LEFT:
-                viewer.step(-stride)
-            elif key == pygame.K_HOME:
-                viewer.first()
-            elif key == pygame.K_END:
-                viewer.last()
-            elif key == pygame.K_PAGEDOWN:
-                viewer.other_picture(1)
-            elif key == pygame.K_PAGEUP:
-                viewer.other_picture(-1)
-            elif key == pygame.K_m:
-                viewer.other_machine(-1 if shift else 1)
-            elif key == pygame.K_h:
-                viewer.highlight = not viewer.highlight
-            drawn = None
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                at = gac_point(*event.pos, width, height)
+                if event.button == 3:
+                    viewer.cancel()
+                elif event.button == 1 and at:
+                    viewer.press(at)
+            elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+                at = gac_point(*event.pos, width, height)
+                if at:
+                    viewer.release(at)
+                else:
+                    viewer.cancel()
+            elif event.type == pygame.TEXTINPUT and typing is not None:
+                typing += event.text.upper()
+            elif event.type == pygame.KEYDOWN:
+                key = event.key
+                if typing is not None:
+                    if key == pygame.K_RETURN:
+                        if typing.strip():
+                            viewer.add(typing)
+                        typing = None
+                    elif key == pygame.K_ESCAPE:
+                        typing = None
+                    elif key == pygame.K_BACKSPACE:
+                        typing = typing[:-1]
+                    continue
+                shift = event.mod & pygame.KMOD_SHIFT
+                ctrl = event.mod & pygame.KMOD_CTRL
+                stride = 100 if ctrl else 10 if shift else 1
+                name = pygame.key.name(key)
+                if key == pygame.K_q:
+                    pygame.quit()
+                    return
+                elif key == pygame.K_ESCAPE:
+                    viewer.cancel()
+                    viewer.choose(SELECT)
+                elif ctrl and key == pygame.K_z:
+                    viewer.take_back()
+                elif key == pygame.K_RIGHT:
+                    viewer.step(stride)
+                elif key == pygame.K_LEFT:
+                    viewer.step(-stride)
+                elif key == pygame.K_HOME:
+                    viewer.first()
+                elif key == pygame.K_END:
+                    viewer.last()
+                elif key == pygame.K_PAGEDOWN:
+                    viewer.other_picture(1)
+                elif key == pygame.K_PAGEUP:
+                    viewer.other_picture(-1)
+                elif key == pygame.K_m:
+                    viewer.other_machine(-1 if shift else 1)
+                elif key == pygame.K_h:
+                    viewer.highlight = not viewer.highlight
+                elif key == pygame.K_g:
+                    viewer.snap = not viewer.snap
+                elif key == pygame.K_DELETE:
+                    viewer.delete()
+                elif key == pygame.K_RETURN:
+                    typing = ""
+                elif name in TOOL_KEYS:
+                    viewer.choose(TOOL_KEYS[name])
         idle += clock.tick(30)
         if idle >= 300:                 # a look at the file three times a second
             idle = 0
             if viewer.changed():
                 drawn = None
         state = (viewer.steps, viewer.steps.count, viewer.highlight, pointer,
-                 viewer.error)
+                 viewer.error, viewer.tool, viewer.pending, viewer.dragging,
+                 viewer.snap, typing)
         if state == drawn:
             continue
         drawn = state
         screen.fill((0, 0, 0))
         screen.blit(pygame.transform.scale(picture_surface(pygame, viewer),
                                            (width, height)), (0, 0))
+        # the points that can be dragged, and what is being drawn
+        if viewer.tool == SELECT:
+            for _, _, point in viewer.handles():
+                x, y = on_screen(point)
+                pygame.draw.rect(screen, HANDLE, (x - 3, y - 3, 7, 7), 1)
+        if viewer.dragging and pointer:
+            pygame.draw.circle(screen, RUBBER,
+                               on_screen(viewer.snapped(pointer)), 5, 1)
+        if viewer.pending and pointer:
+            a, b = on_screen(viewer.pending), on_screen(viewer.snapped(pointer))
+            if viewer.tool == "LINE":
+                pygame.draw.line(screen, RUBBER, a, b)
+            elif viewer.tool == "RECT":
+                pygame.draw.rect(screen, RUBBER, (min(a[0], b[0]), min(a[1], b[1]),
+                                                  abs(b[0] - a[0]) + 1,
+                                                  abs(b[1] - a[1]) + 1), 1)
+            elif viewer.tool == "ELLIPSE":
+                rx, ry = abs(b[0] - a[0]), abs(b[1] - a[1])
+                if rx and ry:
+                    pygame.draw.ellipse(screen, RUBBER,
+                                        (a[0] - rx, a[1] - ry, 2 * rx, 2 * ry), 1)
         y = height + 4
         for text in viewer.lines(pointer):
             screen.blit(font.render(text, True, (230, 230, 230)), (6, y))
             y += line
+        tool = viewer.tool if viewer.tool == SELECT else viewer.tool.lower()
+        what = SECOND[viewer.tool] if viewer.pending else WHAT_NEXT[viewer.tool]
+        doing = (f"write an order: {typing}_" if typing is not None else
+                 f"{tool}: {what}"
+                 + ("  (snapping to cells)" if viewer.snap else ""))
+        screen.blit(font.render(doing, True, RUBBER), (6, y))
+        y += line
         if viewer.error:
             screen.blit(font.render(viewer.error, True, (255, 90, 90)), (6, y))
         y += line
-        screen.blit(font.render(KEYS_HELP, True, (140, 140, 140)), (6, y))
+        for text in KEYS_HELP:
+            screen.blit(font.render(text, True, (140, 140, 140)), (6, y))
+            y += line
         pygame.display.flip()
 
 

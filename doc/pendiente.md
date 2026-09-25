@@ -4252,6 +4252,40 @@ el suyo.
   que el faro no tiene. En las máquinas un mensaje que no hay no escribe nada
   y los números salen igual; ahora aquí también.
 
+## El editor de láminas
+
+La fase dos de lo propuesto después de la 0.1.0. **Decidido por el usuario**:
+es el mismo `regac draw`, no otra orden; una orden nueva va detrás de la del
+cursor; y los puntos se arrastran, con los números de la línea escritos otra
+vez y un nombre de `.def` que hubiera en ellos pasado a número.
+
+- **Lo que se dibuja se escribe en el fuente en el acto** y el fuente se lee
+  otra vez: la ventana enseña lo que el fuente dice. La escritura está en
+  `regac/gfxedit.py`, sin ventana: una línea entra, sale o se reescribe, con
+  la sangría de las de al lado, el comentario del final de la línea y los
+  finales de línea que tuviera el fichero.
+- **Para saber qué línea es cada orden**, el analizador guarda ahora de dónde
+  sale cada una (`parse_with_places`), con lo que ya guardaba para los errores
+  dentro de un `.include`.
+- **No escribe donde no puede estar seguro de qué**: una lámina de otro
+  fichero, un bloque con `.if` --una línea metida ahí sería de unas máquinas y
+  no de otras sin que nadie lo dijera--, o un JSON.
+- **Lo nuevo pertenece a la lámina que se mira**: con el cursor dentro de una
+  que ella llama con `CALL`, va detrás del `CALL`. Sólo se arrastran y se
+  quitan las órdenes propias.
+- Ctrl+Z deshace, y no deshace encima de un cambio que alguien haya hecho en
+  el fuente después: lo dice y se para.
+
+Pruebas en `tests/test_gfxedit.py`: la escritura, los ficheros en los que no
+escribe, cada herramienta en el visor sin ventana, arrastrar, quitar, deshacer
+y la ventana entera con el ratón. Visto en una captura, con un rectángulo a
+medio dibujar. **Sin ver en una pantalla de verdad**: todo se ha probado con
+el controlador de vídeo `dummy` de SDL.
+
+Lo que quedaba propuesto de la herramienta: el calco sobre una imagen de fondo,
+los avisos mientras se dibuja --fugas de un relleno, bytes, tiempo contra el
+tope de 4-5 s-- e importar SVG.
+
 ## Las elipses del faro, y lo que `gac.md` decía de ellas
 
 Al empezar el editor de láminas, que tiene que saber qué punto de una

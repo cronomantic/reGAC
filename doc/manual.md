@@ -357,6 +357,32 @@ está el ratón en las coordenadas de las órdenes**, `x` desde la izquierda e
 lámina. Si el fuente guardado tiene un error, lo dice y deja la última lámina
 buena.
 
+Y **se dibuja en ella**, con el ratón, y lo dibujado se escribe en el fuente
+en el acto, como una línea más de la lámina:
+
+| tecla | qué hace un clic |
+|---|---|
+| `l`, `r`, `e` | una recta, un rectángulo o una elipse: dos clics |
+| `p`, `f`, `b`, `s` | un punto, `FILL`, `BGFILL` o `SHADE`: un clic |
+| `v` | mover: se arrastra un punto de una orden, marcado con un cuadrito |
+
+Una orden nueva va **detrás de la orden en la que está el cursor**, y no al
+final: con las flechas se vuelve atrás y se mete una recta antes de un relleno,
+que es lo que decide hasta dónde llega. Enter deja escribir una orden a mano
+(`INK 3`, `CALL 10`), Supr quita la orden del cursor, Ctrl+Z deshace, `g`
+ajusta los clics a las esquinas de las celdas de ocho, y el botón derecho o Esc
+sueltan lo que se estaba dibujando.
+
+Se escribe como lo escribiría una persona: una línea que entra, sale o cambia,
+con la sangría de las de al lado, y el comentario del final de una línea se
+queda. Un punto arrastrado reescribe los números de su línea, y **un nombre de
+`.def` que hubiera ahí pasa a ser número**. El fuente puede estar abierto a la
+vez en el editor de texto. No escribe en una lámina que está en otro fichero
+—traído con `.include`: se abre ése— ni en una que guarda líneas para algunas
+máquinas con `.if`, que se retoca a mano; y lo que se dibuja pertenece a la
+lámina que se está mirando, aunque el cursor esté dentro de otra que ella
+llama.
+
 ### `/FONT` — la tipografía
 
 Entera, con `file`, o letra a letra.

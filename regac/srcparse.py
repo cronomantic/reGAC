@@ -358,6 +358,10 @@ class Parser:
         self.folder = folder or "."     # what a file= is relative to
         self.pending_exits = {}  # location id -> [(word or number, dest)]
         self.font_chars = 0
+        # Where each picture is written: the line of its header and the line
+        # of each of its orders, as (file, number) -- for regac draw, which
+        # writes what is drawn back into the source.
+        self.gfx_places = {}
         self.ddb = {
             "font": [],
             "verbs": {},
@@ -722,6 +726,9 @@ class Parser:
             if "inks" in a:
                 self.ddb.setdefault("gfx_inks", {})[gid] = self.inks(a["inks"])
             insts = []
+            place = {"head": self.origins[first - 2], "orders": [],
+                     "last": self.origins[first - 2 + len(body)]}
+            self.gfx_places[gid] = place
             for number, raw in enumerate(body):
                 st = strip_comment(raw).strip()
                 if not st:
@@ -744,6 +751,7 @@ class Parser:
                 insts.append([cmd] + [self.number(p, "a number for a "
                                                   "drawing command")
                                       for p in parts[1:]])
+                place["orders"].append(self.origins[lineno - 1])
             self.ddb["gfx"][gid] = insts
 
     def inks(self, written):
@@ -900,3 +908,14 @@ def parse(text, name="adventure", folder=None, machine=None):
     folder = folder or "."
     lines, origins, defs = read_source(text, name, folder, machine)
     return Parser(lines, origins, defs, name, folder).parse()
+
+
+def parse_with_places(text, name="adventure", folder=None, machine=None):
+    """The same, and where every picture is written: {picture: {"head":
+    (file, line), "orders": [(file, line), ...], "last": (file, line)}},
+    "last" being the last line of its entry, blank or comment as it may
+    be."""
+    folder = folder or "."
+    lines, origins, defs = read_source(text, name, folder, machine)
+    parser = Parser(lines, origins, defs, name, folder)
+    return parser.parse(), parser.gfx_places
