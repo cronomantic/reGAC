@@ -35,6 +35,7 @@ was never written.  It has been there since 1987.
 
 import json
 import os
+import subprocess
 import sys
 
 try:
@@ -240,3 +241,30 @@ if __name__ == "__main__":
         if name.startswith("test_"):
             test()
             print(name[5:].replace("_", " "))
+
+
+def regac(*args):
+    return subprocess.run([sys.executable, "-m", "regac", *args], cwd=ROOT,
+                          capture_output=True, text=True, encoding="utf-8",
+                          env=dict(os.environ, PYTHONIOENCODING="utf-8"))
+
+
+def test_check_and_text_take_a_source_as_well():
+    """They took only the JSON, and a source gave a trace of the JSON reader.
+    Now they read either, as lint, map and play do."""
+    source = os.path.join(ROOT, "ejemplo", "faro.gac")
+    said = regac("check", source)
+    assert said.returncode == 0, said.stderr
+    assert "faro.gac: round trip exact" in said.stdout
+    assert "nothing points anywhere it should not" in said.stdout
+    said = regac("text", source)
+    assert said.returncode == 0, said.stderr
+    assert "packed" in said.stdout
+
+
+def test_a_source_where_only_a_json_goes_is_said_plainly():
+    said = regac("render", os.path.join(ROOT, "ejemplo", "faro.gac"), "x.png")
+    assert said.returncode == 1
+    assert "Traceback" not in said.stderr
+    assert "is not a JSON database" in said.stderr
+    assert "regac compile" in said.stderr

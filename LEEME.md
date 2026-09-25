@@ -73,13 +73,13 @@ se midió, en qué orden y por qué.
 |---|---|
 | `regac compile juego.gac juego.json` | el fuente en base de datos, o dice dónde está mal |
 | `regac decompile juego.json juego.gac` | y al revés |
-| `regac check juego.json` | que nada apunte a algo que no existe |
+| `regac check juego.gac` | que nada apunte a algo que no existe |
 | `regac lint juego.gac` | lo que está y nada usa |
 | `regac map juego.gac mapa.svg` | el mapa de las salas |
 | `regac play juego.gac solucion.txt` | juega un fichero de órdenes y dice si la partida acaba |
 | `regac draw juego.gac 12 -m cpc` | una lámina en una ventana: se mira, se dibuja, se calca, se mide |
 | `regac render juego.json laminas/` | las láminas como PNG |
-| `regac text juego.json` | lo que ocupa el texto empaquetado |
+| `regac text juego.gac` | lo que ocupa el texto empaquetado |
 | `regac make juego.toml --zip juego.zip` | todas las máquinas que nombra un proyecto |
 | `regac build`, `regac release` | una máquina, a mano |
 

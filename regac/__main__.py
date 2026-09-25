@@ -50,8 +50,29 @@ VERSION = "0.3.0"
 
 
 def read_json(path):
-    with open(path, encoding="utf-8") as f:
-        return json.load(f)
+    """A JSON database, for the commands that take nothing else; and what is
+    wrong with it said plainly, not as a trace of the JSON reader."""
+    try:
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+    except OSError as e:
+        sys.exit(_("ERROR: {what}", what=e))
+    except ValueError as e:
+        sys.exit(_("ERROR: {path} is not a JSON database ({why}); a source is "
+                   "made into one with regac compile", path=path, why=e))
+
+
+def read_either(args):
+    """A source, read for the machine asked for, or a JSON database."""
+    from .viewer import read_adventure
+
+    try:
+        return read_adventure(args.input, args.machine)
+    except (SourceError, OSError) as e:
+        sys.exit(_("ERROR: {what}", what=e))
+    except ValueError as e:
+        sys.exit(_("ERROR: {path} is not a JSON database ({why})",
+                   path=args.input, why=e))
 
 
 def write_json(path, ddb):
@@ -90,7 +111,7 @@ def cmd_check(args):
     adventure come back the same?  The rest is about the adventure: does every
     number that points at something point at something that is there?
     """
-    original = read_json(args.input)
+    original = read_either(args)
     name = os.path.basename(args.input)
     wrong = False
     try:
@@ -262,7 +283,7 @@ def cmd_checkgfx(args):
 
 def cmd_text(args):
     """Report what the text of an adventure costs once packed."""
-    ddb = read_json(args.input)
+    ddb = read_either(args)
     texts = list(ddb["messages"].values())
     texts += [o["name"] for o in ddb["objects"].values()]
     texts += [l["desc"] for l in ddb["locations"].values()]
@@ -855,11 +876,21 @@ def main():
     p.set_defaults(func=cmd_make)
 
     p = sub.add_parser("text", help=_("report what the text costs once packed"))
-    p.add_argument("input", help=_("JSON database"))
+    p.add_argument("input", help=_("source file, or JSON database"))
+    p.add_argument("-m", "--machine", default="spectrum48",
+                   choices=sorted(MACHINE_LABELS),
+                   help=_("which machine to read a source for, for one that "
+                          "keeps some lines for some of them"))
     p.set_defaults(func=cmd_text)
 
-    p = sub.add_parser("check", help=_("verify that a database survives a round trip"))
-    p.add_argument("input", help=_("JSON database"))
+    p = sub.add_parser("check", help=_("verify that an adventure survives a "
+                                       "round trip and points nowhere it "
+                                       "should not"))
+    p.add_argument("input", help=_("source file, or JSON database"))
+    p.add_argument("-m", "--machine", default="spectrum48",
+                   choices=sorted(MACHINE_LABELS),
+                   help=_("which machine to read a source for, for one that "
+                          "keeps some lines for some of them"))
     p.set_defaults(func=cmd_check)
 
     args = parser.parse_args()

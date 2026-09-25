@@ -204,8 +204,16 @@ SAID = {
         "y todo lo construido en este zip, una carpeta por máquina",
     "report what the text costs once packed":
         "dice cuánto ocupa el texto una vez empaquetado",
-    "verify that a database survives a round trip":
-        "comprueba que una base de datos sobrevive a la ida y vuelta",
+    "verify that an adventure survives a round trip and points nowhere it "
+    "should not":
+        "comprueba que una aventura sobrevive a la ida y vuelta y no apunta "
+        "a donde no debe",
+    "ERROR: {path} is not a JSON database ({why}); a source is made into one "
+    "with regac compile":
+        "ERROR: {path} no es una base de datos JSON ({why}); una fuente se "
+        "convierte en una con regac compile",
+    "ERROR: {path} is not a JSON database ({why})":
+        "ERROR: {path} no es una base de datos JSON ({why})",
 
     # -- binary ---------------------------------------------------------------
     "constant {value} does not fit": "la constante {value} no cabe",

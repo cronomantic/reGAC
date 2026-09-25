@@ -76,13 +76,13 @@ made: what was measured, in what order and why.
 |---|---|
 | `regac compile game.gac game.json` | the source into a database, or says where it is wrong |
 | `regac decompile game.json game.gac` | and back |
-| `regac check game.json` | that nothing points at something that is not there |
+| `regac check game.gac` | that nothing points at something that is not there |
 | `regac lint game.gac` | what is there and nothing uses |
 | `regac map game.gac map.svg` | the map of the rooms |
 | `regac play game.gac solution.txt` | plays a file of orders and says whether the game ended |
 | `regac draw game.gac 12 -m cpc` | a picture in a window: looked at, drawn on, traced, timed |
 | `regac render game.json pictures/` | the pictures as PNG |
-| `regac text game.json` | what the text takes, packed |
+| `regac text game.gac` | what the text takes, packed |
 | `regac make game.toml --zip game.zip` | every machine a project names |
 | `regac build`, `regac release` | one machine at a time, by hand |
 

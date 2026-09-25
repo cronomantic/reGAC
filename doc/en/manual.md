@@ -137,9 +137,9 @@ All of it is in [`project.md`](project.md).
 Write, check, build. The checks are quick and ask for no assembler:
 
     python -m regac compile  faro.gac faro.json     # is it well written?
-    python -m regac check    faro.json              # does it point at nothing?
+    python -m regac check    faro.gac               # does it point at nothing?
     python -m regac checkgfx faro.json -m cpc       # does a picture spill?
-    python -m regac text     faro.json              # what does the text take?
+    python -m regac text     faro.gac               # what does the text take?
     python -m regac render   faro.json pictures/    # the pictures as PNG
     python -m regac draw     faro.gac 1             # a picture, live
     python -m regac lint     faro.gac               # is anything left over?
@@ -153,6 +153,11 @@ database survives a whole round trip -- what was compiled, decompiled and
 compiled again, comes out the same -- and that nothing points at a room, an
 object or a message that is not there. **`text`** says what the packed text
 takes, which is what decides whether an adventure fits in a 464.
+
+`check`, `text`, `lint`, `map`, `play` and `draw` read the source or the
+database, either; `-m` says which machine to read a source for when it keeps
+lines for some. `decompile`, `render`, `checkgfx` and `build` read only the
+database, and given a source they say to compile it first.
 
 **`lint`** looks the other way from `check`: at what is there and nothing
 uses. A room no way leads to and no `GOTO` names, an object nothing can pick

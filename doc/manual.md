@@ -134,9 +134,9 @@ Escribir, comprobar, construir. Las comprobaciones son rápidas y no piden
 ensamblador:
 
     python -m regac compile  faro.gac faro.json     # ¿está bien escrito?
-    python -m regac check    faro.json              # ¿apunta a algo que no existe?
+    python -m regac check    faro.gac               # ¿apunta a algo que no existe?
     python -m regac checkgfx faro.json -m cpc       # ¿se sale alguna lámina?
-    python -m regac text     faro.json              # ¿cuánto ocupan los textos?
+    python -m regac text     faro.gac               # ¿cuánto ocupan los textos?
     python -m regac render   faro.json laminas/     # las láminas como PNG
     python -m regac draw     faro.gac 1             # una lámina, en vivo
     python -m regac lint     faro.gac               # ¿sobra algo?
@@ -150,6 +150,11 @@ de datos sobrevive a una vuelta entera —decompilar lo compilado y volver a
 compilarlo da lo mismo— y que nada apunta a una sala, un objeto o un mensaje
 que no exista. **`text`** dice lo que ocupan los textos empaquetados, que es
 lo que decide si una aventura cabe en un 464.
+
+`check`, `text`, `lint`, `map`, `play` y `draw` leen el fuente o la base de
+datos, lo mismo da; con `-m` se dice para qué máquina leer un fuente que
+guarda líneas para algunas. `decompile`, `render`, `checkgfx` y `build` leen
+sólo la base de datos, y con un fuente dicen que lo compile antes.
 
 **`lint`** mira lo contrario que `check`: lo que está y nada usa. Una sala a
 la que no lleva ninguna salida ni ningún `GOTO`, un objeto que nada puede

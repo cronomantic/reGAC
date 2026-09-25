@@ -4233,9 +4233,14 @@ del sistema, español o inglés, y con `REGAC_LANG` para elegir uno por encima.
   de la herramienta.
 - Los docstrings, los comentarios y este diario.
 
-**Visto al probarlo, y sin tocar:** `regac check` y `regac text` esperan la
-base de datos JSON, como dicen su ayuda y el README; con un `.gac` se caen con
-una traza de `json` en vez de decirlo. Ya pasaba antes.
+**Visto al probarlo:** `regac check` y `regac text` esperaban la base de
+datos JSON, y con un `.gac` se caían con una traza de `json`. **Arreglado a
+petición del usuario**, después de la 0.3.0: leen el fuente o el JSON, como
+`lint`, `map` y `play`, con `-m` para el fuente que guarda líneas para
+algunas máquinas; `check` de un fuente hace la ida y vuelta de lo que el
+fuente compila. Las que siguen leyendo sólo JSON --`decompile`, `render`,
+`checkgfx`, `build`-- dicen, con un fuente, que no es una base de datos y que
+se hace una con `regac compile`, sin traza. Está en `test_check.py`.
 
 **La 0.3.0**, pedida por el usuario, es la primera release con la
 herramienta dentro (`regac-v0.3.0.zip`), las guías en dos idiomas y los
