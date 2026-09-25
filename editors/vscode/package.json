@@ -2,7 +2,7 @@
   "name": "regac-gac",
   "displayName": "GAC (reGAC)",
   "description": "Colours for the source of a Graphic Adventure Creator adventure, as reGAC reads it.",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "publisher": "cronomantic",
   "license": "GPL-3.0-or-later",
   "engines": {
