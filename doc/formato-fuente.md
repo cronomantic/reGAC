@@ -49,6 +49,9 @@ Dentro del texto hay **comandos**, que empiezan por barra invertida:
 | Comando | Qué hace |
 |---|---|
 | `\ink n` | lo que sigue **de este mensaje** se imprime en el color n |
+| `\ctr n` | lo que vale el contador n, de 0 a 127 |
+| `\obj n` | el nombre del objeto n, de 1 a 255 |
+| `\turns` | los turnos jugados, que ocupan los contadores 126 y 127 |
 | `\\` | una barra invertida de verdad |
 
     #14
@@ -69,6 +72,18 @@ lámina.
 tinta de siempre, de modo que no hace falta devolverla antes de acabar y uno
 que se la deje puesta no tiñe lo que venga detrás. Lo que se pierde es pintar
 a lo largo de varios mensajes, que cuesta un `\ink` en el segundo.
+
+Los otros tres son **huecos**, y no son de GAC: se llenan al escribirse. Un
+hueco es texto y forma parte de la palabra en la que está --`\obj 3.` no se
+separa de su punto al partir la línea--, así que no se come los espacios que
+lo siguen. Van, como `\ink`, detrás del código 1, con una letra que los
+colores no usan (`T`, `C` y `O`) y el número en dos caracteres de cuatro bits,
+para que se empaqueten como el resto del texto. Valen en todos los textos; un
+nombre de objeto puede llevar `\ctr` y `\turns` pero no `\obj`, que podría
+nombrarse a sí mismo, y la construcción se niega. El número se escribe con
+cifras: un nombre de `.def` no vale dentro del texto. Y una cifra justo detrás
+del número se leería como parte de él: `\ctr 5` seguido de `0 veces` no se
+puede escribir pegado.
 
 | Sección  | Contenido                                                   |
 |----------|-------------------------------------------------------------|

@@ -60,6 +60,21 @@ print_object_name:
                 ld      d, (hl)                 ; where its name is in the store
                 jp      print_packed
 
+; The same, inside another text: the word it is in is not ended, so what
+; follows the name, a full stop, goes with it.  For a hole, \obj n.
+; Corrupts: everything
+                IFDEF   HOLES
+print_object_within:
+                call    obj_record
+                ret     c
+                ld      de, 4
+                add     hl, de
+                ld      e, (hl)
+                inc     hl
+                ld      d, (hl)
+                jp      unpack_message
+                ENDIF
+
 ; The names of the objects that are in room (list_room), with a comma between
 ; them, the way the original writes both an inventory and what is lying about.
 ; With (list_quiet) set nothing is printed and the walk only answers whether
@@ -242,6 +257,11 @@ print_powers:   dw      10000, 1000, 100, 10, 1
 ; Corrupts: everything
 print_digit:
                 add     a, DIGIT_ZERO           ; a code is its own ASCII here
+                IFDEF   HOLES
+                ld      hl, digit_within
+                bit     0, (hl)
+                jp      nz, text_put            ; in a hole: part of its word
+                ENDIF
                 ld      (digit_char), a
                 ld      hl, digit_char
                 ld      bc, 1

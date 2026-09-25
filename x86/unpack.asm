@@ -60,6 +60,16 @@ message_offset:
 ; of the message it is in: see z80/common/unpack.asm.
 ; Corrupts: everything but DS
 print_packed:
+                call    unpack_message
+                call    text_end                ; the last word goes out
+                mov     al, [text_ink_start]    ; and the ink goes back
+                jmp     text_ink
+
+; Unpack message DX into the printer, and nothing else: the word it ends in is
+; left open and the ink as it is, for a hole that prints an object's name
+; inside another text.
+; Corrupts: everything but DS
+unpack_message:
                 call    message_offset
                 mov     cx, ax                  ; where it starts
                 inc     dx
@@ -81,9 +91,7 @@ print_packed:
                 pop     si
                 jmp     .next
 .ended:
-                call    text_end                ; the last word goes out
-                mov     al, [text_ink_start]    ; and the ink goes back
-                jmp     text_ink
+                ret
 
 ; Expand one code, AL, and print what it stands for: the left half of a pair
 ; first, by calling itself, and the right half after.

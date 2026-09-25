@@ -10,8 +10,12 @@
 ; This knows nothing about the screen beyond how wide it is and where the
 ; cursor sits, which screen.asm says.
 
-INK_CODE        equ 1                   ; the next code is a colour
-INK_ZERO        equ 48                  ; which rides as a character
+INK_CODE        equ 1                   ; the next code says which command
+INK_ZERO        equ 48                  ; a colour rides as a character
+INK_COLOURS     equ 16
+HOLE_TURNS      equ 'T'                 ; and a hole as a letter the colours
+HOLE_COUNTER    equ 'C'                 ; do not use: see regac/text.py
+HOLE_OBJECT     equ 'O'
 WORD_ROOM       equ SCREEN_COLS + 1     ; as much of a word as is held
 AFTER_SEP       equ 80h                 ; another separator came just before
 
@@ -51,7 +55,7 @@ text_end:
 ; Corrupts: everything but DS
 text_put:
                 cmp     byte [ink_next], 0
-                jne     .an_ink
+                jne     .a_command
                 cmp     al, INK_CODE
                 je      .ink_coming
                 cmp     al, SPACE_CODE
@@ -85,16 +89,62 @@ text_put:
                 or      [held_sep], al          ; keeping the mark, if any
                 ret
 .ink_coming:
-                ; a command ends a word too, and its colour is the code after;
-                ; what is held goes out in the colour it was written in
+                mov     byte [ink_next], 1      ; which command, next
+                ret
+.a_command:
+                ; ink_next is 1 for which command it is, 2 and 3 for the two
+                ; halves of a hole's number
+                cmp     byte [ink_next], 1
+                jne     .a_digit
+                cmp     al, INK_ZERO + INK_COLOURS
+                jae     .a_hole
+                mov     byte [ink_next], 0
+                ; a change of ink ends a word, and what is held goes out in
+                ; the colour it was written in; a hole ends nothing, because
+                ; what it prints is part of the word it is in
+                push    ax
                 call    word_out
                 call    put_held_sep
-                mov     byte [ink_next], 1
-                ret
-.an_ink:
-                mov     byte [ink_next], 0
+                pop     ax
                 sub     al, INK_ZERO
                 jmp     text_ink
+.a_hole:
+                mov     [hole_kind], al
+                cmp     al, HOLE_TURNS
+                je      .turns
+                mov     byte [ink_next], 2      ; its number comes next
+                mov     byte [hole_value], 0
+                ret
+.turns:
+                mov     byte [ink_next], 0
+                mov     ax, [vm_counters + TURN_COUNTER_LO]     ; and the high
+.a_number:
+                ; its digits as letters of the word it is in, and not as a
+                ; text of their own, which would end the word at every one
+                mov     byte [digit_within], 1
+                call    print_number
+                mov     byte [digit_within], 0
+                ret
+.a_digit:
+                sub     al, INK_ZERO
+                mov     cl, 4
+                shl     byte [hole_value], cl
+                or      [hole_value], al
+                cmp     byte [ink_next], 2
+                jne     .filled
+                mov     byte [ink_next], 3      ; the low half next
+                ret
+.filled:
+                mov     byte [ink_next], 0
+                mov     al, [hole_value]
+                xor     ah, ah
+                cmp     byte [hole_kind], HOLE_COUNTER
+                jne     .an_object
+                mov     bx, ax
+                mov     al, [vm_counters + bx]
+                jmp     .a_number
+.an_object:
+                jmp     print_object_within
 
 ; The word held so far goes out: word_out for one that has ended, word_piece
 ; for one too long to hold that is still going on.
@@ -190,5 +240,8 @@ held_word:      times WORD_ROOM db 0    ; one word, or a piece of one
 held_length:    db      0               ; how much of it is in use
 held_sep:       db      0               ; what ended it, not printed yet
 held_going_on:  db      0               ; the rest of a word too long to hold
-ink_next:       db      0               ; the next code is a colour
+ink_next:       db      0               ; the next code is a command's
+hole_kind:      db      0               ; which hole it is
+hole_value:     db      0               ; and its number, so far
+digit_within:   db      0               ; a digit is a letter of a word
 section .text

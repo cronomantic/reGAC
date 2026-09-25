@@ -26,7 +26,7 @@ import json
 import random
 import platform
 
-from regac.text import expand, plain, typed
+from regac.text import expand, filled, plain, typed
 
 
 if platform.system() == "Windows":
@@ -1052,11 +1052,21 @@ class GAC_Interpreter:
                    + self.messages[self.YOUTOOK] + str(turns)
                    + self.messages[self.TURNS] + "\n")
 
+    def shown(self, string):
+        """A text as a machine prints it: its commands turned into codes,
+        and its holes -- a counter, an object's name, the turns -- filled in
+        with what they hold now.  The changes of ink stay, for whoever can
+        show them."""
+        def name(number):
+            one = self.objects.get(number)
+            return one["name"] if one else ""
+        return filled(expand(string), lambda n: self.counters[n], name)
+
     def print(self, string):
         # A change of ink is written inside the text of a message and is not
         # text: this screen has one colour, so it comes out here the way it is
         # ignored on a machine that cannot colour anything either.
-        string = plain(expand(string))
+        string = plain(self.shown(string))
         # This follows what the original's $778A does, the same way the
         # machines do in z80/common/textout.asm: a word is held until what
         # ends it arrives, because only then is it known whether it fits, and

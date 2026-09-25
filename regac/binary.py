@@ -52,7 +52,7 @@ from .devices import (AMSTRAD_RULES, cga_amstrad_colours, cga_amstrad_flash,
                       text_ink_of)
 from .opcodes import BY_NAME, GFX_CMDS
 from .glyphs import glyph_for
-from .text import TextStore, typed
+from .text import HOLE_OBJECT, TextStore, commands_of, expand, typed
 
 MAGIC = b"RGAC"
 VERSION = 1
@@ -238,6 +238,13 @@ class Database:
         self.locations = sorted(self.ddb["locations"], key=int)
         texts = [self.ddb["messages"][m] for m in self.messages]
         texts += [self.ddb["objects"][o]["name"] for o in self.objects]
+        for o in self.objects:
+            # a name may say a counter, but not a name, which could be its
+            # own: an interpreter printing it would print it for ever
+            if any(which == HOLE_OBJECT for which, _, _ in
+                   commands_of(expand(self.ddb["objects"][o]["name"]))):
+                raise BuildError(f"object {o} names an object in its name, "
+                                 "which an object's name may not do")
         texts += [self.ddb["locations"][l]["desc"] for l in self.locations]
         self.no_objs_index = len(texts)
         texts.append(self.ddb.get("no_objs_msg", "Nothing"))

@@ -46,6 +46,17 @@ print_object_name:
 .none:
                 ret
 
+; The same, inside another text: the word it is in is not ended, so what
+; follows the name goes with it.  For a hole.
+; Corrupts: everything but DS
+print_object_within:
+                call    obj_record
+                jc      .none
+                mov     dx, [es:bx + 4]
+                jmp     unpack_message
+.none:
+                ret
+
 ; The names of the objects that are in room list_room, with a comma between
 ; them.  With list_quiet set nothing is printed and the walk only answers
 ; whether there was anything.  Zero flag set when there was nothing.
@@ -170,6 +181,8 @@ print_number:
 ; Corrupts: everything but DS
 print_digit:
                 add     al, DIGIT_ZERO          ; a code is its own ASCII here
+                cmp     byte [digit_within], 0
+                jne     text_put                ; in a hole: part of its word
                 mov     [digit_char], al
                 mov     si, digit_char
                 mov     cx, 1

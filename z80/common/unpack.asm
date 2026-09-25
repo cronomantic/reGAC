@@ -86,6 +86,16 @@ message_offset:
 ; which in GAC is worth little: the unit an author writes is the message.
 ; Corrupts: everything
 print_packed:
+                call    unpack_message
+                call    text_end                ; the last word goes out
+                ld      a, (text_ink_start)     ; and the ink goes back
+                jp      text_ink
+
+; Unpack message DE into the printer, and nothing else: the word it ends in
+; is left open and the ink as it is.  That is what a hole needs that prints
+; an object's name inside another text: "\obj 3." is one word.
+; Corrupts: everything
+unpack_message:
                 ld      a, SECTION_TEXT         ; where the machine keeps it,
                 call    db_bank_in              ; which may be a bank
                 push    de
@@ -119,9 +129,7 @@ print_packed:
                 pop     hl
                 jr      .next
 .ended:
-                call    text_end                ; the last word goes out
-                ld      a, (text_ink_start)     ; and the ink goes back
-                jp      text_ink
+                ret
 
 ; Expand one code, A, and print what it stands for.  Calls itself for the left
 ; half of a pair, which is what gives the stack, and nothing it keeps across

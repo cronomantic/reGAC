@@ -42,7 +42,7 @@ compiler nor the machine will say so.
 from .gfx import PICTURE_BOTTOM, PICTURE_TOP
 from .opcodes import (ADVERB, BY_NAME, CTR, FLAG, MSG, NOUN, OBJ, PROC, ROOM,
                       VERB)
-from .text import typed
+from .text import HOLE_OBJECT, commands_of, expand, typed
 
 COUNTERS = 128                  # what the interpreters have, in every machine
 CARRIED = 255                   # where an object the player holds lives
@@ -201,6 +201,31 @@ def problems_of(ddb):
     messages = numbered(ddb.get("messages", {}))
     rooms = numbered(ddb.get("locations", {}))
     pictures = numbered(ddb.get("gfx", {}))
+
+    # The holes in the text: an object's name it asks for has to be there,
+    # and an object's own name may not ask for one.
+    objects = numbered(ddb.get("objects", {}))
+    texts = [(f"message {n}", text)
+             for n, text in (ddb.get("messages") or {}).items()]
+    texts += [(f"room {n}", room.get("desc", ""))
+              for n, room in (ddb.get("locations") or {}).items()]
+    texts += [(f"object {n}", one.get("name", ""))
+              for n, one in (ddb.get("objects") or {}).items()]
+    for where, text in texts:
+        try:
+            commands = list(commands_of(expand(text)))
+        except ValueError as e:
+            found.append(Problem(where, str(e)))
+            continue
+        for which, value, _ in commands:
+            if which != HOLE_OBJECT:
+                continue
+            if where.startswith("object"):
+                found.append(Problem(where, rf"\obj {value} in the name of an "
+                                     "object, which may not name one"))
+            elif value not in objects:
+                found.append(Problem(where, rf"\obj {value}, and there is no "
+                                     f"object {value}"))
 
     follow(found, "the high priority conditions", ddb.get("hpcs", []), ddb)
     follow(found, "the low priority conditions", ddb.get("lpcs", []), ddb)

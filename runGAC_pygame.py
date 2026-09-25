@@ -34,18 +34,18 @@ import json
 from regac.devices import SpectrumDevice
 from regac.gfx import SOURCE_ROWS as PICTURE_ROWS
 from regac.gfx import Renderer
-from regac.text import INK_ARG_FIRST, INK_CHAR, expand
+from regac.text import INK_ARG_FIRST, INK_CHAR
 
 GFX_CHAR_WIDTH = SpectrumDevice.char_width
 from runGAC import GAC_Interpreter
 
 
 
-def split_inks(text):
-    """A message cut into its pieces of text and its changes of ink, which
-    come back as the number of the colour asked for."""
+def split_inks(expanded):
+    """A message, its commands turned into codes and its holes filled, cut
+    into its pieces of text and its changes of ink, which come back as the
+    number of the colour asked for."""
     out = []
-    expanded = expand(text)
     at = 0
     while at < len(expanded):
         if expanded[at] == INK_CHAR:
@@ -387,7 +387,7 @@ class GAC_Interpreter_Pygame(GAC_Interpreter):
         # message it is in.  Without it a message that turned the text red and
         # did not turn it back left everything after it red -- see
         # z80/common/unpack.asm.
-        for piece in split_inks(txt):
+        for piece in split_inks(self.shown(txt)):
             if isinstance(piece, int):
                 self.cmd_queue.put((0x09, piece))
             else:

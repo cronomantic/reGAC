@@ -18,11 +18,17 @@
 ; Amstrad's, see doc/pendiente.md).  A source of ours can say whatever it
 ; likes.
 
-; A code that is not a letter but a command to whoever is printing: the one
-; there is says the ink changes, and the code after it says to what.  See
-; doc/textos.md.
+; A code that is not a letter but a command to whoever is printing, and the
+; code after it says which: a colour, for a change of ink, or a letter for a
+; hole -- something only known now, which is printed where it stands: the
+; turns, what a counter holds, or the name of an object, the last two with
+; their number behind in two codes of four bits.  See regac/text.py.
 INK_CODE        equ 1
 INK_ZERO        equ 48                  ; the colour rides as a character
+INK_COLOURS     equ 16
+HOLE_TURNS      equ 'T'
+HOLE_COUNTER    equ 'C'
+HOLE_OBJECT     equ 'O'
 
 ; How much of a word is held.  One more than the line is wide is enough for
 ; any word at all: one that long does not fit on a line wherever it starts, so
@@ -80,7 +86,7 @@ text_put:
                 ld      hl, ink_next
                 ld      a, (hl)
                 or      a
-                jr      nz, .an_ink
+                jr      nz, .a_command
                 ld      a, c
                 cp      INK_CODE
                 jr      z, .ink_coming
@@ -127,21 +133,85 @@ text_put:
                 ld      (hl), a
                 ret
 .ink_coming:
-                ; a command ends a word too, and its colour is the code after
-                call    word_out
-                ; and what is held goes out in the colour it was written in,
-                ; not in the one that is coming: a space between two words of
-                ; different colours keeps the first, which is what any machine
-                ; of this kind does
-                call    put_held_sep
-                ld      a, 1
-                ld      (ink_next), a
+                ld      (hl), 1                 ; which command, next
                 ret
-.an_ink:
+.a_command:
+                ; A = 1 for which command it is, 2 and 3 for the two halves
+                ; of a hole's number; HL = ink_next, C = the code.  The holes
+                ; travel only in a build whose adventure has one, which regac
+                ; says with -DHOLES, by the rule the noises go by.
+                IFDEF   HOLES
+                dec     a
+                jr      nz, .a_digit
+                ld      a, c
+                cp      INK_ZERO + INK_COLOURS
+                jr      nc, .a_hole
+                ENDIF
                 ld      (hl), 0
+                ; A change of ink ends a word, and what is held goes out in
+                ; the colour it was written in, not in the one that is coming:
+                ; a space between two words of different colours keeps the
+                ; first, which is what any machine of this kind does.  A hole
+                ; ends nothing: what it prints is part of the word it is in.
+                push    bc
+                call    word_out
+                call    put_held_sep
+                pop     bc
                 ld      a, c
                 sub     INK_ZERO
                 jp      text_ink
+                IFDEF   HOLES
+.a_hole:
+                ld      (hole_kind), a
+                cp      HOLE_TURNS
+                jr      z, .turns
+                ld      (hl), 2                 ; its number comes next
+                xor     a
+                ld      (hole_value), a
+                ret
+.turns:
+                ld      (hl), 0
+                ld      hl, (vm_counters + TURN_COUNTER_LO)     ; and the high
+.a_number:
+                ; its digits as letters of the word it is in, and not as a
+                ; text of their own, which would end the word at every one
+                ld      a, 1
+                ld      (digit_within), a
+                call    print_number
+                xor     a
+                ld      (digit_within), a
+                ret
+.a_digit:
+                ld      b, a                    ; 1 the high half, 2 the low
+                ld      a, c
+                sub     INK_ZERO
+                ld      c, a
+                ld      a, (hole_value)
+                add     a, a
+                add     a, a
+                add     a, a
+                add     a, a
+                or      c
+                ld      (hole_value), a
+                djnz    .filled
+                ld      (hl), 3                 ; the low half next
+                ret
+.filled:
+                ld      (hl), 0
+                ld      e, a
+                ld      d, 0
+                ld      a, (hole_kind)
+                cp      HOLE_COUNTER
+                jr      nz, .an_object
+                ld      hl, vm_counters
+                add     hl, de
+                ld      l, (hl)
+                ld      h, d
+                jr      .a_number
+.an_object:
+                ex      de, hl
+                jp      print_object_within
+                ENDIF
 
 ; The word held so far goes out: word_out for one that has ended, word_piece
 ; for one too long to hold that is still going on.
@@ -257,4 +327,7 @@ held_word:      ds      WORD_ROOM               ; one word, or a piece of one
 held_length:    db      0               ; how much of it is in use
 held_sep:       db      0               ; what ended it, not printed yet
 held_going_on:  db      0               ; the rest of a word too long to hold
-ink_next:       db      0               ; the next code is a colour
+ink_next:       db      0               ; the next code is a command's
+hole_kind:      db      0               ; which hole it is
+hole_value:     db      0               ; and its number, so far
+digit_within:   db      0               ; a digit is a letter of a word

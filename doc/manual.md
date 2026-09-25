@@ -173,6 +173,25 @@ manera y el PCW, que no tiene color, lee el comando y sigue.
 otra vez en blanco. Así no hace falta devolver la tinta antes de acabar, y un
 mensaje no puede teñir la descripción de la sala que venga detrás.
 
+Y hay **huecos**: algo que sólo se sabe al escribirlo, y se escribe donde
+está.
+
+| | |
+|---|---|
+| `\ctr n` | lo que vale el contador n |
+| `\obj n` | el nombre del objeto n |
+| `\turns` | los turnos jugados |
+
+    #15
+    Llevas \ctr 0 puntos y \turns turnos, y en la mano \obj 3.
+
+Un hueco es texto: forma parte de la palabra en la que está, así que `\obj 3.`
+no se separa de su punto al partir la línea, y **los espacios que lo siguen se
+quedan**, al revés que con `\ink`. Valen en los mensajes, en las salas y en
+los nombres de objeto; un nombre puede llevar un contador pero no otro nombre,
+que podría ser el suyo, y eso no se construye. El número va escrito, no con un
+nombre de `.def`.
+
 ### `/CTL` — la configuración
 
     /CTL

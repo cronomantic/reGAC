@@ -4125,9 +4125,9 @@ cambia lo que hacen las máquinas:
 2. ~~**`DO n`**: una tabla de condiciones con número, llamada desde cualquier
    condición, para no copiar lo repetido en cada sala.~~ Hecho: ver «`DO` y
    `/PROC`», abajo.
-3. **Huecos en los mensajes**: un marcador que escriba dentro del texto el
+3. ~~**Huecos en los mensajes**: un marcador que escriba dentro del texto el
    nombre de un objeto o lo que vale un contador, como ya hace `\ink` con el
-   color.
+   color.~~ Hecho: ver «Los huecos del texto», abajo.
 4. **Utilidades para quien escribe**: `regac map` (el mapa de salas y
    salidas), `regac lint` (salas a las que no se llega, objetos que no se
    pueden coger, palabras y mensajes que no usa nadie), `regac play` con un
@@ -4194,6 +4194,61 @@ que se llama a sí misma y sale ocho veces exactas, un `DO` a una tabla que no
 hay, y la pila conservada. Se han visto fallar las del Z80 quitando el `ret`
 de después del `vm_done` y quitando la subida de la base, y la del PC quitando
 el suyo.
+
+## Los huecos del texto
+
+**Decidido por el usuario**: los tres, `\ctr n`, `\obj n` y `\turns`, y en
+todos los textos donde vale `\ink` --mensajes, salas y nombres de objeto--.
+
+**No queda ningún código libre por debajo del espacio**: el 0 es el nulo, el 1
+el cambio de tinta y del 2 al 31 las letras con marca. Así que los huecos van
+detrás del mismo código 1, con una letra que los colores (`0` a `?`) no usan
+--`T`, `C`, `O`-- y el número en dos caracteres de cuatro bits, como el color
+va en uno y por lo mismo: todo son caracteres imprimibles y se empaquetan con
+el texto sin que el compresor sepa nada. Está en `regac/text.py`.
+
+**Un hueco es texto, y forma parte de la palabra en la que está.** Eso pedía
+dos cambios en el Z80 y en el PC:
+
+- Un cambio de tinta acababa la palabra en cuanto llegaba el código 1. Ahora
+  la acaba cuando llega el siguiente y dice que es una tinta; un hueco no la
+  acaba, de modo que `(\ctr 5)` es una palabra.
+- `print_digit` escribía cada cifra con `print_text`, que acaba en `text_end`:
+  cada cifra cerraba la palabra, y `(42)` al final de una línea salía `(4` y
+  `2)` debajo. Lo encontró la prueba. Para `PRIN` sigue así, que es lo que
+  hacía; dentro de un hueco, `digit_within` manda las cifras a `text_put`.
+- El nombre de un objeto se desempaqueta dentro del texto que lo pide: el
+  desempaquetador guarda su estado en la pila de la máquina, así que puede
+  llamarse a sí mismo. Para eso `print_packed` se partió en `unpack_message`,
+  que sólo desempaqueta, y lo que hacía al final --vaciar la palabra y
+  devolver la tinta--, que un nombre metido en un mensaje no debe hacer.
+
+**Un nombre no puede llevar `\obj`**: podría ser el suyo, y el intérprete lo
+escribiría para siempre. `check` lo dice y la construcción se niega. Puede
+llevar `\ctr` y `\turns`.
+
+En el Z80 viajan sólo con `-DHOLES`, que `regac make` pone cuando algún texto
+tiene un hueco, como `PROCS` y los ruidos; en el PC, siempre. Además, sin eso
+no ensamblaban los nueve ensamblados de prueba que incluyen `textout.asm` sin
+la máquina virtual (`vm_counters`, `print_number`): `IFDEF` de sjasmplus
+pregunta por definiciones y no por etiquetas, se probó.
+
+`runGAC.py` los llena con `shown()`, que usa también `runGAC_pygame.py`; y
+`split_inks` recibe ya el texto con los códigos y los huecos llenos.
+
+**Lo que no hace**: el número se escribe con cifras, no con un nombre de
+`.def`, porque los nombres se resuelven en las condiciones y el texto se
+expande después; y una cifra pegada detrás del número se leería como parte de
+él. Las dos están dichas en `formato-fuente.md`.
+
+Pruebas en `tests/test_holes.py`: la codificación, la vuelta al fuente, los
+espacios, lo que se llena, los números que no pueden ser, un nombre dentro de
+un nombre y un `\obj` a un objeto que no hay; y la misma aventura en Python,
+en el Spectrum y en el PC --un contador, un nombre con un contador dentro, los
+turnos, una sala con un hueco, y `(\ctr 5)` pegado a una tinta--. Y la que
+parte la línea: `(42)` donde no cabe tiene que bajar entero, en el Spectrum a
+32 columnas y en el PC a 40. Se ha visto fallar en el Z80 quitando
+`digit_within`.
 
 ## El visor de láminas
 

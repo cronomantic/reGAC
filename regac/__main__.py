@@ -41,7 +41,7 @@ from .project import (TARGETS, ProjectError, assemble, screen_for,
 from .project import read as read_project
 from .png import save_picture
 from .srcgen import generate
-from .text import TextStore
+from .text import INK_CHAR, TextStore, commands_of, expand
 from .srcparse import (MACHINE_LABELS, SOUND_CHANNEL_NAMES, SourceError,
                         a_noise, parse)
 
@@ -521,6 +521,17 @@ def makes_a_noise(ddb):
     return uses(ddb, ("SOUND", "QUIET"))
 
 
+def has_holes(ddb):
+    """Whether any text of the adventure has a hole in it -- a counter, an
+    object's name or the turns, printed where it stands -- which is what the
+    interpreter needs -DHOLES for."""
+    texts = list((ddb.get("messages") or {}).values())
+    texts += [room.get("desc", "") for room in (ddb.get("locations") or {}).values()]
+    texts += [one.get("name", "") for one in (ddb.get("objects") or {}).values()]
+    return any(which != INK_CHAR
+               for text in texts for which, _, _ in commands_of(expand(text)))
+
+
 def uses(ddb, names):
     """Whether any table of the adventure has one of those opcodes."""
     tables = [ddb.get("hpcs") or [], ddb.get("lpcs") or []]
@@ -548,6 +559,8 @@ def make_one(target, settings, ddb, name, root, output, where_regac_is,
         # DO and what it needs travel only when the adventure says it, by
         # the same rule as the noises
         defines.append("PROCS")
+    if has_holes(ddb):
+        defines.append("HOLES")
     if target.machine in ("cpc", "next", "pc") and from_an_amstrad(ddb):
         # drawn with the rules of the GAC it was written with
         defines.append("AMSTRAD_PICTURES")

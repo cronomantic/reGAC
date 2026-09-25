@@ -412,6 +412,8 @@ está encima y no cambia lo de debajo:
 - **acentos y eñes**, que el original no tenía;
 - **ruidos**, con `SOUND` y `QUIET`;
 - **tablas propias**, con `/PROC` y `DO`;
+- **huecos en el texto**, `\ctr n`, `\obj n` y `\turns`, que escriben un
+  contador, el nombre de un objeto o los turnos donde están;
 - **ocho máquinas**;
 - **un fuente de texto** que se guarda en un control de versiones, en lugar de
   teclear la aventura dentro de la máquina.

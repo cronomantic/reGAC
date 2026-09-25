@@ -108,7 +108,41 @@ INK_CHAR = "\x01"
 INK_ARG_FIRST = ord("0")
 INK_COLOURS = 16
 
-COMMAND = re.compile(r"\\(?:(\\)|ink[ \t]*(\d{1,2})[ \t]*|(.))", re.S)
+# And a hole: something the text says that is only known when it is printed.
+# `\ctr n` is what counter n holds, `\obj n` the name of object n and
+# `\turns` the turns played, which take two counters.  There is no code left
+# below the space for them -- nought is the null, one the ink and the rest
+# are letters -- so they ride behind INK_CODE as well, with a letter the
+# colours do not use to say which, and a number as two characters of four
+# bits each, the way a colour rides and for the same reason: so that they
+# pack like any other text.  Unlike a change of ink, a hole is text, so the
+# spaces after it are kept: `\ctr 0 puntos` is a number, a space and a word.
+HOLE_TURNS = "T"
+HOLE_COUNTER = "C"
+HOLE_OBJECT = "O"
+COUNTERS = 128
+OBJECTS = 256
+
+COMMAND = re.compile(r"\\(?:(\\)|ink[ \t]*(\d{1,2})[ \t]*"
+                     r"|(ctr|obj)[ \t]*(\d{1,3})|(turns)|(.))", re.S)
+
+
+def number_chars(value):
+    """A number of eight bits as the two characters it rides as."""
+    return chr(INK_ARG_FIRST + (value >> 4)) + chr(INK_ARG_FIRST + (value & 15))
+
+
+def command_at(text, at):
+    """The command that starts at `at` of expanded text: what it is, the
+    number it carries, and how many characters it takes."""
+    which = text[at + 1]
+    if which in (HOLE_COUNTER, HOLE_OBJECT):
+        value = ((ord(text[at + 2]) - INK_ARG_FIRST) << 4
+                 | (ord(text[at + 3]) - INK_ARG_FIRST))
+        return which, value, 4
+    if which == HOLE_TURNS:
+        return which, None, 2
+    return INK_CHAR, ord(which) - INK_ARG_FIRST, 2
 
 
 def expand(text):
@@ -125,7 +159,22 @@ def expand(text):
                     f" from 0 to {INK_COLOURS - 1}"
                 )
             return INK_CHAR + chr(INK_ARG_FIRST + colour)
-        raise ValueError(rf"\{found.group(3)} is not a text command")
+        if found.group(3):
+            value = int(found.group(4))
+            if found.group(3) == "ctr":
+                if value >= COUNTERS:
+                    raise ValueError(
+                        rf"\ctr {value} asks for a counter there is not: they"
+                        f" run from 0 to {COUNTERS - 1}")
+                return INK_CHAR + HOLE_COUNTER + number_chars(value)
+            if not 1 <= value < OBJECTS:
+                raise ValueError(
+                    rf"\obj {value} asks for an object there cannot be: they"
+                    f" run from 1 to {OBJECTS - 1}")
+            return INK_CHAR + HOLE_OBJECT + number_chars(value)
+        if found.group(5):
+            return INK_CHAR + HOLE_TURNS
+        raise ValueError(rf"\{found.group(6)} is not a text command")
     return COMMAND.sub(one, text)
 
 
@@ -137,8 +186,12 @@ def written(text):
     while at < len(text):
         char = text[at]
         if char == INK_CHAR:
-            out.append(rf"\ink {ord(text[at + 1]) - INK_ARG_FIRST} ")
-            at += 2
+            which, value, size = command_at(text, at)
+            out.append({INK_CHAR: rf"\ink {value} ",
+                        HOLE_COUNTER: rf"\ctr {value}",
+                        HOLE_OBJECT: rf"\obj {value}",
+                        HOLE_TURNS: r"\turns"}[which])
+            at += size
             continue
         out.append("\\\\" if char == "\\" else char)
         at += 1
@@ -152,10 +205,49 @@ def plain(text):
     at = 0
     while at < len(text):
         if text[at] == INK_CHAR:
-            at += 2
+            at += command_at(text, at)[2]
             continue
         out.append(text[at])
         at += 1
+    return "".join(out)
+
+
+def commands_of(text):
+    """Every command of expanded text, as command_at gives it."""
+    at = 0
+    while at < len(text):
+        if text[at] == INK_CHAR:
+            found = command_at(text, at)
+            yield found
+            at += found[2]
+        else:
+            at += 1
+
+
+def filled(text, counter, object_name):
+    """Expanded text with its holes filled in, and its changes of ink left
+    where they are: what a machine prints.  `counter` says what a counter
+    holds and `object_name` gives an object's name as it is written, which
+    may have holes of its own but not an object's name, which the build does
+    not allow.  The turns are the two counters they are kept in, the high
+    byte in 127 and the low in 126."""
+    out = []
+    at = 0
+    while at < len(text):
+        if text[at] != INK_CHAR:
+            out.append(text[at])
+            at += 1
+            continue
+        which, value, size = command_at(text, at)
+        if which == INK_CHAR:
+            out.append(text[at:at + size])
+        elif which == HOLE_COUNTER:
+            out.append(str(counter(value)))
+        elif which == HOLE_TURNS:
+            out.append(str(counter(127) * 256 + counter(126)))
+        else:
+            out.append(filled(expand(object_name(value)), counter, object_name))
+        at += size
     return "".join(out)
 
 
