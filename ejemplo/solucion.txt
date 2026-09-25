@@ -1,0 +1,17 @@
+; La solución del faro, una orden por línea, para jugarla sin máquina:
+;
+;     python -m regac play ejemplo/faro.gac ejemplo/solucion.txt --expect "Fin de la aventura"
+;
+; Sale con 0 si la aventura acaba y lo dice, y con 1 si no.  Las líneas en
+; blanco y las que empiezan por punto y coma no son órdenes.
+
+; la primera son dos órdenes en una línea, que es para lo que está el
+; separador propio de esta aventura
+COGE LLAVE Y NORTE
+ABRE PUERTA
+NORTE
+COGE CANDIL
+ENCIENDE CANDIL
+SUBE
+SUBE
+ENCIENDE LENTE

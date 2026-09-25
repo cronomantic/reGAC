@@ -57,6 +57,9 @@ python -m regac compile   game.gac  game.json
 python -m regac check     game.json
 python -m regac render    game.json pictures/ -m spectrum
 python -m regac draw      game.gac  12 -m cpc
+python -m regac lint      game.gac
+python -m regac map       game.gac  map.svg
+python -m regac play      game.gac  solution.txt --expect "The end"
 python -m regac checkgfx  game.json -m cpc
 python -m regac text      game.json
 python -m regac make      game.toml

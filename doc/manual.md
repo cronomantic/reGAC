@@ -129,6 +129,9 @@ ensamblador:
     python -m regac text     faro.json              # ¿cuánto ocupan los textos?
     python -m regac render   faro.json laminas/     # las láminas como PNG
     python -m regac draw     faro.gac 1             # una lámina, en vivo
+    python -m regac lint     faro.gac               # ¿sobra algo?
+    python -m regac map      faro.gac mapa.svg      # el mapa
+    python -m regac play     faro.gac solucion.txt  # ¿se puede ganar?
     python -m regac make     faro.toml              # construir
 
 **`compile`** convierte el fuente en la base de datos y se queja de lo que no
@@ -137,6 +140,35 @@ de datos sobrevive a una vuelta entera —decompilar lo compilado y volver a
 compilarlo da lo mismo— y que nada apunta a una sala, un objeto o un mensaje
 que no exista. **`text`** dice lo que ocupan los textos empaquetados, que es
 lo que decide si una aventura cabe en un 464.
+
+**`lint`** mira lo contrario que `check`: lo que está y nada usa. Una sala a
+la que no lleva ninguna salida ni ningún `GOTO`, un objeto que nada puede
+coger, una palabra por la que no pregunta ninguna condición, un mensaje que
+nadie imprime, una lámina que no enseña ninguna sala, una tabla `/PROC` que no
+corre ningún `DO`. No impide construir, y algo puede ser a propósito —un
+decorado que no se coge—: son avisos. Si un número se calcula al jugar
+(`MESS ( RAND 3 + 10 )`), no se puede seguir, y en vez de avisar en falso lo
+dice.
+
+**`map`** dibuja el mapa en SVG, que abre cualquier navegador: las salas en
+una rejilla según la brújula —NORTE, SUR, ESTE, OESTE y las cuatro de en medio,
+leídas en el vocabulario—, una línea donde se puede ir y volver, una flecha
+donde sólo se puede ir, y lo que no es brújula —SUBE, ENTRA— como una flecha
+curva con su palabra. La sala de salida va con el borde grueso.
+
+**`play`** juega un fichero de órdenes, una por línea, con el intérprete de
+Python, escribe lo que dice la aventura y acaba con 0 si la partida termina
+—y, con `--expect`, si ha dicho eso— y con 1 si las órdenes se acaban con la
+aventura aún preguntando. Guardar la solución junto a la aventura y jugarla
+después de cada cambio es una prueba que no pide máquina ninguna. La del faro
+está en `ejemplo/solucion.txt`:
+
+    python -m regac play ejemplo/faro.gac ejemplo/solucion.txt --expect "Fin de la aventura"
+
+Para escribir, **`editors/vscode/`** es una extensión de VS Code que colorea
+el fuente: secciones, directivas, condiciones, órdenes de dibujo y los
+comandos del texto. Se instala copiando la carpeta a `.vscode/extensions/`, en
+la carpeta del usuario, y reiniciando VS Code.
 
 Para probar sin arrancar una máquina:
 

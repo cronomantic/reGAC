@@ -1,0 +1,285 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "GAC",
+  "scopeName": "source.gac",
+  "fileTypes": [
+    "gac"
+  ],
+  "patterns": [
+    {
+      "include": "#directive"
+    },
+    {
+      "include": "#conditions"
+    },
+    {
+      "include": "#pictures"
+    },
+    {
+      "include": "#texts"
+    },
+    {
+      "include": "#settings"
+    },
+    {
+      "include": "#comment"
+    },
+    {
+      "include": "#number"
+    }
+  ],
+  "repository": {
+    "comment": {
+      "name": "comment.line.semicolon.gac",
+      "match": ";.*$"
+    },
+    "directive": {
+      "name": "keyword.control.directive.gac",
+      "match": "^\\s*\\.(if|else|end|def|include)\\b"
+    },
+    "number": {
+      "name": "constant.numeric.gac",
+      "match": "(?<![\\w#])(0x[0-9A-Fa-f]+|\\d+)(?![\\w])"
+    },
+    "section": {
+      "name": "keyword.other.section.gac",
+      "match": "^\\s*/[A-Za-z]+"
+    },
+    "conditions": {
+      "begin": "^\\s*(/(HIGH|LOW|LOCAL|PROC|CONN))\\b",
+      "beginCaptures": {
+        "1": {
+          "name": "keyword.other.section.gac"
+        }
+      },
+      "end": "(?=^\\s*/[A-Za-z])",
+      "patterns": [
+        {
+          "name": "comment.line.semicolon.gac",
+          "match": ";.*$"
+        },
+        {
+          "name": "keyword.control.directive.gac",
+          "match": "^\\s*\\.(if|else|end|def|include)\\b"
+        },
+        {
+          "name": "entity.name.section.entry.gac",
+          "match": "^\\s*#\\S+"
+        },
+        {
+          "name": "keyword.control.gac",
+          "match": "(?<![\\w?])(IF|END)(?![\\w?])"
+        },
+        {
+          "name": "support.function.opcode.gac",
+          "match": "(?<![\\w?])(NOP29|SOUND|QUIET|HOLD|DROP|SWAP|RESE|SET\\?|RES\\?|CSET|DECR|INCR|EQU\\?|DESC|LOOK|MESS|PRIN|RAND|SAVE|LOAD|HERE|AVAI|CARR|TURN|BRIN|FIND|OKAY|WAIT|QUIT|EXIT|ROOM|NOUN|VERB|ADVE|GOTO|VBNO|LIST|PICT|TEXT|CONN|WEIG|WITH|STRE|AND|NOT|XOR|GET|OBJ|SET|CTR|NOP|NO1|NO2|OR|TO|AT|IN|LF|DO)(?![\\w?])"
+        },
+        {
+          "name": "keyword.operator.gac",
+          "match": "<|>|=|\\+|\\-"
+        },
+        {
+          "name": "punctuation.paren.gac",
+          "match": "[()]"
+        },
+        {
+          "name": "constant.numeric.gac",
+          "match": "(?<![\\w#])(0x[0-9A-Fa-f]+|\\d+)(?![\\w])"
+        },
+        {
+          "name": "variable.other.constant.gac",
+          "match": "\\b[A-Za-z_][A-Za-z0-9_]*\\b"
+        }
+      ]
+    },
+    "pictures": {
+      "begin": "^\\s*(/GFX)\\b",
+      "beginCaptures": {
+        "1": {
+          "name": "keyword.other.section.gac"
+        }
+      },
+      "end": "(?=^\\s*/[A-Za-z])",
+      "patterns": [
+        {
+          "name": "comment.line.semicolon.gac",
+          "match": ";.*$"
+        },
+        {
+          "name": "keyword.control.directive.gac",
+          "match": "^\\s*\\.(if|else|end|def|include)\\b"
+        },
+        {
+          "name": "entity.name.section.entry.gac",
+          "match": "^\\s*#\\S+"
+        },
+        {
+          "match": "\\b([a-z]+)(=)",
+          "captures": {
+            "1": {
+              "name": "variable.parameter.gac"
+            },
+            "2": {
+              "name": "keyword.operator.gac"
+            }
+          }
+        },
+        {
+          "name": "support.function.drawing.gac",
+          "match": "(?<![\\w?])(ELLIPSE|BORDER|BGFILL|BRIGHT|SHADE|PAPER|FLASH|PLOT|FILL|CALL|RECT|LINE|PENS|INK)(?![\\w?])"
+        },
+        {
+          "name": "constant.numeric.gac",
+          "match": "(?<![\\w#])(0x[0-9A-Fa-f]+|\\d+)(?![\\w])"
+        },
+        {
+          "name": "variable.other.constant.gac",
+          "match": "\\b[A-Za-z_][A-Za-z0-9_]*\\b"
+        }
+      ]
+    },
+    "texts": {
+      "begin": "^\\s*(/(MSG|OBJ|LOC))\\b(.*)$",
+      "beginCaptures": {
+        "1": {
+          "name": "keyword.other.section.gac"
+        },
+        "3": {
+          "patterns": [
+            {
+              "name": "entity.name.section.entry.gac",
+              "match": "^\\s*#\\S+"
+            },
+            {
+              "match": "\\b([a-z]+)(=)",
+              "captures": {
+                "1": {
+                  "name": "variable.parameter.gac"
+                },
+                "2": {
+                  "name": "keyword.operator.gac"
+                }
+              }
+            },
+            {
+              "name": "constant.numeric.gac",
+              "match": "(?<![\\w#])(0x[0-9A-Fa-f]+|\\d+)(?![\\w])"
+            },
+            {
+              "name": "comment.line.semicolon.gac",
+              "match": ";.*$"
+            }
+          ]
+        }
+      },
+      "end": "(?=^\\s*/[A-Za-z])",
+      "patterns": [
+        {
+          "name": "keyword.control.directive.gac",
+          "match": "^\\s*\\.(if|else|end|def|include)\\b"
+        },
+        {
+          "match": "^\\s*(#\\S+)(.*)$",
+          "captures": {
+            "1": {
+              "name": "entity.name.section.entry.gac"
+            },
+            "2": {
+              "patterns": [
+                {
+                  "match": "\\b([a-z]+)(=)",
+                  "captures": {
+                    "1": {
+                      "name": "variable.parameter.gac"
+                    },
+                    "2": {
+                      "name": "keyword.operator.gac"
+                    }
+                  }
+                },
+                {
+                  "name": "constant.numeric.gac",
+                  "match": "(?<![\\w#])(0x[0-9A-Fa-f]+|\\d+)(?![\\w])"
+                },
+                {
+                  "name": "variable.other.constant.gac",
+                  "match": "\\b[A-Za-z_][A-Za-z0-9_]*\\b"
+                },
+                {
+                  "name": "comment.line.semicolon.gac",
+                  "match": ";.*$"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "constant.character.escape.gac",
+          "match": "\\\\(ink|ctr|obj)[ \\t]*\\d{1,3}|\\\\turns|\\\\\\\\"
+        },
+        {
+          "name": "invalid.illegal.command.gac",
+          "match": "\\\\."
+        },
+        {
+          "name": "constant.character.escape.line.gac",
+          "match": "^\\s*\\|"
+        },
+        {
+          "name": "string.unquoted.text.gac",
+          "match": "[^\\\\]+"
+        }
+      ]
+    },
+    "settings": {
+      "begin": "^\\s*(/(CTL|VOC|FONT|SOUND))\\b",
+      "beginCaptures": {
+        "1": {
+          "name": "keyword.other.section.gac"
+        }
+      },
+      "end": "(?=^\\s*/[A-Za-z])",
+      "patterns": [
+        {
+          "name": "comment.line.semicolon.gac",
+          "match": ";.*$"
+        },
+        {
+          "name": "keyword.control.directive.gac",
+          "match": "^\\s*\\.(if|else|end|def|include)\\b"
+        },
+        {
+          "match": "\\b([a-z]+)(=)",
+          "captures": {
+            "1": {
+              "name": "variable.parameter.gac"
+            },
+            "2": {
+              "name": "keyword.operator.gac"
+            }
+          }
+        },
+        {
+          "name": "storage.type.word.gac",
+          "match": "\\b(verb|noun|adverb|pronoun)\\b"
+        },
+        {
+          "name": "keyword.other.setting.gac",
+          "match": "^\\s*(model|charset|start|width|punct|sep|ink|nothing)\\b"
+        },
+        {
+          "name": "support.constant.channel.gac",
+          "match": "\\b(tone|noise|both)\\b"
+        },
+        {
+          "name": "string.quoted.double.gac",
+          "match": "\"[^\"]*\""
+        },
+        {
+          "name": "constant.numeric.gac",
+          "match": "(?<![\\w#])(0x[0-9A-Fa-f]+|\\d+)(?![\\w])"
+        }
+      ]
+    }
+  }
+}

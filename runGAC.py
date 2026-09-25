@@ -982,12 +982,17 @@ class GAC_Interpreter:
             self.finished, done, if_true = self.__perfom_conditions(
                 self.lcs[self.current_loc], True
             )
-        if self.new_room or done:
+        # An EXIT or a QUIT in the room's table ends the game there, as it
+        # does on the machines, where it ends the turn as well: the low
+        # priority table used to run after it and put `finished` back to
+        # false, and the example, which wins with an EXIT in a room of its
+        # own, went on asking.  Found by `regac play`.
+        if self.new_room or done or self.finished:
             return self.finished
 
         # Low priority conditions
         self.finished, done, if_true_lcp = self.__perfom_conditions(self.lpcs, True)
-        if self.new_room or done:
+        if self.new_room or done or self.finished:
             return self.finished
 
         if not if_true and not if_true_lcp:
@@ -1047,10 +1052,14 @@ class GAC_Interpreter:
             return
         turns = (self.counters[self.TURN_CNT_H] * 256
                  + self.counters[self.TURN_CNT_L])
-        self.print("\n" + self.messages[self.YOURSCORE]
+        # A message the adventure does not have says nothing, and the numbers
+        # still come out: that is what the machines do, whose message lookup
+        # answers "no such message" and prints nothing.  This fell over.
+        said = self.messages.get
+        self.print("\n" + said(self.YOURSCORE, "")
                    + str(self.counters[self.SCORE_CNT])
-                   + self.messages[self.YOUTOOK] + str(turns)
-                   + self.messages[self.TURNS] + "\n")
+                   + said(self.YOUTOOK, "") + str(turns)
+                   + said(self.TURNS, "") + "\n")
 
     def shown(self, string):
         """A text as a machine prints it: its commands turned into codes,

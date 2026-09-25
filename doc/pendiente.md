@@ -4128,11 +4128,12 @@ cambia lo que hacen las máquinas:
 3. ~~**Huecos en los mensajes**: un marcador que escriba dentro del texto el
    nombre de un objeto o lo que vale un contador, como ya hace `\ink` con el
    color.~~ Hecho: ver «Los huecos del texto», abajo.
-4. **Utilidades para quien escribe**: `regac map` (el mapa de salas y
+4. ~~**Utilidades para quien escribe**: `regac map` (el mapa de salas y
    salidas), `regac lint` (salas a las que no se llega, objetos que no se
    pueden coger, palabras y mensajes que no usa nadie), `regac play` con un
    guion que dice si la aventura se gana, y el resaltado de sintaxis de
-   `.gac` para VS Code.
+   `.gac` para VS Code.~~ Hecho: ver «Las utilidades para quien escribe»,
+   abajo.
 5. ~~**La distribución**: una orden `regac` instalable (`[project.scripts]`,
    que `pyproject.toml` no tiene), CI en GitHub Actions con las pruebas que no
    piden emulador, y el faro construido para las nueve máquinas adjunto a la
@@ -4197,6 +4198,45 @@ que se llama a sí misma y sale ocho veces exactas, un `DO` a una tabla que no
 hay, y la pila conservada. Se han visto fallar las del Z80 quitando el `ret`
 de después del `vm_done` y quitando la subida de la base, y la del PC quitando
 el suyo.
+
+## Las utilidades para quien escribe
+
+- **`regac map`** (`regac/mapper.py`): **decidido por el usuario**, SVG con la
+  brújula, sin depender de nada instalado. Las direcciones se leen en el
+  vocabulario, en castellano y en inglés; `NO` sólo es noroeste al lado de
+  `NOROESTE`, porque suelto es más fácil que sea un no. Se coloca desde la
+  sala de salida, cada sala un paso más allá en la dirección por la que se
+  llega, y si está ocupado más lejos en la misma línea; una sala a la que sólo
+  se llega de vuelta va donde su salida dice. Lo que no alcanza ninguna
+  salida, aparte a la derecha. Pasado por las ocho aventuras y el faro: todas
+  sus salas colocadas --de 5 a 66-- y el SVG bien formado. Y visto, el del
+  faro y el de MegaCorp, pasados a PNG con SDL, que dibuja cajas y líneas
+  pero no texto ni puntas de flecha: eso no lo ha visto aquí nadie.
+- **`regac lint`** (`regac/lint.py`): lo que está y nada usa. Un objeto que un
+  `SWAP` o un `TO` a la mano pueden traer no se da por imposible de coger: era
+  el candil encendido del faro. Donde un número se calcula al jugar no se
+  adivina: se dice que no se ha mirado.
+- **`regac play`** (`regac/play.py`): juega un fichero de órdenes con
+  `runGAC.py`. La solución del faro está en `ejemplo/solucion.txt`.
+- **`editors/vscode/`**: la extensión de VS Code, con la gramática hecha por
+  `grammar.py` a partir de `regac/opcodes.py`; `test_editor.py` dice cuándo la
+  del repositorio no se volvió a hacer. **No se ha visto en un VS Code**: lo
+  probado es que cada patrón compila y reconoce lo que debe.
+
+**Lo que encontraron al estrenarse**, que ya estaba:
+
+- **El saludo del faro no sale nunca.** El mensaje 10, `SALUDO` --«EL FARO DE
+  SANTA BÁRBARA -- una aventura de ejemplo. Escribe...»--, está escrito desde
+  el primer día y nada lo imprime: el faro no tiene tabla `/HIGH`. Lo dijo
+  `lint`. **Sin tocar**: cambia cómo empieza el ejemplo, y es del usuario.
+- **En `runGAC.py`, un `EXIT` en la tabla de una sala no acababa la
+  partida**: la tabla baja corría después y devolvía `finished` a falso. El
+  faro gana con un `EXIT` en su última sala y seguía preguntando. En las
+  máquinas `EXIT` pone `vm_done` y las tablas siguientes no corren; ahora
+  aquí tampoco. Lo encontró `play`.
+- **Y la puntuación se caía** en una aventura sin los mensajes 249, 250 y 255,
+  que el faro no tiene. En las máquinas un mensaje que no hay no escribe nada
+  y los números salen igual; ahora aquí también.
 
 ## La distribución
 

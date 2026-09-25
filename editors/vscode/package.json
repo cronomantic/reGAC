@@ -1,0 +1,36 @@
+{
+  "name": "regac-gac",
+  "displayName": "GAC (reGAC)",
+  "description": "Colours for the source of a Graphic Adventure Creator adventure, as reGAC reads it.",
+  "version": "0.1.0",
+  "publisher": "cronomantic",
+  "license": "GPL-3.0-or-later",
+  "engines": {
+    "vscode": "^1.60.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "gac",
+        "aliases": [
+          "GAC",
+          "gac"
+        ],
+        "extensions": [
+          ".gac"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "gac",
+        "scopeName": "source.gac",
+        "path": "./syntaxes/gac.tmLanguage.json"
+      }
+    ]
+  }
+}

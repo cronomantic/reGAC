@@ -154,6 +154,62 @@ def cmd_draw(args):
         sys.exit(f"ERROR: {e}")
 
 
+def cmd_map(args):
+    """The map of an adventure, as an SVG.  See regac/mapper.py."""
+    from .mapper import svg
+    from .viewer import read_adventure
+
+    try:
+        ddb = read_adventure(args.input, args.machine)
+    except (SourceError, OSError, ValueError) as e:
+        sys.exit(f"ERROR: {e}")
+    with open(args.output, "w", encoding="utf-8") as f:
+        f.write(svg(ddb, os.path.basename(args.input)))
+    print(f"{args.input} -> {args.output}")
+
+
+def cmd_play(args):
+    """Play a file of orders and say whether the game ended.  See
+    regac/play.py."""
+    from .play import orders_of, play
+    from .viewer import read_adventure
+
+    try:
+        ddb = read_adventure(args.input, args.machine)
+        with open(args.orders, encoding="utf-8") as f:
+            orders = orders_of(f.read())
+        ended, said = play(ddb, orders)
+    except (SourceError, OSError, ValueError) as e:
+        sys.exit(f"ERROR: {e}")
+    sys.stdout.write(said)
+    won = ended and (args.expect is None or args.expect in said)
+    if not ended:
+        print("\n-- the orders ran out with the game still asking",
+              file=sys.stderr)
+    elif args.expect is not None and not won:
+        print(f"\n-- the game ended without saying {args.expect!r}",
+              file=sys.stderr)
+    else:
+        print("\n-- the game ended", file=sys.stderr)
+    sys.exit(0 if won else 1)
+
+
+def cmd_lint(args):
+    """What the adventure has that nothing uses.  See regac/lint.py."""
+    from .lint import notes_of
+    from .viewer import read_adventure
+
+    try:
+        ddb = read_adventure(args.input, args.machine)
+    except (SourceError, OSError, ValueError) as e:
+        sys.exit(f"ERROR: {e}")
+    notes = notes_of(ddb)
+    for note in notes:
+        print(note)
+    if not notes:
+        print("nothing that nothing uses")
+
+
 def cmd_checkgfx(args):
     """Compare the pictures on a target machine against the Spectrum.
 
@@ -692,6 +748,33 @@ def main():
                         "first the adventure can be drawn on)")
     p.add_argument("-s", "--scale", type=int, default=3, help="pixel scale")
     p.set_defaults(func=cmd_draw)
+
+    p = sub.add_parser("play", help="play a file of orders, and say whether "
+                                    "the game ended")
+    p.add_argument("input", help="source file, or JSON database")
+    p.add_argument("orders", help="a file of orders, one a line")
+    p.add_argument("--expect", help="and it has to have said this")
+    p.add_argument("-m", "--machine", default="spectrum48",
+                   choices=sorted(MACHINE_LABELS),
+                   help="which machine to read a source for")
+    p.set_defaults(func=cmd_play)
+
+    p = sub.add_parser("lint", help="what the adventure has that nothing "
+                                    "uses: rooms, objects, words, messages")
+    p.add_argument("input", help="source file, or JSON database")
+    p.add_argument("-m", "--machine", default="spectrum48",
+                   choices=sorted(MACHINE_LABELS),
+                   help="which machine to read a source for")
+    p.set_defaults(func=cmd_lint)
+
+    p = sub.add_parser("map", help="the map of an adventure, as SVG")
+    p.add_argument("input", help="source file, or JSON database")
+    p.add_argument("output", help="SVG file to write")
+    p.add_argument("-m", "--machine", default="spectrum48",
+                   choices=sorted(MACHINE_LABELS),
+                   help="which machine to read a source for, for one that "
+                        "keeps some lines for some of them")
+    p.set_defaults(func=cmd_map)
 
     p = sub.add_parser(
         "checkgfx", help="compare the pictures on a machine against the Spectrum"
