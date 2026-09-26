@@ -4348,6 +4348,8 @@ en la pantalla después de cada orden-- y en el PC, donde la pantalla del
 final se compara punto a punto con la lámina que dibuja el renderer de
 referencia.
 
+**La 0.4.0**, pedida por el usuario, es la primera release con `DRAW n`.
+
 ## Las utilidades para quien escribe
 
 - **`regac map`** (`regac/mapper.py`): **decidido por el usuario**, SVG con la
