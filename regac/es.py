@@ -289,6 +289,8 @@ SAID = {
         "{op} {value}, y no hay sala {value}",
     "{op} {value}, and there is no /PROC {value}":
         "{op} {value}, y no hay /PROC {value}",
+    "{op} {value}, and there is no picture {value}":
+        "{op} {value}, y no hay lámina {value}",
     "{op} {value}, and there is no object {value}":
         "{op} {value}, y no hay objeto {value}",
     "{op} {value}, and there are {counters} counters, numbered 0 to {last}":
@@ -514,9 +516,14 @@ SAID = {
     "messages": "mensajes",
     "message {number}: nothing prints it":
         "mensaje {number}: nada lo escribe",
-    "picture {number}: no room shows it and no picture calls it":
-        "lámina {number}: ninguna sala la enseña y ninguna lámina la "
-        "llama",
+    "picture {number}: no room shows it, no picture calls it and no DRAW "
+    "draws it":
+        "lámina {number}: ninguna sala la enseña, ninguna lámina la llama y "
+        "ningún DRAW la dibuja",
+    "a DRAW works its picture out while the game plays, so which are drawn "
+    "is not looked at":
+        "un DRAW calcula su lámina mientras se juega, así que no se mira "
+        "cuáles se dibujan",
     "pictures": "láminas",
     "a DO works its table out while the game plays, so which run is not "
     "looked at":

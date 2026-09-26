@@ -159,8 +159,8 @@ sólo la base de datos, y con un fuente dicen que lo compile antes.
 **`lint`** mira lo contrario que `check`: lo que está y nada usa. Una sala a
 la que no lleva ninguna salida ni ningún `GOTO`, un objeto que nada puede
 coger, una palabra por la que no pregunta ninguna condición, un mensaje que
-nadie imprime, una lámina que no enseña ninguna sala, una tabla `/PROC` que no
-corre ningún `DO`. No impide construir, y algo puede ser a propósito —un
+nadie imprime, una lámina que no enseña ninguna sala ni dibuja ningún `DRAW`,
+una tabla `/PROC` que no corre ningún `DO`. No impide construir, y algo puede ser a propósito —un
 decorado que no se coge—: son avisos. Si un número se calcula al jugar
 (`MESS ( RAND 3 + 10 )`), no se puede seguir, y en vez de avisar en falso lo
 dice.
@@ -338,6 +338,14 @@ número, y se llama con `DO`:
 
 Corre como si estuviera escrita donde está el `DO`: si dentro hay un `WAIT`,
 el turno se acaba ahí. El detalle, en [`gac.md`](gac.md).
+
+Un primer plano se enseña con `DRAW`, que dibuja otra lámina donde va la de
+la sala:
+
+    IF ( VERB VERBO_EXAMINA AND NOUN NOMBRE_CARACOLA ) DRAW CARACOLA MESS EL_MAR WAIT END
+
+No se guarda nada: la lámina de la sala vuelve cuando la sala se describe otra
+vez —al moverse, o con `MIRA`—, o con un `DRAW` de su número.
 
 GAC **no tiene precedencia**: evalúa estrictamente de izquierda a derecha. Por
 eso el operando de un operador prefijo no es voraz, y `NOT VERB 1 AND NOUN 2`

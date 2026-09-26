@@ -1102,6 +1102,29 @@ op_do:
 vm_depth:       db      0
                 ENDIF
 
+; DRAW n: picture n, where the room's goes and the way the room's goes, which
+; is describe_location's own step: nought is no picture and gives the text
+; the whole screen, and under TEXT nothing is drawn.  Not the original's.
+; Nothing is kept: the room's picture comes back when the room is next
+; described.  It draws in the dark as well, for it is not the room being
+; described.  It travels only in a build whose adventure has DRAW in it,
+; which regac says with -DDRAWS.
+                IFDEF   DRAWS
+op_draw:
+                call    vm_pop
+                ld      a, (vm_graphics)
+                or      a
+                jp      z, vm_loop              ; TEXT says to draw none
+                ld      a, h
+                or      l
+                jr      z, .without_a_picture
+                call    draw_picture
+                jp      vm_loop
+.without_a_picture:
+                call    text_window_all
+                jp      vm_loop
+                ENDIF
+
 ; SOUND and QUIET: which noise of the adventure's own table to make, and
 ; silence.  There used to be two ways of making one -- the tracker's player
 ; where there was music and the speaker where there was not -- and now there
@@ -1248,4 +1271,7 @@ vm_table:
                 dw      op_do           ; $43
                 ELSE
                 dw      op_nop          ; $43, DO, in a build with none
+                ENDIF
+                IFDEF   DRAWS
+                dw      op_draw         ; $44
                 ENDIF

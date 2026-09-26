@@ -40,8 +40,8 @@ compiler nor the machine will say so.
 """
 
 from .gfx import PICTURE_BOTTOM, PICTURE_TOP
-from .opcodes import (ADVERB, BY_NAME, CTR, FLAG, MSG, NOUN, OBJ, PROC, ROOM,
-                      VERB)
+from .opcodes import (ADVERB, BY_NAME, CTR, FLAG, MSG, NOUN, OBJ, PICTURE,
+                      PROC, ROOM, VERB)
 from .i18n import N_, _
 from .text import HOLE_OBJECT, commands_of, expand, typed
 
@@ -147,6 +147,7 @@ def follow(problems, where, code, ddb):
     rooms = numbered(ddb.get("locations", {}))
     objects = numbered(ddb.get("objects", {}))
     procs = numbered(ddb.get("procs") or {})
+    pictures = numbered(ddb.get("gfx") or {})
     # Nought is not a word of the vocabulary but what the parser says when it
     # knew none of them, so a condition may well ask for it.
     words = {
@@ -172,6 +173,11 @@ def follow(problems, where, code, ddb):
             elif kind is PROC and value not in procs:
                 problems.append(Problem(where, _(
                     "{op} {value}, and there is no /PROC {value}",
+                    op=op.name, value=value)))
+            elif kind is PICTURE and value and value not in pictures:
+                # nought is no picture, as it is for a room
+                problems.append(Problem(where, _(
+                    "{op} {value}, and there is no picture {value}",
                     op=op.name, value=value)))
             elif kind is OBJ and value not in objects:
                 problems.append(Problem(where, _(

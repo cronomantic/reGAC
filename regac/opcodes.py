@@ -47,6 +47,7 @@ NOUN = "noun"
 ADVERB = "adverb"
 COND = "cond"
 PROC = "proc"
+PICTURE = "picture"
 
 
 class Op:
@@ -148,6 +149,10 @@ OPS = [
     # comes out true in it has taken the order, and what ends the turn in it
     # ends the turn.
     Op("DO",       0x43, PREFIX,  (PROC,)),
+    # Draws picture n where the room's goes, as the room would: nought is no
+    # picture, and the text has the whole screen.  Nothing is kept, and the
+    # room's picture comes back when the room is next described.
+    Op("DRAW",     0x44, PREFIX,  (PICTURE,)),
 ]
 # fmt: on
 

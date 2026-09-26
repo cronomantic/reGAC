@@ -436,7 +436,7 @@ as it is in the file, and a finger under the word. And when the word is
         IF ( VERB 7 ) MESSS 14 END
                       ^
 
-The language is sixty eight words, so guessing the one it was comes nearly
+The language is sixty nine words, so guessing the one it was comes nearly
 free and saves the search. If the word looks like none, nothing is guessed:
 a bad suggestion sends one looking where it is not.
 
@@ -459,7 +459,7 @@ player sees is a blank, a room closed or silence, with nothing to say why.
 Everything that points is looked at: messages, rooms, objects, counters, words
 of the vocabulary, pictures -- including a picture that calls another --
 where one goes out of each place, where each object starts, the noises the
-adventure says it has, and the tables `DO` runs. What cannot be known is not
+adventure says it has, the tables `DO` runs and the pictures `DRAW` draws. What cannot be known is not
 said: `MESS ( CTR 3 )` changes every game and there is nothing to check there.
 What is doubtful comes out as a warning; what cannot be anything but a fault,
 as a fault.

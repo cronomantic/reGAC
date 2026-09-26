@@ -440,7 +440,7 @@ palabra está *casi* bien —que es lo que pasa siempre—, qué se quiso decir:
         IF ( VERB 7 ) MESSS 14 END
                       ^
 
-El lenguaje son sesenta y ocho palabras, así que adivinar la que era sale casi
+El lenguaje son sesenta y nueve palabras, así que adivinar la que era sale casi
 gratis y ahorra la búsqueda. Si la palabra no se parece a ninguna no se adivina
 nada, que una sugerencia mala manda a mirar donde no es.
 
@@ -462,7 +462,7 @@ silencio, sin nada que diga por qué.
 Se mira todo lo que apunta: mensajes, localidades, objetos, contadores,
 palabras del vocabulario, láminas —incluida una lámina que llama a otra—, por
 dónde se sale de cada sitio, dónde empieza cada objeto, los ruidos que la
-aventura dice tener y las tablas que corre `DO`. Lo que no se puede saber no se dice: `MESS ( CTR 3 )`
+aventura dice tener, las tablas que corre `DO` y las láminas que dibuja `DRAW`. Lo que no se puede saber no se dice: `MESS ( CTR 3 )`
 cambia en cada partida y ahí no hay nada que comprobar. Lo que es dudoso sale
 como aviso; lo que no puede ser otra cosa que un fallo, como fallo.
 

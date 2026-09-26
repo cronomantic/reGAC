@@ -663,6 +663,8 @@ def make_one(target, settings, ddb, name, root, output, where_regac_is,
         # DO and what it needs travel only when the adventure says it, by
         # the same rule as the noises
         defines.append("PROCS")
+    if uses(ddb, ("DRAW",)):
+        defines.append("DRAWS")
     if has_holes(ddb):
         defines.append("HOLES")
     if target.machine in ("cpc", "next", "pc") and from_an_amstrad(ddb):

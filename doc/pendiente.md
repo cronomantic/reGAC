@@ -4307,6 +4307,47 @@ hay, y la pila conservada. Se han visto fallar las del Z80 quitando el `ret`
 de después del `vm_done` y quitando la subida de la base, y la del PC quitando
 el suyo.
 
+## `DRAW n`
+
+**Pedido por el usuario**, que temía por la memoria, y **decidido por él** al
+ver lo que cuesta cada manera:
+
+- `DRAW n` dibuja la lámina `n` donde va la de la sala y como va la de la
+  sala: `describe_location` hace lo mismo con la suya. Recupera sus filas del
+  texto, y con un `TEXT` en vigor no dibuja nada.
+- **No se guarda nada.** La lámina de la sala vuelve cuando la sala se
+  describe otra vez: al salir por una salida, con `GOTO`, `LOOK` o `DESC`.
+  Guardar la pantalla para reponerla habría sido un búfer del tamaño de la
+  ventana de la lámina, y en el CPC la pantalla son 16 KB (`SCREEN_BYTES`):
+  en el 464 no hay sitio. Volver a dibujarla cuesta sólo su tiempo, dentro del
+  tope de 4-5 s.
+- **A oscuras dibuja igual**: no es la sala la que se describe, y la condición
+  puede mirar la luz si quiere.
+- **`DRAW 0` es lo que hace una sala sin lámina**: el texto toma toda la
+  pantalla (`text_window_all`) y no se borra nada.
+
+Es el opcode `$44`. En el Z80 viaja sólo con `-DDRAWS`, que `regac make` pone
+cuando alguna tabla lo tiene, como `PROCS`: **28 bytes**, medidos
+ensamblando el Spectrum con y sin él --26 del código y 2 de su entrada en la
+tabla--. Se había dicho «unos 15» contándolo a mano, antes de que `DRAW 0`
+fuera como una sala sin lámina. Una aventura que no lo usa sale **igual byte a
+byte** en las ocho máquinas Z80: se construyó el faro con el código de antes y
+con el de ahora y sólo cambió `FARO.EXE`. En el PC va siempre, como `DO`, y
+son 32 bytes más en el ejecutable (18744 a 18776).
+
+Un `DRAW` de una lámina que no existe borra la ventana y no dibuja nada, que es
+lo que hace una sala que apunte a una lámina que no hay: `draw_picture` borra
+antes de buscarla. `check` lo avisa como fallo; `DRAW 0` no. `lint` cuenta
+como enseñada una lámina que dibuja un `DRAW`, y si un `DRAW` calcula su
+número al jugar, no dice de ninguna que sobre.
+
+`runGAC.py` llama a los mismos `draw_picture` y `clear_picture` que la sala y
+`TEXT`, así que `runGAC_pygame.py` lo enseña sin más. `tests/test_draw.py` lo
+juega en Python, en el Spectrum --leyendo `text_top` y las filas de la lámina
+en la pantalla después de cada orden-- y en el PC, donde la pantalla del
+final se compara punto a punto con la lámina que dibuja el renderer de
+referencia.
+
 ## Las utilidades para quien escribe
 
 - **`regac map`** (`regac/mapper.py`): **decidido por el usuario**, SVG con la

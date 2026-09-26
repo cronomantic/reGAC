@@ -5,7 +5,7 @@
 ; original it was measured, is written there against each of them.
 
 OP_END          equ 3Fh
-OP_LAST         equ 43h
+OP_LAST         equ 44h
 
 ; -- small helpers -----------------------------------------------------------
 
@@ -788,6 +788,22 @@ op_do:
 .over:
                 ret                             ; it ended the turn: so does this
 
+; DRAW n: picture n, where the room's goes and the way the room's goes --
+; see z80/common/opcodes.asm.  Nought is no picture and gives the text the
+; whole screen, and under TEXT nothing is drawn.  Always here, as DO is.
+op_draw:
+                call    vm_pop
+                cmp     byte [vm_graphics], 0
+                je      .done                   ; TEXT says to draw none
+                test    ax, ax
+                jz      .without_a_picture
+                call    draw_picture
+                jmp     vm_loop
+.without_a_picture:
+                call    text_window_all
+.done:
+                jmp     vm_loop
+
 op_if:
                 call    vm_pop
                 test    ax, ax
@@ -903,4 +919,5 @@ vm_table:
                 dw      op_sound        ; 41h
                 dw      op_quiet        ; 42h
                 dw      op_do           ; 43h
+                dw      op_draw         ; 44h
 section .text

@@ -111,7 +111,8 @@ def notes_of(ddb):
     rooms = keys(ddb.get("locations"))
     objects = keys(ddb.get("objects"))
     used = {name: constant.get(name, set()) for name in
-            ("GOTO", "GET", "VERB", "NOUN", "ADVE", "MESS", "DO", "OBJ")}
+            ("GOTO", "GET", "VERB", "NOUN", "ADVE", "MESS", "DO", "OBJ",
+             "DRAW")}
 
     # Rooms no way leads to and no GOTO names.
     start = int(ddb.get("init_loc", 0))
@@ -189,16 +190,23 @@ def notes_of(ddb):
             notes.append(Note(_("messages"), _(
                 "message {number}: nothing prints it", number=number)))
 
-    # Pictures no room shows and no picture calls.
+    # Pictures no room shows, no picture calls and no DRAW draws.
     pictures = keys(ddb.get("gfx"))
     shown = {int(room.get("graphic_id", 0))
              for room in (ddb.get("locations") or {}).values()}
     for drawing in (ddb.get("gfx") or {}).values():
         shown.update(int(order[1]) for order in drawing if order[0] == "CALL")
-    for number in sorted(pictures - shown):
-        notes.append(Note(_("pictures"), _(
-            "picture {number}: no room shows it and no picture calls it",
-            number=number)))
+    shown |= used["DRAW"]
+    if "DRAW" in worked_out:
+        if pictures - shown:
+            notes.append(Note(_("pictures"), _(
+                "a DRAW works its picture out while the game plays, so which "
+                "are drawn is not looked at")))
+    else:
+        for number in sorted(pictures - shown):
+            notes.append(Note(_("pictures"), _(
+                "picture {number}: no room shows it, no picture calls it and "
+                "no DRAW draws it", number=number)))
 
     # Tables no DO runs.
     procs = keys(ddb.get("procs"))

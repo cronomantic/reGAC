@@ -897,6 +897,18 @@ class GAC_Interpreter:
                     self.stack.pop()
                 elif cmd == "QUIET":
                     pass
+                elif cmd == "DRAW":
+                    # The picture goes where the room's goes, as the room's
+                    # would: nought is none, and the text takes the screen.
+                    # Nothing is kept: the room's comes back when the room is
+                    # described again.  It is drawn in the dark as well, for
+                    # it is not the room being described.
+                    picture = self.stack.pop()
+                    if self.graphics:
+                        if picture:
+                            self.draw_picture(picture)
+                        else:
+                            self.clear_picture()
                 elif cmd == "DO":
                     # The table runs as if it were written here: what comes
                     # out true in it has taken the order, and what ends the

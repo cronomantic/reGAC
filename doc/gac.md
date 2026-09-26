@@ -268,12 +268,35 @@ escribe una vez en un bloque `/PROC #n` y se llama con `DO n`.
   tabla que no existe tampoco, y `regac check` lo avisa.
 - Sólo viaja en el intérprete de una aventura que lo usa, como los ruidos.
 
+### Primeros planos
+
+| | |
+|---|---|
+| `DRAW n` | dibuja la lámina `n` donde va la de la sala |
+
+Añadido de este proyecto, no de GAC: una lámina a mitad de turno, por ejemplo
+el primer plano de lo que se examina.
+
+- **Se dibuja como la de una sala**: recupera sus filas del texto, y con un
+  `TEXT` en vigor no dibuja nada. `DRAW 0` es lo que hace una sala sin
+  lámina: el texto pasa a ocupar toda la pantalla, sin borrar nada.
+- **No se guarda nada.** La lámina de la sala vuelve cuando la sala se
+  describe otra vez —al salir por una salida, con `GOTO`, `LOOK` o `DESC`—, y
+  cuesta lo que tarde en dibujarse, no una copia de la pantalla. Para
+  devolverla sin repetir el texto, `DRAW` con el número de la lámina de la
+  sala, por ejemplo al turno siguiente con una bandera.
+- **Dibuja también a oscuras**: no es la sala la que se describe.
+- Un `DRAW` de una lámina que no existe borra la ventana de la lámina, como
+  una sala que apuntara a ella, y `regac check` lo avisa.
+- Sólo viaja en el intérprete de una aventura que lo usa: 28 bytes en el
+  Z80.
+
 ### Sin uso
 
 `NOP` y `NOP29` no hacen nada. Están porque el original los tenía.
 
 Y uno más que no se escribe nunca: `ENDTABLE` es la marca de fin de tabla que
-pone el compilador. Con él, sesenta y ocho.
+pone el compilador. Con él, sesenta y nueve.
 
 ---
 
@@ -418,6 +441,7 @@ está encima y no cambia lo de debajo:
 - **acentos y eñes**, que el original no tenía;
 - **ruidos**, con `SOUND` y `QUIET`;
 - **tablas propias**, con `/PROC` y `DO`;
+- **primeros planos**, con `DRAW`;
 - **huecos en el texto**, `\ctr n`, `\obj n` y `\turns`, que escriben un
   contador, el nombre de un objeto o los turnos donde están;
 - **nueve máquinas**;

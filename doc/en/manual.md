@@ -162,7 +162,7 @@ database, and given a source they say to compile it first.
 **`lint`** looks the other way from `check`: at what is there and nothing
 uses. A room no way leads to and no `GOTO` names, an object nothing can pick
 up, a word no condition asks for, a message nobody prints, a picture no room
-shows, a `/PROC` table no `DO` runs. It does not stop anything being built,
+shows and no `DRAW` draws, a `/PROC` table no `DO` runs. It does not stop anything being built,
 and some of it may be on purpose -- scenery nobody takes -- so these are
 notes. A number worked out while the game plays (`MESS ( RAND 3 + 10 )`)
 cannot be followed, and rather than say something false, it says so.
@@ -341,6 +341,14 @@ called with `DO`:
 
 It runs as if it were written where the `DO` is: if there is a `WAIT` in it,
 the turn ends there. The detail is in [`gac.md`](gac.md).
+
+A close up is shown with `DRAW`, which draws another picture where the room's
+goes:
+
+    IF ( VERB EXAMINE_VERB AND NOUN SHELL_NOUN ) DRAW SHELL MESS THE_SEA WAIT END
+
+Nothing is kept: the room's picture comes back when the room is described
+again -- on moving, or with `LOOK` -- or with a `DRAW` of its number.
 
 GAC **has no precedence**: it evaluates strictly from left to right. That is
 why the operand of a prefix operator is not greedy, and `NOT VERB 1 AND NOUN

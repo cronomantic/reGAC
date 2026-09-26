@@ -162,7 +162,7 @@ def nearest(word, among):
     """The one of those a misspelling was probably meant to be, or None.
 
     An unknown word in a condition is a typo far more often than it is
-    anything else, and the language is sixty eight words long: saying which of
+    anything else, and the language is sixty nine words long: saying which of
     them was meant costs a line and saves a hunt.
     """
     spellings = {str(one).upper(): one for one in among}

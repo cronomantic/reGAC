@@ -274,12 +274,35 @@ written once, in a block `/PROC #n`, and called with `DO n`.
 - It travels only in the interpreter of an adventure that uses it, like the
   noises.
 
+### Close ups
+
+| | |
+|---|---|
+| `DRAW n` | draws picture `n` where the room's goes |
+
+An addition of this project, not GAC's: a picture in the middle of a turn,
+the close up of what is examined, say.
+
+- **It is drawn as a room's is**: it takes its rows back from the text, and
+  with a `TEXT` in force it draws nothing. `DRAW 0` is what a room with no
+  picture does: the text takes the whole screen, and nothing is wiped.
+- **Nothing is kept.** The room's picture comes back when the room is
+  described again -- going out by a way out, with `GOTO`, `LOOK` or `DESC` --
+  and costs its drawing, not a copy of the screen. To bring it back without
+  saying the text again, `DRAW` the room's picture, the next turn with a flag,
+  say.
+- **It draws in the dark as well**: it is not the room being described.
+- A `DRAW` of a picture that does not exist wipes the picture's window, as a
+  room pointing at it would, and `regac check` says so.
+- It travels only in the interpreter of an adventure that uses it: 28 bytes
+  on the Z80.
+
 ### Unused
 
 `NOP` and `NOP29` do nothing. They are here because the original had them.
 
 And one more that is never written: `ENDTABLE` is the mark the compiler puts
-at the end of a table. With it, sixty eight.
+at the end of a table. With it, sixty nine.
 
 ---
 
@@ -424,6 +447,7 @@ added sits on top and does not change what is below:
 - **accents and ñ**, which the original had not;
 - **noises**, with `SOUND` and `QUIET`;
 - **tables of one's own**, with `/PROC` and `DO`;
+- **close ups**, with `DRAW`;
 - **holes in the text**, `\ctr n`, `\obj n` and `\turns`, which write a
   counter, the name of an object or the turns where they stand;
 - **nine machines**;

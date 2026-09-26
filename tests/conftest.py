@@ -69,6 +69,8 @@ GROUPS = {
         # DO and the holes in the text, played on this build as well as on
         # the PC's and in Python
         "test_proc", "test_holes",
+        # and DRAW, looked at on the screen of the same build
+        "test_draw",
         "test_media_plus3", "test_tape_z80",
         "test_textmode_z80",
         # it lays text out through test_markers_z80's own game
