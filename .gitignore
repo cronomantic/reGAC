@@ -172,3 +172,18 @@ cython_debug/
 
 # What a build leaves behind
 salida/
+# and what regac make and regac build write beside the interpreters: the
+# database, the includes that cut it into banks, the adventure's noises, and
+# what the assemblers make of all of it -- listings, labels, binaries, media
+/music/noises.asm
+/z80/**/*.rgac
+/z80/**/banks*.inc
+/z80/**/*.lst
+/z80/**/*.sym
+/z80/**/*.bin
+/z80/**/*.sna
+/z80/**/*.tap
+/z80/**/*.nex
+/x86/*.rgac
+/x86/*.lst
+/x86/*.bin
