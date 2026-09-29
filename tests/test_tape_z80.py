@@ -325,6 +325,110 @@ def test_the_128_tape_carries_its_banks_to_their_pages():
     assert not wrong, f"{wrong} bytes of the picture differ from the reference"
 
 
+VAJILLAS = os.path.join(ROOT, "snapshots", "vajillas1.json")
+
+
+@needs_tools
+def test_a_game_saved_on_a_128_is_the_game_it_loads(tmp_path):
+    """On a 128 and a +3 the game is not in the code but in page five, above
+    the BASIC that loads it, where nothing else is once the interpreter runs.
+    So it is played there, saved on a tape and loaded back.
+
+    La guerra de las vajillas, because its first room has a way out: NORTE
+    takes it to room four.  It is saved there, and the saved block goes on the
+    end of the very tape the adventure came off, so a second machine loads the
+    adventure, is told LOAD straight away and reads the game that comes next:
+    room four, and the rest of the game as it was.  The ROM does both halves,
+    as it does for a person, and the save is caught with ZEsarUX's --outtape."""
+    if not os.path.exists(VAJILLAS):
+        pytest.skip("La guerra de las vajillas must be in snapshots/")
+    defs = os.path.join(SPECTRUM, "banks.inc")
+    listing = build(
+        VAJILLAS,
+        os.path.join(SPECTRUM, "game128.rgac"),
+        "spectrum128",
+        os.path.join(SPECTRUM, "game128.asm"),
+        os.path.join(SPECTRUM, "game128.lst"),
+        banks="16k",
+        defs=defs,
+    )
+    where = {name: emulator.label_address(listing, name)
+             for name in ("vm_location", "vm_state", "vm_state_end", "vm_seed",
+                          "vm_flags", "vm_counters", "obj_loc")}
+    assert 0x5D00 <= where["vm_state"] < 0x8000, "the game is in the code"
+    with open(VAJILLAS, encoding="utf-8") as f:
+        ddb = json.load(f)
+    glyphs = glyph_table(Database(ddb))
+    prompt = ddb["messages"]["240"]
+    start = ddb["init_loc"]
+    tape = os.path.join(SPECTRUM, "game128.tap")
+    saved = str(tmp_path / "saved.tap")
+
+    def room(session):
+        low, high = session.read(where["vm_location"], 2)
+        return low | high << 8
+
+    def game(session, block=None):
+        """The room, the weights, the flags and where every object is: not the
+        counters, which Vajillas counts its turns in, nor the seed."""
+        at = where["vm_state"]
+        if block is None:
+            block = bytes(session.read(at, where["vm_state_end"] - at))
+        part = {name: where[name] - at for name in where}
+        return (block[:part["vm_seed"]]
+                + block[part["vm_flags"]:part["vm_counters"]]
+                + block[part["obj_loc"]:])
+
+    def settles_in(session, wanted, timeout=60.0):
+        emulator.asked(lambda: screen(session, glyphs), prompt, timeout)
+        return room(session) == wanted
+
+    def order(session, words, then_in):
+        session.type(words + ENTER)
+        time.sleep(emulator.longer(1.0))        # for the order to be taken
+        assert settles_in(session, then_in), (
+            f"after {words} it is in room {room(session)} and not {then_in}: "
+            f"{screen(session, glyphs)}"
+        )
+
+    session = emulator.Session(machine="128k",
+                               extra=TAPE_FLAGS + ["--outtape", saved])
+    try:
+        session.load(tape)
+        assert settles_in(session, start, 120.0), (
+            f"the adventure never asked: {screen(session, glyphs)}"
+        )
+        order(session, "NORTE", 4)
+        order(session, "SAVE", 4)
+        played = game(session)
+    finally:
+        session.close()
+
+    with open(saved, "rb") as f:
+        block = f.read()
+    length = block[0] | block[1] << 8
+    assert length == where["vm_state_end"] - where["vm_state"] + 2, (
+        f"what went on the tape is not a game: {len(block)} bytes"
+    )
+    assert game(None, block[3:3 + length - 2]) == played, (
+        "what went on the tape is not the game being played"
+    )
+
+    both = str(tmp_path / "and_the_game.tap")
+    with open(tape, "rb") as f, open(both, "wb") as out:
+        out.write(f.read() + block)
+    session = emulator.Session(machine="128k", extra=TAPE_FLAGS)
+    try:
+        session.load(both)
+        assert settles_in(session, start, 120.0), (
+            f"the adventure never asked: {screen(session, glyphs)}"
+        )
+        order(session, "LOAD", 4)
+        assert game(session) == played, "what was loaded is not what was saved"
+    finally:
+        session.close()
+
+
 if __name__ == "__main__":
     test_the_48_tape_loads_and_plays()
     print("the 48 tape loads and plays")

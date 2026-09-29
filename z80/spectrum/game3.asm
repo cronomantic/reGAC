@@ -28,6 +28,10 @@ DB_PAGE_4       equ 0                   ; there is no fifth or sixth to give,
 DB_PAGE_5       equ 0                   ; which is what the next line says
                 ASSERT DB_BANK_COUNT <= 4
 
+; The game goes in page five, above the BASIC and short of the stack, as on a
+; 128 and for the same reasons: see game128.asm.
+                DEFINE  STATE_AT $7000
+
                 ; The loader travels in the BASIC area, which is page five and
                 ; is always there.
                 SLOT    1
@@ -99,9 +103,13 @@ database:
 last:
                 ; What is resident has to end before the window, or paging a
                 ; bank in would take the end of it away without a word.  The
-                ; eight adventures leave from 338 bytes (Bangkok2) to four
-                ; kilobytes; nothing looked at it before.
+                ; eight adventures leave from 1362 bytes (Bangkok2) to five
+                ; kilobytes, since the game went to page five; nothing looked
+                ; at it before.
                 ASSERT  last <= $C000
+                ; and the game clear of the BASIC and of the stack
+                ASSERT  STATE_AT >= basic_end
+                ASSERT  vm_state_end <= $7FF0 - 512
 
                 IFDEF SCREEN
                 SAVEBIN "game3_screen.bin", loading_screen, SCREEN_BYTES

@@ -241,6 +241,33 @@ def test_the_pcw_keeps_the_game_out_of_its_code(tmp_path):
 
 
 @pytest.mark.skipif(not tools(), reason="sjasmplus and nasm are needed")
+@pytest.mark.parametrize("target, sym_file, low, high", [
+    ("spectrum128", ("spectrum", "game128.sym"), 0x7000, 0x7DF0),
+    ("plus3", ("spectrum", "game3.sym"), 0x7000, 0x7DF0),
+    ("next", ("next", "game.sym"), 0x4400, 0x5C00),
+])
+def test_the_tight_machines_keep_the_game_out_of_their_code(
+        tmp_path, target, sym_file, low, high):
+    """Bangkok2 had 338 bytes left under $C000 on the 128 and the +3, and the
+    Next's interpreter 225 under its mask.  The game goes where nothing else is
+    while the interpreter runs -- page five above the BASIC, or the Next's free
+    memory at $4000 -- and the code does not carry it."""
+    kept = tmp_path / "build"
+    done = subprocess.run(
+        [sys.executable, "-m", "regac", "make",
+         os.path.join(EXAMPLE, "faro.toml"), "-o", str(tmp_path / "out"),
+         "-t", target, "--build-dir", str(kept)],
+        cwd=ROOT, capture_output=True, text=True)
+    assert done.returncode == 0, done.stdout + done.stderr
+    sym = memory.symbols(str(kept.joinpath("z80", *sym_file)))
+    for name in ("obj_entry", "vm_state", "vm_seed", "obj_loc"):
+        assert low <= sym[name] < high, name
+    assert sym["vm_state_end"] <= high
+    for name in ("start", "vm_init", "last"):
+        assert sym[name] >= 0x8000, name
+
+
+@pytest.mark.skipif(not tools(), reason="sjasmplus and nasm are needed")
 def test_make_says_it_for_every_machine(tmp_path):
     done = subprocess.run(
         [sys.executable, "-m", "regac", "make",

@@ -29,6 +29,16 @@ DB_PAGE_3       equ 6
 DB_PAGE_4       equ 7
 DB_PAGE_5       equ 0
 
+; The game -- where the player is, the markers, the counters, where every
+; object is -- and the table of where each object's record is: twelve hundred
+; bytes of room and nothing else, and not worth the sixteen kilobytes the code
+; shares with what is resident.  Page five is always in, and above the BASIC
+; that loads us nothing uses it once the interpreter runs: the interrupts are
+; off, and the ROM's tape routines want the system variables and no more.  So
+; they go there, well short of the stack, which comes down from $7FF0.  See
+; common/conditions.asm.
+                DEFINE  STATE_AT $7000
+
                 SLOT    3
                 IF DB_BANK_COUNT > 0
                 PAGE    DB_PAGE_0
@@ -132,9 +142,13 @@ database:
 last:
                 ; What is resident has to end before the window, or paging a
                 ; bank in would take the end of it away without a word.  The
-                ; eight adventures leave from 338 bytes (Bangkok2) to four
-                ; kilobytes; nothing looked at it before.
+                ; eight adventures leave from 1362 bytes (Bangkok2) to five
+                ; kilobytes, since the game went to page five; nothing looked
+                ; at it before.
                 ASSERT  last <= $C000
+                ; and the game clear of the BASIC and of the stack
+                ASSERT  STATE_AT >= basic_end
+                ASSERT  vm_state_end <= $7FF0 - 512
 
                 SAVESNA "game128.sna", start
 
