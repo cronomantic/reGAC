@@ -50,7 +50,7 @@ from .text import INK_CHAR, TextStore, commands_of, expand
 from .srcparse import (MACHINE_LABELS, SOUND_CHANNEL_NAMES, SourceError,
                         a_noise, parse)
 
-VERSION = "0.4.0"
+VERSION = "0.5.0"
 
 
 def read_json(path):

@@ -4777,6 +4777,9 @@ pocas por dos `make` en el mismo `z80/`. La prueba nueva,
 `test_it_builds_in_a_copy_and_leaves_the_interpreters_alone`, mira que
 ningún fichero de `z80/`, `x86/` ni `music/` cambie con un `make`.
 
+**La 0.5.0**, pedida por el usuario, es la primera release con el informe de
+la memoria y con `make` construyendo en una copia.
+
 ## Cosas menores
 
 ### Lo residente del 128 y del +3, que nadie vigilaba
