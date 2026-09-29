@@ -235,6 +235,31 @@ def test_one_command_builds_every_machine(tmp_path):
 
 
 @needs_assemblers
+def test_it_builds_in_a_copy_and_leaves_the_interpreters_alone(tmp_path):
+    """Two builds at once trod on each other when make assembled where regac
+    is, and an installation nobody may write in could build nothing: it
+    assembles in a copy, and what it leaves there is kept only when asked."""
+    where = str(tmp_path)
+    path = a_project(where, EVERY_MACHINE)
+    tree = [os.path.join(ROOT, folder) for folder in ("z80", "x86", "music")]
+
+    def stamps():
+        return {os.path.join(folder, name):
+                os.stat(os.path.join(folder, name)).st_mtime_ns
+                for top in tree if os.path.isdir(top)
+                for folder, _dirs, names in os.walk(top) for name in names}
+
+    before = stamps()
+    kept = os.path.join(where, "build")
+    done = make(path, "-t", "spectrum128", "--build-dir", kept)
+    assert done.returncode == 0, f"regac make failed:\n{done.stdout}\n{done.stderr}"
+    assert stamps() == before, "make wrote where regac is installed"
+    for left in ("game128.rgac", "banks.inc", "game128.lst", "game128.sym",
+                 "game128.tap"):
+        assert os.path.exists(os.path.join(kept, "z80", "spectrum", left)), left
+
+
+@needs_assemblers
 def test_only_the_machine_that_was_asked_for(tmp_path):
     where = str(tmp_path)
     path = a_project(where, EVERY_MACHINE)
@@ -315,12 +340,14 @@ def test_a_source_is_read_again_for_every_machine(tmp_path):
     with open(path, "w", encoding="utf-8") as f:
         f.write(KEPT_BACK)
 
-    done = make(path)
+    # the databases are read where it assembled, which it keeps when told
+    kept = os.path.join(where, "build")
+    done = make(path, "--build-dir", kept)
     assert done.returncode == 0, f"regac make failed:\n{done.stdout}\n{done.stderr}"
     sizes = {}
     for which, folder, built in (("spectrum48", "spectrum", "game.rgac"),
                                  ("cpc", "cpc", "game.rgac")):
-        with open(os.path.join(ROOT, "z80", folder, built), "rb") as f:
+        with open(os.path.join(kept, "z80", folder, built), "rb") as f:
             sizes[which] = len(Reader(f.read()).section(S_TEXT))
     assert sizes["spectrum48"] > sizes["cpc"], (
         f"both machines got the same text: {sizes}"

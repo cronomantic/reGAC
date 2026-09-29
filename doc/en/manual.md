@@ -84,6 +84,10 @@ to bottom to be read as a tutorial. It is in Spanish, like the adventures of
 builds it for the nine machines and leaves them in `ejemplo/salida/`, a folder
 for each. Load one in the emulator you have and it is playing. With `--zip
 faro.zip` they go into a zip as well, as they are on the disk, to hand out.
+`make` assembles in a copy of the interpreters, in a temporary folder it
+removes when it is done, so it writes nothing where reGAC is installed; with
+`--build-dir work` it assembles in `work/` and leaves there what comes out of
+the assemblers, listings included, in case it has to be looked at.
 
 And to see it with no emulator at all:
 

@@ -82,6 +82,10 @@ objetos y un enigma, comentada de arriba abajo para leerse como un tutorial.
 Construye las nueve máquinas y las deja en `ejemplo/salida/`, una carpeta por
 destino. Cárgala en el emulador que tengas y ya está jugando. Con `--zip
 faro.zip` las mete además en un zip, igual que en el disco, para repartirlas.
+`make` ensambla en una copia de los intérpretes, en una carpeta temporal que
+borra al acabar, así que no escribe nada donde está instalado reGAC; con
+`--build-dir obra` ensambla en `obra/` y deja allí lo que sale de los
+ensambladores, listados incluidos, por si hace falta mirarlo.
 
 Y para verla sin emulador ninguno:
 

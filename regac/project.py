@@ -62,8 +62,9 @@ class Target:
     """One machine, and everything it takes to build for it.
 
     `database` and `defs` are where that machine's own source expects to find
-    them, so they are written into the tree next to it and not into the
-    output: they are part of the build, not of what is handed over.
+    them, so they are written next to it and not into the output: they are
+    part of the build, not of what is handed over.  `regac make` does it in a
+    copy of the interpreters, and not where they are installed.
     """
 
     def __init__(self, machine, folder, source, database, banks="none",
