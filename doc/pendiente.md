@@ -4540,9 +4540,11 @@ pide lo que queda a la vista de la sala; se ha pasado dos veces seguidas.
   sin `snapshots/`**, porque copiaban MegaCorp igualmente; ahora no copian
   nada. Las tres que construyen y no arrancan nada usan el faro, construido
   de su fuente, y piden sólo los ensambladores; la que enciende un PCW sigue
-  con MegaCorp y con ZEsarUX. La prueba del informe que construye las nueve
+  con MegaCorp y con ZEsarUX. ~~La prueba del informe que construye las nueve
   máquinas, en `test_memory.py`, también es `serial`, por lo mismo que
-  `test_project.py`.
+  `test_project.py`.~~ **Ya no**: desde que `make` construye en una copia
+  (abajo, «`make` construye en una copia»), ninguna de las dos es `serial`,
+  y la segunda pasada sólo tiene lo que pide emulador, que en la CI se salta.
 - **La release**: **decidido por el usuario**, un script local y no un flujo
   de GitHub. Es `regac make proyecto.toml --zip faro.zip`: lo construido, una
   carpeta por máquina, en un zip para subirlo a mano. Lo mira
@@ -4743,6 +4745,37 @@ Al hacerlo salieron **tres fallos que no avisaba nadie**:
 `regac release`, a mano, también acababa en traceback con una base de datos
 que no fuera de reGAC. Las pruebas están en
 [`test_memory.py`](../tests/test_memory.py).
+
+## `make` construye en una copia
+
+**Pedido por el usuario.** `make` ensamblaba donde está instalado reGAC:
+escribía la base de datos, los `banks.inc`, `music/noises.asm`, los listados,
+los símbolos y los binarios al lado de los fuentes de `z80/` y `x86/`. Eso
+tenía dos consecuencias. **Dos `make` a la vez se pisaban** --por eso
+`test_project.py` era `serial`: junto a cpc-game, una vez el 464 leyó un
+intérprete de cero bytes que sjasmplus estaba escribiendo--, y **una
+instalación en la que no se puede escribir no podía construir nada**.
+
+Ahora `build_tree`, en `regac/__main__.py`, copia `z80/` y `x86/` --1,2 MB,
+todo `.asm`-- a una carpeta temporal, crea `music/` allí y construye dentro;
+al acabar la borra. Los intérpretes no se han tocado: sólo hay dos rutas que
+salen de la carpeta de una máquina, el `include "../../music/noises.asm"` del
+Z80 y el `NOISES_FILE` del PC, que ya se le pasaba como ruta absoluta, y las
+dos quedan dentro de la copia. Lo que sale es **idéntico byte a byte** a lo
+que se construía en el árbol, en las nueve máquinas. Con `--build-dir` se
+ensambla en esa carpeta y se conserva, con los listados y los `.sym`.
+
+Lo que sigue construyendo en el árbol es `regac build` --que escribe donde se
+le dice--, las pruebas que ensamblan su propio banco de pruebas, y
+`regac draw` cuando mide lo que tarda una lámina (`regac/measure.py`). El
+`.gitignore` sigue por ellos.
+
+Con eso `test_project.py` y la prueba de `make` de `test_memory.py` dejan de
+ser `serial`, y **todo junto en paralelo, sin separar, ya no falla**: antes,
+con los ensambladores en el PATH, `pytest -n 8 tests` fallaba una vez de cada
+pocas por dos `make` en el mismo `z80/`. La prueba nueva,
+`test_it_builds_in_a_copy_and_leaves_the_interpreters_alone`, mira que
+ningún fichero de `z80/`, `x86/` ni `music/` cambie con un `make`.
 
 ## Cosas menores
 

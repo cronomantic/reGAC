@@ -58,8 +58,9 @@ jobs:
           SDL_VIDEODRIVER: dummy
         run: python -m pytest -q -n 4 --dist loadgroup -m "not serial"
       - name: Test, the ones that run on their own
-        # what builds in z80/ over the files every other test uses, and what
-        # measures time; those that want an emulator skip themselves here.
+        # what measures time, and what cannot share the machine; they all want
+        # an emulator and skip themselves here, but one that did not would
+        # still be run.
         # One expression and not two -m, and not the mirror: see
         # doc/pruebas.md.
         env:

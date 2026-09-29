@@ -21,12 +21,14 @@
 """ReGAC: convert between the JSON database and the editable source format."""
 
 import argparse
+import contextlib
 import shlex
 import shutil
 import subprocess
 import json
 import os
 import sys
+import tempfile
 
 from .check import problems_of
 from .binary import (MACHINES, SECTION_NAMES, BuildError, Database, Reader,
@@ -554,45 +556,47 @@ def cmd_make(args):
     output = args.output or os.path.join(root, project["output"])
 
     # The adventure and its loading screens sit beside the project file; the
-    # interpreters sit where reGAC itself is installed.
-    tree = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    # interpreters sit where reGAC itself is installed, and are assembled in
+    # a copy of them, never where they are.
     wanted = args.target or sorted(project["targets"])
     everything = []
-    for which in wanted:
-        settings = project["targets"].get(which)
-        if settings is None:
-            sys.exit(_("ERROR: the project says nothing about {machine}",
-                       machine=which))
-        # A source is read again for every machine, because it may keep some
-        # of itself back for some of them; a JSON has no such thing in it and
-        # is read once.
-        if written_source is not None:
+    with build_tree(args.build_dir) as tree:
+        for which in wanted:
+            settings = project["targets"].get(which)
+            if settings is None:
+                sys.exit(_("ERROR: the project says nothing about {machine}",
+                           machine=which))
+            # A source is read again for every machine, because it may keep
+            # some of itself back for some of them; a JSON has no such thing
+            # in it and is read once.
+            if written_source is not None:
+                try:
+                    # From the folder the source is in, which is what a file=
+                    # in it is relative to: a font, another source it
+                    # includes.  This said nothing, so `make` looked for them
+                    # where it was run from and `compile` looked where the
+                    # source was.
+                    ddb = parse(written_source, os.path.basename(source),
+                                os.path.dirname(os.path.abspath(source)),
+                                machine=which)
+                except SourceError as e:
+                    sys.exit(_("ERROR: {what}", what=e))
             try:
-                # From the folder the source is in, which is what a file= in
-                # it is relative to: a font, another source it includes.  This
-                # said nothing, so `make` looked for them where it was run
-                # from and `compile` looked where the source was.
-                ddb = parse(written_source, os.path.basename(source),
-                            os.path.dirname(os.path.abspath(source)),
-                            machine=which)
-            except SourceError as e:
-                sys.exit(_("ERROR: {what}", what=e))
-        try:
-            noises = make_noises(ddb, tree)
-            written, room = make_one(TARGETS[which], settings, ddb, name, root,
-                                     output, tree, noises)
-        except (ProjectError, BuildError) as e:
-            # what did not fit, and by how much, before why it stopped
-            room = getattr(e, "room", ())
-            if room:
-                print(which)
-                print("\n".join(room))
-            sys.exit(_("ERROR: {machine}: {what}", machine=which, what=e))
-        print(f"{which:12} -> " + ", ".join(
-            os.path.relpath(path, output) for path in written))
-        for row in room:
-            print(row)
-        everything += written
+                noises = make_noises(ddb, tree)
+                written, room = make_one(TARGETS[which], settings, ddb, name,
+                                         root, output, tree, noises)
+            except (ProjectError, BuildError) as e:
+                # what did not fit, and by how much, before why it stopped
+                room = getattr(e, "room", ())
+                if room:
+                    print(which)
+                    print("\n".join(room))
+                sys.exit(_("ERROR: {machine}: {what}", machine=which, what=e))
+            print(f"{which:12} -> " + ", ".join(
+                os.path.relpath(path, output) for path in written))
+            for row in room:
+                print(row)
+            everything += written
     if args.zip:
         # What was built, a folder a machine as it is on the disk, in one
         # file to hand out: a release, for one.
@@ -602,6 +606,34 @@ def cmd_make(args):
             for path in everything:
                 bundle.write(path, os.path.relpath(path, output))
         print(f"{'':12} -> {args.zip}")
+
+
+# The interpreters, which make copies to assemble; and what a build leaves
+# beside them, which is not worth copying from a folder a build was run in.
+INTERPRETERS = ("z80", "x86")
+LEFT_BEHIND = ("*.rgac", "*.inc", "*.lst", "*.sym", "*.bin", "*.sna", "*.tap",
+               "*.nex")
+
+
+@contextlib.contextmanager
+def build_tree(keep=None):
+    """Where make assembles: a copy of the interpreters, in a folder of its
+    own.  Assembling writes beside the source -- the database, the includes
+    that cut it up, the adventure's noises, the listings, what the assembler
+    makes -- and doing it where reGAC is installed meant that two builds at
+    once trod on each other, and that an installation nobody may write in
+    could build nothing.  The folder is a temporary one and goes when the
+    build is done, or `keep`, which is kept, with all of that in it."""
+    here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    with contextlib.ExitStack() as stack:
+        where = keep or stack.enter_context(
+            tempfile.TemporaryDirectory(prefix="regac-"))
+        for folder in INTERPRETERS:
+            shutil.copytree(os.path.join(here, folder),
+                            os.path.join(where, folder),
+                            ignore=shutil.ignore_patterns(*LEFT_BEHIND),
+                            dirs_exist_ok=True)
+        yield os.path.abspath(where)
 
 
 def make_noises(ddb, where_regac_is):
@@ -927,6 +959,10 @@ def main():
                    help=_("only this machine, and again for more than one"))
     p.add_argument("--zip", help=_("and everything it built in this zip file, "
                                    "a folder a machine"))
+    p.add_argument("--build-dir",
+                   help=_("assemble in this folder and keep what the "
+                          "assemblers leave there, listings included "
+                          "(default: a temporary folder, removed after)"))
     p.set_defaults(func=cmd_make)
 
     p = sub.add_parser("text", help=_("report what the text costs once packed"))

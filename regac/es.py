@@ -233,6 +233,11 @@ SAID = {
         "sólo esta máquina, y otra vez para más de una",
     "and everything it built in this zip file, a folder a machine":
         "y todo lo construido en este zip, una carpeta por máquina",
+    "assemble in this folder and keep what the assemblers leave there, "
+    "listings included (default: a temporary folder, removed after)":
+        "ensamblar en esta carpeta y conservar lo que dejan allí los "
+        "ensambladores, listados incluidos (por omisión: una carpeta "
+        "temporal, que se borra al acabar)",
     "report what the text costs once packed":
         "dice cuánto ocupa el texto una vez empaquetado",
     "verify that an adventure survives a round trip and points nowhere it "
