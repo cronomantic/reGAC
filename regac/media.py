@@ -570,6 +570,12 @@ def msx_tape(code, database=b"", screen=None, load=MSX_CODE_AT, entry=None,
     stopping the motor between them would buy nothing: the screen needs no
     memory at all, it goes straight into the chip as it is read.
     """
+    if len(database) > load:
+        # it goes from $0000 up to where the interpreter loads, and nothing
+        # the assembler builds ever sees it to say so
+        raise ValueError(_(
+            "the database is {count} bytes and {room} fit under the "
+            "interpreter", count=len(database), room=load))
     out = bytearray()
     msx_file(out, name, code, load, load if entry is None else entry)
     header = struct.pack("<HB", len(database), 1 if screen else 0)

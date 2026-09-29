@@ -4657,6 +4657,70 @@ dice, pero cada dispositivo guarda el borde a su manera --un color del
 Spectrum, una entrada de paleta, una pluma-- y ponerlo alrededor de la lámina
 pide traducir cada uno.
 
+## La memoria que queda, dicha al construir
+
+**Pedido por el usuario**: que al construir se sepa la memoria que ocupa la
+aventura, cómo se reparte en los bancos y cuánta queda. `regac make` lo dice
+después de cada máquina, y está en el apartado «La memoria que queda» del
+manual; aquí va de dónde salen las cifras.
+
+**Son las del ensamblador, no una cuenta nuestra.** sjasmplus escribe con
+`--sym` la dirección de cada etiqueta en `<fuente>.sym`, junto al `.lst`, y
+`regac/memory.py` las lee y las compara con los mismos límites que miran los
+`ASSERT` del final de cada `game*.asm`. Un tramo es desde dónde empieza lo
+primero hasta dónde tiene que acabar lo último:
+
+| máquina | tramo | tope |
+|---|---|---|
+| Spectrum 48 | intérprete y base de datos, desde `$8000` | el final de la memoria |
+| 128, +3 | intérprete y lo residente, desde `$8000` | `DB_WINDOW`, `$C000` |
+| PCW | intérprete y lo residente, desde `$0100` | `DB_WINDOW`, `$4000` |
+| CPC 464 | intérprete y base de datos, desde `$4000` | `FIRMWARE_AT` |
+| CPC 464 del revés | el intérprete, desde `$0400` | `MASK` o `BASIC_KEEPS_FROM`, lo que antes llegue |
+| | la base de datos, desde `$4000` | `ISLAND_AT` |
+| CPC 6128 | lo residente, desde `$0300` | `RESIDENT_LOADS` |
+| | el intérprete, desde `$8000` | `SAVE_AREA`, o antes si hay máscara |
+| MSX | la base de datos, desde `$0000` | donde empieza el intérprete |
+| | el intérprete | `SHADOW` |
+| Next | lo residente, desde `$5D00` | `$8000` |
+| | el intérprete | `MASK`, o `ABOVE_MASK` en una aventura de Amstrad |
+| | `picture.asm`, encima de la máscara | `STACK_AT - STACK_ROOM` |
+
+Lo que decide si hay máscara es `MASK_BYTES`: sólo existe cuando se ensambla
+el relleno del Spectrum. El Spectrum 48 no puede usar `DB_WINDOW` como los
+otros, porque sin bancos vale 0.
+
+**sjasmplus escribe los símbolos aunque falle un `ASSERT`**, y eso es lo que
+deja decir cuánto sobra justo cuando más interesa: la construcción que no
+cabe dice su informe y luego el error. El `.sym` de la vez anterior se borra
+antes de ensamblar, para no leer el de otra construcción si esta falla antes
+de escribirlo.
+
+Debajo del tramo que lleva la base de datos va **lo que la forma, sección a
+sección y de la más grande a la más pequeña**, que es lo que el autor tiene
+que recortar: en el 48, el 464 y el MSX es la base de datos entera, y en los
+demás sólo lo residente, porque los textos y las láminas van en los bancos y
+cada banco dice ya las suyas.
+
+Al hacerlo salieron **tres fallos que no avisaba nadie**:
+
+- **El MSX no miraba el tamaño de la base de datos.** Va de `$0000` a donde
+  empieza el intérprete, la lee el intérprete de la cinta, y ningún `ASSERT`
+  la ve. Con 36000 bytes salía un casete que se cargaba encima del intérprete,
+  y con más de 64 KB un `struct.error` de Python. Ahora `make` para y
+  `msx_tape` no la escribe.
+- **El 464 del revés acababa en un traceback** cuando la base de datos no
+  cabía bajo la isla: el `ValueError` de `cpc_low_tape` decía lo correcto,
+  pero nadie lo recogía. Ahora es un error, en `make` y en `release`.
+- **El 128 y el Next dejaban bancos fuera sin decirlo.** Tienen página para
+  seis y su `game*.asm` los pone uno a uno con `IF DB_BANK_COUNT > n`; un
+  séptimo no llegaba a la cinta ni al `.nex`. Ahora `make` para. Cuántos cabe
+  en cada máquina está en `most_banks`, en la tabla de `regac/project.py`.
+
+`regac release`, a mano, también acababa en traceback con una base de datos
+que no fuera de reGAC. Las pruebas están en
+[`test_memory.py`](../tests/test_memory.py).
+
 ## Cosas menores
 
 ### Lo residente del 128 y del +3, que nadie vigilaba

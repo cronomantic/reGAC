@@ -79,11 +79,39 @@ def test_a_128_says_what_is_left_under_the_window_and_in_every_bank():
     assert f"{free} free of 16384" in lines[0]
     assert "interpreter 8448" in lines[0]
     assert f"database {database.resident_size}" in lines[0]
-    assert "1 of 6, 16384 bytes each" in lines[1]
+    assert lines[1].strip().startswith("database: ")
+    assert "1 of 6, 16384 bytes each" in lines[2]
     used = len(database.banks[0])
-    assert f"{16384 - used} free of 16384" in lines[2]
-    assert "text" in lines[2] and "graphics" in lines[2]
-    assert "banks 1-5" in lines[3] and str(5 * 16384) in lines[3]
+    assert f"{16384 - used} free of 16384" in lines[3]
+    assert "text" in lines[3] and "graphics" in lines[3]
+    assert "banks 1-5" in lines[4] and str(5 * 16384) in lines[4]
+
+
+def test_the_database_is_told_section_by_section_biggest_first():
+    # what is resident, which on a 128 leaves the text and pictures out
+    database = the_example()
+    sym = {"start": 0x8000, "database": 0xA100,
+           "last": 0xA100 + database.resident_size, "DB_WINDOW": 0xC000}
+    lines, _over = memory.report("spectrum128", sym, database, most_banks=6)
+    said = lines[1].strip()
+    assert said.startswith("database: ")
+    parts = [part.rsplit(" ", 1) for part in said[len("database: "):]
+             .split(", ")]
+    sizes = [int(size) for _name, size in parts]
+    assert sum(sizes) == database.resident_size
+    assert sizes == sorted(sizes, reverse=True)
+    names = {name for name, _size in parts}
+    assert "header" in names and "font" in names
+    assert "text" not in names and "graphics" not in names
+
+
+def test_an_unbanked_database_is_all_of_it():
+    database = the_example("spectrum48", 0)
+    said = memory.database_line(database)
+    assert "text" in said and "graphics" in said
+    assert sum(int(part.rsplit(" ", 1)[1]) for part
+               in said.strip()[len("database: "):].split(", ")) \
+        == database.resident_size
 
 
 def test_what_does_not_fit_is_said_and_by_how_much():
@@ -91,6 +119,7 @@ def test_what_does_not_fit_is_said_and_by_how_much():
     sym = {"start": 0x8000, "database": 0xF000, "last": 0x10000 + 300}
     lines, over = memory.report("spectrum48", sym, database)
     assert "300 too many, of 32768" in lines[0]
+    assert lines[1].strip().startswith("database: ")
     assert over == ["$8000-$FFFF by 300 bytes"]
 
 
@@ -102,7 +131,7 @@ def test_the_msx_database_is_held_to_what_is_under_the_interpreter():
     database.resident_size = 0x8000 + 1
     lines, over = memory.report("msx", sym, database)
     assert over == ["$0000-$7FFF by 1 bytes"]
-    assert "8192 free of 16384" in lines[1]
+    assert "8192 free of 16384" in lines[2]
 
 
 def test_the_bar_is_never_wider_than_itself():
@@ -117,7 +146,44 @@ def test_a_pc_says_what_dos_has_to_give_it():
     lines = memory.pc_report(15000, database, 2048)
     image = database.resident_size + sum(len(b) for b in database.banks)
     assert f"{15000 + image + 2048} bytes" in lines[0]
-    assert "free of 65520" in lines[1]
+    assert "text" in lines[1] and "graphics" in lines[1]  # all of it
+    assert "free of 65520" in lines[2]
+
+
+def test_a_msx_tape_will_not_carry_more_than_fits_under_the_interpreter():
+    # it would load over the interpreter; nothing else would have said so
+    from regac.media import MSX_CODE_AT, msx_tape
+
+    msx_tape(b"code", bytes(MSX_CODE_AT))
+    with pytest.raises(ValueError, match="fit under the interpreter"):
+        msx_tape(b"code", bytes(MSX_CODE_AT + 1))
+
+
+def test_release_says_what_does_not_fit_instead_of_a_trace(tmp_path):
+    code = tmp_path / "code.bin"
+    code.write_bytes(b"code")
+    database = tmp_path / "game.rgac"
+    image = the_example("msx", 0).build()
+    database.write_bytes(image + bytes(40000 - len(image)))
+    done = subprocess.run(
+        [sys.executable, "-m", "regac", "release", str(code), str(tmp_path),
+         "-m", "msx", "--database", str(database)],
+        cwd=ROOT, capture_output=True, text=True,
+        env=dict(os.environ, REGAC_LANG="en"))
+    assert done.returncode != 0
+    assert "Traceback" not in done.stderr, done.stderr
+    assert "40000 bytes and 32768 fit under the interpreter" in done.stderr
+
+    # and something that is not a database at all is said to be so
+    database.write_bytes(bytes(100))
+    done = subprocess.run(
+        [sys.executable, "-m", "regac", "release", str(code), str(tmp_path),
+         "-m", "msx", "--database", str(database)],
+        cwd=ROOT, capture_output=True, text=True,
+        env=dict(os.environ, REGAC_LANG="en"))
+    assert done.returncode != 0
+    assert "Traceback" not in done.stderr, done.stderr
+    assert "not a reGAC database" in done.stderr
 
 
 def tools():
@@ -142,5 +208,6 @@ def test_make_says_it_for_every_machine(tmp_path):
                     "$8000-$BFFF"):
         assert stretch in said, f"no {stretch} in:\n{said}"
     assert said.count("bank 0 ") == 5, said        # the five with banks
+    assert said.count("database: ") == 9, said      # one to every machine
     assert "the largest section" in said            # and the PC
     assert "too many" not in said

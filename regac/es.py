@@ -28,6 +28,7 @@ tipografía, bandera, contador, fuente, base de datos."""
 SAID = {
     # -- regac, the command ---------------------------------------------------
     "ERROR: {what}": "ERROR: {what}",
+    "ERROR: {path}: {what}": "ERROR: {path}: {what}",
     "{name}: round trip exact": "{name}: la ida y vuelta sale exacta",
     "{name}: round trip differs in {parts}":
         "{name}: la ida y vuelta difiere en {parts}",
@@ -117,6 +118,8 @@ SAID = {
     "database": "base de datos",
     "stack": "pila",
     "the largest section": "la sección más grande",
+    "header": "cabecera",
+    "database: {what}": "base de datos: {what}",
     "{n:>5} free of {size:>5}": "{n:>5} libres de {size:>5}",
     "{n:>5} too many, of {size:>5}": "{n:>5} de más, de {size:>5}",
     "    banks        {used} of {most}, {size} bytes each":
@@ -566,6 +569,9 @@ SAID = {
     "with the interpreter out of the way":
         "la base de datos ocupa {count} bytes y debajo de la isla caben "
         "{room}, incluso quitando de en medio el intérprete",
+    "the database is {count} bytes and {room} fit under the interpreter":
+        "la base de datos ocupa {count} bytes y debajo del intérprete caben "
+        "{room}",
     "a 6128 has {given} banks to give and this wants {wanted}":
         "un 6128 tiene {given} bancos que dar y esto quiere {wanted}",
     "the 6128's interpreter should start by jumping over the three bytes "
