@@ -24,6 +24,10 @@ tiempo sin que fallara nada por ello: sólo tardaba cuarenta y nueve minutos en
 vez de once, repitiendo en serie lo que la primera orden acababa de hacer en
 paralelo. La puerta pasa de una hora larga a poco más de veinte minutos.
 
+La CI de GitHub corre las dos primeras, sin emuladores y con los dos
+ensambladores: ahí se saltan solas las que piden ZEsarUX, DOSBox-X o las
+aventuras de `snapshots/`, y corre todo lo que construye.
+
 **El espejo no está en la puerta**: juega tres aventuras enteras --MegaCorp,
 Los pájaros de Bangkok y El Quijote II-- en dos máquinas a la vez, tarda un
 cuarto de hora largo, y su trabajo es **buscar** y no vigilar. Se lanza cuando

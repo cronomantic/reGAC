@@ -29,7 +29,8 @@ import os
 import sys
 
 from .check import problems_of
-from .binary import MACHINES, SECTION_NAMES, BuildError, Database, Reader
+from .binary import (MACHINES, SECTION_NAMES, BuildError, Database, Reader,
+                     section_name)
 from .devices import DEVICES, device_for, from_an_amstrad, make
 from .gfx import Renderer
 from . import memory
@@ -356,30 +357,16 @@ def cmd_build(args):
         print(f"{args.input} -> {args.noises}")
         print(_("  noises      {n}", n=len(noises)))
     if args.defs:
-        # What an assembler needs to cut the image up: where the banks start
-        # and how many there are.  Which of the machine's own pages they go
-        # to is the machine's business and not the database's.
-        lines = [
-            "; Written by regac build.  See doc/binario.md.",
-            f"DB_RESIDENT_SIZE equ {database.resident_size}",
-            f"DB_BANK_COUNT    equ {len(database.banks)}",
-            f"DB_BANK_BYTES    equ {1 << database.page_bits if database.banks else 0}",
-        ]
-        # And how much of each bank is really used, because a loader has no
-        # reason to read the padding that makes them all the same size.
-        for number, bank in enumerate(database.banks):
-            lines.append(f"DB_BANK_USED_{number}  equ {len(bank)}")
-        with open(args.defs, "w", encoding="utf-8") as f:
-            f.write("\n".join(lines) + "\n")
+        write_defs(database, args.defs)
     print(f"{args.input} -> {args.output}")
     print(_("  machine     {machine}", machine=args.machine))
     print(_("  image       {n} bytes", n=len(image)))
     print(_("  resident    {n} bytes", n=database.resident_size))
     print(_("  banks       {n}", n=len(database.banks)))
-    for index, name in enumerate(SECTION_NAMES):
+    for index in range(len(SECTION_NAMES)):
         bank, offset, size = database.placement[index]
         where = _("resident") if bank == 0xFF else _("bank {bank}", bank=bank)
-        print(f"  {name:<12}{size:7}  {where}")
+        print(f"  {section_name(index):<14}{size:7}  {where}")
 
 
 def write_media(machine, code, where, name, load, entry, screen=None,
@@ -511,22 +498,26 @@ def write_database(ddb, path, machine, banks, defs=None):
     with open(path, "wb") as f:
         f.write(database.build())
     if defs:
-        # What an assembler needs: where the banks start and how many there
-        # are.  Which of the machine's own pages they go to is the machine's
-        # business and not the database's.
-        lines = [
-            "; Written by regac.  See doc/binario.md.",
-            f"DB_RESIDENT_SIZE equ {database.resident_size}",
-            f"DB_BANK_COUNT    equ {len(database.banks)}",
-            f"DB_BANK_BYTES    equ {1 << database.page_bits if database.banks else 0}",
-        ]
-        # And how much of each bank is really used, because a loader has no
-        # reason to read the padding that makes them all the same size.
-        for number, bank in enumerate(database.banks):
-            lines.append(f"DB_BANK_USED_{number}  equ {len(bank)}")
-        with open(defs, "w", encoding="utf-8") as f:
-            f.write("\n".join(lines) + "\n")
+        write_defs(database, defs)
     return database
+
+
+def write_defs(database, path):
+    """What an assembler needs to cut a built database up: where the banks
+    start and how many there are.  Which of the machine's own pages they go
+    to is the machine's business and not the database's."""
+    lines = [
+        "; Written by regac.  See doc/binario.md.",
+        f"DB_RESIDENT_SIZE equ {database.resident_size}",
+        f"DB_BANK_COUNT    equ {len(database.banks)}",
+        f"DB_BANK_BYTES    equ {1 << database.page_bits if database.banks else 0}",
+    ]
+    # And how much of each bank is really used, because a loader has no
+    # reason to read the padding that makes them all the same size.
+    for number, bank in enumerate(database.banks):
+        lines.append(f"DB_BANK_USED_{number}  equ {len(bank)}")
+    with open(path, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines) + "\n")
 
 
 # The PC's stack: the unpacking of a message calls itself, and a picture calls

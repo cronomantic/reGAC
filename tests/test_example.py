@@ -228,9 +228,10 @@ def test_the_release_builds_every_machine(tmp_path):
         target = clean / name
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(os.path.join(ROOT, name), target)
-    # the assembler, where the tests keep it: it is not in git
+    # the assembler, where the tests keep it: it is not in git.  Copied with
+    # its mode, because off the path it is a program that has to stay one.
     (clean / "tools").mkdir()
-    shutil.copyfile(emulator.find_sjasmplus(), clean / "tools" / "sjasmplus.exe")
+    shutil.copy(emulator.find_sjasmplus(), clean / "tools" / "sjasmplus.exe")
     where = str(tmp_path / "salida")
     subprocess.run([sys.executable, "-m", "regac", "make",
                     str(clean / "ejemplo" / "faro.toml"), "--output", where],

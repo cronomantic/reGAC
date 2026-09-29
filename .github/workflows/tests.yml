@@ -1,17 +1,23 @@
-# The tests that need nothing but Python, on every push and pull request.
+# The tests that need no emulator, on every push and pull request.
 #
 # Most of the suite drives real machines in emulators -- ZEsarUX, DOSBox-X --
-# with the assemblers and the original adventures beside it, and none of that
-# is in the repository: tools/ and snapshots/ are other people's.  Those tests
-# see it is not there and skip themselves, and what runs here is the rest:
-# the source format, the compiler and decompiler, the database, the renderer,
-# the interpreter in Python, the viewer.  The whole suite runs on a machine
-# that has the tools: see doc/pruebas.md.
+# with the original adventures beside it, and none of that is in the
+# repository: tools/ and snapshots/ are other people's.  Those tests see it is
+# not there and skip themselves, and what runs here is the rest: the source
+# format, the compiler and decompiler, the database, the renderer, the
+# interpreter in Python, the viewer -- and, with the two assemblers, which are
+# free and quick to have, regac make itself: the example built for the nine
+# machines and the report of the memory it takes.  sjasmplus is built from its
+# own repository at the version the release uses, and kept between runs.  The
+# whole suite runs on a machine that has the tools: see doc/pruebas.md.
 name: tests
 
 on:
   push:
   pull_request:
+
+env:
+  SJASMPLUS: v1.23.1                    # as .github/workflows/release.yml
 
 jobs:
   python:
@@ -25,6 +31,25 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+      - name: NASM
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y nasm
+      - name: sjasmplus, as it was built last time
+        id: sjasmplus
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/sjasmplus/build/release
+          key: sjasmplus-${{ env.SJASMPLUS }}-${{ runner.os }}
+      - name: sjasmplus, built
+        if: steps.sjasmplus.outputs.cache-hit != 'true'
+        run: |
+          git clone --depth 1 --branch "$SJASMPLUS" \
+            https://github.com/z00m128/sjasmplus.git "$RUNNER_TEMP/sjasmplus"
+          make -C "$RUNNER_TEMP/sjasmplus" USE_LUA=0 -j4
+      - name: The assemblers, on the path
+        run: |
+          echo "$RUNNER_TEMP/sjasmplus/build/release" >> "$GITHUB_PATH"
       - name: Install
         run: python -m pip install -e ".[dev]"
       - name: Test
@@ -32,3 +57,11 @@ jobs:
         env:
           SDL_VIDEODRIVER: dummy
         run: python -m pytest -q -n 4 --dist loadgroup -m "not serial"
+      - name: Test, the ones that run on their own
+        # what builds in z80/ over the files every other test uses, and what
+        # measures time; those that want an emulator skip themselves here.
+        # One expression and not two -m, and not the mirror: see
+        # doc/pruebas.md.
+        env:
+          SDL_VIDEODRIVER: dummy
+        run: python -m pytest -q -m "serial and not mirror"

@@ -119,6 +119,16 @@ SAID = {
     "stack": "pila",
     "the largest section": "la sección más grande",
     "header": "cabecera",
+    # las secciones de la base de datos (binary.SECTION_NAMES); "objects"
+    # ya está, más arriba
+    "config": "configuración",
+    "vocabulary": "vocabulario",
+    "locations": "salas",
+    "conditions": "condiciones",
+    "text": "textos",
+    "font": "tipografía",
+    "graphics": "láminas",
+    "music": "música",
     "database: {what}": "base de datos: {what}",
     "{n:>5} free of {size:>5}": "{n:>5} libres de {size:>5}",
     "{n:>5} too many, of {size:>5}": "{n:>5} de más, de {size:>5}",
@@ -264,10 +274,11 @@ SAID = {
     "unknown graphics command {name!r}":
         "orden de dibujo desconocida {name!r}",
     "the {section} section is {size} bytes and a PC reaches {most} of one":
-        "la sección {section} ocupa {size} bytes y un PC alcanza {most} de "
-        "una",
+        "la sección de {section} ocupa {size} bytes y un PC alcanza {most} "
+        "de una",
     "the {section} section is {size} bytes and a bank holds {page}":
-        "la sección {section} ocupa {size} bytes y en un banco caben {page}",
+        "la sección de {section} ocupa {size} bytes y en un banco caben "
+        "{page}",
     "not a reGAC database": "no es una base de datos de reGAC",
 
     # -- cautions -------------------------------------------------------------
