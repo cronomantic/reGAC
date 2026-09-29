@@ -4746,6 +4746,56 @@ Al hacerlo salieron **tres fallos que no avisaba nadie**:
 que no fuera de reGAC. Las pruebas están en
 [`test_memory.py`](../tests/test_memory.py).
 
+### Los márgenes de las ocho, máquina a máquina
+
+Medido por el usuario con `regac make` sobre las ocho de `snapshots/`, una
+máquina cada vez, el 29 de septiembre de 2026, con la 0.5.0. Es lo que queda
+libre en el tramo de cada máquina que crece con la aventura: el que lleva la
+base de datos entera en las que no tienen bancos, y lo residente en las demás.
+En el PC, lo que le queda a la sección más grande hasta los 65520 bytes de un
+segmento.
+
+| aventura | 48 | 128 y +3 | 464 | 6128 | MSX | Next | PCW | PC |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| Bangkok1 | 5990 | 2422 | 1409 | 10102 | 14438 | 3446 | 1654 | 57267 |
+| Bangkok2 | 5110 | **338** | **577** | 8018 | 13558 | 1362 | **no cabe: 430 de más** | 57119 |
+| megacorp1 | 5117 | 3697 | **524** | sin medir | 13565 | 4721 | 2929 | 55430 |
+| megacorp2 | 3746 | 3471 | 6446 del revés | sin medir | 12194 | 4495 | 2703 | 54952 |
+| quijote1 | 3203 | 1539 | 5975 del revés | 9219 | 11651 | 2563 | **771** | 55711 |
+| quijote2 | 3334 | 2790 | 6166 del revés | 10470 | 11782 | 3814 | 2022 | 54140 |
+| vajillas1 | 6992 | 4069 | 2663 | sin medir | 15440 | 5093 | 3301 | 56431 |
+| vajillas2 | 7143 | 3431 | 2754 | sin medir | 15591 | 4455 | 2663 | 56962 |
+
+Las del **128 y el +3 son las mismas, byte a byte, que las de «Lo residente
+del 128 y del +3»**, más abajo, que se midieron a mano antes de que hubiera
+informe: el informe mide lo mismo. Las del 464 «del revés» son las que
+necesitan `LOW_CODE`, y ahí la base de datos va sola de `$4000` a la isla;
+Bangkok2 pasa de 588 a 577 bytes de holgura en la manera habitual, que es lo
+que ha crecido el intérprete desde entonces.
+
+Lo que el autor no mueve, porque es sólo intérprete, es igual para las ocho:
+en el 6128 le quedan 2565 bytes hasta `SAVE_AREA`; en el MSX, 7245 hasta la
+copia de la pantalla; en el 464 del revés, 2390 hasta la máscara; y en el
+Next, **225 bytes** hasta la máscara de `$A000` y 2292 encima de ella. El
+Next es el que menos sitio tiene para crecer el intérprete.
+
+Los bancos van holgados en todas: cada aventura cabe en el primero, textos y
+láminas, y a megacorp2 le quedan 275 bytes en él, que no es un límite --lo que
+no quepa va al siguiente, y hay seis--.
+
+Salieron **dos cosas que no se sabían**:
+
+- **Bangkok2 no cabe en el PCW.** El intérprete del PCW son 8960 bytes y lo
+  residente de Bangkok2, 7598: pasan de `DB_WINDOW` por 430, y el `ASSERT` lo
+  para. Es la única de las ocho que no se construye en una máquina. La
+  siguiente más justa ahí es quijote1, con 771. **Pendiente de decidir** qué
+  se hace.
+- **El 6128 no construía una aventura cuyo nombre pase de ocho letras**:
+  megacorp1, megacorp2, vajillas1 y vajillas2 acabaron en un traceback,
+  `DiskError: megacorp1.BAS no cabe en ocho y tres`, porque AMSDOS nombra los
+  ficheros con ocho letras y tres, y el nombre del proyecto se usaba tal cual.
+  Por eso esas cuatro no tienen cifra en el 6128. **Pendiente de arreglar**.
+
 ## `make` construye en una copia
 
 **Pedido por el usuario.** `make` ensamblaba donde está instalado reGAC:
