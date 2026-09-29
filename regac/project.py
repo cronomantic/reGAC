@@ -69,7 +69,7 @@ class Target:
     def __init__(self, machine, folder, source, database, banks="none",
                  defs=None, media=(), release=None, binary=None, boot=None,
                  screen_bytes=0, screen_when="release", scales=(1,),
-                 assembler="sjasmplus", boot_source=None):
+                 assembler="sjasmplus", boot_source=None, most_banks=None):
         self.machine = machine          # what regac build calls it
         self.folder = folder            # where its interpreter lives
         self.source = source            # and which file of it to assemble
@@ -89,6 +89,9 @@ class Target:
         self.screen_when = screen_when  # "assembly" or "release"
         self.scales = scales            # the widths a picture may be drawn at
         self.assembler = assembler      # sjasmplus, or NASM for the PC
+        # how many banks the machine has pages for: what its game*.asm has a
+        # DB_PAGE for, and an ASSERT holds it to where there is one
+        self.most_banks = most_banks
 
     def at(self, *names):
         return os.path.join(self.folder, *names)
@@ -113,12 +116,14 @@ TARGETS = {
     "spectrum128": Target(
         machine="spectrum128", folder=SPECTRUM, source="game128.asm",
         database="game128.rgac", banks="16k", defs="banks.inc",
+        most_banks=6,
         media=("game128.tap",),
         screen_bytes=6912, screen_when="assembly",
     ),
     "plus3": Target(
         machine="spectrum128", folder=SPECTRUM, source="game3.asm",
         database="game3.rgac", banks="16k", defs="banks3.inc",
+        most_banks=4,
         release="plus3", binary="game3_code.bin", boot="game3_boot.bin",
         screen_bytes=6912, screen_when="assembly",
     ),
@@ -135,12 +140,14 @@ TARGETS = {
     "cpc6128": Target(
         machine="cpc", folder=CPC, source="game6128.asm",
         database="game6128.rgac", banks="16k", defs="banks6128.inc",
+        most_banks=4,
         release="cpc6128", binary="game6128.bin",
         screen_bytes=0x4000,
     ),
     "next": Target(
         machine="next", folder=NEXT, source="game.asm", database="game.rgac",
         banks="16k", defs="banks.inc", media=("game.nex",),
+        most_banks=6,
         screen_bytes=NEXT_SCREEN_BYTES, screen_when="assembly",
     ),
     "msx": Target(
@@ -150,7 +157,7 @@ TARGETS = {
     ),
     "pcw": Target(
         machine="pcw", folder=PCW, source="game.asm", database="game.rgac",
-        banks="16k", defs="banks.inc",
+        banks="16k", defs="banks.inc", most_banks=6,
         release="pcw", binary="game_code.bin", boot="boot.bin",
         boot_source="boot.asm",
         screen_bytes=2 * 16 * 720, scales=(1, 2),
@@ -257,10 +264,15 @@ def assemble(target, root, defines=()):
 
 
 def sjasmplus(folder, source, defines=()):
-    """Assemble one file where it sits; the listing it wrote."""
+    """Assemble one file where it sits; the listing it wrote.  Beside it goes
+    the address of every label, in symbols_of(listing): what the report of
+    the memory is read from, and written even when an ASSERT fails."""
     listing = os.path.splitext(source)[0] + ".lst"
+    table = symbols_of(os.path.join(folder, listing))
+    if os.path.exists(table):
+        os.remove(table)                # not last build's, if this one fails
     result = subprocess.run(
-        [find_assembler(), f"--lst={listing}"]
+        [find_assembler(), f"--lst={listing}", f"--sym={os.path.basename(table)}"]
         + [f"-D{name}" for name in defines]
         + [source],
         cwd=folder, capture_output=True, text=True,
@@ -270,6 +282,11 @@ def sjasmplus(folder, source, defines=()):
             _("{source} did not assemble:", source=source) + "\n"
             + result.stdout + "\n" + result.stderr)
     return os.path.join(folder, listing)
+
+
+def symbols_of(listing):
+    """Where sjasmplus wrote the labels of what it wrote that listing of."""
+    return os.path.splitext(listing)[0] + ".sym"
 
 
 def assemble_nasm(target, folder, defines):

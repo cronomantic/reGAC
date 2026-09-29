@@ -32,13 +32,14 @@ from .check import problems_of
 from .binary import MACHINES, SECTION_NAMES, BuildError, Database, Reader
 from .devices import DEVICES, device_for, from_an_amstrad, make
 from .gfx import Renderer
+from . import memory
 from .i18n import _, argparse_speaks
 from .media import (MSX_SCREEN_BYTES, PCW_SCREEN_BYTES, banks_of, cpc6128_disk,
                     cpc_low_tape, cpc_tape, msx_screen, msx_tape,
                     pcw_release, CPC_LOW_CODE_AT, CPC_LOW_ROOM,
                     plus3_banked_disk, plus3_disk, mz_exe, MZ_STACK_BYTES)
 from .project import (TARGETS, ProjectError, assemble, screen_for,
-                      wide)
+                      symbols_of, wide)
 from .project import read as read_project
 from .png import save_picture
 from .srcgen import generate
@@ -580,12 +581,19 @@ def cmd_make(args):
                 sys.exit(_("ERROR: {what}", what=e))
         try:
             noises = make_noises(ddb, tree)
-            written = make_one(TARGETS[which], settings, ddb, name, root, output,
-                               tree, noises)
+            written, room = make_one(TARGETS[which], settings, ddb, name, root,
+                                     output, tree, noises)
         except (ProjectError, BuildError) as e:
+            # what did not fit, and by how much, before why it stopped
+            room = getattr(e, "room", ())
+            if room:
+                print(which)
+                print("\n".join(room))
             sys.exit(_("ERROR: {machine}: {what}", machine=which, what=e))
         print(f"{which:12} -> " + ", ".join(
             os.path.relpath(path, output) for path in written))
+        for row in room:
+            print(row)
         everything += written
     if args.zip:
         # What was built, a folder a machine as it is on the disk, in one
@@ -647,14 +655,24 @@ def uses(ddb, names):
 
 def make_one(target, settings, ddb, name, root, output, where_regac_is,
              noises=()):
-    """One machine, end to end: its database, its interpreter, its medium."""
+    """One machine, end to end: its database, its interpreter, its medium;
+    what it wrote, and the rows that say how much of the machine it took."""
     tree = os.path.join(where_regac_is, target.folder)
+    which = target.machine if target.release is None else target.release
     database = write_database(
         ddb, os.path.join(tree, target.database),
         machine=target.machine,
         banks=settings.get("banks", target.banks),
         defs=os.path.join(tree, target.defs) if target.defs else None,
     )
+    if target.most_banks is not None and len(database.banks) > target.most_banks:
+        # The 128 and the Next have no ASSERT for it: a bank past the last
+        # page they name would be left off the medium without a word.
+        e = ProjectError(_("the database needs {banks} banks and a {machine} "
+                           "has room for {most}", banks=len(database.banks),
+                           machine=which, most=target.most_banks))
+        e.room = memory.bank_lines(database, target.most_banks)
+        raise e
     screen = None
     defines = list(noises)
     if makes_a_noise(ddb):
@@ -691,22 +709,34 @@ def make_one(target, settings, ddb, name, root, output, where_regac_is,
         defines.append(f"PICTURE_SCALE={across}")
     low = False
     try:
-        assemble(target, where_regac_is, defines)
-    except ProjectError:
+        listing = assemble(target, where_regac_is, defines)
+    except ProjectError as e:
         # The one machine with nowhere to put an overflow is the 464: no
         # banks, and a database that has to sit in one stretch.  When the two
         # together pass the firmware, the interpreter goes under $4000
         # instead and the database has everything above it -- 27392 bytes
         # rather than what is left over the code.  See z80/cpc/game.asm.
         if target.release != "cpc464":
+            e.room = room_of(which, target, database, tree)[0]
             raise
-        assemble(target, where_regac_is, list(defines) + ["LOW_CODE"])
+        try:
+            listing = assemble(target, where_regac_is,
+                               list(defines) + ["LOW_CODE"])
+        except ProjectError as e:
+            e.room = room_of(which, target, database, tree)[0]
+            raise
         low = True
         print(_("  {machine:12} does not fit the usual way round: the "
                 "interpreter goes under the database", machine=target.machine))
+    room, over = room_of(which, target, database, tree, listing)
+    if over:
+        # What no ASSERT sees: the database the MSX and the 464 under LOW_CODE
+        # read in by themselves, which the assembler never has in front of it.
+        e = ProjectError(_("it does not fit: {where}", where=", ".join(over)))
+        e.room = room
+        raise e
 
-    where = os.path.join(output, target.machine if target.release is None
-                         else target.release)
+    where = os.path.join(output, which)
     os.makedirs(where, exist_ok=True)
     if target.machine == "pc":
         # The whole of it is one .EXE: the image NASM made, the database
@@ -716,7 +746,9 @@ def make_one(target, settings, ddb, name, root, output, where_regac_is,
         path = os.path.join(where, dos_name(name) + ".EXE")
         with open(path, "wb") as f:
             f.write(mz_exe(image, stack=PC_STACK_BYTES))
-        return [path]
+        with open(os.path.join(tree, target.database), "rb") as f:
+            program = len(image) - len(f.read())
+        return [path], memory.pc_report(program, database, PC_STACK_BYTES)
     if target.media:
         # The assembler wrote the medium as it went; it only has to be given
         # the name the project asked for.
@@ -725,7 +757,7 @@ def make_one(target, settings, ddb, name, root, output, where_regac_is,
             path = os.path.join(where, name.lower() + os.path.splitext(made)[1])
             shutil.copyfile(os.path.join(tree, made), path)
             written.append(path)
-        return written
+        return written, room
     with open(os.path.join(tree, target.binary), "rb") as f:
         code = f.read()
     boot = None
@@ -741,7 +773,25 @@ def make_one(target, settings, ddb, name, root, output, where_regac_is,
     else:
         entry = load
     return write_media(target.release, code, where, name, load, entry,
-                       screen, boot, banks, image)[0]
+                       screen, boot, banks, image)[0], room
+
+
+def room_of(which, target, database, tree, listing=None):
+    """The rows of the report of the memory, from the labels the assembler
+    left beside its listing, and where it went over; none for the PC, whose
+    is made from the image, or when the assembler never got as far as writing
+    them."""
+    if target.assembler != "sjasmplus":
+        return [], []
+    listing = listing or os.path.join(
+        tree, os.path.splitext(target.source)[0] + ".lst")
+    sym = memory.symbols(symbols_of(listing))
+    if not sym:
+        return [], []
+    try:
+        return memory.report(which, sym, database, target.most_banks)
+    except KeyError:
+        return [], []
 
 
 def main():

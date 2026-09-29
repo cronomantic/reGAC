@@ -126,6 +126,34 @@ Cada destino puede llevar lo suyo:
     [targets.pcw]
     scale  = 2                  # a qué tamaño se dibujan las láminas
 
+### La memoria que queda
+
+Después de cada máquina, `make` dice cuánto ocupa y cuánto queda libre, para
+saberlo antes de que la aventura deje de caber y no después:
+
+    spectrum128  -> spectrum128/faro.tap
+        $8000-$BFFF  [############--------]  62%   6221 libres de 16384  intérprete 8448, base de datos 1715
+        bancos       1 de 6, de 16384 bytes cada uno
+        banco 0      [##------------------]   9%  14923 libres de 16384  text 1223, graphics 236, music 2
+        bancos 1-5   sin usar: 81920 bytes más
+
+Una línea con direcciones es un **tramo de la memoria** de la máquina: desde
+dónde empieza hasta dónde tiene que acabar, lo que hay dentro y lo que sobra.
+Las cifras no son una estimación: son las direcciones donde el ensamblador ha
+dejado de verdad el intérprete y la base de datos, comparadas con los mismos
+límites que comprueba al construir. La parte **residente** de la base de datos
+—vocabulario, objetos, salas, condiciones y tipografía— crece con esas cosas;
+los **bancos** llevan los textos y las láminas, y dicen qué secciones van en
+cada uno. Una sección no se parte entre dos bancos, así que los textos, o las
+láminas, no pueden pasar del tamaño de un banco. En el PC, que no tiene mapa
+que llenar, dice la memoria que pide a DOS y la sección más grande, que tiene
+que caber en los 64 KB de un segmento.
+
+Si algo no cabe, la línea dice **cuántos bytes sobran** en vez de cuántos
+quedan, y `make` se para con un error que dice dónde: también en el MSX y en
+el 464 del revés, donde la base de datos la lee el intérprete por su cuenta y
+el ensamblador no llega a verla.
+
 ---
 
 ## 5. El ciclo de trabajo
