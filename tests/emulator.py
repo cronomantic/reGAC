@@ -31,6 +31,7 @@ to be polled until the program counter is actually inside our code.
 
 import contextlib
 import os
+import shutil
 import re
 import socket
 import subprocess
@@ -77,8 +78,10 @@ CODE_START = 0x8000
 
 
 def find_sjasmplus():
+    """In tools/, where the suite keeps it, or on the path, where the CI and
+    regac itself also look for it."""
     path = os.path.join(TOOLS, "sjasmplus.exe")
-    return path if os.path.isfile(path) else None
+    return path if os.path.isfile(path) else shutil.which("sjasmplus")
 
 
 def find_zesarux():

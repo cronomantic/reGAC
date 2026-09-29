@@ -151,7 +151,9 @@ SERIAL_MODULES = {
     # writing.  Fifteen seconds on its own.
     "test_project",
 }
-SERIAL_TESTS = {"test_it_keeps_up_with_quick_typing_and_repeats_a_held_key"}
+SERIAL_TESTS = {"test_it_keeps_up_with_quick_typing_and_repeats_a_held_key",
+                # `regac make` over every machine, in z80/, as test_project
+                "test_make_says_it_for_every_machine"}
 
 
 # The mirror plays whole adventures on two machines at once and takes a

@@ -25,8 +25,11 @@ loading screen, how wide the pictures are drawn -- is said once here instead
 of in a dozen command lines, and `regac make` does the rest for every machine
 the project lists.
 
-The last of these switches a PCW on with what came out, because a file that
-builds is not the same as a file that runs.
+The adventure is the example, built from its source, so that everything but
+the last of these runs wherever the two assemblers are, the CI included.  The
+last switches a PCW on with what came out, because a file that builds is not
+the same as a file that runs, and that one wants ZEsarUX and an adventure of
+1986.
 """
 
 import json
@@ -49,39 +52,68 @@ import emulator  # noqa: E402
 from regac.project import ProjectError, TARGETS  # noqa: E402
 from regac.binary import S_TEXT, Reader  # noqa: E402
 from regac.srcgen import generate  # noqa: E402
+from regac.srcparse import parse  # noqa: E402
 from regac.project import read as read_project  # noqa: E402
+from regac.project import find_assembler, find_nasm  # noqa: E402
 
-ADVENTURE = os.path.join(ROOT, "snapshots", "megacorp2.json")
+EXAMPLE = os.path.join(ROOT, "ejemplo")
+ORIGINAL = os.path.join(ROOT, "snapshots", "megacorp2.json")
 SCREENS = {"scr": 6912, "cpc": 0x4000, "pcw": 2 * 16 * 720}
 
+
+def assemblers():
+    """Whether regac can build: sjasmplus and NASM, wherever it looks."""
+    try:
+        find_assembler()
+        find_nasm()
+    except ProjectError:
+        return False
+    return True
+
+
 if pytest is not None:
+    needs_assemblers = pytest.mark.skipif(
+        not assemblers(), reason="sjasmplus and NASM, in tools/ or on the path",
+    )
     needs_tools = pytest.mark.skipif(
-        not emulator.available() or not os.path.exists(ADVENTURE),
-        reason="sjasmplus must be in tools/, with a decompiled adventure",
+        not emulator.available() or not os.path.exists(ORIGINAL),
+        reason="ZEsarUX and sjasmplus in tools/, and snapshots/megacorp2.json",
     )
 else:
 
     def needs_tools(func):
         return func
 
+    needs_assemblers = needs_tools
 
-def a_project(where, body, screens=True):
-    """A folder with an adventure, its loading screens and a project file."""
-    shutil.copyfile(ADVENTURE, os.path.join(where, "megacorp.json"))
+
+def the_example():
+    """The example adventure as a database, read from its own source."""
+    with open(os.path.join(EXAMPLE, "faro.gac"), encoding="utf-8") as f:
+        return parse(f.read(), "faro.gac", EXAMPLE)
+
+
+def a_project(where, body, screens=True, adventure=True):
+    """A folder with an adventure, its loading screens and a project file.
+    Reading a project does not open the adventure, so what only reads one
+    goes without."""
+    if adventure:
+        with open(os.path.join(where, "faro.json"), "w", encoding="utf-8") as f:
+            json.dump(the_example(), f)
     if screens:
         for suffix, size in SCREENS.items():
             filler = random.Random(len(suffix))
             with open(os.path.join(where, "carga." + suffix), "wb") as f:
                 f.write(bytes(filler.randrange(256) for _ in range(size)))
-    path = os.path.join(where, "megacorp.toml")
+    path = os.path.join(where, "faro.toml")
     with open(path, "w", encoding="utf-8") as f:
         f.write(body)
     return path
 
 
 EVERY_MACHINE = """
-name   = "megacorp"
-source = "megacorp.json"
+name   = "faro"
+source = "faro.json"
 output = "salida"
 
 [targets.spectrum48]
@@ -116,19 +148,19 @@ def test_it_says_what_is_wrong_with_a_project(tmp_path):
     where = str(tmp_path)
     for body, complaint in (
         ('name = "x"\n[targets.spectrum48]\n', "source"),
-        ('name = "x"\nsource = "megacorp.json"\n', "which machines"),
-        ('name = "x"\nsource = "megacorp.json"\n[targets.oric]\n', "no oric"),
-        ('name = "x"\nsource = "megacorp.json"\n[targets.cpc464]\nbancos = "16k"\n',
+        ('name = "x"\nsource = "faro.json"\n', "which machines"),
+        ('name = "x"\nsource = "faro.json"\n[targets.oric]\n', "no oric"),
+        ('name = "x"\nsource = "faro.json"\n[targets.cpc464]\nbancos = "16k"\n',
          "bancos"),
-        ('name = "x"\nsource = "megacorp.json"\n[targets.cpc464]\nscale = 2\n',
+        ('name = "x"\nsource = "faro.json"\n[targets.cpc464]\nscale = 2\n',
          "cannot draw"),
-        ('name = "x"\nsource = "megacorp.json"\nsalida = "x"\n[targets.cpc464]\n',
+        ('name = "x"\nsource = "faro.json"\nsalida = "x"\n[targets.cpc464]\n',
          "salida"),
         # as the manual wrote it for a long time, and it fell over in Python
-        ('name = "x"\nsource = "megacorp.json"\n[targets.pcw]\nscale = "2x"\n',
+        ('name = "x"\nsource = "faro.json"\n[targets.pcw]\nscale = "2x"\n',
          "one number or two"),
     ):
-        path = a_project(where, body, screens=False)
+        path = a_project(where, body, screens=False, adventure=False)
         try:
             read_project(path)
         except ProjectError as e:
@@ -140,8 +172,8 @@ def test_it_says_what_is_wrong_with_a_project(tmp_path):
 def test_a_scale_is_checked_against_what_the_machine_can_do(tmp_path):
     path = a_project(
         str(tmp_path),
-        'name = "x"\nsource = "megacorp.json"\n[targets.pcw]\nscale = [3, 1]\n',
-        screens=False,
+        'name = "x"\nsource = "faro.json"\n[targets.pcw]\nscale = [3, 1]\n',
+        screens=False, adventure=False,
     )
     try:
         read_project(path)
@@ -153,13 +185,13 @@ def test_a_scale_is_checked_against_what_the_machine_can_do(tmp_path):
     for scale in ("1", "2", "[1, 1]", "[2, 1]"):
         path = a_project(
             str(tmp_path),
-            f'name = "x"\nsource = "megacorp.json"\n[targets.pcw]\nscale = {scale}\n',
-            screens=False,
+            f'name = "x"\nsource = "faro.json"\n[targets.pcw]\nscale = {scale}\n',
+            screens=False, adventure=False,
         )
         read_project(path)
 
 
-@needs_tools
+@needs_assemblers
 def test_one_command_builds_every_machine(tmp_path):
     where = str(tmp_path)
     path = a_project(where, EVERY_MACHINE)
@@ -168,24 +200,26 @@ def test_one_command_builds_every_machine(tmp_path):
 
     out = os.path.join(where, "salida")
     for folder, name in (
-        ("spectrum48", "megacorp.tap"),
-        ("spectrum128", "megacorp.tap"),
-        ("plus3", "megacorp.dsk"),
-        ("cpc464", "megacorp.cdt"),
-        ("cpc6128", "megacorp.dsk"),
-        ("pcw", "megacorp.dsk"),
+        ("spectrum48", "faro.tap"),
+        ("spectrum128", "faro.tap"),
+        ("plus3", "faro.dsk"),
+        ("cpc464", "faro.cdt"),
+        ("cpc6128", "faro.dsk"),
+        ("pcw", "faro.dsk"),
     ):
         made = os.path.join(out, folder, name)
+        # the example is small: its tape for a 48K Spectrum, with no screen,
+        # is some eleven and a half kilobytes
         assert os.path.exists(made), f"{folder}/{name} was never written"
-        assert os.path.getsize(made) > 16 * 1024, f"{folder}/{name} is too small"
+        assert os.path.getsize(made) > 8 * 1024, f"{folder}/{name} is too small"
 
     # The loading screens really went on: each is its machine's own dump, and
     # a sector of it is enough to look for, because a disk breaks a file up.
     for folder, name, suffix in (
-        ("spectrum128", "megacorp.tap", "scr"),
-        ("plus3", "megacorp.dsk", "scr"),
-        ("cpc6128", "megacorp.dsk", "cpc"),
-        ("pcw", "megacorp.dsk", "pcw"),
+        ("spectrum128", "faro.tap", "scr"),
+        ("plus3", "faro.dsk", "scr"),
+        ("cpc6128", "faro.dsk", "cpc"),
+        ("pcw", "faro.dsk", "pcw"),
     ):
         with open(os.path.join(where, "carga." + suffix), "rb") as f:
             screen = f.read()
@@ -196,18 +230,18 @@ def test_one_command_builds_every_machine(tmp_path):
     # and the one that asked for no screen did not get one
     with open(os.path.join(where, "carga.scr"), "rb") as f:
         screen = f.read()
-    with open(os.path.join(out, "spectrum48", "megacorp.tap"), "rb") as f:
+    with open(os.path.join(out, "spectrum48", "faro.tap"), "rb") as f:
         assert screen[:512] not in f.read(), "a screen turned up uninvited"
 
 
-@needs_tools
+@needs_assemblers
 def test_only_the_machine_that_was_asked_for(tmp_path):
     where = str(tmp_path)
     path = a_project(where, EVERY_MACHINE)
     done = make(path, "-t", "pcw")
     assert done.returncode == 0, f"regac make failed:\n{done.stdout}\n{done.stderr}"
     out = os.path.join(where, "salida")
-    assert os.path.exists(os.path.join(out, "pcw", "megacorp.dsk"))
+    assert os.path.exists(os.path.join(out, "pcw", "faro.dsk"))
     assert not os.path.exists(os.path.join(out, "cpc464")), (
         "it built more than it was told"
     )
@@ -218,11 +252,12 @@ def test_what_it_built_actually_runs(tmp_path):
     """A file that builds is not the same as a file that runs, so one of them
     is switched on: the PCW, which needs no menu and no tape."""
     where = str(tmp_path)
-    path = a_project(where, EVERY_MACHINE)
+    path = a_project(where, EVERY_MACHINE, adventure=False)
+    shutil.copyfile(ORIGINAL, os.path.join(where, "faro.json"))
     assert make(path, "-t", "pcw").returncode == 0
-    disk = os.path.join(where, "salida", "pcw", "megacorp.dsk")
+    disk = os.path.join(where, "salida", "pcw", "faro.dsk")
 
-    with open(ADVENTURE, encoding="utf-8") as f:
+    with open(ORIGINAL, encoding="utf-8") as f:
         ddb = json.load(f)
     from test_game_pcw import screen, wait_screen  # noqa: F401
     from test_text_pcw import glyph_table
@@ -243,8 +278,8 @@ def test_what_it_built_actually_runs(tmp_path):
 
 
 KEPT_BACK = """
-name   = "megacorp"
-source = "megacorp.gac"
+name   = "faro"
+source = "faro.gac"
 output = "salida"
 
 [targets.spectrum48]
@@ -253,7 +288,7 @@ output = "salida"
 """
 
 
-@needs_tools
+@needs_assemblers
 def test_a_source_is_read_again_for_every_machine(tmp_path):
     """A source may keep some of itself back for some machines, so the one
     command has to read it once for each of them rather than once for all.
@@ -266,18 +301,17 @@ def test_a_source_is_read_again_for_every_machine(tmp_path):
     inks in front of them.
     """
     where = str(tmp_path)
-    with open(ADVENTURE, encoding="utf-8") as f:
-        ddb = json.load(f)
-    source = generate(ddb)
-    # A message that is not the same on the two machines, by a good margin.
-    mark = "#1\n"
-    at = source.index(mark) + len(mark)
+    source = generate(the_example())
+    # A message that is not the same on the two machines, by a good margin:
+    # the first of /MSG, whatever its number.
+    at = source.index("\n#", source.index("/MSG")) + 1
+    at = source.index("\n", at) + 1
     source = (source[:at] + ".if cpc\nCorto.\n.else\n"
               + "Largo, y mucho mas largo, para que se note en el tamano. " * 8
               + "\n.end\n" + source[at:])
-    with open(os.path.join(where, "megacorp.gac"), "w", encoding="utf-8") as f:
+    with open(os.path.join(where, "faro.gac"), "w", encoding="utf-8") as f:
         f.write(source)
-    path = os.path.join(where, "megacorp.toml")
+    path = os.path.join(where, "faro.toml")
     with open(path, "w", encoding="utf-8") as f:
         f.write(KEPT_BACK)
 

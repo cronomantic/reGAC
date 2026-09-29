@@ -4523,6 +4523,26 @@ pide lo que queda a la vista de la sala; se ha pasado dos veces seguidas.
   las pruebas `not serial`. Sin `tools/` ni `snapshots/`, que no están en el
   repositorio, las que piden emulador o las aventuras originales se saltan
   solas.
+
+  **Y después, con los dos ensambladores y las `serial`.** Durante un tiempo
+  la CI no probaba nada de `make`: sin sjasmplus ni NASM, todo lo que
+  construye se saltaba, y el informe de la memoria sólo se habría probado
+  aquí. Ahora instala NASM y compila sjasmplus como la release, guardándolo
+  entre vueltas con `actions/cache`, y lo pone en el PATH. Para eso
+  `find_sjasmplus`, en `tests/emulator.py`, lo busca también en el PATH, como
+  hace `regac`; y la prueba que copia sjasmplus a un árbol limpio lo copia con
+  su modo, porque fuera de `tools/` es un programa de Linux que tiene que
+  seguir siéndolo.
+
+  Y hace una segunda pasada, `-m "serial and not mirror"`, que no corría en
+  ningún sitio fuera de esta máquina: ahí está todo `test_project.py`, que
+  construye en `z80/`. Dos de sus pruebas sólo leen proyectos y **fallaban
+  sin `snapshots/`**, porque copiaban MegaCorp igualmente; ahora no copian
+  nada. Las tres que construyen y no arrancan nada usan el faro, construido
+  de su fuente, y piden sólo los ensambladores; la que enciende un PCW sigue
+  con MegaCorp y con ZEsarUX. La prueba del informe que construye las nueve
+  máquinas, en `test_memory.py`, también es `serial`, por lo mismo que
+  `test_project.py`.
 - **La release**: **decidido por el usuario**, un script local y no un flujo
   de GitHub. Es `regac make proyecto.toml --zip faro.zip`: lo construido, una
   carpeta por máquina, en un zip para subirlo a mano. Lo mira
