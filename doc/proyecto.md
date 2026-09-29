@@ -43,6 +43,12 @@ hay que decirlos; `output`, si no se dice, es `release`. Las máquinas se llaman
 `spectrum48`, `spectrum128`, `plus3`, `cpc464`, `cpc6128`, `msx`, `next`,
 `pcw` y `pc`.
 
+`name` es el nombre de lo que sale: `faro.tap`, `faro.dsk`. Donde un nombre
+tiene que caber en ocho letras --los ficheros dentro de un disco del 6128 y el
+`.EXE` del PC-- se queda en sus letras y cifras, las ocho primeras y en
+mayúsculas: un proyecto `megacorp1` sale en `megacorp1.dsk` y se arranca con
+`RUN"MEGACORP"`.
+
 ## Las perillas
 
 | clave | qué dice | por defecto |

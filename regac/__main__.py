@@ -408,12 +408,16 @@ def write_media(machine, code, where, name, load, entry, screen=None,
             sys.exit(_("ERROR: a cpc6128 release wants --database"))
         resident = database[:Reader(database).resident_size]
         path = os.path.join(where, name.lower() + ".dsk")
+        # AMSDOS names its files with eight letters and three, and a project
+        # called megacorp1 has nine: the files on the disk take the name DOS
+        # would, as the PC's .EXE does.  The .dsk keeps the project's.
+        on_disk = dos_name(name)
         with open(path, "wb") as f:
-            f.write(cpc6128_disk(code, resident, banks or [], name, screen,
+            f.write(cpc6128_disk(code, resident, banks or [], on_disk, screen,
                                  ))
         written.append(path)
         how = _('RUN"{name}" on the disk, with {banks} banks behind it',
-                name=name, banks=len(banks or []))
+                name=on_disk, banks=len(banks or []))
     elif machine == "cpc464":
         # A tape and sixty four kilobytes: the loader is in BASIC, and what
         # it runs is whatever comes first, so RUN and nothing else.
