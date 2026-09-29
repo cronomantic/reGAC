@@ -112,6 +112,24 @@ SAID = {
     "under the database":
         "  {machine:12} no cabe de la forma habitual: el intérprete va "
         "debajo de la base de datos",
+    # -- regac make: la memoria que queda (memory.py) --------------------------
+    "interpreter": "intérprete",
+    "database": "base de datos",
+    "stack": "pila",
+    "the largest section": "la sección más grande",
+    "{n:>5} free of {size:>5}": "{n:>5} libres de {size:>5}",
+    "{n:>5} too many, of {size:>5}": "{n:>5} de más, de {size:>5}",
+    "    banks        {used} of {most}, {size} bytes each":
+        "    bancos       {used} de {most}, de {size} bytes cada uno",
+    "banks {first}-{last}": "bancos {first}-{last}",
+    "    {where:<12} unused: {n} bytes more":
+        "    {where:<12} sin usar: {n} bytes más",
+    "    memory       {n} bytes: {what}": "    memoria      {n} bytes: {what}",
+    "{where} by {n} bytes": "{where} por {n} bytes",
+    "it does not fit: {where}": "no cabe: se pasa en {where}",
+    "the database needs {banks} banks and a {machine} has room for {most}":
+        "la base de datos necesita {banks} bancos y en un {machine} caben "
+        "{most}",
     "ReGAC {version}": "ReGAC {version}",
     "JSON database -> .gac source": "base de datos JSON -> fuente .gac",
     "JSON database": "base de datos JSON",
