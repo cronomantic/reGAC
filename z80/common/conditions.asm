@@ -42,6 +42,8 @@ MARK_LIT        equ %00000010           ; this place has light of its own
 MARK_LAMP       equ %00000100           ; the player carries something alight
 MARK_NO_SCORE   equ %00001000           ; do not tell the score at the end
 
+SEED_START      equ $A55A               ; what the random numbers start from
+
 TURN_COUNTER_LO equ 126
 TURN_COUNTER_HI equ 127
 
@@ -49,6 +51,17 @@ TURN_COUNTER_HI equ 127
 ; says there is light, and every object where the adventure says it starts.
 ; Corrupts: AF, BC, DE, HL
 vm_init:
+                IFDEF   STATE_AT
+                ; nothing brought the game here: all of it nought, as the
+                ; file has it, and then the seed it starts from
+                ld      hl, vm_state
+                ld      de, vm_state + 1
+                ld      bc, vm_state_end - vm_state - 1
+                ld      (hl), 0
+                ldir
+                ld      hl, SEED_START
+                ld      (vm_seed), hl
+                ENDIF
                 ld      hl, vm_flags
                 ld      de, vm_flags + 1
                 ld      bc, FLAG_BYTES + COUNTERS - 1
@@ -395,6 +408,16 @@ vm_adverb:      db      0
 ; The price is that vm_init clears this and obj_loc apart, where one ldir did
 ; both when they were neighbours.  Twelve bytes, against keeping every offset
 ; in the block where it has always been.  See doc/pendiente.md.
+;
+; A machine whose code is tight says where these go instead with STATE_AT,
+; and then they are laid out there, the same as here, and not in the code:
+; they are twelve hundred bytes that are nothing but room, and on a PCW the
+; code and what is resident of the database share sixteen kilobytes.  They
+; do not travel in the file then, so vm_init gives them what the file would.
+                IFDEF   STATE_AT
+state_resumes   equ     $
+                ORG     STATE_AT
+                ENDIF
 obj_entry:      ds      512
 
 ; Everything from here to vm_state_end is what a game amounts to, so it is
@@ -410,7 +433,7 @@ vm_location:    dw      0
 ; leaves the count where it was, which is what the original does too.
 vm_max_weight:  db      250
 vm_weight:      db      0
-vm_seed:        dw      $A55A
+vm_seed:        dw      SEED_START
 ; A byte that was what the music was doing, back when there was a tune player.
 ; Nothing writes it now, and it stays because it is saved and loaded with the
 ; rest: taking it out would make every game saved before this unreadable, and
@@ -421,3 +444,6 @@ vm_flags:       ds      FLAG_BYTES
 vm_counters:    ds      COUNTERS
 obj_loc:        ds      512                     ; where every object is now
 vm_state_end:
+                IFDEF   STATE_AT
+                ORG     state_resumes           ; and the code goes on here
+                ENDIF
