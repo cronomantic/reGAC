@@ -4915,11 +4915,70 @@ Lo que lo vigila:
   y vuelve a la sala cuatro con la partida igual.
 - El Next ya tenía las suyas: `test_save_next` guarda y carga, también con
   NextZXOS arrancado de su tarjeta, y pasa. El +3 arranca del disco y juega
-  hasta una sala con lámina (`test_media_plus3`), y guarda con el mismo
-  `tape.asm` que el 128, en cinta. **Y eso es un hueco, no una elección**:
-  el +3 tiene que guardar en su disco, como el PCW y el 6128, y hoy guarda
-  en cinta. Visto al repasar esto con el usuario; pendiente de hacer, con sus
-  decisiones --cómo, qué nombre, qué pasa sin disco-- consultadas antes.
+  hasta una sala con lámina (`test_media_plus3`), y guardaba con el mismo
+  `tape.asm` que el 128, en cinta. **Y eso era un hueco, no una elección**:
+  el +3 tiene que guardar en su disco, como el PCW y el 6128. Visto al
+  repasar esto con el usuario, y ya hecho: ver «Las partidas del +3, en su
+  disco», justo aquí debajo.
+
+### Las partidas del +3, en su disco
+
+**Decidido por el usuario**, las tres cosas: con un fichero de +3DOS, sólo en
+disco, y en silencio cuando algo va mal.
+
+- **Un fichero de +3DOS**, y no los sectores de un fichero reservado como en
+  el PCW y el 6128. Aquellos los escriben a mano porque no tienen a quién
+  pedírselo; el +3 tiene +3DOS, que su cargador ya usa para leer la aventura,
+  así que `SAVE` abre `<PROYECTO>.SAV` con `DOS OPEN` --borrando lo que
+  hubiera con ese nombre--, lo escribe y lo cierra, como el Next con NextZXOS
+  y el PC con DOS. El nombre lo pone `make` con `SAVE_NAME`, el mismo que el
+  del Next: `FARO.SAV`. Una construcción a la que nadie se lo dice guarda en
+  `GAME.SAV`.
+- **Sólo en disco.** `game3.asm` ya no lleva `tape.asm` sino `disk3.asm`, con
+  las mismas dos entradas, `tape_save` y `tape_load`: la orden no se entera.
+- **En silencio**, como el 6128 y el Next. +3DOS pregunta «Retry, Ignore or
+  Cancel?» con su letra encima de lo que haya y espera una tecla; se le dice
+  que no con `DOS SET MESSAGE`. Un `SAVE` que no va vuelve sin más, y un `LOAD`
+  lee primero a un sitio aparte, `LOAD_AREA`, en `$7600` --en la página cinco,
+  detrás de la partida y medio kilobyte por debajo de la pila, con sus
+  `ASSERT`--, y sólo si ha llegado entera la copia encima. Sin fichero, o con
+  uno más corto que una partida, la partida sigue como estaba.
+
+Que la partida esté ahora en la página cinco ayuda: +3DOS lee y escribe ahí
+sin paginar nada nuestro. Lo que sí quiere es su ROM y su página siete en la
+ventana mientras trabaja, así que se le ponen durante las llamadas --lo mismo
+que hace el cargador-- y al volver se pone la ROM del 48 y la página que la
+base de datos tenía en la ventana. El intérprete no la puede leer del puerto,
+pero la guarda en `db_paged`; si todavía no ha paginado nada, se deja la que
+dejó el cargador. Y `BANKM` y `BANK678` se escriben a la vez que los puertos,
+que es lo que +3DOS espera encontrar.
+
+El intérprete sigue midiendo **7424 bytes**: lo nuevo cabe en el hueco que
+deja el `ALIGN 256` de lo residente. **Las otras ocho máquinas salen
+idénticas, byte a byte**, con el faro comparado con `cmp`.
+
+Las pruebas, en `test_media_plus3.py`, arrancan Vajillas desde su disco con
+bancos, como lo arrancaría su dueño:
+
+- `test_a_game_is_saved_on_the_disk_and_loaded_off_it`: un `LOAD` sin fichero
+  no cambia la partida; luego `NORTE`, `SAVE`, `SUR` y `LOAD`, y vuelve a la
+  sala cuatro con la partida igual. Con `--dsk-persistent-writes` el emulador
+  escribe en la imagen, y al acabar se lee desde fuera: `VAJILLAS.SAV` está en
+  el directorio y lleva dentro dónde está cada objeto. **Se mira sólo eso** y
+  no el bloque entero, porque el turno del `SAVE` sigue después de guardar y
+  Vajillas cuenta sus turnos en un contador: lo que hay en memoria al acabar
+  ya no es lo que se escribió.
+- `test_a_protected_disk_leaves_the_game_going`: con `--dsk-write-protection`,
+  el `SAVE` vuelve, pregunta la orden siguiente y la partida no ha cambiado.
+  **Se comprobó que puede fallar**: con los mensajes de +3DOS encendidos, la
+  máquina se queda en su pregunta y la prueba cae.
+- `test_example` mira que el disco del faro que sale de `make` lleve
+  `FARO.SAV` en el intérprete.
+
+Queda una cosa de la que avisar: **el disco del +3 sin bancos** --`release
+-m plus3` con el `game.bin` del 48, que está en `binario.md` y que `make` no
+usa-- lleva el intérprete del 48, y ése guarda en cinta. `make` hace siempre
+el de bancos.
 
 Con los dos cambios, el del PCW y éste, las dos órdenes de la puerta y el
 espejo salen verdes.

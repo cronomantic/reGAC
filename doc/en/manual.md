@@ -568,7 +568,10 @@ blanks on every machine.
   pages of their own, and so adventures fit in it that do not fit in the 48;
   and it has a sound chip, so the noises and the key click come out of it. The
   48 is the one machine that makes them on the speaker.
-- **Spectrum +3.** Disk, with the loader in the machine's menu.
+- **Spectrum +3.** Disk, with the loader in the machine's menu. `SAVE` and
+  `LOAD` use a file on the same disk, with the name of the project and
+  `.SAV`: `faro.dsk` saves in `FARO.SAV`. With no disk, a protected one or
+  no game to load, it says nothing and the game goes on as it was.
 - **Amstrad CPC 464.** The tightest: no banks, and the database in one
   stretch. If an adventure does not fit the usual way, `regac` **builds it the
   other way round by itself** -- the interpreter under `$4000` and the database

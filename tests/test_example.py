@@ -134,6 +134,9 @@ def test_every_machine_it_names_comes_out(tmp_path):
     # and the Next keeps its game under the project's name
     with open(os.path.join(where, "next", "faro.nex"), "rb") as f:
         assert b"FARO.SAV\0" in f.read(), "the Next's game is not in FARO.SAV"
+    # and so does the +3, on its own disk, in the way +3DOS ends a name
+    with open(os.path.join(where, "plus3", "faro.dsk"), "rb") as f:
+        assert b"FARO.SAV\xff" in f.read(), "the +3's game is not in FARO.SAV"
     import zipfile
 
     with zipfile.ZipFile(bundle) as z:

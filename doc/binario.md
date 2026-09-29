@@ -268,6 +268,14 @@ esperar. La del disco con bancos usa una aventura engordada hasta necesitar
 dos, y compara la lámina de la pantalla byte a byte contra la referencia, que
 sólo cuadra si cada banco acabó en su página.
 
+**Y la partida, en el mismo disco.** La construcción con bancos, que es la
+que hace `make`, guarda en un fichero sin cabecera con el nombre del proyecto
+y `.SAV` --`FARO.SAV`--, que +3DOS crea la primera vez y rehace en cada
+`SAVE`. Dentro va lo mismo que en una cinta: la partida, de `vm_state` a
+`vm_state_end`, tal cual está en la memoria. `release` no tiene que reservarle
+nada, al revés que en el PCW y el 6128: lo pide el intérprete a +3DOS. Está en
+[`disk3.asm`](../z80/spectrum/disk3.asm).
+
 ## El PCW, que no tiene a quién pedirle nada
 
 Ni ROM, ni sistema operativo, ni cargador que valga: la máquina lee el sector

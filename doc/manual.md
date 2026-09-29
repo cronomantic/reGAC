@@ -565,7 +565,10 @@ con la letra de la ROM. Sin eso, imprimirían en blanco en todas las máquinas.
   propias, y así le caben aventuras que no caben en el 48; y tiene chip de
   sonido, así que los ruidos y el clic de tecla salen por él. El 48 es la
   única máquina que los hace con el altavoz.
-- **Spectrum +3.** Disco, con el cargador en el menú de la máquina.
+- **Spectrum +3.** Disco, con el cargador en el menú de la máquina. `SAVE`
+  y `LOAD` usan un fichero en el mismo disco, con el nombre del proyecto y
+  `.SAV`: `faro.dsk` guarda en `FARO.SAV`. Sin disco, con el disco protegido
+  o sin partida que cargar, no dice nada y la partida sigue como estaba.
 - **Amstrad CPC 464.** El más justo: sin bancos, y la base de datos en un
   trozo seguido. Si una aventura no cabe de la manera normal, `regac` **la
   construye sola del revés** —el intérprete debajo de `$4000` y la base de
