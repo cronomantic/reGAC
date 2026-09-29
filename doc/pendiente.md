@@ -4915,8 +4915,11 @@ Lo que lo vigila:
   y vuelve a la sala cuatro con la partida igual.
 - El Next ya tenía las suyas: `test_save_next` guarda y carga, también con
   NextZXOS arrancado de su tarjeta, y pasa. El +3 arranca del disco y juega
-  hasta una sala con lámina (`test_media_plus3`); guarda con el mismo
-  `tape.asm` que el 128, pero **no hay prueba que guarde en un +3**.
+  hasta una sala con lámina (`test_media_plus3`), y guarda con el mismo
+  `tape.asm` que el 128, en cinta. **Y eso es un hueco, no una elección**:
+  el +3 tiene que guardar en su disco, como el PCW y el 6128, y hoy guarda
+  en cinta. Visto al repasar esto con el usuario; pendiente de hacer, con sus
+  decisiones --cómo, qué nombre, qué pasa sin disco-- consultadas antes.
 
 Con los dos cambios, el del PCW y éste, las dos órdenes de la puerta y el
 espejo salen verdes.
