@@ -4791,8 +4791,9 @@ Salieron **dos cosas que no se sabían**:
 - **Bangkok2 no cabe en el PCW.** El intérprete del PCW son 8960 bytes y lo
   residente de Bangkok2, 7598: pasan de `DB_WINDOW` por 430, y el `ASSERT` lo
   para. Es la única de las ocho que no se construye en una máquina. La
-  siguiente más justa ahí es quijote1, con 771. **Pendiente de decidir** qué
-  se hace.
+  siguiente más justa ahí es quijote1, con 771. **Resuelto** sacando del
+  código el estado de la partida: ver «El juego del PCW, fuera del código»,
+  abajo.
 - **El 6128 no construía una aventura cuyo nombre pase de ocho letras**:
   megacorp1, megacorp2, vajillas1 y vajillas2 acabaron en un traceback,
   `DiskError: megacorp1.BAS no cabe en ocho y tres`, porque AMSDOS nombra los
@@ -4805,6 +4806,49 @@ Salieron **dos cosas que no se sabían**:
   que `make` y `release` digan lo que no cabe en un disco en vez de
   enseñar la traza. Medidas otra vez por el usuario con el arreglo, las
   cuatro se construyen y ya tienen su cifra en la tabla.
+
+### El juego del PCW, fuera del código
+
+**Decidido por el usuario**, entre dos maneras de hacerle sitio a Bangkok2.
+La suya era **quitar del intérprete las órdenes que la aventura no usa**:
+`vm_table` es una tabla de saltos, así que una orden sin usar apuntaría a
+`op_nop` y su código no se ensamblaría. Medido en el PCW, el código de las 64
+órdenes suma **1290 bytes**; el faro, que usa 30 de 69, se ahorraría unos 700,
+y una aventura de 1986, que usa bastantes más, quizá entre 200 y 400. Pero
+cuesta tocar las 64 y lo que comparten, y cada aventura tendría su propio
+intérprete que probar.
+
+Mirando dónde se iban los 8960 bytes del intérprete del PCW salió la otra:
+**1255 de ellos no eran código sino sitio**, reservado con `ds` y viajando
+como ceros en el fichero -- el estado de la partida (`vm_state`: la pila, las
+banderas, los contadores y dónde está cada objeto, 743 bytes) y `obj_entry`,
+512 --. Y de `$C000` para arriba el PCW tiene sitio: entre la fila que cruza
+la pantalla, que acaba en `$E2CF`, y la tabla del cargador en `$F000`. Ahí
+va ahora, desde `$E300` hasta `$E7E7`.
+
+- `common/conditions.asm` lo coloca en `STATE_AT` si la máquina lo define
+  --con `DEFINE`, porque `IFDEF` de sjasmplus sólo mira esos y no las
+  etiquetas--, con un `ORG` y otro de vuelta: la disposición es la misma y
+  está escrita una sola vez.
+- Como ya no viaja en el fichero, `vm_init` lo pone a cero entero y le da la
+  semilla de los números al azar, `SEED_START`, que antes venía en el
+  fichero. Sólo se llama al arrancar, así que no cambia nada de lo que hace.
+- `z80/pcw/game.asm` lo define y comprueba con dos `ASSERT` que no pisa la
+  fila de la pantalla ni la tabla del cargador.
+
+El intérprete del PCW pasa de **8960 a 7680 bytes**: 1280 más de sitio para lo
+residente. Por cuenta, Bangkok2 pasa de 430 de más a unos 850 libres, y
+quijote1 de 771 a unos 2050. **Las otras ocho máquinas salen idénticas, byte a
+byte**: no definen `STATE_AT`. `test_the_pcw_keeps_the_game_out_of_its_code`
+mira que esté arriba y que el código haya menguado.
+
+**Lo que no se ha podido probar aquí** es el PCW funcionando, que pide
+ZEsarUX: las pruebas del PCW --`test_game_pcw`, `test_save_pcw` y las demás--
+son las que dicen que juega y que guarda igual.
+
+La idea del usuario queda para cuando haga falta más de lo que dan cosas
+como esta. Lo mismo --sacar el estado del tramo que va justo-- podría servir
+en el 128, el +3 y el Next, cada uno con su mapa.
 
 ## `make` construye en una copia
 

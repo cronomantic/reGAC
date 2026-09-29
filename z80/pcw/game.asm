@@ -9,10 +9,11 @@
 ;   $0000  the interpreter, and the part of the database that stays
 ;   $4000  the window the rest of the database is paged through
 ;   $8000  whichever half of the screen is being written to
-;   $C000  the mask, the buffers -- a saved game is put together at $D000 and
+;   $C000  the mask, the buffers -- a saved game is put together at $D000,
 ;          a row of text crosses from one half of the screen to the other at
-;          $E000 -- the stack, the table the video reads, and at the very top
-;          the sixteen bytes the keyboard leaves itself
+;          $E000, and the game itself is at $E300 -- the stack, the table the
+;          video reads, and at the very top the sixteen bytes the keyboard
+;          leaves itself
 ;
 ; What comes out of here is not a medium but the pieces of one, because the
 ; disk itself is put together by regac release:
@@ -39,6 +40,13 @@ DB_PAGE_5       equ 10
 
 LOCK            equ $F4
 UNLOCKED        equ 0
+
+; The game -- where the player is, the markers, the counters, where every
+; object is -- and the table of where each object's record is: twelve hundred
+; bytes of room and nothing else, and not worth the sixteen kilobytes the code
+; shares with the database.  They go after the row the scroll carries across,
+; well short of the loader's table at $F000.  See common/conditions.asm.
+                DEFINE  STATE_AT $E300
 
                 ORG     $0100
 start:
@@ -92,6 +100,8 @@ database:
                 INCBIN  "game.rgac", 0, DB_RESIDENT_SIZE
 last:
                 ASSERT  last <= DB_WINDOW       ; or it would page itself out
+                ASSERT  STATE_AT >= SCROLL_BUFFER + ROW_BYTES
+                ASSERT  vm_state_end <= $F000   ; where the loader's table is
                 ; and a game has to fit in the file the builder sets aside
                 ASSERT  vm_state_end - vm_state <= SAVE_BYTES
 

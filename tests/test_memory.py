@@ -221,6 +221,26 @@ def tools():
 
 
 @pytest.mark.skipif(not tools(), reason="sjasmplus and nasm are needed")
+def test_the_pcw_keeps_the_game_out_of_its_code(tmp_path):
+    """On a PCW the code and what is resident of the database share sixteen
+    kilobytes, and Bangkok2 did not fit by 430 bytes.  The game and the table
+    of object records are twelve hundred bytes of room and nothing else: they
+    go above $C000, and the code is that much shorter."""
+    kept = tmp_path / "build"
+    done = subprocess.run(
+        [sys.executable, "-m", "regac", "make",
+         os.path.join(EXAMPLE, "faro.toml"), "-o", str(tmp_path / "out"),
+         "-t", "pcw", "--build-dir", str(kept)],
+        cwd=ROOT, capture_output=True, text=True)
+    assert done.returncode == 0, done.stdout + done.stderr
+    sym = memory.symbols(str(kept / "z80" / "pcw" / "game.sym"))
+    for name in ("obj_entry", "vm_state", "vm_seed", "obj_loc"):
+        assert 0xE300 <= sym[name] < 0xF000, name
+    assert sym["vm_state_end"] <= 0xF000
+    assert sym["database"] - sym["start"] < 8000, "the code did not get shorter"
+
+
+@pytest.mark.skipif(not tools(), reason="sjasmplus and nasm are needed")
 def test_make_says_it_for_every_machine(tmp_path):
     done = subprocess.run(
         [sys.executable, "-m", "regac", "make",
