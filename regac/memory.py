@@ -37,7 +37,7 @@ report can say by how much it went over.
 
 import os
 
-from .binary import PC_LONGEST_SECTION, SECTION_NAMES
+from .binary import PC_LONGEST_SECTION, RESIDENT, SECTION_NAMES
 from .i18n import _
 
 BAR = 20                        # how wide the bar is, in characters
@@ -165,6 +165,19 @@ def sections_in(database, bank):
                      if where == bank and size)
 
 
+def database_line(database, everything=False):
+    """What the database carries next to the interpreter, section by
+    section, the biggest first: what there is to trim when it does not fit.
+    That is the resident part -- or all of it, on a PC, where every section is
+    in memory at once."""
+    parts = [(_("header"), 0, database.header_size)]
+    parts += [(SECTION_NAMES[index], 0, size)
+              for index, (bank, _offset, size) in enumerate(database.placement)
+              if size and (everything or bank == RESIDENT)]
+    parts.sort(key=lambda part: -part[2])
+    return " " * 17 + _("database: {what}", what=pieces_of(parts))
+
+
 def bank_lines(database, most):
     """A row for every bank the database fills, and one for those left."""
     if not database.page_bits or most is None:
@@ -192,6 +205,9 @@ def report(which, sym, database, most_banks=None):
         where = f"${stretch.start:04X}-${stretch.end - 1:04X}"
         lines.append(line(where, stretch.used, stretch.size,
                           pieces_of(stretch.pieces)))
+        if any(what == _("database") for what, _start, _size
+               in stretch.pieces):
+            lines.append(database_line(database))
         if stretch.free < 0:
             over.append(_("{where} by {n} bytes", where=where,
                           n=-stretch.free))
@@ -207,7 +223,8 @@ def pc_report(program, database, stack):
                n=program + image + stack,
                what=pieces_of([(_("interpreter"), 0, program),
                                (_("database"), 0, image),
-                               (_("stack"), 0, stack)]))]
+                               (_("stack"), 0, stack)])),
+             database_line(database, everything=True)]
     sizes = [size for _bank, _offset, size in database.placement]
     largest = max(range(len(sizes)), key=lambda index: sizes[index])
     lines.append(line(SECTION_NAMES[largest], sizes[largest],

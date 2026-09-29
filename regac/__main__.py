@@ -487,10 +487,17 @@ def cmd_release(args):
     if args.database:
         with open(args.database, "rb") as f:
             database = f.read()
-        banks = banks_of(database)
-    written, how = write_media(args.machine, code, args.output, name, load,
-                               args.entry or load, screen, boot, banks,
-                               database)
+        try:
+            banks = banks_of(database)
+        except BuildError as e:
+            sys.exit(_("ERROR: {path}: {what}", path=args.database, what=e))
+    try:
+        written, how = write_media(args.machine, code, args.output, name, load,
+                                   args.entry or load, screen, boot, banks,
+                                   database)
+    except ValueError as e:
+        # what does not fit on the medium, or in the machine once it is loaded
+        sys.exit(_("ERROR: {what}", what=e))
     print(f"{args.input} -> " + ", ".join(written))
     print(_("  loads at    ${load:04X}, {n} bytes", load=load, n=len(code)))
     print(_("  starts with {how}", how=how))
@@ -772,8 +779,12 @@ def make_one(target, settings, ddb, name, root, output, where_regac_is,
         load = entry = CPC_LOW_CODE_AT
     else:
         entry = load
-    return write_media(target.release, code, where, name, load, entry,
-                       screen, boot, banks, image)[0], room
+    try:
+        written = write_media(target.release, code, where, name, load, entry,
+                              screen, boot, banks, image)[0]
+    except ValueError as e:
+        raise ProjectError(str(e)) from e
+    return written, room
 
 
 def room_of(which, target, database, tree, listing=None):

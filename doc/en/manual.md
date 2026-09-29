@@ -137,20 +137,25 @@ as to know before the adventure stops fitting and not after:
 
     spectrum128  -> spectrum128/faro.tap
         $8000-$BFFF  [############--------]  62%   6221 free of 16384  interpreter 8448, database 1715
+                     database: font 970, conditions 340, vocabulary 244, header 57, locations 55, objects 25, config 24
         banks        1 of 6, 16384 bytes each
         bank 0       [##------------------]   9%  14923 free of 16384  text 1223, graphics 236, music 2
         banks 1-5    unused: 81920 bytes more
 
 A row with addresses is a **stretch of the machine's memory**: from where it
 starts to where it has to end by, what is in it and what is left.  The figures
-are not an estimate: they are the addresses where the assembler really put
-the interpreter and the database, held to the same limits it checks when it
+are not an estimate: they are the addresses where the assembler really put the
+interpreter and the database, held to the same limits it checks when it
 builds.  The **resident** part of the database -- vocabulary, objects, rooms,
-conditions and font -- grows with those; the **banks** carry the text and the
-pictures, and say which sections went in each.  A section is never split
-between two banks, so the text, or the pictures, cannot be bigger than a
-bank.  On the PC, which has no map to fill, it says the memory it asks DOS
-for and the largest section, which has to fit in the 64 KB of a segment.
+conditions and font -- grows with those, and the row under it breaks it down
+section by section, the biggest first: it is what there is to trim when it
+does not fit.  On the machines with no banks -- the Spectrum 48, the CPC 464
+and the MSX -- the database is all of it, text and pictures included.  On the
+others, the **banks** carry the text and the pictures, and say which sections
+went in each.  A section is never split between two banks, so the text, or the
+pictures, cannot be bigger than a bank.  On the PC, which has no map to fill,
+it says the memory it asks DOS for and the largest section, which has to fit
+in the 64 KB of a segment.
 
 When something does not fit, the row says **how many bytes too many** instead
 of how many are left, and `make` stops with an error that says where: on the
