@@ -260,6 +260,37 @@ def test_it_builds_in_a_copy_and_leaves_the_interpreters_alone(tmp_path):
 
 
 @needs_assemblers
+def test_a_name_longer_than_a_disk_takes_still_builds(tmp_path):
+    """AMSDOS names a file with eight letters and three, and four of the eight
+    of 1986 are called with nine -- megacorp1, vajillas2 -- which the 6128's
+    disk once refused with a trace.  Its files take the name DOS would, and
+    the .dsk keeps the project's."""
+    where = str(tmp_path)
+    path = a_project(where, 'name = "vajillas1"\nsource = "faro.json"\n'
+                            'output = "salida"\n[targets.cpc6128]\n',
+                     screens=False)
+    done = make(path)
+    assert done.returncode == 0, f"regac make failed:\n{done.stdout}\n{done.stderr}"
+    with open(os.path.join(where, "salida", "cpc6128", "vajillas1.dsk"),
+              "rb") as f:
+        disk = f.read()
+    for suffix in (b"BAS", b"BIN", b"RES", b"B0 "):
+        assert b"VAJILLAS" + suffix in disk, suffix
+
+
+def test_what_does_not_go_on_a_disk_is_said_and_not_traced():
+    from regac.dsk import DiskError, filename
+
+    assert issubclass(DiskError, ValueError)
+    try:
+        filename("megacorp1.BAS")
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("nine letters went on an AMSDOS disk")
+
+
+@needs_assemblers
 def test_only_the_machine_that_was_asked_for(tmp_path):
     where = str(tmp_path)
     path = a_project(where, EVERY_MACHINE)

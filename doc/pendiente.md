@@ -4794,7 +4794,13 @@ Salieron **dos cosas que no se sabían**:
   megacorp1, megacorp2, vajillas1 y vajillas2 acabaron en un traceback,
   `DiskError: megacorp1.BAS no cabe en ocho y tres`, porque AMSDOS nombra los
   ficheros con ocho letras y tres, y el nombre del proyecto se usaba tal cual.
-  Por eso esas cuatro no tienen cifra en el 6128. **Pendiente de arreglar**.
+  Por eso esas cuatro no tienen cifra en el 6128. **Arreglado**: los
+  ficheros del disco llevan el nombre que le daría DOS --letras y cifras,
+  ocho como mucho, como el `.EXE` del PC--, así que megacorp1 va en
+  `MEGACORP.BAS` y los demás, y el `.dsk` sigue llamándose como el proyecto.
+  Y `DiskError` es un `ValueError`, como los errores de los otros medios, para
+  que `make` y `release` digan lo que no cabe en un disco en vez de
+  enseñar la traza. Falta volver a medir esas cuatro en el 6128.
 
 ## `make` construye en una copia
 

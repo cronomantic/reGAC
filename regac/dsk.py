@@ -47,8 +47,9 @@ EMPTY = 0xE5                    # a formatted but unused byte, and a free entry
 FILLER = 0x1A                   # what the tail of the last block is padded with
 
 
-class DiskError(Exception):
-    pass
+class DiskError(ValueError):
+    """What does not go on a disk.  A ValueError, as what does not go on the
+    other media is, so that make and release say it rather than trace it."""
 
 
 class Format:

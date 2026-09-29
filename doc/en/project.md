@@ -43,6 +43,11 @@ to be said; `output`, if it is not said, is `release`. The machines are called
 `spectrum48`, `spectrum128`, `plus3`, `cpc464`, `cpc6128`, `msx`, `next`,
 `pcw` and `pc`.
 
+`name` is what comes out is called: `faro.tap`, `faro.dsk`.  Where a name has
+to fit in eight letters -- the files inside a 6128's disk and the PC's `.EXE`
+-- it keeps its letters and digits, the first eight and in capitals: a project
+`megacorp1` comes out in `megacorp1.dsk` and is started with `RUN"MEGACORP"`.
+
 ## The knobs
 
 | key | what it says | by default |
