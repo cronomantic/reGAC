@@ -133,9 +133,9 @@ saberlo antes de que la aventura deje de caber y no después:
 
     spectrum128  -> spectrum128/faro.tap
         $8000-$BFFF  [############--------]  62%   6221 libres de 16384  intérprete 8448, base de datos 1715
-                     base de datos: font 970, conditions 340, vocabulary 244, cabecera 57, locations 55, objects 25, config 24
+                     base de datos: tipografía 970, condiciones 340, vocabulario 244, cabecera 57, salas 55, objetos 25, configuración 24
         bancos       1 de 6, de 16384 bytes cada uno
-        banco 0      [##------------------]   9%  14923 libres de 16384  text 1223, graphics 236, music 2
+        banco 0      [##------------------]   9%  14923 libres de 16384  textos 1223, láminas 236, música 2
         bancos 1-5   sin usar: 81920 bytes más
 
 Una línea con direcciones es un **tramo de la memoria** de la máquina: desde

@@ -50,7 +50,7 @@ import struct
 from .devices import (AMSTRAD_RULES, cga_amstrad_colours, cga_amstrad_flash,
                       cga_picture_colours, cpc_picture_colours, from_an_amstrad,
                       text_ink_of)
-from .i18n import _
+from .i18n import N_, _
 from .opcodes import BY_NAME, GFX_CMDS
 from .glyphs import glyph_for
 from .text import HOLE_OBJECT, TextStore, commands_of, expand, typed
@@ -111,17 +111,23 @@ MUSIC_SLOT = 1  # the tune stays in a bank of its own, mapped to its own slot
     S_MUSIC,
 ) = range(9)
 
+# What each section is called where a person reads it, in the language of the
+# tools: section_name(S_TEXT) is "text", or "textos".
 SECTION_NAMES = [
-    "config",
-    "vocabulary",
-    "objects",
-    "locations",
-    "conditions",
-    "text",
-    "font",
-    "graphics",
-    "music",
+    N_("config"),
+    N_("vocabulary"),
+    N_("objects"),
+    N_("locations"),
+    N_("conditions"),
+    N_("text"),
+    N_("font"),
+    N_("graphics"),
+    N_("music"),
 ]
+
+
+def section_name(index):
+    return _(SECTION_NAMES[index])
 
 # What cannot be paged out, because the interpreter reaches for it at any time.
 ALWAYS_RESIDENT = {S_CONFIG, S_VOCAB, S_OBJECTS, S_LOCATIONS, S_CONDITIONS, S_FONT}
@@ -588,7 +594,7 @@ class Database:
                 if len(block) > PC_LONGEST_SECTION:
                     raise BuildError(_(
                         "the {section} section is {size} bytes and a PC "
-                        "reaches {most} of one", section=SECTION_NAMES[index],
+                        "reaches {most} of one", section=section_name(index),
                         size=len(block), most=PC_LONGEST_SECTION))
         resident = bytearray()
         placement = [None] * len(blocks)
@@ -603,7 +609,7 @@ class Database:
             if len(block) > page:
                 raise BuildError(_(
                     "the {section} section is {size} bytes and a bank holds "
-                    "{page}", section=SECTION_NAMES[index], size=len(block),
+                    "{page}", section=section_name(index), size=len(block),
                     page=page))
             for number, bank in enumerate(banks):
                 if len(bank) + len(block) <= page:

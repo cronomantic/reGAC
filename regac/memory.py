@@ -37,7 +37,7 @@ report can say by how much it went over.
 
 import os
 
-from .binary import PC_LONGEST_SECTION, RESIDENT, SECTION_NAMES
+from .binary import PC_LONGEST_SECTION, RESIDENT, section_name
 from .i18n import _
 
 BAR = 20                        # how wide the bar is, in characters
@@ -159,7 +159,7 @@ def pieces_of(pieces):
 
 def sections_in(database, bank):
     """The sections that went into a bank, with how big each is."""
-    return ", ".join(f"{SECTION_NAMES[index]} {size}"
+    return ", ".join(f"{section_name(index)} {size}"
                      for index, (where, _offset, size)
                      in enumerate(database.placement)
                      if where == bank and size)
@@ -171,7 +171,7 @@ def database_line(database, everything=False):
     That is the resident part -- or all of it, on a PC, where every section is
     in memory at once."""
     parts = [(_("header"), 0, database.header_size)]
-    parts += [(SECTION_NAMES[index], 0, size)
+    parts += [(section_name(index), 0, size)
               for index, (bank, _offset, size) in enumerate(database.placement)
               if size and (everything or bank == RESIDENT)]
     parts.sort(key=lambda part: -part[2])
@@ -227,7 +227,7 @@ def pc_report(program, database, stack):
              database_line(database, everything=True)]
     sizes = [size for _bank, _offset, size in database.placement]
     largest = max(range(len(sizes)), key=lambda index: sizes[index])
-    lines.append(line(SECTION_NAMES[largest], sizes[largest],
+    lines.append(line(section_name(largest), sizes[largest],
                       PC_LONGEST_SECTION, _("the largest section")))
     return lines
 

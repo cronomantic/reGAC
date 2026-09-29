@@ -114,6 +114,32 @@ def test_an_unbanked_database_is_all_of_it():
         == database.resident_size
 
 
+def test_the_sections_are_named_in_the_language_of_the_tools():
+    database = the_example()
+    i18n.speak(i18n.SPANISH)
+    said = memory.database_line(database)
+    assert said.strip().startswith("base de datos: ")
+    for spanish in ("tipografía", "condiciones", "vocabulario", "cabecera"):
+        assert spanish in said, said
+    assert "font" not in said and "header" not in said
+    banks = " ".join(memory.bank_lines(database, 6))
+    assert "textos" in banks and "láminas" in banks, banks
+
+
+def test_the_include_says_where_the_banks_are(tmp_path):
+    from regac.__main__ import write_defs
+
+    database = the_example()
+    path = tmp_path / "banks.inc"
+    write_defs(database, str(path))
+    said = path.read_text(encoding="utf-8").splitlines()
+    assert said[1] == f"DB_RESIDENT_SIZE equ {database.resident_size}"
+    assert said[2] == f"DB_BANK_COUNT    equ {len(database.banks)}"
+    assert said[3] == "DB_BANK_BYTES    equ 16384"
+    assert said[4:] == [f"DB_BANK_USED_{n}  equ {len(bank)}"
+                        for n, bank in enumerate(database.banks)]
+
+
 def test_what_does_not_fit_is_said_and_by_how_much():
     database = the_example("spectrum48", 0)
     sym = {"start": 0x8000, "database": 0xF000, "last": 0x10000 + 300}

@@ -4720,7 +4720,10 @@ Debajo del tramo que lleva la base de datos va **lo que la forma, sección a
 sección y de la más grande a la más pequeña**, que es lo que el autor tiene
 que recortar: en el 48, el 464 y el MSX es la base de datos entera, y en los
 demás sólo lo residente, porque los textos y las láminas van en los bancos y
-cada banco dice ya las suyas.
+cada banco dice ya las suyas. Las secciones se nombran en el idioma de las
+herramientas --`section_name`, en `binary.py`--, como `regac build` y los dos
+errores de una sección que no cabe; hasta entonces salían en inglés también en
+español.
 
 Al hacerlo salieron **tres fallos que no avisaba nadie**:
 
