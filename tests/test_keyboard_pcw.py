@@ -32,6 +32,7 @@ events on purpose: handing the emulator a whole string to type drops letters.
 """
 
 import os
+import subprocess
 import sys
 import time
 
@@ -51,6 +52,7 @@ PCW = os.path.join(ROOT, "z80", "pcw")
 SOURCE = os.path.join(PCW, "test_keyboard.asm")
 BINARY = os.path.join(PCW, "keys.bin")
 LISTING = os.path.join(PCW, "keys.lst")
+ADVENTURE = os.path.join(ROOT, "snapshots", "megacorp2.json")
 DATABASE = os.path.join(PCW, "text.rgac")
 LOADS_AT = 0x0100
 KEYS_AT = 0xFFF0
@@ -71,8 +73,8 @@ COUNTING_FROM = 20
 
 if pytest is not None:
     needs_tools = pytest.mark.skipif(
-        not emulator.available() or not os.path.exists(DATABASE),
-        reason="sjasmplus and ZEsarUX must be in tools/, with a database built",
+        not emulator.available() or not os.path.exists(ADVENTURE),
+        reason="sjasmplus and ZEsarUX must be in tools/, with a decompiled adventure",
     )
 else:
 
@@ -80,9 +82,30 @@ else:
         return func
 
 
+built = False
+
+
+def database():
+    """The adventure the build prints with, which it reads out of text.rgac.
+    That file used to be whatever test_text_pcw had left behind, so in a fresh
+    checkout, or with this file run first, every test here skipped itself
+    saying there was no database -- and a skip reads like a pass.  So it is
+    built here, once, from the same adventure: the two files are in one group
+    and never run side by side."""
+    global built
+    if not built:
+        subprocess.run(
+            [sys.executable, "-m", "regac", "build", ADVENTURE, DATABASE,
+             "-m", "pcw"],
+            cwd=ROOT, check=True, capture_output=True,
+        )
+        built = True
+
+
 def watching():
     """Start the build that watches the keyboard, and say where it keeps what
     it saw."""
+    database()
     listing = emulator.assemble(SOURCE, listing=LISTING)
     where = {
         name: emulator.label_address(listing, name)
@@ -320,7 +343,11 @@ def line_typed(steps, machine, events):
             if not jumped(session, at["read_a_line"], at["read_a_line"]):
                 why = "the jump into read_line never landed"
                 continue
-            keystrokes.play(session, steps, events)
+            # Counted in the machine's frames, as type_them does: four, which
+            # is a look at the keyboard and more, and far short of the
+            # thirty-five a held key waits to repeat.
+            keystrokes.play(session, steps, events,
+                            between=lambda: machine_frames(session, 4))
             if not session.wait_for(at["line_done"], 0xFF, timeout=10.0,
                                     every=0.2):
                 why = "the line was never finished"

@@ -4058,6 +4058,33 @@ ha tocado nada del PCW ni de `z80/common/`, y a solas pasó tres de tres. Queda
 apuntada: es de las que dependen del ritmo con que ZEsarUX recibe las teclas,
 como las del teclado de las otras máquinas, y si vuelve hay que mirarla.
 
+**Volvió, y mirada.** Otra vez en el lote de serie, `OL`, en la puerta a la
+contra de los ficheros que construyen lo que leen (ver `pruebas.md`). No era
+del orden: la misma fila del lote de serie al revés --`test_tape_z80`,
+`test_statements_z80` y ésta-- pasó tres de tres, el fichero entero tres de
+tres y la prueba a solas seis de seis. Era lo que `pruebas.md` ya contaba del
+PCW, «una tecla aguantada 0,06 s de los nuestros no son 0,06 s de la
+máquina», con el arreglo puesto sólo a medias: `type_them` y `pressed`
+esperaban en tramas de la máquina, y `line_typed` seguía tecleando con
+`keystrokes.play` y 0,15 s del anfitrión entre paso y paso. Si ZEsarUX no
+barre el teclado entre `S` abajo y `O` abajo, ve las dos a la vez, que no
+decide nada, y la `S` se pierde. Ahora `play` acepta una espera `between` y el
+PCW le pasa cuatro tramas suyas, como `type_them`.
+
+**Lo que no se pudo**: reproducirlo a propósito. Con diez procesos quemando
+CPU en ocho núcleos pasó tres de tres con el arreglo **y tres de tres sin
+él**, así que el arreglo cuadra con el mecanismo pero no hay un antes y un
+después medidos. Si vuelve a dar `OL`, esto no era todo.
+
+La otra de esa puerta, en la orden en paralelo,
+`test_game_pc.py::test_the_machines_own_keyboard_gets_the_keys_there`, es la
+de `AUTOTYPE` de más arriba, «puede fallar de vez en cuando»: DOSBox-X se
+colgó y agotó sus 64 s. Y en la primera vuelta de esa puerta cayeron dos, una
+el ruido del AY y otra cuyo nombre se perdió con la salida recortada, también
+de la orden en paralelo. En la segunda, con la salida entera guardada, el AY
+pasó y la única del paralelo que cayó fue la de `AUTOTYPE`: o la perdida era
+ésa, o no volvió.
+
 Y otra del mismo pie, en el lote en paralelo después de `DO`:
 `test_textmode_cpc.py::test_a_picture_clears_what_the_text_left_either_side_of_it`
 vio las filas de la lámina vacías después de `TEXTO`, como si el texto no

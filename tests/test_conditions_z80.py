@@ -116,6 +116,11 @@ def test_a_saved_game_holds_nothing_that_depends_on_where_the_code_is():
     A behavioural check would need two builds of different sizes and a game
     played between them.
     """
+    # The build reads a database, and this used to assemble with whichever
+    # the test before it had left: run first, in a fresh checkout, there was
+    # none and sjasmplus stopped.  Any will do for the shape, so the smallest.
+    with open(DATABASE, "wb") as f:
+        f.write(Database(adventure(["END"])).build())
     listing = emulator.assemble(SOURCE, listing=LISTING)
     at = {name: emulator.label_address(listing, name)
           for name in ("vm_state", "vm_state_end", "obj_entry", "obj_loc",

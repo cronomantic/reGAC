@@ -31,6 +31,7 @@ whole path and not just that something happened.
 
 import os
 import shutil
+import subprocess
 import sys
 import tempfile
 import time
@@ -51,6 +52,7 @@ CPC = os.path.join(ROOT, "z80", "cpc")
 SOURCE = os.path.join(CPC, "test_tape.asm")
 BINARY = os.path.join(CPC, "tape.bin")
 LISTING = os.path.join(CPC, "tape.lst")
+ADVENTURE = os.path.join(ROOT, "snapshots", "megacorp2.json")
 DATABASE = os.path.join(CPC, "text.rgac")
 TAPE = os.path.join(ROOT, "juegos", "megacorp_ams.zip")
 LOADS_AT = 0x4000
@@ -58,11 +60,11 @@ LOAD_LEN = 256
 
 if pytest is not None:
     needs_tools = pytest.mark.skipif(
-        not emulator.available() or not os.path.exists(DATABASE),
-        reason="sjasmplus and ZEsarUX must be in tools/, with a database built",
+        not emulator.available() or not os.path.exists(ADVENTURE),
+        reason="sjasmplus and ZEsarUX must be in tools/, with a decompiled adventure",
     )
     needs_tape = pytest.mark.skipif(
-        not emulator.available() or not os.path.exists(DATABASE)
+        not emulator.available() or not os.path.exists(ADVENTURE)
         or not os.path.exists(TAPE),
         reason="the Amstrad tape of Megacorp must be in juegos/",
     )
@@ -75,6 +77,15 @@ else:
 
 
 def build(low=False):
+    # The build reads text.rgac, which used to be whatever test_text_cpc had
+    # left behind: in a fresh checkout, or with this file run first, every
+    # test here skipped itself.  So it is built here from the same adventure;
+    # the files are in one group and never run side by side.
+    subprocess.run(
+        [sys.executable, "-m", "regac", "build", ADVENTURE, DATABASE,
+         "-m", "cpc"],
+        cwd=ROOT, check=True, capture_output=True,
+    )
     listing = emulator.assemble(SOURCE, listing=LISTING,
                                 defines=("LOW_CODE",) if low else ())
     return {

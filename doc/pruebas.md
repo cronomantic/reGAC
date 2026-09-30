@@ -121,6 +121,30 @@ orden es la única en que corre sola, y le cuesta quince segundos.
 construye lo de varios. Las que construyen en su carpeta temporal —como la
 del PC, que ensambla con NASM en `tmp_path`— no necesitan nada.
 
+**Y pruebas que leían lo que había dejado otra.** Un grupo impide que dos
+pruebas se pisen, pero no que una **dependa** de la de al lado. Las del
+teclado del Amstrad y del PCW, y la de la cinta del Amstrad, ensamblaban con
+el `text.rgac` que dejaba `test_text_cpc` o `test_text_pcw`, y si no lo había
+se saltaban solas diciendo que faltaba la base de datos --y un salto se lee
+como un aprobado--. `test_conditions_z80`, en la prueba de la partida
+guardada, ensamblaba con la `conditions.rgac` que hubiera, y sin ella
+sjasmplus paraba. Con el árbol recién limpio, o con esa prueba la primera, no
+probaban nada o fallaban. Ahora cada una construye lo que lee.
+
+**Para verlo, la puerta a la contra**: en árbol limpio y con los ficheros al
+revés, que es cuando una que lee lo de otra corre antes que ella.
+
+```
+git clean -qfX z80 x86 music
+pytest -n 4 --dist loadgroup -m "not serial" -ra $(ls tests/test_*.py | sort -r)
+pytest -m "serial and not mirror" -ra $(ls tests/test_*.py | sort -r)
+```
+
+Con `-ra`, y **la salida entera a un fichero**: los nombres de lo que falla
+van en el resumen del final, pero antes va el detalle de cada fallo, y quien
+guarda sólo la cola se queda a veces con el detalle de uno y sin el nombre del
+otro. Así se perdió uno en la primera vuelta de ésta.
+
 ## La regla: un fallo en paralelo no se cree hasta repetirlo a solas
 
 Con los plazos estirados quedan una o dos pruebas por vuelta que fallan por la
@@ -248,7 +272,12 @@ Eran tres cosas, todas la misma en el fondo —**adivinar en vez de esperar**—
    Este emulador no lleva el tiempo del PCW, de modo que con el anfitrión
    ocupado el mismo `sleep` compra menos ciclos, y una tecla que dura menos de
    una pasada del teclado **no la ve nadie**. Ahora se cuenta en ciclos suyos,
-   con `get-tstates-partial`, cuatro tramas por tecla.
+   con `get-tstates-partial`, cuatro tramas por tecla. ~~Todas.~~ Las tres que
+   teclean con `keystrokes.play` --las solapadas, dos a la vez y la aguantada--
+   se quedaron con sus 0,15 s de los nuestros entre paso y paso, y dos teclas
+   que bajan antes de que nadie mire el teclado son dos teclas a la vez, que no
+   deciden nada: por eso la solapada dio `OL` dos veces. Ahora `play` acepta
+   una espera `between`, y el PCW le pasa las mismas cuatro tramas.
 3. **Saltar no es haber llegado.** `session.jump(read_a_line)` y teclear
    0,3 s después tiraba las primeras teclas cuando el salto no había caído.
    Todo lo que hay por encima de `read_a_line` en el fuente son esas entradas

@@ -28,6 +28,7 @@ until it was measured.
 """
 
 import os
+import subprocess
 import sys
 import time
 
@@ -47,6 +48,7 @@ CPC = os.path.join(ROOT, "z80", "cpc")
 SOURCE = os.path.join(CPC, "test_keyboard.asm")
 BINARY = os.path.join(CPC, "keys.bin")
 LISTING = os.path.join(CPC, "keys.lst")
+ADVENTURE = os.path.join(ROOT, "snapshots", "megacorp2.json")
 DATABASE = os.path.join(CPC, "text.rgac")
 LOADS_AT = 0x4000
 
@@ -63,8 +65,8 @@ EVENTS = emulator.Session.EVENT_KEYS
 
 if pytest is not None:
     needs_tools = pytest.mark.skipif(
-        not emulator.available() or not os.path.exists(DATABASE),
-        reason="sjasmplus and ZEsarUX must be in tools/, with a database built",
+        not emulator.available() or not os.path.exists(ADVENTURE),
+        reason="sjasmplus and ZEsarUX must be in tools/, with a decompiled adventure",
     )
 else:
 
@@ -72,9 +74,30 @@ else:
         return func
 
 
+built = False
+
+
+def database():
+    """The adventure the build prints with, which it reads out of text.rgac.
+    That file used to be whatever test_text_cpc had left behind, so in a fresh
+    checkout, or with this file run first, every test here skipped itself
+    saying there was no database -- and a skip reads like a pass.  So it is
+    built here, once, from the same adventure: the two files are in one group
+    and never run side by side."""
+    global built
+    if not built:
+        subprocess.run(
+            [sys.executable, "-m", "regac", "build", ADVENTURE, DATABASE,
+             "-m", "cpc"],
+            cwd=ROOT, check=True, capture_output=True,
+        )
+        built = True
+
+
 def watching():
     """Start the build that watches the keyboard, and say where it keeps what
     it saw."""
+    database()
     listing = emulator.assemble(SOURCE, listing=LISTING)
     where = {
         name: emulator.label_address(listing, name)

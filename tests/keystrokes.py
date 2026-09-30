@@ -52,9 +52,15 @@ HELD = [("R", 1), 4.0, ("R", 0), (ENTER, 1), (ENTER, 0)]
 HELD_KEY = "R"
 
 
-def play(session, steps, events, gap=0.15):
+def play(session, steps, events, gap=0.15, between=None):
     """Send the steps as key events.  `events` says which of the emulator's key
-    numbers a character is where it is not its own ASCII."""
+    numbers a character is where it is not its own ASCII.
+
+    Between one step and the next go `gap` seconds of ours, or whatever
+    `between` waits for where the emulator does not keep the machine's time:
+    there a busy host buys fewer cycles with the same sleep, and two keys
+    that go down before the keyboard has been looked at are two keys held at
+    once, which decides nothing -- ROLLED came out OL on the PCW that way."""
     for step in steps:
         if isinstance(step, (int, float)):
             time.sleep(step)
@@ -62,4 +68,7 @@ def play(session, steps, events, gap=0.15):
         char, down = step
         code = events.get(char, ord(char.lower()))
         session.command(f"send-keys-event {code} {down}")
-        time.sleep(gap)
+        if between is None:
+            time.sleep(gap)
+        else:
+            between()
