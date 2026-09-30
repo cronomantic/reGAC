@@ -4776,7 +4776,10 @@ que no fuera de reGAC. Las pruebas están en
 ### Los márgenes de las ocho, máquina a máquina
 
 Medido por el usuario con `regac make` sobre las ocho de `snapshots/`, una
-máquina cada vez, el 29 de septiembre de 2026, con la 0.5.0. Es lo que queda
+máquina cada vez, el 29 de septiembre de 2026, con la 0.5.0; las columnas del
+128 y el +3, del Next y del PCW, medidas otra vez con `medir.py` después de
+sacar de su código el estado de la partida --abajo, «El juego del PCW, fuera
+del código» y «Y el del 128, el +3 y el Next»--. Es lo que queda
 libre en el tramo de cada máquina que crece con la aventura: el que lleva la
 base de datos entera en las que no tienen bancos, y lo residente en las demás.
 En el PC, lo que le queda a la sección más grande hasta los 65520 bytes de un
@@ -4784,18 +4787,21 @@ segmento.
 
 | aventura | 48 | 128 y +3 | 464 | 6128 | MSX | Next | PCW | PC |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
-| Bangkok1 | 5990 | 2422 | 1409 | 10102 | 14438 | 3446 | 1654 | 57267 |
-| Bangkok2 | 5110 | **338** | **577** | 8018 | 13558 | 1362 | **no cabe: 430 de más** | 57119 |
-| megacorp1 | 5117 | 3697 | **524** | 11377 | 13565 | 4721 | 2929 | 55430 |
-| megacorp2 | 3746 | 3471 | 6446 del revés | 11151 | 12194 | 4495 | 2703 | 54952 |
-| quijote1 | 3203 | 1539 | 5975 del revés | 9219 | 11651 | 2563 | **771** | 55711 |
-| quijote2 | 3334 | 2790 | 6166 del revés | 10470 | 11782 | 3814 | 2022 | 54140 |
-| vajillas1 | 6992 | 4069 | 2663 | 11749 | 15440 | 5093 | 3301 | 56431 |
-| vajillas2 | 7143 | 3431 | 2754 | 11111 | 15591 | 4455 | 2663 | 56962 |
+| Bangkok1 | 5990 | 3446 | 1409 | 10102 | 14438 | 3446 | 2934 | 57267 |
+| Bangkok2 | 5110 | 1362 | **577** | 8018 | 13558 | 1362 | **850** | 57119 |
+| megacorp1 | 5117 | 4721 | **524** | 11377 | 13565 | 4721 | 4209 | 55430 |
+| megacorp2 | 3746 | 4495 | 6446 del revés | 11151 | 12194 | 4495 | 3983 | 54952 |
+| quijote1 | 3203 | 2563 | 5975 del revés | 9219 | 11651 | 2563 | 2051 | 55711 |
+| quijote2 | 3334 | 3814 | 6166 del revés | 10470 | 11782 | 3814 | 3302 | 54140 |
+| vajillas1 | 6992 | 5093 | 2663 | 11749 | 15440 | 5093 | 4581 | 56431 |
+| vajillas2 | 7143 | 4455 | 2754 | 11111 | 15591 | 4455 | 3943 | 56962 |
 
-Las del **128 y el +3 son las mismas, byte a byte, que las de «Lo residente
+Las del **128 y el +3 eran las mismas, byte a byte, que las de «Lo residente
 del 128 y del +3»**, más abajo, que se midieron a mano antes de que hubiera
-informe: el informe mide lo mismo. Las del 464 «del revés» son las que
+informe: el informe mide lo mismo. Ahora son 1024 más cada una, y coinciden
+con las del Next por casualidad: lo residente tiene 8960 bytes en los dos,
+allí de `$5D00` a `$8000` y aquí lo que el intérprete deja libre hasta
+`$C000`. Las del 464 «del revés» son las que
 necesitan `LOW_CODE`, y ahí la base de datos va sola de `$4000` a la isla;
 Bangkok2 pasa de 588 a 577 bytes de holgura en la manera habitual, que es lo
 que ha crecido el intérprete desde entonces.
@@ -4803,8 +4809,9 @@ que ha crecido el intérprete desde entonces.
 Lo que el autor no mueve, porque es sólo intérprete, es igual para las ocho:
 en el 6128 le quedan 2565 bytes hasta `SAVE_AREA`; en el MSX, 7245 hasta la
 copia de la pantalla; en el 464 del revés, 2390 hasta la máscara; y en el
-Next, **225 bytes** hasta la máscara de `$A000` y 2292 encima de ella. El
-Next es el que menos sitio tiene para crecer el intérprete.
+Next, **1461** hasta la máscara de `$A000` --eran 225 antes de sacar de ahí el
+estado de la partida-- y 2292 encima de ella. El Next sigue siendo el que
+menos sitio tiene para crecer el intérprete, pero ya no por poco.
 
 Los bancos van holgados en todas: cada aventura cabe en el primero, textos y
 láminas, menos megacorp2 en el 6128, cuyas láminas --que en un Amstrad llevan
@@ -4864,18 +4871,186 @@ va ahora, desde `$E300` hasta `$E7E7`.
   fila de la pantalla ni la tabla del cargador.
 
 El intérprete del PCW pasa de **8960 a 7680 bytes**: 1280 más de sitio para lo
-residente. Por cuenta, Bangkok2 pasa de 430 de más a unos 850 libres, y
-quijote1 de 771 a unos 2050. **Las otras ocho máquinas salen idénticas, byte a
-byte**: no definen `STATE_AT`. `test_the_pcw_keeps_the_game_out_of_its_code`
-mira que esté arriba y que el código haya menguado.
+residente. Medido con `medir.py`, Bangkok2 pasa de 430 de más a **850
+libres**, y quijote1 de 771 a **2051**. **Las otras ocho máquinas salen
+idénticas, byte a byte**: no definen `STATE_AT`.
+`test_the_pcw_keeps_the_game_out_of_its_code` mira que esté arriba y que el
+código haya menguado.
 
-**Lo que no se ha podido probar aquí** es el PCW funcionando, que pide
-ZEsarUX: las pruebas del PCW --`test_game_pcw`, `test_save_pcw` y las demás--
-son las que dicen que juega y que guarda igual.
+Se hizo en una sesión sin ZEsarUX, así que el PCW funcionando quedó para
+después, y **ya está probado**: las ocho de la lista --`test_game_pcw`,
+`test_save_pcw`, `test_textmode_pcw`, `test_screen_pcw`, `test_boot_pcw`,
+`test_text_pcw`, `test_keyboard_pcw` y `test_project`-- juegan, guardan y
+cargan con el estado en `$E300`. En la primera vuelta, todas juntas, cayeron
+dos de `test_keyboard_pcw`, y a solas pasaron las nueve: el banco de pruebas
+del teclado ni siquiera ensambla `conditions.asm`, así que era la compañía,
+como dice «Los plazos» en `pruebas.md`.
 
 La idea del usuario queda para cuando haga falta más de lo que dan cosas
-como esta. Lo mismo --sacar el estado del tramo que va justo-- podría servir
-en el 128, el +3 y el Next, cada uno con su mapa.
+como esta.
+
+### Y el del 128, el +3 y el Next
+
+**Decidido por el usuario**, después de ver dónde iría en cada una: lo mismo
+en las tres máquinas que iban más justas después del PCW, y el 464 se queda
+como está.
+
+- **En el 128 y el +3, en la página cinco, desde `$7000`.** El tramo que va
+  justo es de `$8000` a `$C000`, intérprete y lo residente, y a Bangkok2 le
+  quedaban 338 bytes. La página cinco está siempre puesta: la pantalla acaba
+  en `$5AFF`, las variables del sistema en `$5CB5` y el BASIC que carga la
+  aventura en `$5D33` --`$5D8A` en el +3--, y ese BASIC sólo corre al cargar.
+  Con el intérprete en marcha no usa aquello nadie: las interrupciones están
+  cerradas siempre, no hay `im 2` ni tabla de vectores, y las rutinas de
+  cinta de la ROM, con las que guardan las dos, sólo quieren las variables
+  del sistema. La pila baja desde `$7FF0`, y lo que se lleva es de `$7000` a
+  `$74E6`: dos `ASSERT` miran que quede por encima de `basic_end` y medio
+  kilobyte por debajo de la pila.
+- **En el Next, desde `$4400`.** El tramo justo era el intérprete hasta la
+  máscara de `$A000`, con 225 bytes. De `$4000` a `$5BFF` ya estaba libre en
+  su mapa, porque la pantalla es la capa 2, y la ULA no se ve: `screen_init`
+  pone el color transparente de la capa 2 a uno que no usa nadie. Lo único
+  que había ahí es el sitio donde se lee una partida antes de ponerla encima
+  de la que se juega, 743 bytes desde `$4000`, así que empieza en `$4400`;
+  los `ASSERT` miran que quede después de eso y antes de las variables de la
+  ROM, en `$5C00`, que se pide prestada para guardar.
+
+Las cifras, en la tabla de arriba. **El 128 y el +3 ganan 1024 y no 1255**:
+lo residente empieza en un `ALIGN 256`, y los 1255 del intérprete se quedan
+en cuatro páginas de 256. El Next gana 1236. **Las otras seis salen
+idénticas, byte a byte**, comparadas con `cmp` construyendo el faro antes y
+después; y en el manual, el ejemplo del informe, que era el del 128, lleva
+las cifras nuevas en los dos idiomas.
+
+Una cosa que cambia de verdad: **la página cinco del 128 y del +3 es memoria
+contendida**, la que la ULA comparte con el procesador mientras pinta, y ahí
+están ahora las banderas, los contadores y dónde está cada objeto. Leerlas
+cuesta algo más mientras se pinta la pantalla. El dibujo no las toca, así que
+el tope de cuatro o cinco segundos de una lámina no se mueve.
+
+Lo que lo vigila:
+
+- `test_the_tight_machines_keep_the_game_out_of_their_code`, en
+  `test_memory.py`, mira en los tres `.sym` que el estado esté en su sitio y
+  el código siga en `$8000`.
+- **El 128 no tenía ninguna prueba que guardara una partida**, y ahora que la
+  partida está en otra página es justo lo que había que ver.
+  `test_a_game_saved_on_a_128_is_the_game_it_loads`, en `test_tape_z80.py`,
+  juega Vajillas en un 128 cargado de su cinta, va al norte y guarda --con el
+  `--outtape` de ZEsarUX--; el bloque que sale es la partida, y puesto al
+  final de la misma cinta, una segunda máquina carga la aventura, oye `LOAD`
+  y vuelve a la sala cuatro con la partida igual.
+- El Next ya tenía las suyas: `test_save_next` guarda y carga, también con
+  NextZXOS arrancado de su tarjeta, y pasa. El +3 arranca del disco y juega
+  hasta una sala con lámina (`test_media_plus3`), y guardaba con el mismo
+  `tape.asm` que el 128, en cinta. **Y eso era un hueco, no una elección**:
+  el +3 tiene que guardar en su disco, como el PCW y el 6128. Visto al
+  repasar esto con el usuario, y ya hecho: ver «Las partidas del +3, en su
+  disco», justo aquí debajo.
+
+### Las partidas del +3, en su disco
+
+**Decidido por el usuario**, las tres cosas: con un fichero de +3DOS, sólo en
+disco, y en silencio cuando algo va mal.
+
+- **Un fichero de +3DOS**, y no los sectores de un fichero reservado como en
+  el PCW y el 6128. Aquellos los escriben a mano porque no tienen a quién
+  pedírselo; el +3 tiene +3DOS, que su cargador ya usa para leer la aventura,
+  así que `SAVE` abre `<PROYECTO>.SAV` con `DOS OPEN` --borrando lo que
+  hubiera con ese nombre--, lo escribe y lo cierra, como el Next con NextZXOS
+  y el PC con DOS. El nombre lo pone `make` con `SAVE_NAME`, el mismo que el
+  del Next: `FARO.SAV`. Una construcción a la que nadie se lo dice guarda en
+  `GAME.SAV`.
+- **Sólo en disco.** `game3.asm` ya no lleva `tape.asm` sino `disk3.asm`, con
+  las mismas dos entradas, `tape_save` y `tape_load`: la orden no se entera.
+- **En silencio**, como el 6128 y el Next. +3DOS pregunta «Retry, Ignore or
+  Cancel?» con su letra encima de lo que haya y espera una tecla; se le dice
+  que no con `DOS SET MESSAGE`. Un `SAVE` que no va vuelve sin más, y un `LOAD`
+  lee primero a un sitio aparte, `LOAD_AREA`, en `$7600` --en la página cinco,
+  detrás de la partida y medio kilobyte por debajo de la pila, con sus
+  `ASSERT`--, y sólo si ha llegado entera la copia encima. Sin fichero, o con
+  uno más corto que una partida, la partida sigue como estaba.
+
+Que la partida esté ahora en la página cinco ayuda: +3DOS lee y escribe ahí
+sin paginar nada nuestro. Lo que sí quiere es su ROM y su página siete en la
+ventana mientras trabaja, así que se le ponen durante las llamadas --lo mismo
+que hace el cargador-- y al volver se pone la ROM del 48 y la página que la
+base de datos tenía en la ventana. El intérprete no la puede leer del puerto,
+pero la guarda en `db_paged`; si todavía no ha paginado nada, se deja la que
+dejó el cargador. Y `BANKM` y `BANK678` se escriben a la vez que los puertos,
+que es lo que +3DOS espera encontrar.
+
+El intérprete sigue midiendo **7424 bytes**: lo nuevo cabe en el hueco que
+deja el `ALIGN 256` de lo residente. **Las otras ocho máquinas salen
+idénticas, byte a byte**, con el faro comparado con `cmp`.
+
+Las pruebas, en `test_media_plus3.py`, arrancan Vajillas desde su disco con
+bancos, como lo arrancaría su dueño:
+
+- `test_a_game_is_saved_on_the_disk_and_loaded_off_it`: un `LOAD` sin fichero
+  no cambia la partida; luego `NORTE`, `SAVE`, `SUR` y `LOAD`, y vuelve a la
+  sala cuatro con la partida igual. Con `--dsk-persistent-writes` el emulador
+  escribe en la imagen, y al acabar se lee desde fuera: `VAJILLAS.SAV` está en
+  el directorio y lleva dentro dónde está cada objeto. **Se mira sólo eso** y
+  no el bloque entero, porque el turno del `SAVE` sigue después de guardar y
+  Vajillas cuenta sus turnos en un contador: lo que hay en memoria al acabar
+  ya no es lo que se escribió.
+- `test_a_protected_disk_leaves_the_game_going`: con `--dsk-write-protection`,
+  el `SAVE` vuelve, pregunta la orden siguiente y la partida no ha cambiado.
+  **Se comprobó que puede fallar**: con los mensajes de +3DOS encendidos, la
+  máquina se queda en su pregunta y la prueba cae.
+- `test_example` mira que el disco del faro que sale de `make` lleve
+  `FARO.SAV` en el intérprete.
+
+~~Queda una cosa de la que avisar: **el disco del +3 sin bancos** --`release
+-m plus3` con el `game.bin` del 48, que está en `binario.md` y que `make` no
+usa-- lleva el intérprete del 48, y ése guarda en cinta. `make` hace siempre
+el de bancos.~~ **Pedido por el usuario, y hecho**: también guarda en disco.
+Ver «Y el +3 sin bancos», aquí debajo.
+
+Con los dos cambios, el del PCW y éste, las dos órdenes de la puerta y el
+espejo salen verdes.
+
+### Y el +3 sin bancos
+
+El disco del +3 sin bancos lleva el intérprete del 48 --de `$8000` al final
+de la memoria, con lo de arriba de `$C000` en la página cero--, que guardaba
+en cinta. Ahora `game.asm` ensamblado con **`-DPLUS3`** lleva `disk3.asm` en
+vez de `tape.asm` y escribe su propio binario, `game3flat.bin`, para que el
+`game.bin` del 48 siga saliendo **idéntico, byte a byte**. Es el que va a
+`release -m plus3`; `binario.md` dice cómo.
+
+Tres cosas cambian en `disk3.asm` para servir a las dos:
+
+- **A qué se vuelve.** Con bancos, la página de la base de datos, que el
+  intérprete guarda en `db_paged`. Sin ellos no hay `db_paged`: se vuelve a lo
+  que había, la página cero y la ROM del 48, que el BASIC dejó en `BANKM` y
+  `BANK678` y que se apuntan al entrar.
+- **Dónde se copia lo cargado.** Sin bancos la partida va en el código, y
+  podría quedar encima de `$C000`, donde +3DOS tiene su página siete mientras
+  trabaja. Así que la copia desde `LOAD_AREA` se hace **después** de volver a
+  lo nuestro. Hoy queda en `$90FD`, así que no pasaba, pero no dependía de
+  nada que lo vigilara. Guardar, en cambio, no tiene arreglo así: +3DOS
+  escribe la partida desde donde está, con su página en la ventana, así que
+  **la partida tiene que quedar debajo de `$C000`**, y lo vigila un `ASSERT`
+  en `game.asm`. Lo mismo el propio `disk3.asm` y lo que usa, con otro al
+  final de él.
+- **Los nombres de +3DOS** pasan a `dos3.asm`, porque sin bancos no está el
+  cargador que los decía. Lo incluyen los dos con una palabra de guarda, que
+  `IFNDEF` mira las `DEFINE` y no las etiquetas.
+
+`LOAD_AREA` es `$7600` también aquí, en la página cinco, por encima del BASIC
+que carga el intérprete y medio kilobyte por debajo de la pila.
+
+Las dos pruebas del disco del +3 --guardar y cargar, y el disco protegido--
+corren ahora **con bancos y sin ellos**, y las del disco sin bancos que ya
+había arrancan el binario de `-DPLUS3`.
+
+**El 464, mirado y dejado.** Debajo de `$4000` hay RAM que nadie usa con las
+dos ROM fuera, pero `CAS_WRITE` vuelve a poner la baja mientras graba y leería
+la ROM en vez de la partida: por eso el 464 del revés lleva la isla. Lo que sí
+podría ir abajo sin más es `obj_entry`, que no se guarda nunca: 512 bytes, y
+megacorp1 pasaría de 524 a unos 1036. Queda para cuando haga falta.
 
 ## `make` construye en una copia
 
@@ -4936,6 +5111,10 @@ Caben todas, pero Bangkok2 va justa y nadie lo habría dicho. Ahora
 `game128.asm` y `game3.asm` llevan `ASSERT last <= $C000`: no cambia ningún
 binario, y una aventura que no quepa deja de ensamblar en vez de salir rota.
 Salió al medir la memoria de cada máquina para las aventuras de CPC.
+
+Ya no va justa: desde que el estado de la partida va en la página cinco, cada
+una tiene 1024 bytes más, y Bangkok2 se queda con 1362. Ver «Y el del 128, el
++3 y el Next».
 
 
 ### `SAVE` y `LOAD` en `runGAC.py`, que eran dos `TODO` con un `pass`

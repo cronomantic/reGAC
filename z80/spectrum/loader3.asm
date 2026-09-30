@@ -20,16 +20,7 @@
 ; is what the build hands out.
 
                 include "basic.asm"
-
-DOS_OPEN        equ $0106
-DOS_CLOSE       equ $0109
-DOS_READ        equ $0112
-DOS_SET_1346    equ $013F
-DOS_OFF_MOTOR   equ $019C
-
-BANKM           equ $5B5C               ; what was last sent out of $7FFD
-BANK678         equ $5B67               ; and out of $1FFD
-NAME_END        equ $FF                 ; what a name ends with here
+                include "dos3.asm"
 
                 ORG     BASIC_START
 basic:

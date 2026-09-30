@@ -6,7 +6,8 @@
 ; changes is which pages it goes in and who puts it there.  A +3 has fewer to
 ; spare: +3DOS keeps the seventh for itself and holds the sixth for its cache,
 ; so what is left is nought, one, three and four.  The loader is the one in
-; loader3.asm, and +3DOS reads each bank into its own page.
+; loader3.asm, and +3DOS reads each bank into its own page.  And a game is
+; saved on the same disk, in a file of its own, by +3DOS too: see disk3.asm.
 ;
 ; What comes out of here is not a medium but its two pieces, because the disk
 ; itself is put together by regac release:
@@ -27,6 +28,14 @@ DB_PAGE_3       equ 4
 DB_PAGE_4       equ 0                   ; there is no fifth or sixth to give,
 DB_PAGE_5       equ 0                   ; which is what the next line says
                 ASSERT DB_BANK_COUNT <= 4
+
+; The game goes in page five, above the BASIC and short of the stack, as on a
+; 128 and for the same reasons: see game128.asm.  +3DOS, which saves it here,
+; reads and writes page five without paging anything.  After it goes the
+; place a game being loaded is read into, so that one that does not come in
+; whole leaves the game as it was.
+                DEFINE  STATE_AT $7000
+LOAD_AREA       equ $7600
 
                 ; The loader travels in the BASIC area, which is page five and
                 ; is always there.
@@ -83,7 +92,7 @@ done_flag:      db      0
 ; it rather than through the speaker: see spectrum/keyboard.asm.
                 DEFINE  WITH_AY 1
                 include "keyboard.asm"
-                include "tape.asm"
+                include "disk3.asm"
                 include "draw.asm"
                 include "../common/shapes.asm"
                 include "fill.asm"
@@ -99,9 +108,15 @@ database:
 last:
                 ; What is resident has to end before the window, or paging a
                 ; bank in would take the end of it away without a word.  The
-                ; eight adventures leave from 338 bytes (Bangkok2) to four
-                ; kilobytes; nothing looked at it before.
+                ; eight adventures leave from 1362 bytes (Bangkok2) to five
+                ; kilobytes, since the game went to page five; nothing looked
+                ; at it before.
                 ASSERT  last <= $C000
+                ; and the game clear of the BASIC, and the place a game is
+                ; loaded into clear of the game and of the stack
+                ASSERT  STATE_AT >= basic_end
+                ASSERT  LOAD_AREA >= vm_state_end
+                ASSERT  LOAD_AREA + vm_state_end - vm_state <= $7FF0 - 512
 
                 IFDEF SCREEN
                 SAVEBIN "game3_screen.bin", loading_screen, SCREEN_BYTES

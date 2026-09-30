@@ -136,7 +136,7 @@ Después de cada máquina, `make` dice cuánto ocupa y cuánto queda libre, para
 saberlo antes de que la aventura deje de caber y no después:
 
     spectrum128  -> spectrum128/faro.tap
-        $8000-$BFFF  [############--------]  62%   6221 libres de 16384  intérprete 8448, base de datos 1715
+        $8000-$BFFF  [###########---------]  56%   7245 libres de 16384  intérprete 7424, base de datos 1715
                      base de datos: tipografía 970, condiciones 340, vocabulario 244, cabecera 57, salas 55, objetos 25, configuración 24
         bancos       1 de 6, de 16384 bytes cada uno
         banco 0      [##------------------]   9%  14923 libres de 16384  textos 1223, láminas 236, música 2
@@ -565,7 +565,10 @@ con la letra de la ROM. Sin eso, imprimirían en blanco en todas las máquinas.
   propias, y así le caben aventuras que no caben en el 48; y tiene chip de
   sonido, así que los ruidos y el clic de tecla salen por él. El 48 es la
   única máquina que los hace con el altavoz.
-- **Spectrum +3.** Disco, con el cargador en el menú de la máquina.
+- **Spectrum +3.** Disco, con el cargador en el menú de la máquina. `SAVE`
+  y `LOAD` usan un fichero en el mismo disco, con el nombre del proyecto y
+  `.SAV`: `faro.dsk` guarda en `FARO.SAV`. Sin disco, con el disco protegido
+  o sin partida que cargar, no dice nada y la partida sigue como estaba.
 - **Amstrad CPC 464.** El más justo: sin bancos, y la base de datos en un
   trozo seguido. Si una aventura no cabe de la manera normal, `regac` **la
   construye sola del revés** —el intérprete debajo de `$4000` y la base de

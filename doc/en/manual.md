@@ -140,7 +140,7 @@ After every machine, `make` says how much it takes and how much is left, so
 as to know before the adventure stops fitting and not after:
 
     spectrum128  -> spectrum128/faro.tap
-        $8000-$BFFF  [############--------]  62%   6221 free of 16384  interpreter 8448, database 1715
+        $8000-$BFFF  [###########---------]  56%   7245 free of 16384  interpreter 7424, database 1715
                      database: font 970, conditions 340, vocabulary 244, header 57, locations 55, objects 25, config 24
         banks        1 of 6, 16384 bytes each
         bank 0       [##------------------]   9%  14923 free of 16384  text 1223, graphics 236, music 2
@@ -568,7 +568,10 @@ blanks on every machine.
   pages of their own, and so adventures fit in it that do not fit in the 48;
   and it has a sound chip, so the noises and the key click come out of it. The
   48 is the one machine that makes them on the speaker.
-- **Spectrum +3.** Disk, with the loader in the machine's menu.
+- **Spectrum +3.** Disk, with the loader in the machine's menu. `SAVE` and
+  `LOAD` use a file on the same disk, with the name of the project and
+  `.SAV`: `faro.dsk` saves in `FARO.SAV`. With no disk, a protected one or
+  no game to load, it says nothing and the game goes on as it was.
 - **Amstrad CPC 464.** The tightest: no banks, and the database in one
   stretch. If an adventure does not fit the usual way, `regac` **builds it the
   other way round by itself** -- the interpreter under `$4000` and the database

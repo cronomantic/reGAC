@@ -242,7 +242,13 @@ Los números del BASIC van escritos como `VAL "32767"`. Es el mismo número para
 la máquina y se ahorra los cinco bytes de binario escondido que arrastra un
 número tecleado, que son cinco bytes que se pueden escribir mal para nada.
 
-    python -m regac release z80/spectrum/game.bin salida/ -m plus3
+El intérprete es el del 48, pero ensamblado con `-DPLUS3`: así guarda la
+partida en el disco y no en la cinta --ver abajo, «Y la partida, en el mismo
+disco»-- y sale en un binario suyo, `game3flat.bin`, para no pisar el del 48.
+
+    python -m regac build partida.json z80/spectrum/game.rgac -m spectrum48
+    sjasmplus -DPLUS3 game.asm            # en z80/spectrum
+    python -m regac release z80/spectrum/game3flat.bin salida/ -m plus3
 
 Y también con la base de datos repartida en bancos, que es donde se pone
 interesante, porque paginar no es cosa que el BASIC pueda hacer. Ahí el
@@ -267,6 +273,14 @@ Las pruebas lo arrancan como lo arrancaría su dueño: enter en el menú y a
 esperar. La del disco con bancos usa una aventura engordada hasta necesitar
 dos, y compara la lámina de la pantalla byte a byte contra la referencia, que
 sólo cuadra si cada banco acabó en su página.
+
+**Y la partida, en el mismo disco.** Las dos construcciones --con bancos, que
+es la que hace `make`, y sin ellos-- guardan en un fichero sin cabecera con el nombre del proyecto
+y `.SAV` --`FARO.SAV`--, que +3DOS crea la primera vez y rehace en cada
+`SAVE`. Dentro va lo mismo que en una cinta: la partida, de `vm_state` a
+`vm_state_end`, tal cual está en la memoria. `release` no tiene que reservarle
+nada, al revés que en el PCW y el 6128: lo pide el intérprete a +3DOS. Está en
+[`disk3.asm`](../z80/spectrum/disk3.asm).
 
 ## El PCW, que no tiene a quién pedirle nada
 

@@ -8,7 +8,8 @@
 ;          for as long as a save takes, which is when the system answers
 ;   $4000  free: a Spectrum keeps its screen here, and this machine's screen
 ;          is layer 2.  A game being loaded is read here first, and put over
-;          the one playing only once all of it has come
+;          the one playing only once all of it has come; and the game itself
+;          is at $4400
 ;   $5C00  left free, because that is where the ROM keeps its variables and
 ;          the ROM is borrowed to save a game
 ;   $5D00  what is resident of the database
@@ -61,6 +62,15 @@ DB_FIRST_PAGE   equ 32                  ; the 8K pages the banks are put in,
                                         ; clear of the ones a Spectrum has and
                                         ; of layer 2's own
 database        equ $5D00
+
+; The game -- where the player is, the markers, the counters, where every
+; object is -- and the table of where each object's record is: twelve hundred
+; bytes of room and nothing else, and the interpreter has little enough under
+; the mask without them.  They go in the free memory at $4000, after the place
+; a game being loaded is read into and short of the ROM's variables; layer 2
+; has no colour that lets the ULA through, so nothing of them is seen.  See
+; common/conditions.asm.
+                DEFINE  STATE_AT $4400
 
 ; A bank of the database is sixteen kilobytes, which is two of this machine's
 ; pages; they are mapped into the two slots the window is made of.
@@ -217,6 +227,9 @@ last:
                 ASSERT  last <= ABOVE_MASK      ; no mask: up to what is above it
                 ENDIF
                 ASSERT  last < STACK_AT         ; or the stack would land in it
+                ; and the game clear of a game being loaded, and of the ROM's
+                ASSERT  STATE_AT >= LOAD_AREA + vm_state_end - vm_state
+                ASSERT  vm_state_end <= $5C00
 
 ; Above the mask there is room that nothing touches, and for a long time it
 ; went unused because the wall at $A000 looked like the end of the machine.
