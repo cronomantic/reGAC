@@ -12,12 +12,15 @@
 ; none is on the other machines: the original saved one block and said
 ; nothing.  A save makes the file anew, whatever was there.
 ;
-; What travels is vm_state to vm_state_end, and it is in page five, which is
-; always in: +3DOS reads and writes it without paging anything of ours.  What
+; What travels is vm_state to vm_state_end.  With banks it is in page five,
+; which is always in; without them it is in the code, under the window.
+; Either way +3DOS reads and writes it without paging anything of ours.  What
 ; it does want is its own ROM and its own page in the window while it works,
-; so both are put in for as long as the calls take, and the page the database
-; had there is put back afterwards -- the interpreter keeps it in db_paged,
-; because the port cannot be read back.
+; so both are put in for as long as the calls take -- which is why everything
+; here has to be under $C000, see the ASSERT at the end -- and what was there
+; is put back afterwards.  With banks that is the page the database had in
+; the window, which the interpreter keeps in db_paged because the port cannot
+; be read back; without them it is page nought, and BASIC left it in BANKM.
 ;
 ; Nothing is said when it goes wrong -- no disk, a disk that is protected or
 ; full, no game to load -- because the original said nothing either: +3DOS is
@@ -27,11 +30,8 @@
 ; one that fails leaves the game as it was.  The place is in page five too,
 ; after the game: see LOAD_AREA in game3.asm.
 ;
-; The names of the calls are the loader's, which is in the same build.
+                include "dos3.asm"
 
-DOS_WRITE       equ $0115
-DOS_ABANDON     equ $010C
-DOS_SET_MESSAGE equ $014E
 SYSTEM_VARS     equ $5C3A               ; where IY points for the ROM
 SAVE_FILE       equ 0                   ; the number the file is opened as
 OPEN_TO_READ    equ $0001               ; B the number, C to read
@@ -101,13 +101,14 @@ load_it:
                 ld      b, SAVE_FILE
                 call    DOS_CLOSE
                 pop     af
-                jr      nc, .failed
+                call    dos_out                 ; ours again, and then
+                ret     nc
                 ld      hl, LOAD_AREA           ; all of it: over the game
                 ld      de, (save_block)
                 ld      bc, (save_length)
                 ldir
                 scf
-                jp      dos_out
+                ret
 .failed:
                 or      a                       ; it did not
                 jp      dos_out
@@ -119,6 +120,12 @@ load_it:
 dos_in:
                 di
                 ld      iy, SYSTEM_VARS
+                IFNDEF  BANKED
+                ld      a, (BANKM)              ; to be put back as they were
+                ld      (paged_before), a
+                ld      a, (BANK678)
+                ld      (paged_before + 1), a
+                ENDIF
                 ld      a, (BANKM)
                 and     %11101000
                 or      %00000111               ; page seven in the window
@@ -141,18 +148,26 @@ dos_in:
 dos_out:
                 push    af
                 call    DOS_OFF_MOTOR
+                IFDEF   BANKED
                 ld      a, (BANK678)
                 res     0, a
                 set     2, a
+                ELSE
+                ld      a, (paged_before + 1)
+                ENDIF
                 ld      bc, $1FFD
                 out     (c), a
                 ld      (BANK678), a
+                IFDEF   BANKED
                 ld      a, (db_paged)
                 cp      $FF
                 jr      nz, .paged
                 ld      a, (BANKM)
                 set     4, a                    ; the 48K ROM, page seven
 .paged:
+                ELSE
+                ld      a, (paged_before)
+                ENDIF
                 ld      b, $7F
                 out     (c), a
                 ld      (BANKM), a
@@ -168,3 +183,9 @@ save_name:
                 ENDIF
 save_block:     dw      0
 save_length:    dw      0
+                IFNDEF  BANKED
+paged_before:   db      0, 0                    ; BANKM and BANK678, as found
+                ENDIF
+                ; Page seven is in the window for as long as +3DOS works, so
+                ; nothing it comes back to may be there.
+                ASSERT  $ <= $C000

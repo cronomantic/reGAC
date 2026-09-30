@@ -51,8 +51,10 @@ from test_tape_z80 import fattened, same_picture, screen_address  # noqa: E402,F
 SPECTRUM = os.path.join(ROOT, "z80", "spectrum")
 SOURCE = os.path.join(SPECTRUM, "game.asm")
 DATABASE = os.path.join(SPECTRUM, "game.rgac")
-BINARY = os.path.join(SPECTRUM, "game.bin")
-LISTING = os.path.join(SPECTRUM, "game.lst")
+# The interpreter of the 48, built for a +3 disk: -DPLUS3 saves a game on the
+# disk and not on the tape, and writes a binary of its own.
+BINARY = os.path.join(SPECTRUM, "game3flat.bin")
+LISTING = os.path.join(SPECTRUM, "game3flat.lst")
 ADVENTURE = os.path.join(ROOT, "snapshots", "Bangkok1.json")
 MACHINE = "P341"                # a +3 with the last of its ROMs
 ENTER = chr(13)
@@ -71,20 +73,26 @@ if pytest is not None:
         not emulator.available() or not os.path.exists(ADVENTURE),
         reason="sjasmplus and ZEsarUX must be in tools/, with a decompiled adventure",
     )
+    # a +3 disk with banks, the way make does it, and one without
+    both_disks = pytest.mark.parametrize("banks", [True, False],
+                                         ids=["banks", "no banks"])
 else:
 
     def needs_tools(func):
         return func
 
+    both_disks = needs_tools
 
-def built():
-    """The interpreter with an adventure in it, as the assembler leaves it."""
+
+def built(adventure=ADVENTURE, defines=()):
+    """The interpreter with an adventure in it, as the assembler leaves it for
+    a +3 disk with no banks."""
     subprocess.run(
-        [sys.executable, "-m", "regac", "build", ADVENTURE, DATABASE,
+        [sys.executable, "-m", "regac", "build", adventure, DATABASE,
          "-m", "spectrum48"],
         cwd=ROOT, check=True, capture_output=True,
     )
-    emulator.assemble(SOURCE, listing=LISTING)
+    emulator.assemble(SOURCE, listing=LISTING, defines=("PLUS3",) + defines)
     with open(BINARY, "rb") as f:
         return f.read()
 
@@ -211,19 +219,25 @@ SAVE = "VAJILLAS.SAV"
 
 
 class Vajillas:
-    """La guerra de las vajillas on a +3 disk, the way regac make leaves it:
-    its game kept under its own name.  It is the one of the eight whose first
-    room has a way out, NORTE to room four and SUR back."""
+    """La guerra de las vajillas on a +3 disk, its game kept under its own
+    name: with banks, the way regac make leaves it, or without them, the way
+    regac release makes it out of the 48's interpreter.  It is the one of the
+    eight whose first room has a way out, NORTE to room four and SUR back."""
 
-    def __init__(self, where):
+    def __init__(self, where, banks=True):
         if not os.path.exists(VAJILLAS):
             pytest.skip("La guerra de las vajillas must be in snapshots/")
         with open(VAJILLAS, encoding="utf-8") as f:
             self.ddb = json.load(f)
-        boot, code, banks = banked(self.ddb, where,
-                                   defines=(f'SAVE_NAME="{SAVE}"',))
-        self.image = plus3_banked_disk(boot, code, banks)
-        self.where = {name: emulator.label_address(BANKED_LISTING, name)
+        named = (f'SAVE_NAME="{SAVE}"',)
+        if banks:
+            boot, code, pieces = banked(self.ddb, where, defines=named)
+            self.image = plus3_banked_disk(boot, code, pieces)
+            listing = BANKED_LISTING
+        else:
+            self.image = plus3_disk(built(VAJILLAS, named))
+            listing = LISTING
+        self.where = {name: emulator.label_address(listing, name)
                       for name in ("vm_location", "vm_state", "vm_state_end",
                                    "vm_seed", "vm_flags", "vm_counters",
                                    "obj_loc")}
@@ -282,13 +296,18 @@ class Vajillas:
 
 
 @needs_tools
-def test_a_game_is_saved_on_the_disk_and_loaded_off_it(tmp_path):
+@both_disks
+def test_a_game_is_saved_on_the_disk_and_loaded_off_it(tmp_path, banks):
     """SAVE and LOAD on a +3 go to its disk, in a file of their own, by way of
-    +3DOS.  A load with nothing to load leaves the game alone; a save makes
-    the file, and a load brings back what it saved.  And the file is on the
-    disk, read from the outside once the machine is off: the emulator writes
-    to the image only with --dsk-persistent-writes."""
-    game = Vajillas(str(tmp_path))
+    +3DOS, with banks and without.  A load with nothing to load leaves the
+    game alone; a save makes the file, and a load brings back what it saved.
+    And the file is on the disk, read from the outside once the machine is
+    off: the emulator writes to the image only with --dsk-persistent-writes.
+
+    Without banks the game is in the code, among what the interpreter uses,
+    and what +3DOS is asked for is found and put back as BASIC left it: page
+    nought in the window, and not the one a database of banks had there."""
+    game = Vajillas(str(tmp_path), banks)
     path = str(tmp_path / "juego.dsk")
     with open(path, "wb") as f:
         f.write(game.image)
@@ -322,12 +341,13 @@ def test_a_game_is_saved_on_the_disk_and_loaded_off_it(tmp_path):
 
 
 @needs_tools
-def test_a_protected_disk_leaves_the_game_going(tmp_path):
+@both_disks
+def test_a_protected_disk_leaves_the_game_going(tmp_path, banks):
     """No disk to write on is said nothing about, as on the other machines:
     +3DOS is told not to ask "Retry, Ignore or Cancel?", which would stop
     the machine over the picture waiting for a key.  So the save comes back,
     the adventure asks for the next order, and the game is as it was."""
-    game = Vajillas(str(tmp_path))
+    game = Vajillas(str(tmp_path), banks)
     path = str(tmp_path / "juego.dsk")
     with open(path, "wb") as f:
         f.write(game.image)

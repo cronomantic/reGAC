@@ -4975,13 +4975,49 @@ bancos, como lo arrancaría su dueño:
 - `test_example` mira que el disco del faro que sale de `make` lleve
   `FARO.SAV` en el intérprete.
 
-Queda una cosa de la que avisar: **el disco del +3 sin bancos** --`release
+~~Queda una cosa de la que avisar: **el disco del +3 sin bancos** --`release
 -m plus3` con el `game.bin` del 48, que está en `binario.md` y que `make` no
 usa-- lleva el intérprete del 48, y ése guarda en cinta. `make` hace siempre
-el de bancos.
+el de bancos.~~ **Pedido por el usuario, y hecho**: también guarda en disco.
+Ver «Y el +3 sin bancos», aquí debajo.
 
 Con los dos cambios, el del PCW y éste, las dos órdenes de la puerta y el
 espejo salen verdes.
+
+### Y el +3 sin bancos
+
+El disco del +3 sin bancos lleva el intérprete del 48 --de `$8000` al final
+de la memoria, con lo de arriba de `$C000` en la página cero--, que guardaba
+en cinta. Ahora `game.asm` ensamblado con **`-DPLUS3`** lleva `disk3.asm` en
+vez de `tape.asm` y escribe su propio binario, `game3flat.bin`, para que el
+`game.bin` del 48 siga saliendo **idéntico, byte a byte**. Es el que va a
+`release -m plus3`; `binario.md` dice cómo.
+
+Tres cosas cambian en `disk3.asm` para servir a las dos:
+
+- **A qué se vuelve.** Con bancos, la página de la base de datos, que el
+  intérprete guarda en `db_paged`. Sin ellos no hay `db_paged`: se vuelve a lo
+  que había, la página cero y la ROM del 48, que el BASIC dejó en `BANKM` y
+  `BANK678` y que se apuntan al entrar.
+- **Dónde se copia lo cargado.** Sin bancos la partida va en el código, y
+  podría quedar encima de `$C000`, donde +3DOS tiene su página siete mientras
+  trabaja. Así que la copia desde `LOAD_AREA` se hace **después** de volver a
+  lo nuestro. Hoy queda en `$90FD`, así que no pasaba, pero no dependía de
+  nada que lo vigilara. Guardar, en cambio, no tiene arreglo así: +3DOS
+  escribe la partida desde donde está, con su página en la ventana, así que
+  **la partida tiene que quedar debajo de `$C000`**, y lo vigila un `ASSERT`
+  en `game.asm`. Lo mismo el propio `disk3.asm` y lo que usa, con otro al
+  final de él.
+- **Los nombres de +3DOS** pasan a `dos3.asm`, porque sin bancos no está el
+  cargador que los decía. Lo incluyen los dos con una palabra de guarda, que
+  `IFNDEF` mira las `DEFINE` y no las etiquetas.
+
+`LOAD_AREA` es `$7600` también aquí, en la página cinco, por encima del BASIC
+que carga el intérprete y medio kilobyte por debajo de la pila.
+
+Las dos pruebas del disco del +3 --guardar y cargar, y el disco protegido--
+corren ahora **con bancos y sin ellos**, y las del disco sin bancos que ya
+había arrancan el binario de `-DPLUS3`.
 
 **El 464, mirado y dejado.** Debajo de `$4000` hay RAM que nadie usa con las
 dos ROM fuera, pero `CAS_WRITE` vuelve a poner la baja mientras graba y leería
