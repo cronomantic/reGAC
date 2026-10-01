@@ -8,11 +8,9 @@
 ;     4  version
 ;     5  machine
 ;     6  page bits
-;     7  reserved
-;     8  reserved
-;    10  number of banks
-;    11  number of sections
-;    12  directory, five bytes a section: bank, offset, size
+;     7  number of banks
+;     8  number of sections
+;     9  directory, five bytes a section: bank, offset, size
 ;
 ; The whole of the database is in memory, because it is inside the .EXE and
 ; DOS loads all of it: a PC has the room.  What it has not got is a pointer
@@ -39,8 +37,8 @@ NO_MESSAGE          equ 0FFh    ; no message carries that number
 NOT_BANKED          equ 0FFh    ; the bank of a section that is resident
 
 HEADER_PAGE_BITS     equ 6
-HEADER_SECTION_COUNT equ 11
-HEADER_DIRECTORY     equ 12
+HEADER_SECTION_COUNT equ 8
+HEADER_DIRECTORY     equ 9
 
 ; Where every section is: its segment, the offset in it, and its size.  The
 ; database itself starts at db_seg:0.

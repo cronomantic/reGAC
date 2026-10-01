@@ -278,6 +278,34 @@ def test_binary_database_round_trips(path):
     }
 
 
+def test_the_header_is_version_two_without_the_music():
+    """Version 2 is version 1 without what the music player had: the banks
+    and the sections at bytes 7 and 8, the directory from 9, eight sections
+    and not nine.  And the reader turns down any other version, which the
+    interpreters do not look at: see doc/binario.md."""
+    from regac.binary import S_GRAPHICS, VERSION, BuildError
+
+    example = os.path.join(ROOT, "ejemplo")
+    with open(os.path.join(example, "faro.gac"), encoding="utf-8") as f:
+        ddb = parse(f.read(), "faro.gac", example)
+    for page_bits in (0, 14):
+        database = Database(ddb, page_bits=page_bits)
+        image = database.build()
+        assert image[4] == VERSION == 2
+        assert image[7] == len(database.banks)
+        assert image[8] == S_GRAPHICS + 1 == 8
+        assert database.header_size == 9 + 5 * 8
+        assert Reader(image).header_size == database.header_size
+    old = bytearray(image)
+    old[4] = 1
+    try:
+        Reader(bytes(old))
+    except BuildError as e:
+        assert "1" in str(e)
+    else:
+        raise AssertionError("a database of version 1 was read")
+
+
 @needs_databases
 @parametrized
 def test_banking_changes_nothing_but_the_layout(path):

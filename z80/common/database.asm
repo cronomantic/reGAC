@@ -7,11 +7,9 @@
 ;     4  version
 ;     5  machine
 ;     6  page bits
-;     7  reserved, nought: it was the music mode
-;     8  reserved, nought: it was the music buffer size
-;    10  number of banks
-;    11  number of sections
-;    12  directory, five bytes a section: bank, offset, size
+;     7  number of banks
+;     8  number of sections
+;     9  directory, five bytes a section: bank, offset, size
 ;
 ; A section is either resident, meaning always reachable, or it lives in a
 ; bank, and then the bank has to be brought in before the section can be read.
@@ -27,8 +25,6 @@ SECTION_CONDITIONS  equ 4
 SECTION_TEXT        equ 5
 SECTION_FONT        equ 6
 SECTION_GRAPHICS    equ 7
-; Section eight was the music, and nothing writes or reads one now.  The
-; number is left standing so that the sections before it keep theirs.
 
 NO_MESSAGE          equ $FF   ; no message carries that number
 NOT_BANKED          equ $FF   ; the bank of a section that is resident
@@ -38,8 +34,8 @@ CONFIG_PUNCTUATION  equ 3     ; how many, then the codes; the space comes first
 
 NO_CHARACTER        equ $FF   ; the adventure has no such character
 
-HEADER_SECTION_COUNT equ 11
-HEADER_DIRECTORY     equ 12
+HEADER_SECTION_COUNT equ 8
+HEADER_DIRECTORY     equ 9
 DIRECTORY_ENTRY_SIZE equ 5
 
 ; Work out where the resident sections start and keep it.

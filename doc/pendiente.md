@@ -210,9 +210,10 @@ entera para la ventana de la base de datos, y las dos mitades de la pantalla se
 turnan en otra.
 
 **No hay AY.** Sólo un zumbador, así que toda la previsión de música que
-condiciona el reparto de bancos no aplica aquí. La sección de música del
+condiciona el reparto de bancos no aplica aquí. ~~La sección de música del
 formato seguirá estando, vacía, y este destino no necesitará ni buffer
-residente ni ranura propia.
+residente ni ranura propia.~~ Ya no hay sección de música: ver «La versión 2
+del formato, sin la música».
 
 **La pantalla, hecha.** No es un mapa de bits fijo: hay una *roller RAM* de 256
 entradas, una por línea de barrido, y la máquina dibuja la línea que cada
@@ -1729,10 +1730,10 @@ dieciséis módulos de prueba, páginas y bancos reservados en cuatro máquinas,
 el clic de tecla del Amstrad atascado precisamente porque el reproductor era
 dueño del AY. Eso último se arregla solo al quitarlo.
 
-**Lo que no se tocó a propósito:** el formato binario. Su sección `music` ya
+~~Lo que no se tocó a propósito: el formato binario. Su sección `music` ya
 estaba vacía —las melodías eran fuente de ensamblador, nunca datos— y dos
 bytes de su cabecera quedan siempre a cero. Cambiarlo obligaría a romper la
-versión del formato, y eso merece ir solo y no dentro de este cambio.
+versión del formato, y eso merece ir solo y no dentro de este cambio.~~ **Ya se tocó**: ver «La versión 2 del formato, sin la música», al final.
 
 **Y el hueco del opcode.** `$40` era `MUSIC`. Se deja apuntando a `op_nop` en
 vez de renumerar `SOUND` y `QUIET`, porque renumerar rompería en silencio
@@ -5204,8 +5205,11 @@ fallo.
 | dónde está el jugador | 2 |
 | lo que puede llevar y lo que lleva | 2 |
 | la semilla del azar | 2 |
-| el byte que fue la música | 1 |
+| ~~el byte que fue la música~~ | ~~1~~ |
 | ~~`obj_entry`~~ | ~~512~~ |
+
+~~El byte que fue la música~~ también se fue después, con la versión 2 del
+formato: la partida son ahora 742 bytes.
 
 En una cinta de Spectrum a 1500 baudios son **4,0 s en vez de 6,7**, cada vez
 que se guarda y cada vez que se carga.
@@ -5434,3 +5438,52 @@ De paso se miró lo otro que se había dado por imposible, `run` en paso a paso
 con un punto de parada, que sería un reloj exacto al ciclo: no era el
 indicador. Tumba el emulador. El reloj sigue siendo el de mirar la bandera cada
 centésima.
+
+## La versión 2 del formato, sin la música
+
+**Pedido por el usuario**: quitar del formato binario lo que quedaba de la
+música, que el diario había dejado para un cambio aparte. Y con ello, tres
+decisiones suyas:
+
+- **La versión la miran las herramientas y no los intérpretes.** Pasa de 1 a
+  2, y el lector de `regac/binary.py` no lee una base de datos de otra
+  versión: dice que hay que construirla otra vez. Hasta ahora no la miraba
+  nadie, y un `.rgac` viejo con un intérprete nuevo habría fallado en
+  silencio. Los intérpretes siguen sin mirar ni la versión ni la marca,
+  porque `make` y `release` los construyen siempre juntos con su base de
+  datos, y comprobarlo costaría bytes en las nueve máquinas.
+- **El opcode `$40` se queda como está**, un `op_nop` donde estuvo `MUSIC`.
+  Con la versión nueva ya no protege a ninguna base de datos vieja, pero
+  correr `SOUND` y `QUIET` un número cambiaría el código de toda condición
+  que suena para ahorrar dos bytes de tabla.
+- **Y el byte `vm_music` de la partida guardada se va también**, aunque es
+  otro formato: una partida guardada antes no se carga bien en un intérprete
+  de después. La partida pasa de 743 bytes a **742**.
+
+Lo que se quitó de la base de datos:
+
+| | antes | ahora |
+|---|---|---|
+| cabecera | 12 bytes y 9 entradas de directorio: **57** | 9 bytes y 8: **49** |
+| byte 7 | modo de música, a cero | número de bancos |
+| byte 8 | buffer de música (dos bytes), a cero | número de secciones |
+| byte 9 | --- | el directorio |
+| sección 8 | `music`, dos bytes a cero | no hay |
+
+Las ocho secciones conservan su número, porque la de la música era la
+última. En los intérpretes cambian sólo dos constantes, `HEADER_SECTION_COUNT`
+y `HEADER_DIRECTORY`, en `z80/common/database.asm` y en `x86/database.asm`;
+los cargadores no leen la cabecera, sino los tamaños que les escribe `make`.
+
+Medido con el faro, antes y después, en las nueve:
+
+- la parte residente, **8 bytes menos** donde hay bancos y **10 menos** donde
+  no, porque ahí la sección vacía también era residente; y el banco 0, 2
+  bytes más libre;
+- el intérprete, **un byte menos** donde la partida va dentro del código --464,
+  6128 y MSX--, y **16 menos** en el PC, que alinea a 16 lo que va detrás y
+  el byte lo cruzaba; donde la partida va fuera, igual.
+
+Pruebas: `test_conditions_z80` cuenta los bytes de la partida sin el de la
+música, `test_save_pc` espera 742, y el lector rechaza una versión 1.
+

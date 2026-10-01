@@ -14,23 +14,25 @@ reescribir nada de lo que tiene dentro.
 | Byte | Contenido |
 |---|---|
 | 0 | marca `RGAC` |
-| 4 | versión del formato |
+| 4 | versión del formato: 2 |
 | 5 | máquina |
 | 6 | bits de página: 14 para bancos de 16K, 13 para 8K, 0 para sin bancos |
-| 7 | reservado, a cero: fue el modo de música |
-| 8 | reservado, a cero: fue el tamaño del buffer de música |
-| 10 | número de bancos |
-| 11 | número de secciones |
-| 12 | directorio, cinco bytes por sección: banco, desplazamiento, tamaño |
+| 7 | número de bancos |
+| 8 | número de secciones |
+| 9 | directorio, cinco bytes por sección: banco, desplazamiento, tamaño |
 
 Un banco 0xFF quiere decir que la sección es residente.
+
+La versión **la miran las herramientas y no los intérpretes**: el lector de
+`regac/binary.py` no lee una base de datos de otra versión y dice que hay que
+construirla otra vez. Un intérprete no lo comprueba, porque `make` y
+`release` lo construyen siempre junto con su base de datos, y mirarlo costaría
+bytes en las nueve máquinas.
 
 ## Secciones
 
 `config`, `vocabulary`, `objects`, `locations`, `conditions`, `text`, `font` y
-`graphics`, y `music`, que se sigue escribiendo **vacía** —dos bytes, una
-cuenta de cero— para que el directorio no cambie de forma y las siete de
-delante conserven su número.
+`graphics`, en ese orden y con esos números, del 0 al 7.
 
 ### `config`, y cómo crece
 
@@ -457,17 +459,20 @@ Un aviso de andar por casa: los medios de todas las máquinas se llaman igual
 (`juego.dsk`, `juego.cdt`), así que cada una quiere su propia carpeta de
 salida. Dos `release` seguidos en la misma se pisan.
 
-## Los dos huecos de la cabecera, y por qué siguen ahí
+## La versión 2, sin lo que era de la música
 
-Los bytes 7 y 8 y la sección 8 fueron de la música. Hubo un reproductor de
-Arkos que sonaba de verdad en cinco máquinas, y se quitó: lo que contaba en
-memoria y en mantenimiento no lo pagaba una aventura conversacional, y el GAC
-de 1986 no tenía música. Está contado en [`pendiente.md`](pendiente.md).
+La versión 1 llevaba en la cabecera el modo y el tamaño del buffer de un
+reproductor de música, y una novena sección para las melodías. Hubo un
+reproductor de Arkos que sonaba de verdad en cinco máquinas, y se quitó: lo
+que contaba en memoria y en mantenimiento no lo pagaba una aventura
+conversacional, y el GAC de 1986 no tenía música. Está contado en
+[`pendiente.md`](pendiente.md).
 
-Lo que queda son tres huecos a cero, y **se dejan a propósito**: quitarlos
-correría los números de todo lo demás y obligaría a subir la versión del
-formato, que es un precio mucho mayor que tres bytes. Una base de datos escrita
-antes de esto se lee hoy tal cual.
+Quedaron tres bytes a cero en la cabecera y una sección vacía, y se dejaron un
+tiempo para no tener que subir la versión. **La versión 2 los quita**: la
+cabecera pasa de 57 bytes a 49, y una base de datos de la versión 1 hay que
+construirla otra vez. Las ocho secciones conservan su número, porque la de la
+música era la última.
 
 El reparto de bancos que hay ahora lo decidió aquella previsión, y se queda
 como está porque es bueno por sí mismo: una sección nunca se parte entre dos

@@ -45,12 +45,13 @@ from test_game_pc import PASSWORD, megacorp, needs_tools  # noqa: E402
 
 SAVED = "GAME.SAV"              # the program is GAME.EXE
 # What a game is, on every machine: see z80/common/conditions.asm.
-GAME_BYTES = 2 + 1 + 1 + 2 + 1 + 32 * 2 + 32 + 128 + 512
+GAME_BYTES = 2 + 1 + 1 + 2 + 32 * 2 + 32 + 128 + 512
 
 
 def test_the_block_is_the_one_every_machine_saves():
-    """743 bytes, which is what the others save since obj_entry left it."""
-    assert GAME_BYTES == 743
+    """742 bytes, which is what the others save since obj_entry left it and
+    the byte the music had went after it."""
+    assert GAME_BYTES == 742
 
 
 @needs_tools

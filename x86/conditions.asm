@@ -294,7 +294,6 @@ vm_location:    dw      0
 vm_max_weight:  db      250
 vm_weight:      db      0
 vm_seed:        dw      0A55Ah
-vm_music:       db      0                       ; nothing writes it now
 vm_stack:       times VM_STACK_DEPTH dw 0
 vm_flags:       times FLAG_BYTES db 0
 vm_counters:    times COUNTERS db 0

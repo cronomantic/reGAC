@@ -134,10 +134,9 @@ def test_a_saved_game_holds_nothing_that_depends_on_where_the_code_is():
         assert at[name] in saved, f"{name} fell out of the saved game"
 
     # What a game is: where every object is (512), where the player is (2),
-    # what can be carried and what is (2), the seed (2), the byte the music
-    # left behind (1), the condition stack (64), the flags (32) and the
-    # counters (128).
-    wanted = 512 + 2 + 2 + 2 + 1 + 64 + 32 + 128
+    # what can be carried and what is (2), the seed (2), the condition stack
+    # (64), the flags (32) and the counters (128).
+    wanted = 512 + 2 + 2 + 2 + 64 + 32 + 128
     size = at["vm_state_end"] - at["vm_state"]
     assert size == wanted, (
         f"a saved game is {size} bytes and the fields that belong in it come "

@@ -140,10 +140,10 @@ After every machine, `make` says how much it takes and how much is left, so
 as to know before the adventure stops fitting and not after:
 
     spectrum128  -> spectrum128/faro.tap
-        $8000-$BFFF  [###########---------]  56%   7245 free of 16384  interpreter 7424, database 1715
-                     database: font 970, conditions 340, vocabulary 244, header 57, locations 55, objects 25, config 24
+        $8000-$BFFF  [###########---------]  56%   7253 free of 16384  interpreter 7424, database 1707
+                     database: font 970, conditions 340, vocabulary 244, locations 55, header 49, objects 25, config 24
         banks        1 of 6, 16384 bytes each
-        bank 0       [##------------------]   9%  14923 free of 16384  text 1223, graphics 236, music 2
+        bank 0       [##------------------]   9%  14925 free of 16384  text 1223, graphics 236
         banks 1-5    unused: 81920 bytes more
 
 A row with addresses is a **stretch of the machine's memory**: from where it

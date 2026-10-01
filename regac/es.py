@@ -128,7 +128,6 @@ SAID = {
     "text": "textos",
     "font": "tipografía",
     "graphics": "láminas",
-    "music": "música",
     "database: {what}": "base de datos: {what}",
     "{n:>5} free of {size:>5}": "{n:>5} libres de {size:>5}",
     "{n:>5} too many, of {size:>5}": "{n:>5} de más, de {size:>5}",
@@ -286,6 +285,10 @@ SAID = {
     "the {section} section is {size} bytes and a bank holds {page}":
         "la sección de {section} ocupa {size} bytes y en un banco caben "
         "{page}",
+    "a reGAC database of version {found}, and this reads version {wanted}: "
+    "build it again":
+        "una base de datos de reGAC de la versión {found}, y esto lee la "
+        "{wanted}: hay que construirla otra vez",
     "not a reGAC database": "no es una base de datos de reGAC",
 
     # -- cautions -------------------------------------------------------------

@@ -434,11 +434,6 @@ vm_location:    dw      0
 vm_max_weight:  db      250
 vm_weight:      db      0
 vm_seed:        dw      SEED_START
-; A byte that was what the music was doing, back when there was a tune player.
-; Nothing writes it now, and it stays because it is saved and loaded with the
-; rest: taking it out would make every game saved before this unreadable, and
-; one byte is not worth that.  See doc/pendiente.md.
-vm_music:       db      0
 vm_stack:       ds      VM_STACK_DEPTH * 2
 vm_flags:       ds      FLAG_BYTES
 vm_counters:    ds      COUNTERS

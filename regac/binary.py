@@ -27,18 +27,20 @@ what is inside it.
 Sections are either resident, meaning always reachable, or banked.  What must
 be resident is what the interpreter touches on every turn with no warning: the
 vocabulary, the object and location tables, the condition tables and the font.
-Text, pictures and music are looked up at known moments and can be paged in.
+Text and pictures are looked up at known moments and can be paged in.
 
     Header
       0  magic "RGAC"
       4  version
       5  machine
       6  page bits: 14 for banks of 16K, 13 for 8K, 0 for no banking at all
-      7  music mode
-      8  music buffer size, in bytes
-     10  number of banks
-     11  number of sections
-     12  directory, five bytes a section: bank, offset, size
+      7  number of banks
+      8  number of sections
+      9  directory, five bytes a section: bank, offset, size
+
+Version 2 is version 1 without what the music player had: the mode and the
+buffer size in the header, and a ninth section that was always empty.  See
+doc/binario.md.
 
 A bank of 0xFF means the section is resident.  With no banking the whole image
 is one block and every section is resident, which is what the eight adventures
@@ -56,7 +58,7 @@ from .glyphs import glyph_for
 from .text import HOLE_OBJECT, TextStore, commands_of, expand, typed
 
 MAGIC = b"RGAC"
-VERSION = 1
+VERSION = 2
 RESIDENT = 0xFF
 
 MACHINES = {
@@ -93,12 +95,6 @@ PC_LONGEST_SECTION = 0x10000 - 16
 # firmware with SCR GET INK.  See doc/graficos.md.
 START_INKS = (1, 1, 24, 24, 20, 20, 6, 6)
 
-# How the music player gets at the tune it is playing.  The player runs from
-# the interrupt, so it must never read through a paging window that the main
-# code is free to change underneath it.  See doc/binario.md.
-MUSIC_COPY = 0  # the tune is copied into a resident buffer when it starts
-MUSIC_SLOT = 1  # the tune stays in a bank of its own, mapped to its own slot
-
 (
     S_CONFIG,
     S_VOCAB,
@@ -108,8 +104,7 @@ MUSIC_SLOT = 1  # the tune stays in a bank of its own, mapped to its own slot
     S_TEXT,
     S_FONT,
     S_GRAPHICS,
-    S_MUSIC,
-) = range(9)
+) = range(8)
 
 # What each section is called where a person reads it, in the language of the
 # tools: section_name(S_TEXT) is "text", or "textos".
@@ -122,7 +117,6 @@ SECTION_NAMES = [
     N_("text"),
     N_("font"),
     N_("graphics"),
-    N_("music"),
 ]
 
 
@@ -214,8 +208,7 @@ def disassemble_conditions(data):
 class Database:
     """Lays out an adventure as the bytes the 8 bit interpreter will read."""
 
-    def __init__(self, ddb, machine="spectrum48", page_bits=0, music_buffer=0,
-                 music_mode=MUSIC_COPY):
+    def __init__(self, ddb, machine="spectrum48", page_bits=0):
         if machine not in MACHINES:
             raise BuildError(_("unknown machine {machine!r}", machine=machine))
         if from_an_amstrad(ddb) and machine not in AMSTRAD_RULES:
@@ -232,8 +225,6 @@ class Database:
         self.ddb = ddb
         self.machine = machine
         self.page_bits = page_bits
-        self.music_buffer = music_buffer
-        self.music_mode = music_mode
         self.__gather_text()
 
     # -- text ---------------------------------------------------------------
@@ -556,12 +547,6 @@ class Database:
             blocks += u16(len(picture)) + picture
         return bytes(index + blocks)
 
-    def music(self):
-        """Nothing to put here yet.  The shape is fixed now so that adding
-        tunes later moves no other section: a count, then for each tune where
-        it starts and how long it is."""
-        return u16(0)
-
     # -- layout -------------------------------------------------------------
 
     def sections(self):
@@ -574,7 +559,6 @@ class Database:
             self.text(),
             self.font(),
             self.graphics(),
-            self.music(),
         ]
 
     def plan(self):
@@ -628,8 +612,6 @@ class Database:
         header += u8(VERSION)
         header += u8(MACHINES[self.machine])
         header += u8(self.page_bits)
-        header += u8(self.music_mode)
-        header += u16(self.music_buffer)
         header += u8(len(banks))
         header += u8(len(blocks))
         for bank, offset, size in placement:
@@ -653,8 +635,8 @@ class Database:
         return image
 
 
-def build(ddb, machine="spectrum48", page_bits=0, music_buffer=0):
-    database = Database(ddb, machine, page_bits, music_buffer)
+def build(ddb, machine="spectrum48", page_bits=0):
+    database = Database(ddb, machine, page_bits)
     return database.build(), database
 
 
@@ -670,19 +652,23 @@ class Reader:
     def __init__(self, image):
         if image[:4] != MAGIC:
             raise BuildError(_("not a reGAC database"))
+        if image[4] != VERSION:
+            # The interpreters do not look, because make always builds them
+            # with their database; this is where an old one would be read.
+            raise BuildError(_("a reGAC database of version {found}, and "
+                               "this reads version {wanted}: build it again",
+                               found=image[4], wanted=VERSION))
         self.image = image
         self.version = image[4]
         self.machine = image[5]
         self.page_bits = image[6]
-        self.music_mode = image[7]
-        self.music_buffer = struct.unpack_from("<H", image, 8)[0]
-        self.bank_count = image[10]
-        count = image[11]
+        self.bank_count = image[7]
+        count = image[8]
         self.directory = []
         for n in range(count):
-            bank, offset, size = struct.unpack_from("<BHH", image, 12 + 5 * n)
+            bank, offset, size = struct.unpack_from("<BHH", image, 9 + 5 * n)
             self.directory.append((bank, offset, size))
-        self.header_size = 12 + 5 * count
+        self.header_size = 9 + 5 * count
         self.resident_size = self.header_size + sum(
             size for bank, _, size in self.directory if bank == RESIDENT
         )

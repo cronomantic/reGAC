@@ -136,10 +136,10 @@ Después de cada máquina, `make` dice cuánto ocupa y cuánto queda libre, para
 saberlo antes de que la aventura deje de caber y no después:
 
     spectrum128  -> spectrum128/faro.tap
-        $8000-$BFFF  [###########---------]  56%   7245 libres de 16384  intérprete 7424, base de datos 1715
-                     base de datos: tipografía 970, condiciones 340, vocabulario 244, cabecera 57, salas 55, objetos 25, configuración 24
+        $8000-$BFFF  [###########---------]  56%   7253 libres de 16384  intérprete 7424, base de datos 1707
+                     base de datos: tipografía 970, condiciones 340, vocabulario 244, salas 55, cabecera 49, objetos 25, configuración 24
         bancos       1 de 6, de 16384 bytes cada uno
-        banco 0      [##------------------]   9%  14923 libres de 16384  textos 1223, láminas 236, música 2
+        banco 0      [##------------------]   9%  14925 libres de 16384  textos 1223, láminas 236
         bancos 1-5   sin usar: 81920 bytes más
 
 Una línea con direcciones es un **tramo de la memoria** de la máquina: desde
