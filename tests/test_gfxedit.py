@@ -220,8 +220,9 @@ def test_the_window_draws_with_the_mouse(tmp_path, monkeypatch):
     path = a_copy(tmp_path)
     scale = 3
 
-    def at(x, y):
-        return (x * scale + 1, (175 - y) * scale + 1)
+    def at(x, y):                       # inside the border round the picture
+        edge = viewer.EDGE * scale
+        return (edge + x * scale + 1, edge + (175 - y) * scale + 1)
 
     def click(x, y):
         return [pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1, pos=at(x, y)),

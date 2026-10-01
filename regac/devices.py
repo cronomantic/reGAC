@@ -1148,6 +1148,24 @@ def make(name):
     return DEVICES[name]()
 
 
+def border_colour(device):
+    """The colour round a picture, as its machine shows it once the picture
+    has been drawn: what the last BORDER left, in the colours the device
+    draws with.  Where BORDER is a colour of the Spectrum the device keeps
+    the entry of its palette that colour came to; on an Amstrad, and an
+    Amstrad's adventure on the Next, the pen whose ink the border wears,
+    which a picture puts back to nought as it starts.
+
+    Two machines do nothing with BORDER, and the picture's border is not
+    theirs to change: the PC, where the border is the background of the
+    picture's palette, its first colour; and the PCW, which has none, and
+    round the picture is dark.  Flashing inks are not shown: what is shown is
+    the one the machine starts with, as in the picture."""
+    if device.name in ("cga", "pcw"):
+        return rgb(device.palette[0])
+    return rgb(device.palette[device.border])
+
+
 def device_for(name, gfx=None, picture_id=None, ddb=None):
     """Build a device for one picture, the way that machine shows it.
 

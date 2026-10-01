@@ -4762,10 +4762,53 @@ saltaba los `FILL` pasaba con él solo; con ella falla. Además, que sigue al
 fuente y guarda la última buena, las coordenadas del ratón, y la ventana
 entera corriendo sin pantalla con teclas que se le dan.
 
-**Lo que no hace, apuntado**: no pinta el borde. `BORDER` se recorre y se
+~~**Lo que no hace, apuntado**: no pinta el borde. `BORDER` se recorre y se
 dice, pero cada dispositivo guarda el borde a su manera --un color del
 Spectrum, una entrada de paleta, una pluma-- y ponerlo alrededor de la lámina
-pide traducir cada uno.
+pide traducir cada uno.~~ **Ya lo pinta**: ver «El borde, en el visor».
+
+### El borde, en el visor
+
+**Pedido por el usuario.** Alrededor de la lámina va ahora un marco del color
+del borde, tal como estaría en la máquina con la lámina dibujada hasta el
+cursor, así que al recorrerla orden a orden se ve cambiar. El marco son 16
+píxeles de la lámina por cada lado, no el borde de verdad de ninguna máquina,
+que es distinto en cada una: lo que importa es el color.
+
+Traducirlo resultó más corto de lo que el diario temía, porque cada
+dispositivo ya guarda **lo que su intérprete escribe**, comprobado contra el
+código de cada uno: `devices.border_colour` es la entrada de su paleta que
+dejó el último `BORDER`.
+
+- **Spectrum y Next**: el color, sin brillo, como `out ($FE)`.
+- **MSX**: el suyo más parecido, la misma tabla que `msx_colours` en
+  `z80/msx/screen.asm` (`1,4,6,13,2,7,10,14`), al registro 7 del VDP.
+- **CPC, aventura de Spectrum**: la pluma más parecida de las cuatro que
+  eligió la lámina, que es lo que hace `colour_pen` en `z80/cpc/spectrum.asm`.
+  Un rojo en una lámina sin rojo cae en negro, y es lo que se ve en la máquina.
+- **Aventura de Amstrad** (CPC y Next): la tinta de la pluma, y cada lámina la
+  pone a la cero al empezar, que es «el borde del primer par» del original.
+- **PC y PCW, a mano**, porque su intérprete no hace nada con `BORDER`: en el
+  PC el borde es el fondo de la paleta de la lámina, y el PCW no tiene borde y
+  alrededor de la lámina está oscuro. Su dispositivo sí guardaba el número, y
+  en el PCW, con una paleta de dos, habría dado un error.
+
+Lo que no se ve, apuntado:
+
+- **Las tintas que parpadean**, en el borde como en la lámina: se ve la
+  primera que enseña la máquina.
+- **Los colores exactos del Next**: el borde del Next es la paleta de la ULA y
+  las tintas de Amstrad pasan por `next_inks`, que tienen otros niveles que la
+  paleta con que el visor dibuja; es la misma diferencia que tiene la lámina
+  entera.
+- **El borde de antes de la primera lámina**, que en el CPC es azul: el visor
+  enseña cada lámina sola, como empieza.
+
+Pruebas en `tests/test_viewer.py`: el color en las seis máquinas antes y
+después de un `BORDER 2`, una aventura de Amstrad en el CPC, el Next y el PC,
+y la ventana, mirando un píxel del marco al principio de la lámina y al final.
+Las que dan coordenadas de la ventana --dibujar con el ratón, el calco--
+cuentan ahora con el marco.
 
 ## La memoria que queda, dicha al construir
 

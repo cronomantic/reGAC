@@ -416,6 +416,16 @@ está el ratón en las coordenadas de las órdenes**, `x` desde la izquierda e
 lámina. Si el fuente guardado tiene un error, lo dice y deja la última lámina
 buena.
 
+Alrededor va **el borde**, del color que tendría en esa máquina con la lámina
+dibujada hasta donde está el cursor: el de `BORDER` en el Spectrum, el Next y
+el MSX —en el MSX, el suyo más parecido—, y en el CPC la pluma más parecida de
+las cuatro de la lámina, que es lo que hace su intérprete. En una aventura de
+Amstrad el borde lleva la tinta de la pluma que diga `BORDER`, y al empezar
+cada lámina la de la primera. El PC y el PCW no hacen nada con `BORDER`: en el
+PC el borde es el fondo de la lámina, y el PCW no tiene, así que alrededor
+queda oscuro. Una tinta que parpadea se ve quieta, en la primera que enseña
+la máquina.
+
 Y **se dibuja en ella**, con el ratón, y lo dibujado se escribe en el fuente
 en el acto, como una línea más de la lámina:
 

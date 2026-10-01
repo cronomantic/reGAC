@@ -41,7 +41,7 @@ import copy
 import json
 import os
 
-from .devices import device_for, from_an_amstrad
+from .devices import border_colour, device_for, from_an_amstrad
 from .gfx import MAX_Y, SOURCE_ROWS, SOURCE_WIDTH, Renderer
 from .i18n import N_, _
 
@@ -56,6 +56,10 @@ SOURCE_LABEL = {"spectrum": "spectrum48", "cpc": "cpc", "msx": "msx",
                 "pcw": "pcw", "next": "next", "cga": "pc"}
 
 HIGHLIGHT = (255, 0, 255)       # what the last order laid is lit up in
+# How wide the border round the picture is drawn, in pixels of the picture:
+# not the machine's own, which differs from one to another, but enough to
+# see what colour it is.
+EDGE = 16
 
 # What an image to trace can be, and how much of it is seen at first.
 TRACE_TYPES = (".png", ".jpg", ".jpeg", ".bmp", ".gif")
@@ -178,6 +182,11 @@ class Steps:
 
     def rgb(self):
         return self.device.to_rgb()
+
+    def border(self):
+        """The colour round the picture at the cursor, as the machine shows
+        it: see devices.border_colour."""
+        return border_colour(self.device)
 
     def laid(self):
         """The points the last order changed, in the device's own pixels."""
@@ -668,10 +677,15 @@ def run(path, picture=None, machine=None, scale=3, trace=None, svg=None):
     pygame.init()
     pygame.key.set_repeat(300, 40)
     width, height = SOURCE_WIDTH * scale, SOURCE_ROWS * scale
+    edge = EDGE * scale                 # the border, all round the picture
     font = pygame.font.Font(None, 22)
     line = font.get_linesize()
     panel = line * 14 + 8
-    screen = pygame.display.set_mode((width, height + panel))
+    screen = pygame.display.set_mode((width + 2 * edge,
+                                      height + 2 * edge + panel))
+    # what is drawn on the picture, with its corner at the picture's: the
+    # mouse is taken back by the edge to come to the same place
+    canvas = screen.subsurface((edge, edge, width, height))
     pygame.display.set_caption(f"regac draw {os.path.basename(path)}")
     clock = pygame.time.Clock()
     pointer = None
@@ -706,15 +720,18 @@ def run(path, picture=None, machine=None, scale=3, trace=None, svg=None):
                 pygame.quit()
                 return
             if event.type == pygame.MOUSEMOTION:
-                pointer = gac_point(*event.pos, width, height)
+                pointer = gac_point(event.pos[0] - edge, event.pos[1] - edge,
+                                    width, height)
             elif event.type == pygame.MOUSEBUTTONDOWN:
-                at = gac_point(*event.pos, width, height)
+                at = gac_point(event.pos[0] - edge, event.pos[1] - edge,
+                               width, height)
                 if event.button == 3:
                     viewer.cancel()
                 elif event.button == 1 and at:
                     viewer.press(at)
             elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
-                at = gac_point(*event.pos, width, height)
+                at = gac_point(event.pos[0] - edge, event.pos[1] - edge,
+                               width, height)
                 if at:
                     viewer.release(at)
                 else:
@@ -792,7 +809,9 @@ def run(path, picture=None, machine=None, scale=3, trace=None, svg=None):
             continue
         drawn = state
         screen.fill((0, 0, 0))
-        screen.blit(pygame.transform.scale(picture_surface(pygame, viewer),
+        screen.fill(viewer.steps.border(),
+                    (0, 0, width + 2 * edge, height + 2 * edge))
+        canvas.blit(pygame.transform.scale(picture_surface(pygame, viewer),
                                            (width, height)), (0, 0))
         # the image being traced, over the picture and half seen through
         found = viewer.trace_file() if viewer.trace_on else None
@@ -803,29 +822,29 @@ def run(path, picture=None, machine=None, scale=3, trace=None, svg=None):
                                  image=os.path.basename(found), error=image)
             else:
                 image[0].set_alpha(round(viewer.trace_alpha * 255))
-                screen.blit(image[0], image[1])
+                canvas.blit(image[0], image[1])
         # the points that can be dragged, and what is being drawn
         if viewer.tool == SELECT:
             for _step, _which, point in viewer.handles():
                 x, y = on_screen(point)
-                pygame.draw.rect(screen, HANDLE, (x - 3, y - 3, 7, 7), 1)
+                pygame.draw.rect(canvas, HANDLE, (x - 3, y - 3, 7, 7), 1)
         if viewer.dragging and pointer:
-            pygame.draw.circle(screen, RUBBER,
+            pygame.draw.circle(canvas, RUBBER,
                                on_screen(viewer.snapped(pointer)), 5, 1)
         if viewer.pending and pointer:
             a, b = on_screen(viewer.pending), on_screen(viewer.snapped(pointer))
             if viewer.tool == "LINE":
-                pygame.draw.line(screen, RUBBER, a, b)
+                pygame.draw.line(canvas, RUBBER, a, b)
             elif viewer.tool == "RECT":
-                pygame.draw.rect(screen, RUBBER, (min(a[0], b[0]), min(a[1], b[1]),
+                pygame.draw.rect(canvas, RUBBER, (min(a[0], b[0]), min(a[1], b[1]),
                                                   abs(b[0] - a[0]) + 1,
                                                   abs(b[1] - a[1]) + 1), 1)
             elif viewer.tool == "ELLIPSE":
                 rx, ry = abs(b[0] - a[0]), abs(b[1] - a[1])
                 if rx and ry:
-                    pygame.draw.ellipse(screen, RUBBER,
+                    pygame.draw.ellipse(canvas, RUBBER,
                                         (a[0] - rx, a[1] - ry, 2 * rx, 2 * ry), 1)
-        y = height + 4
+        y = height + 2 * edge + 4
         for text in viewer.lines(pointer):
             screen.blit(font.render(text, True, (230, 230, 230)), (6, y))
             y += line

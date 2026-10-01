@@ -418,6 +418,16 @@ the coordinates of the orders**, `x` from the left and `y` from the bottom,
 which is what has to be written. Page Up and Page Down change the picture. If
 the source saved has a mistake, it says so and keeps the last good picture.
 
+Round it goes **the border**, in the colour it would have on that machine with
+the picture drawn as far as the cursor: the one `BORDER` names on the
+Spectrum, the Next and the MSX -- on the MSX, its nearest -- and on the CPC
+the nearest of the picture's four pens, which is what its interpreter does.
+In an Amstrad's adventure the border wears the ink of the pen `BORDER` names,
+and at the start of each picture the first one's. The PC and the PCW do
+nothing with `BORDER`: on the PC the border is the picture's background, and
+the PCW has none, so round it is dark. An ink that flashes is seen still, in
+the first one the machine shows.
+
 And **one draws in it**, with the mouse, and what is drawn is written into the
 source at once, as one more line of the picture:
 

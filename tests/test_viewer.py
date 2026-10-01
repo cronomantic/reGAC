@@ -178,3 +178,87 @@ def test_a_json_reads_as_well(tmp_path):
     with open(path, "w", encoding="utf-8") as f:
         json.dump(ddb, f)
     assert read_adventure(path, "spectrum")["gfx"] == ddb["gfx"]
+
+
+# -- the border ------------------------------------------------------------------
+
+def test_the_border_is_what_each_machine_shows():
+    """Where BORDER is one of the Spectrum's colours each machine shows the
+    one its interpreter writes: the colour itself on the Spectrum and the
+    Next, the MSX's nearest -- the same table as z80/msx/screen.asm -- and
+    on the CPC the pen that colour came to.  The PC and the PCW do nothing
+    with it: the PC's border is the picture's background and the PCW has
+    none, so round the picture is dark."""
+    from regac.devices import MSX1_PALETTE, SPECTRUM_PALETTE, rgb
+
+    gfx = {"1": [["PAPER", 6], ["BORDER", 2], ["INK", 1],
+                 ["RECT", 20, 60, 120, 160], ["FILL", 70, 100]]}
+    ddb = {"gfx": gfx}
+    seen = {}
+    for machine in SPECTRUM_MACHINES:
+        steps = Steps(ddb, "1", machine)
+        steps.go(1)
+        before = steps.border()
+        steps.go(len(steps.steps))
+        seen[machine] = (before, steps.border(), steps.device)
+    assert seen["spectrum"][:2] == (rgb(SPECTRUM_PALETTE[0]),
+                                   rgb(SPECTRUM_PALETTE[2]))
+    assert seen["next"][1] == rgb(SPECTRUM_PALETTE[2])
+    msx_colours = (1, 4, 6, 13, 2, 7, 10, 14)       # z80/msx/screen.asm
+    assert seen["msx"][:2] == (rgb(MSX1_PALETTE[msx_colours[0]]),
+                               rgb(MSX1_PALETTE[msx_colours[2]]))
+    cpc = seen["cpc"][2]
+    assert seen["cpc"][1] == rgb(cpc.palette[cpc.map[2]])
+    for machine in ("pcw", "cga"):
+        before, after, device = seen[machine]
+        assert before == after == rgb(device.palette[0]), machine
+    assert seen["pcw"][1] == (0, 0, 0)
+
+
+def test_an_amstrad_border_wears_the_ink_of_its_pen():
+    """On an Amstrad's adventure BORDER names a pen, and the border wears its
+    ink -- the second of the pair, which the machine shows first; a picture
+    starts it at pen nought, the first pair, as the original does at $0538.
+    On the PC, still the background."""
+    from regac.devices import CPC_HARDWARE_PALETTE, border_colour, rgb
+
+    ddb = {"model": "CPC",
+           "gfx": {"1": [["BORDER", 2], ["PLOT", 5, 60]]},
+           "gfx_inks": {"1": [0, 3, 0, 24, 0, 6, 0, 13]}}
+    for machine in ("cpc", "next"):
+        steps = Steps(ddb, "1", machine)
+        assert steps.border() == rgb(CPC_HARDWARE_PALETTE[3]), machine
+        steps.go(1)
+        assert steps.border() == rgb(CPC_HARDWARE_PALETTE[6]), machine
+    steps = Steps(ddb, "1", "cga")
+    steps.go(1)
+    assert steps.border() == rgb(steps.device.palette[0])
+    assert border_colour(steps.device) == steps.border()
+
+
+def test_the_window_paints_the_border_round_the_picture(monkeypatch, tmp_path):
+    os.environ["SDL_VIDEODRIVER"] = "dummy"
+    import pygame
+
+    from regac import viewer
+    from regac.devices import SPECTRUM_PALETTE, rgb
+
+    source = tmp_path / "b.gac"
+    source.write_text("/GFX\n#1\n  BORDER 2\n  PLOT 5 60\n", encoding="utf-8")
+    screens = []
+    flip = pygame.display.flip
+
+    def kept():
+        flip()
+        screens.append(pygame.display.get_surface().copy())
+
+    monkeypatch.setattr(pygame.display, "flip", kept)
+    key = lambda name: pygame.event.Event(pygame.KEYDOWN, key=name, mod=0)  # noqa: E731
+    handed = iter([[], [key(pygame.K_HOME)], [key(pygame.K_q)]])
+    monkeypatch.setattr(pygame.event, "get", lambda: next(handed))
+    viewer.run(str(source), 1, "spectrum", scale=2)
+    whole, start = screens[0], screens[-1]
+    corner, inside = (3, 3), (viewer.EDGE * 2 + 3, viewer.EDGE * 2 + 3)
+    assert tuple(whole.get_at(corner))[:3] == rgb(SPECTRUM_PALETTE[2])
+    assert tuple(start.get_at(corner))[:3] == rgb(SPECTRUM_PALETTE[0])
+    assert tuple(whole.get_at(inside))[:3] == rgb(SPECTRUM_PALETTE[7])

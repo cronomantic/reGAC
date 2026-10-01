@@ -103,7 +103,8 @@ def test_the_window_lays_it_over_the_picture(tmp_path, monkeypatch):
     viewer.run(EXAMPLE, 1, "spectrum", scale=3, trace=image)
 
     shown, hidden, again, more = screens[-4:]
-    middle, side = (384, 300), (20, 300)
+    edge = viewer.EDGE * 3              # the border round the picture
+    middle, side = (edge + 384, edge + 300), (edge + 20, edge + 300)
     assert hidden.get_at(side) == shown.get_at(side), "the sides were touched"
     a, b, c = shown.get_at(middle), hidden.get_at(middle), more.get_at(middle)
     assert again.get_at(middle) == a
