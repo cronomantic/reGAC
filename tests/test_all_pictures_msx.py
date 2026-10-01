@@ -69,12 +69,10 @@ LISTING = os.path.join(MSX, "picture.lst")
 MSX_HZ = 3_579_545              # what a machine of this kind really runs at
 LIMIT_SECONDS = 5.0             # the same a player will wait for anywhere
 
-# The one picture that is over it, and by how much, so that the number is a
-# fact and not a memory: 6.1 seconds here against 4.7 on a Spectrum.  It is
-# the picture itself that is heavy, not the machine -- it is also the worst
-# of its adventure on a Spectrum, by four times over the next one.  Where
-# those seconds go is not known: see doc/pendiente.md.
-KNOWN_SLOW = {("Bangkok2", 28): 6.5}
+# All 196 under it.  Bangkok2 28 used to be let off up to 6.5 seconds, at
+# 6.1, until the border was found to be where they went (doc/pendiente.md):
+# it draws in 4.45 now, and a let-off it no longer needs would hide it
+# growing past the limit.
 CODE_AT = 0x8000
 VRAM = 24                       # the emulator's name for the video chip's memory
 
@@ -146,8 +144,7 @@ def test_every_picture_matches_and_stays_quick():
         for number, _, seconds in drawn:
             if seconds is None:
                 continue
-            allowed = KNOWN_SLOW.get((name, number), LIMIT_SECONDS)
-            if seconds > allowed:
+            if seconds > LIMIT_SECONDS:
                 slow.append(f"{name} {number} at {seconds:.1f}s")
         print(f"{name:12} {sum(1 for _, m, _ in drawn if m == 0):3}/{len(drawn):3}"
               f" identicas, la mas lenta {slowest:.1f}s")

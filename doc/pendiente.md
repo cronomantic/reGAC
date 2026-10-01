@@ -550,9 +550,11 @@ mismos hasta la décima que antes del cambio, lo cual es de paso la prueba de
 que lo que bajó a Bangkok2 fue el borde y no otra cosa.
 
 La prueba lenta `tests/test_all_pictures_msx.py` guarda el tope de 5 segundos
-para las 196 y lleva esa única lámina apuntada con nombre y con su número en
-`KNOWN_SLOW`, de modo que si crece se entera, y si crece otra distinta,
-también.
+para las 196. ~~Y lleva esa única lámina apuntada con nombre y con su número
+en `KNOWN_SLOW`, de modo que si crece se entera.~~ **Ya no**: el permiso era
+de 6,5 s y se quedó puesto después de que la lámina bajara a 4,45, de modo que
+podía crecer casi dos segundos, pasar del tope y la prueba no lo diría. Se ha
+quitado, y Bangkok2 #28 pasa por el mismo tope que las otras 195.
 
 ### Los dos Amstrad, que son dos máquinas
 
@@ -734,6 +736,10 @@ bytes** hasta el escalón, y el día que se crucen, las ocho pierden 256 de golp
 y megacorp2 se sale. Eso es justo lo que pasó a mitad de esta tanda: con una
 tabla de separadores metida a capón el intérprete pasó de `$6000`, la base de
 datos se fue a `$6100` y `regac make` dejó de construir esta máquina.
+
+**Ya no hay escalón**: el `ALIGN 256` de la base de datos se quitó, porque
+nada lo necesitaba, y desde entonces cada byte del intérprete cuesta un byte y
+no 256 de golpe. Ver «El 464 sigue sin sitio», en «`TEXT` y `PICT`».
 
 ### El Quijote en un 464, con el mapa del revés
 
@@ -1544,8 +1550,9 @@ Spectrum en un Next, y con el `screen.asm` de antes falla la mitad de la
 ventana.
 
 Queda debajo de la máscara: 218 bytes libres sin música y **158 con música y
-efectos**, que es el caso más justo. Los tres kilobytes de encima de `$B200`
-siguen sin usar, para cuando haga falta.
+efectos**, que es el caso más justo. ~~Los tres kilobytes de encima de
+`$B200` siguen sin usar, para cuando haga falta.~~ **Ya se usan**:
+`picture.asm` vive en `$B200`, ver «Lo que costó, y de dónde salió el sitio».
 
 Se ve en la presentación de MegaCorp, que es lo que lo motivó: antes se perdía
 desplazada en ocho renglones y ahora sale letra por letra como la del
@@ -1576,9 +1583,11 @@ original. La prueba es [`test_textmode_z80.py`](../tests/test_textmode_z80.py).
   tendría que vivir arriba, porque el firmware tapa la ROM baja mientras
   dura—.
 
-- **El Amstrad va justo, y hay un escalón.** Está medido, aventura por
+- ~~**El Amstrad va justo, y hay un escalón.** Está medido, aventura por
   aventura, antes y después de meter los marcadores, con un árbol aparte en el
-  commit anterior para poder comparar.
+  commit anterior para poder comparar.~~ **El escalón ya no está**: era el
+  `ALIGN 256` de la base de datos, que se quitó, como cuenta el punto de
+  arriba; ver también la tabla de «`TEXT` y `PICT`».
 
 ### La pared del Next, que era la máscara
 
@@ -4398,8 +4407,10 @@ referencia.
   `runGAC.py`. La solución del faro está en `ejemplo/solucion.txt`.
 - **`editors/vscode/`**: la extensión de VS Code, con la gramática hecha por
   `grammar.py` a partir de `regac/opcodes.py`; `test_editor.py` dice cuándo la
-  del repositorio no se volvió a hacer. **No se ha visto en un VS Code**: lo
-  probado es que cada patrón compila y reconoce lo que debe.
+  del repositorio no se volvió a hacer. ~~**No se ha visto en un VS Code**: lo
+  probado es que cada patrón compila y reconoce lo que debe.~~ **Ya se ha
+  visto**, en VS Code 1.139 con el usuario: ver «El resaltador, probado en VS
+  Code 1.139», en «La herramienta, en su release y en dos idiomas».
 
 **Lo que encontraron al estrenarse**, que ya estaba:
 
