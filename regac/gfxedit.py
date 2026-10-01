@@ -131,15 +131,16 @@ class Picture:
                 return line[:len(line) - len(line.lstrip())]
         return "  "
 
-    def inserted(self, index, text):
-        """The source with a line put in so that it is order number `index`
-        of the picture, counted from nought: after the order before it, or
-        straight after the header."""
+    def inserted(self, index, *texts):
+        """The source with lines put in so that the first is order number
+        `index` of the picture, counted from nought: after the order before
+        it, or straight after the header.  The rest follow it."""
         after = self.orders[index - 1] if index > 0 else self.head
         near = self.orders[index - 1] if index > 0 else (
             self.orders[0] if self.orders else None)
         lines = list(self.lines)
-        lines.insert(after, self.indent(near) + text.strip())
+        indent = self.indent(near)
+        lines[after:after] = [indent + text.strip() for text in texts]
         return self.newline.join(lines)
 
     def deleted(self, index):

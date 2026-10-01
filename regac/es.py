@@ -176,6 +176,8 @@ SAID = {
     "12.png":
         "una imagen sobre la que calcar, o una carpeta con una para cada "
         "lámina, llamada 12.png",
+    "an SVG whose outlines go into the picture, at the end of it":
+        "un SVG cuyos contornos entran en la lámina, al final de ella",
     "play a file of orders, and say whether the game ended":
         "juega un fichero de órdenes, y dice si el juego acabó",
     "a file of orders, one a line": "un fichero de órdenes, una por línea",
@@ -779,6 +781,23 @@ SAID = {
         "calco: nada para #{picture} en {where}",
     "trace: {image} at {percent}%  (t hides it, +/- more or less of it)":
         "calco: {image} al {percent}%  (t lo oculta, +/- más o menos)",
+    "there is nothing in {file} to draw": "en {file} no hay nada que dibujar",
+    "imported: {count} orders from {file}  (ctrl-z takes them out)":
+        "importado: {count} órdenes de {file}  (ctrl-z las quita)",
+    # -- regac draw --import, regac/svgin.py --------------------------------
+    "left out, as it is not lines: {what}":
+        "se queda fuera, porque no son líneas: {what}",
+    "left out, as it does not read: a {what} with {where}":
+        "se queda fuera, porque no se entiende: un {what} con {where}",
+    "left out: a use of {what}, which is not there":
+        "se queda fuera: un use de {what}, que no está",
+    "lines cut at the edge of the picture, as they reached past it: {count}":
+        "líneas cortadas en el borde de la lámina, porque pasaban de él: "
+        "{count}",
+    "{what} (x{count})": "{what} (x{count})",
+    "{file} does not read as an SVG: {error}":
+        "{file} no se lee como SVG: {error}",
+    "{file} is not an SVG": "{file} no es un SVG",
     "#{picture} on {machine}    order {count} of {orders}":
         "#{picture} en {machine}    orden {count} de {orders}",
     "last: {order}": "última: {order}",

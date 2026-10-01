@@ -454,6 +454,28 @@ another. The image is made as big as it fits **without being put out of
 shape**, and centred. `t` hides it and shows it, and `+` and `-` let more or
 less of it be seen.
 
+To **bring in a drawing made in another program**, an SVG -- Inkscape's, for
+instance:
+
+    python -m regac draw faro.gac 1 --import house.svg
+
+Its outlines go into the source **at the end of the picture**, all at once,
+and a single Ctrl+Z takes them out. It is laid over the picture as a
+`--trace` image is, as big as it fits without being put out of shape and
+centred, so an SVG 256 by 128 falls pixel for pixel, and one traced over the
+same sketch falls on top of it. What comes in:
+
+- **The outlines, and only those.** Fills are put in afterwards in the
+  window, where the seed can be seen and whether it leaks; the SVG's colours
+  are not looked at, because each machine has its own palette.
+- A rectangle and an ellipse **not turned** that fit are a `RECT` and an
+  `ELLIPSE`. The rest are straight lines: **a curve** -- a Bézier, an arc, a
+  turned ellipse -- **is cut into straight lines** that stray from it no more
+  than half a pixel.
+- What reaches past the picture **is cut at its edge**.
+- Text and images are left out. What does not come in is said on the
+  terminal before the window opens.
+
 While drawing, the window **warns**:
 
 - of a fill that **gets out** through a gap or a passage one pixel high, which

@@ -4474,7 +4474,7 @@ el controlador de vídeo `dummy` de SDL.
 Lo que quedaba propuesto de la herramienta: ~~el calco sobre una imagen de
 fondo~~ (hecho: ver abajo), ~~los avisos mientras se dibuja --fugas de un
 relleno, bytes, tiempo contra el tope de 4-5 s--~~ (hechos: ver abajo) e
-importar SVG.
+~~importar SVG~~ (hecho: ver «Importar SVG», abajo).
 
 ### El calco
 
@@ -4525,6 +4525,55 @@ la pared se escapa y dice por dónde, sin el agujero no dice nada, una semilla
 en la pared no rellena, una pared inclinada no es un rayo, el faro no dice nada
 más que sus bytes, `n` lleva al relleno, y la primera lámina del faro medida
 en el Spectrum de verdad, dentro del tope.
+
+### Importar SVG
+
+`regac draw fuente.gac 12 --import casa.svg`. **Decidido por el usuario**,
+las cuatro cosas:
+
+- **Es una opción de `regac draw`**, no una orden aparte. Lo importado va
+  detrás del cursor como cualquier orden nueva --al abrir, el cursor está al
+  final de la lámina--, todo en **una sola escritura**, que un Ctrl+Z quita
+  entera. Para eso `Picture.inserted` y `Viewer.add` toman varias líneas.
+- **Las curvas se parten en rectas.** GAC tiene rectas, rectángulos y
+  elipses; una curva de Bézier, un arco o una elipse girada se cortan en
+  trozos que no se apartan de ella más de **medio píxel de la lámina**,
+  partiéndola por la mitad hasta que los dos tiradores caen así de cerca de
+  la cuerda. Un rectángulo o una elipse **sin girar** que caben van como
+  `RECT` y `ELLIPSE`, que es lo que usaba el arte de 1986 y cuesta menos.
+- **Sólo contornos.** Una semilla calculada sola acierta mal cuando unas
+  formas tapan a otras, y en el editor ya se ve la semilla y si se escapa.
+  Un rectángulo relleno y sin trazo entra como su contorno.
+- **Los colores no se miran**: cada máquina tiene su paleta, y un color de
+  SVG no dice cuál.
+
+Y una más, que no se preguntó porque ya estaba decidida para `--trace`: se
+encaja **sin deformarse, tan grande como quepa, y centrado**, así que un SVG
+y un calco con las mismas proporciones caen uno encima del otro. Lo que se
+encaja es el `viewBox`; sin él, el ancho y el alto, y sin ellos, lo dibujado.
+
+Lo que se sale de la lámina **se corta en el borde** con la geometría, y no
+se deja al intérprete, que lleva un punto de fuera al borde y convierte una
+recta que sale en otra recta distinta. Y un punto en el borde lejano del
+dibujo va al último píxel de dentro: sin eso, un rectángulo alrededor de un
+dibujo cuadrado salía un píxel más ancho por la derecha.
+
+Entra `line`, `polyline`, `polygon`, `rect` --con esquinas redondeadas--,
+`circle`, `ellipse` y `path` entero --relativos, `S` y `T`, arcos con las
+banderas pegadas--, con los `transform` de los grupos, y `use`, también de un
+`symbol`. Lo oculto no se dibuja ni se dice. El texto, las imágenes y lo que
+no se entiende --un ancho en milímetros dentro de un dibujo-- se dicen en la
+terminal antes de abrir la ventana, y una recta que dos formas comparten se
+escribe una vez.
+
+En `regac/svgin.py`, sin ventana. Pruebas en `tests/test_svgin.py`: el
+encaje, cada forma, que los trozos de una curva quedan a menos de un píxel de
+ella, hacia dónde va un arco según sus banderas, el recorte, un `d` escrito
+apretado contra el mismo suelto, los `use`, lo que se queda fuera, y en el
+fuente: dónde entra, que un Ctrl+Z lo quita todo, y la ventana abierta con
+él. Visto en una captura: una casa dibujada como en Inkscape --milímetros,
+una capa trasladada, un rectángulo relleno sin trazo-- entra entera.
+**Sin probar con un dibujo de verdad** hecho por alguien en Inkscape.
 
 ## Las elipses del faro, y lo que `gac.md` decía de ellas
 

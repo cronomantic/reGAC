@@ -452,6 +452,27 @@ el número de la lámina (`12.png`, `12.jpg`), que cambia sola al pasar de
 lámina. La imagen se hace tan grande como quepa **sin deformarse**, y se
 centra. `t` la esconde y la enseña, y `+` y `-` dejan ver más o menos de ella.
 
+Para **traer un dibujo hecho en otro programa**, un SVG —el de Inkscape, por
+ejemplo—:
+
+    python -m regac draw faro.gac 1 --import casa.svg
+
+Sus contornos entran en el fuente **al final de la lámina**, todos de una vez,
+y un solo Ctrl+Z los quita. Se encaja como una imagen de `--trace`, tan grande
+como quepa sin deformarse y centrado, así que un SVG de 256 por 128 cae píxel
+a píxel, y uno calcado sobre el mismo boceto cae encima de él. Lo que entra:
+
+- **Los contornos, y sólo ellos.** Los rellenos se ponen después en la
+  ventana, donde se ve la semilla y si se escapa; los colores del SVG no se
+  miran, porque cada máquina tiene su paleta.
+- Un rectángulo y una elipse **sin girar** que caben son un `RECT` y un
+  `ELLIPSE`. Lo demás son rectas: **una curva** —de Bézier, un arco, una
+  elipse girada— **se parte en rectas** que no se apartan de ella más de
+  medio píxel.
+- Lo que se sale de la lámina **se corta en su borde**.
+- El texto y las imágenes se quedan fuera. Lo que no entra se dice en la
+  terminal antes de abrir la ventana.
+
 Mientras se dibuja, la ventana **avisa**:
 
 - de un relleno que **se escapa** por un hueco o un pasillo de un píxel de

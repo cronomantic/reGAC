@@ -221,6 +221,7 @@ class Viewer:
         self.dragging = None            # (step, which point) being dragged
         self.snap = False               # points to the corners of cells
         self.taken_back = []            # (before, after) of every edit
+        self.imported = None            # what --import brought in, said
         self.said = None                # the cautions, worked out once a picture
         self.measuring = None           # (picture, machine) being timed
         self.measured = None            # (picture, machine, seconds or why, stamp)
@@ -366,11 +367,30 @@ class Viewer:
         self.reload()
         return self.error is None
 
-    def add(self, text):
-        """An order, as it is written, after the one at the cursor."""
+    def add(self, *texts):
+        """Orders, as they are written, after the one at the cursor: one edit
+        however many they are, which ctrl-z takes back whole."""
         at = self.at_cursor()
-        if self.write(lambda p: p.inserted(at, text)):
-            self.cursor_to(at + 1)
+        if self.write(lambda p: p.inserted(at, *texts)):
+            self.cursor_to(at + len(texts))
+            return True
+        return False
+
+    def import_svg(self, path):
+        """The outlines of an SVG, after the order at the cursor; see
+        regac/svgin.py.  Gives back what was left out of it, a sentence
+        each."""
+        from .gfxedit import written
+        from .svgin import imported
+
+        orders, left_out = imported(path)
+        name = os.path.basename(path)
+        if not orders:
+            self.error = _("there is nothing in {file} to draw", file=name)
+        elif self.add(*(written(order) for order in orders)):
+            self.imported = _("imported: {count} orders from {file}  (ctrl-z "
+                              "takes them out)", count=len(orders), file=name)
+        return left_out
 
     def delete(self):
         """Take out the order at the cursor, if it is the picture's own."""
@@ -408,6 +428,7 @@ class Viewer:
             return
         with open(self.path, "w", encoding="utf-8", newline="") as f:
             f.write(before)
+        self.imported = None            # whatever it said may be gone
         count = self.steps.count
         self.reload()
         self.steps.go(count)
@@ -634,11 +655,16 @@ TIME_OK = (120, 220, 120)
 HANDLE = (0, 200, 255)
 
 
-def run(path, picture=None, machine=None, scale=3, trace=None):
-    """The window, until it is closed."""
+def run(path, picture=None, machine=None, scale=3, trace=None, svg=None):
+    """The window, until it is closed.  With `svg`, its outlines go into the
+    picture first."""
     import pygame
 
     viewer = Viewer(path, picture, machine, trace)
+    if svg:
+        for text in viewer.import_svg(svg):
+            print(text)
+        print(viewer.imported or viewer.error)
     pygame.init()
     pygame.key.set_repeat(300, 40)
     width, height = SOURCE_WIDTH * scale, SOURCE_ROWS * scale
@@ -810,7 +836,9 @@ def run(path, picture=None, machine=None, scale=3, trace=None):
                  + (_("  (snapping to cells)") if viewer.snap else ""))
         screen.blit(font.render(doing, True, RUBBER), (6, y))
         y += line
-        screen.blit(font.render(viewer.trace_said(), True, HANDLE), (6, y))
+        notes = "  |  ".join(text for text in (viewer.trace_said(),
+                                                viewer.imported) if text)
+        screen.blit(font.render(notes, True, HANDLE), (6, y))
         y += line
         # the cautions: how many, and the one about the order at the cursor
         said = viewer.cautions()

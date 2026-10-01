@@ -178,7 +178,8 @@ def cmd_draw(args):
                    "of {machines}", machine=args.machine,
                    machines=", ".join(SPECTRUM_MACHINES)))
     try:
-        run(args.input, args.picture, args.machine, args.scale, args.trace)
+        run(args.input, args.picture, args.machine, args.scale, args.trace,
+            args.svg)
     except ValueError as e:
         sys.exit(_("ERROR: {what}", what=e))
 
@@ -877,6 +878,9 @@ def main():
     p.add_argument("-s", "--scale", type=int, default=3, help=_("pixel scale"))
     p.add_argument("--trace", help=_("an image to draw over, or a folder with "
                                      "one to each picture, named 12.png"))
+    p.add_argument("--import", dest="svg", metavar="SVG",
+                   help=_("an SVG whose outlines go into the picture, at the "
+                          "end of it"))
     p.set_defaults(func=cmd_draw)
 
     p = sub.add_parser("play", help=_("play a file of orders, and say whether "

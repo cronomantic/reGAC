@@ -80,7 +80,7 @@ made: what was measured, in what order and why.
 | `regac lint game.gac` | what is there and nothing uses |
 | `regac map game.gac map.svg` | the map of the rooms |
 | `regac play game.gac solution.txt` | plays a file of orders and says whether the game ended |
-| `regac draw game.gac 12 -m cpc` | a picture in a window: looked at, drawn on, traced, timed |
+| `regac draw game.gac 12 -m cpc` | a picture in a window: looked at, drawn on, traced, timed, an SVG brought in |
 | `regac render game.json pictures/` | the pictures as PNG |
 | `regac text game.gac` | what the text takes, packed |
 | `regac make game.toml --zip game.zip` | every machine a project names |
