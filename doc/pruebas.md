@@ -340,6 +340,21 @@ reglas no servía para nada y que la otra valía para los dos casos.
 > antes de mover un umbral, mídelo cuatro veces. Si lo que se mueve es la
 > medida y no el código, el umbral no es el problema.
 
+**Y la tercera vez, la regla tampoco estaba quieta.** Los tramos distintos
+siguieron cayendo de vez en cuando --36 contra 29, 1,24 veces la nota--, y
+medidos seis veces a solas y seis con otros tres emuladores al lado se vio
+por qué: la nota medía **de 19 a 29**, y con carga una vuelta del Next dio
+1,15. Lo que se movía no era la onda, sino los tramos largos: los silencios
+entre una vez del efecto y la siguiente y las paradas del emulador, cuya
+longitud es el ritmo del emulador --156, 158, 160... 312, 468--, distinta en
+cada vuelta. La onda de una nota son tramos de menos de diez muestras, y el
+silencio más corto, 144. Contando sólo los de menos de 64 la nota mide de 8 a
+10 siempre, el ruido nunca baja de 2,67 veces eso y los dos juntos de 1,9.
+
+> lo que se mide tiene que ser **sólo** lo que se quiere medir. Una cuenta
+> que mezcla la señal con el ritmo del emulador hereda la dispersión del
+> ritmo, y con carga el ritmo es lo que más se mueve.
+
 ## Si una vuelta se corta a medias
 
 Un emulador huérfano se queda con el puerto, y la vuelta siguiente falla en

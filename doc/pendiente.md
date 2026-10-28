@@ -5530,3 +5530,30 @@ Medido con el faro, antes y después, en las nueve:
 Pruebas: `test_conditions_z80` cuenta los bytes de la partida sin el de la
 música, `test_save_pc` espera 742, y el lector rechaza una versión 1.
 
+## La prueba del ruido del AY, que caía de vez en cuando
+
+`test_a_noise_is_a_hiss_and_not_a_note` caía en una puerta de cada pocas,
+en una máquina distinta cada vez, y a solas pasaba. **Medido antes de tocar
+nada**, como pide `pruebas.md`: seis vueltas por máquina de la nota, el ruido
+y los dos juntos, a solas y con otros tres emuladores trabajando, guardando
+cada grabación para calcular varias medidas sobre las mismas.
+
+Contaba las longitudes de tramo distintas de toda la grabación, y la nota,
+que es la referencia, medía **de 19 a 29**. A solas una vuelta del Next se
+quedó en 1,29 veces la nota, por debajo del 1,3 que pedía; con carga, en
+1,15. La onda era siempre la misma, de 1 a 9 muestras; lo que cambiaba eran
+los tramos largos --los silencios entre una vez del efecto y la siguiente, y
+las paradas del emulador--, de 144 muestras para arriba y con una longitud
+que es el ritmo del emulador y no el del chip.
+
+Ahora cuenta sólo los tramos de menos de 64 (`SHORT`, `runs_of_the_wave`).
+En las 36 grabaciones la nota mide de 8 a 10, el ruido nunca menos de 2,67
+veces eso y los dos juntos nunca menos de 1,9; con el byte sin llegar al chip
+las tres medirían como la nota, a lo sumo 1,25. El umbral pasa de 1,3 a
+**1,5**, entre lo uno y lo otro. Probada después tres veces a solas y dos con
+carga, en las tres máquinas: todas pasan.
+
+Contar sólo las longitudes que aparecen tres veces o más deja la nota más
+quieta todavía, de 7 a 9, pero junta los dos juntos con ella --el peor
+margen baja a 1,75--, así que no se hizo.
+

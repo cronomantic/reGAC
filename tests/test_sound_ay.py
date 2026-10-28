@@ -69,6 +69,10 @@ NOT_AN_EFFECT = 99
 # The three of them, and what the emulator calls each one.
 # What a noise may come out of, as the fourth byte of its four says it.
 TONE, NOISE, BOTH = 0, 1, 2
+# What tells the wave of a noise from the stretches between one go of it and
+# the next, in samples of the recording: a note's runs are under ten, and the
+# shortest stretch of nothing measured is 144.  See runs_of_the_wave.
+SHORT = 64
 
 MACHINES = [
     ("spectrum", "128k"),
@@ -156,6 +160,19 @@ def runs(heard):
     return lengths
 
 
+def runs_of_the_wave(heard):
+    """The different lengths of run a recording has, of the ones short enough
+    to be the noise itself.
+
+    The long ones are the stretches between one go of the effect and the
+    next, and where the emulator stopped for a moment.  How long each comes
+    out is the emulator's timing and not the chip's -- 156, 158, 160... 312,
+    468, a different handful every time -- so counting them made a plain note
+    measure anything from 19 to 29, and the test failed whenever the note
+    measured high.  Without them a note is 8 to 10, always."""
+    return len({length for length in runs(heard) if length < SHORT})
+
+
 if pytest is not None:
     every_machine = pytest.mark.parametrize("folder,machine", MACHINES,
                                             ids=[f for f, _ in MACHINES])
@@ -222,31 +239,31 @@ def test_a_noise_is_a_hiss_and_not_a_note(folder, machine, tmp_path):
 
     The same effect is played three ways, with only that byte changed in the
     machine, so nothing else can account for a difference.  What separates
-    them is **how many different run lengths** the recording has: a note is a
+    them is **how many different run lengths** the wave has: a note is a
     square wave, the same handful of lengths over and over, and a hiss is a
     scatter.  Counting the values instead says nothing at all -- both come
     out of the same four bit volume, and both measure four or five.
 
-    **Both are asked by the same measure, and it took two failures to get
-    here.** Run lengths are steady; counting how often the value changes is
-    not.  Four goes at the same build on the same machine:
+    **It took three failures to get here.**  The first two were counting how
+    often the value changes, which swings by two thirds for a hiss and
+    overlaps the note.  The third was counting every run length, the long
+    ones too: those are the gaps between one go and the next, and their
+    lengths are the emulator's timing, so the note itself measured from 19 to
+    29 and the test fell whenever it measured high -- at 1.15 times the note,
+    with three other emulators running.  Only the runs of the wave count now,
+    the ones under SHORT.  Six goes of each, alone and with three emulators
+    beside it:
 
-        tramos distintos   cambios de valor
-        tono    18 - 21     7243 - 9236
-        ruido   38 - 45     7373 - 12337
-        ambos   31 - 44    11351 - 14088
+                 note      noise     both
+        Spectrum 8 - 10    24 - 34   19 - 23
+        MSX      8         28 - 32   19 - 29
+        Next     8 - 9     28 - 34   18 - 24
 
-    The change count of a hiss swings by two thirds and overlaps the note's,
-    so an assertion built on it fails the day the hiss measures high -- which
-    is exactly what happened, at 9934.  The run lengths never come close to
-    overlapping: everything that is not a plain note is at least half again
-    as scattered, and with the engine deaf to the fourth byte all three
-    measure like the note, around twenty.
-
-    Asked as a ratio against the note measured in the same run, because what
-    varies between runs is how much machine time two seconds of ours buys.
-    The thinnest margin seen is `both` at 1.48 times the note, against the
-    1.3 asked for below; `noise` has never come in under 2.1.
+    Asked as a ratio against the note measured in the same run.  The
+    thinnest margin seen is `both` at 1.9 times the note, and `noise` has
+    never come in under 2.67; with the engine deaf to the fourth byte all
+    three would measure like the note, at most 10 against 8, 1.25.  So 1.5,
+    between the two.
 
     Forcing the pitch to stand still does not sharpen any of this, and it was
     tried: the spread is the recording being resampled, not the note
@@ -259,14 +276,14 @@ def test_a_noise_is_a_hiss_and_not_a_note(folder, machine, tmp_path):
         heard, went_round = played(1, where, blob, machine, sound,
                                    out_of=out_of)
         assert went_round, f"it never came back from playing {name}"
-        told[name] = (len(set(runs(heard))), len(runs(heard)))
+        told[name] = runs_of_the_wave(heard)
 
-    lengths = {name: how[0] for name, how in told.items()}
     for name in ("noise", "both"):
-        assert lengths[name] > 1.3 * lengths["tone"], (
-            f"{name} came out shaped like a note: {lengths[name]} different "
-            f"run lengths against {lengths['tone']} for the note itself, and "
-            f"anything the noise generator touches is half again as scattered"
+        assert told[name] > 1.5 * told["tone"], (
+            f"{name} came out shaped like a note: {told[name]} different "
+            f"run lengths in its wave against {told['tone']} for the note "
+            f"itself, and anything the noise generator touches is nearly "
+            f"twice as scattered"
         )
 
 
