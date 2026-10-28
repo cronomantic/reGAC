@@ -288,6 +288,9 @@ class Session:
         # machine and both come out wrong.  Three separate hunts have started
         # here, so it is checked before anything is launched.
         self.process = self.socket = None
+        # The keys the emulator has been told are down and not yet up: see
+        # held, which has to press them again.
+        self.down = set()
         try:
             already = socket.create_connection(("127.0.0.1", port), timeout=0.5)
         except OSError:
@@ -356,6 +359,12 @@ class Session:
         return data.decode("latin-1")
 
     def command(self, text):
+        said = text.split()
+        if len(said) == 3 and said[0] == "send-keys-event":
+            if said[2] == "0":
+                self.down.discard(said[1])
+            else:
+                self.down.add(said[1])
         self.socket.sendall(text.encode("latin-1") + b"\n")
         return self.__drain()
 
@@ -485,8 +494,19 @@ class Session:
         the end of it.  Anything that sets up more than the program counter --
         a stack pointer, memory the running code might read -- goes in here
         whole: a register changed while the processor runs is changed under
-        whatever it happens to be doing."""
+        whatever it happens to be doing.
+
+        **Stopping lets go of every key**, and that is the emulator's doing:
+        going into its step mode empties the keyboard, as its debugger does,
+        so a key held down came back up and the machine saw it let go.
+        Measured on the CPC, the MSX and the PCW alike, and it is the going
+        in and not the coming out: a key sent down while the machine is
+        stopped is still down after.  So the keys that were down are sent
+        down again as soon as it stops, and a key held across a jump stays
+        held."""
         self.command("enter-cpu-step")
+        for code in sorted(self.down):
+            self.command(f"send-keys-event {code} 1")
         try:
             yield self
         finally:

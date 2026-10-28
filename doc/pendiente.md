@@ -2195,10 +2195,11 @@ pulsar, que en un emulador que va a un cuarto de velocidad —el Next— son cua
 de reloj: `Session.SAME_KEY_GAP` es medio segundo y lo usan todos los que
 teclean. Con el hueco de antes, `XYZZY` salía `XYZY` en el Next.
 
-Para medir, una cosa que no se entiende del todo y conviene saber: con una
+~~Para medir, una cosa que no se entiende del todo y conviene saber: con una
 tecla pulsada, parar la máquina un momento con `Session.held()` hace que al
 soltarla el intérprete ya no la vea pulsada. Las medidas de arriba se hicieron
-sin parar la máquina.
+sin parar la máquina.~~ **Entendido y arreglado**: ver «Parar la máquina
+soltaba las teclas», al final.
 
 ## La aventura de ejemplo, que ya está escrita
 
@@ -5556,4 +5557,39 @@ carga, en las tres máquinas: todas pasan.
 Contar sólo las longitudes que aparecen tres veces o más deja la nota más
 quieta todavía, de 7 a 9, pero junta los dos juntos con ella --el peor
 margen baja a 1,75--, así que no se hizo.
+
+## Parar la máquina soltaba las teclas
+
+El diario tenía apuntado, como cosa que no se entendía, que con una tecla
+pulsada un `Session.held()` hacía que el intérprete dejara de verla. **Era el
+emulador**, medido con el banco de teclado del CPC, del MSX y del PCW, que
+escriben en `scan_result` la tecla que ven en cada vuelta:
+
+| | lo que ve la máquina |
+|---|---|
+| `A` abajo, sin parar | `A`, todo el rato |
+| después de un `held()`, aunque esté vacío | nada |
+| `A` abajo otra vez | `A` |
+| `A` mandada abajo **con la máquina parada**, y luego seguir | `A` |
+
+O sea que **lo que suelta las teclas es entrar en el paso a paso**,
+`enter-cpu-step`, y no salir: ZEsarUX vacía el teclado al entrar, como hace al
+abrir su depurador --su changelog dice de una versión que «las acciones de un
+punto de parada ya no reinician el teclado», que es lo mismo visto desde el
+otro lado--. Las tres máquinas igual, así que no es de ningún intérprete.
+
+**El arreglo, en `tests/emulator.py`**: la sesión apunta las teclas que manda
+abajo y las que suelta, mirando sus propios `send-keys-event`, y `held()`, en
+cuanto la máquina para, vuelve a mandar abajo las que siguen pulsadas. Como
+una tecla mandada con la máquina parada sobrevive a la salida, una tecla
+mantenida a través de un salto sigue mantenida. Ninguna prueba de hoy lo
+necesitaba: las que mantienen una tecla --la que se repite, en el Spectrum y
+en el Next-- no paran la máquina mientras tanto, y las demás saltan antes de
+teclear. Pero la siguiente que lo hiciera habría perdido una tecla sin decir
+por qué.
+
+La prueba es `test_a_key_held_down_stays_down_while_the_machine_is_stopped`,
+en `test_keyboard_cpc.py`: la `A` abajo, un `held()`, y la máquina la sigue
+viendo; y cuando se suelta, se suelta. Sin el arreglo falla diciendo que la
+tecla subió al parar la máquina.
 

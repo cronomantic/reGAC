@@ -147,6 +147,33 @@ def test_it_reads_what_is_pressed():
 
 
 @needs_tools
+def test_a_key_held_down_stays_down_while_the_machine_is_stopped():
+    """Stopping the machine empties the emulator's keyboard -- its step mode
+    does, as its debugger does -- so a key held across a jump used to come
+    back up, and the machine saw it let go.  Session.held presses again what
+    was down: see tests/emulator.py.  Looked at in scan_result, which the
+    build writes on every round with the key it sees, nought for none."""
+    session, where = watching()
+    scan = emulator.label_address(LISTING, "scan_result")
+    code = emulator.Session.EVENT_KEYS.get("A", ord("a"))
+    try:
+        session.command(f"send-keys-event {code} 1")
+        time.sleep(0.3)
+        assert chr(session.read(scan, 1)[0]) == "A", "the key was never seen"
+        with session.held():
+            session.command(f"write-memory {scan} 0")   # nothing seen yet
+        time.sleep(0.3)
+        assert chr(session.read(scan, 1)[0]) == "A", (
+            "the key came up when the machine was stopped")
+        session.command(f"send-keys-event {code} 0")
+        time.sleep(0.3)
+        assert session.read(scan, 1)[0] == 0, "the key never came up"
+        assert not session.down
+    finally:
+        session.close()
+
+
+@needs_tools
 def test_every_key_of_a_word_arrives():
     """Five keys typed, five keys seen: nothing runs together and nothing is
     lost."""
